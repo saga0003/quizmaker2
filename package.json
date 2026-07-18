@@ -1,8 +1,8 @@
 {
   "name": "scholaros",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && mkdir -p dist && cp index.html styles.css data.js shell.js super.js admin-school.js student.js interactions.js dist/"
+    "build": "rm -rf dist && mkdir -p dist && cp index.html styles.css v2.css data.js shell.js super.js admin-school.js student.js interactions.js v2.js dist/"
   }
 }
