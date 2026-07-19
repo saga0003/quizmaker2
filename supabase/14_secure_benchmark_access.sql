@@ -28,7 +28,8 @@ begin
  on conflict(paper_id,paper_version) do update set title=excluded.title,opens_at=excluded.opens_at,closes_at=excluded.closes_at,updated_at=now()
  returning id into v_id;
  return v_id;
-end$$;
+end;
+$$;
 grant execute on function public.ensure_school_shared_benchmark(uuid) to authenticated;
 
 create or replace function public.set_shared_benchmark_active(p_benchmark_id uuid,p_is_active boolean)
@@ -40,7 +41,8 @@ begin
  if not public.is_school_manager(v_org) then raise exception 'School manager permission required.';end if;
  update public.shared_paper_benchmarks set is_active=p_is_active,updated_at=now() where id=p_benchmark_id;
  return p_is_active;
-end$$;
+end;
+$$;
 grant execute on function public.set_shared_benchmark_active(uuid,boolean) to authenticated;
 
 create or replace function public.list_school_shared_benchmarks(p_organization_id uuid)
