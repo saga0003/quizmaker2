@@ -35,31 +35,18 @@ create table if not exists public.benchmark_attempt_facts (
   unique (benchmark_id, attempt_key)
 );
 
-create index if not exists benchmark_attempt_facts_benchmark_valid_idx
-  on public.benchmark_attempt_facts(benchmark_id, is_valid, submitted_at);
-create index if not exists benchmark_attempt_facts_school_idx
-  on public.benchmark_attempt_facts(benchmark_id, organization_id);
-
+create index if not exists benchmark_attempt_facts_benchmark_valid_idx on public.benchmark_attempt_facts(benchmark_id,is_valid,submitted_at);
+create index if not exists benchmark_attempt_facts_school_idx on public.benchmark_attempt_facts(benchmark_id,organization_id);
 alter table public.shared_paper_benchmarks enable row level security;
 alter table public.benchmark_attempt_facts enable row level security;
 
--- Active metadata may be discovered, but it contains no school result or student evidence.
 drop policy if exists "active benchmark metadata is readable" on public.shared_paper_benchmarks;
-create policy "active benchmark metadata is readable"
-  on public.shared_paper_benchmarks for select
-  using (
-    is_active = true
-    and (opens_at is null or opens_at <= now())
-    and (closes_at is null or closes_at >= now())
-  );
+create policy "active benchmark metadata is readable" on public.shared_paper_benchmarks for select using(is_active=true and(opens_at is null or opens_at<=now())and(closes_at is null or closes_at>=now()));
 
--- Attempt facts intentionally have no select policy for public or ordinary authenticated clients.
+-- There is intentionally no client insert/select/update/delete policy on attempt facts.
+-- Migration 15 records a fact only after verifying an authenticated completed exam attempt.
 drop policy if exists "students may insert own benchmark facts" on public.benchmark_attempt_facts;
-create policy "students may insert own benchmark facts"
-  on public.benchmark_attempt_facts for insert to authenticated
-  with check (student_id = auth.uid());
+revoke select,insert,update,delete,truncate,references,trigger on public.benchmark_attempt_facts from anon,authenticated;
 
-comment on table public.shared_paper_benchmarks is
-  'Shareable exact paper versions. Never publish a school leaderboard from this table.';
-comment on table public.benchmark_attempt_facts is
-  'Private attempt facts used only for aggregate benchmark calculations.';
+comment on table public.shared_paper_benchmarks is 'Shareable exact paper versions. Never publish a school leaderboard from this table.';
+comment on table public.benchmark_attempt_facts is 'Private, server-derived completed-attempt facts used only for aggregate benchmark calculations.';
