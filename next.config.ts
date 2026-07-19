@@ -1,24 +1,19 @@
 import type { NextConfig } from "next";
 
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+];
+
 const nextConfig: NextConfig = {
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // 禁用 Next.js 热重载，由 nodemon 处理重编译
-  reactStrictMode: false,
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // 禁用 webpack 的热模块替换
-      config.watchOptions = {
-        ignored: ['**/*'], // 忽略所有文件变化
-      };
-    }
-    return config;
-  },
-  eslint: {
-    // 构建时忽略ESLint错误
-    ignoreDuringBuilds: true,
+  trailingSlash: true,
+  images: { unoptimized: true },
+  experimental: { cpus: 2 },
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
   },
 };
 
