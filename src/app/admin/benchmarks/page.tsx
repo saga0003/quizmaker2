@@ -1,5 +1,5 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
-import { BenchmarkGovernance } from "@/components/benchmarks/BenchmarkGovernance";
+import { AdminBenchmarkRouter } from "@/components/benchmarks/BenchmarkWorkspaceRouter";
 
-export default function Page(){return <ProtectedPage allowed="admin"><DashboardShell kind="admin"><BenchmarkGovernance/></DashboardShell></ProtectedPage>}
+export default function Page(){return <ProtectedPage allowed="admin"><DashboardShell kind="admin"><AdminBenchmarkRouter/></DashboardShell></ProtectedPage>}
