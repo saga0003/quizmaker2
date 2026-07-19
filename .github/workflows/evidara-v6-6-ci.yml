@@ -1,0 +1,37 @@
+name: Evidara V6.6 CI
+
+on:
+  push:
+    branches:
+      - evidara-v6-6-cloud-benchmarks
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify benchmark schema targets
+        run: |
+          grep -q "public.question_papers" supabase/11_shared_benchmarks.sql
+          grep -q "public.exam_attempts" supabase/11_shared_benchmarks.sql
+          ! grep -q "public.assessments" supabase/11_shared_benchmarks.sql
+          ! grep -q "public.attempts" supabase/11_shared_benchmarks.sql
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
