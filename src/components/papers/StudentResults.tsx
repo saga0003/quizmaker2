@@ -9,10 +9,10 @@ import { MetricLabel } from "@/components/ui/MetricInfo";
 import { metricDefinitions } from "@/lib/evidaraMetrics";
 
 const demoRows:AttemptResult[]=[
- {attempt_id:"a1",paper_title:"NEET Full Syllabus Mock 01",status:"evaluated",started_at:"2026-07-14T09:00:00Z",score:604,maximum_marks:720,percentage:83.9,correct_count:151,incorrect_count:25,unanswered_count:4} as AttemptResult,
- {attempt_id:"a2",paper_title:"Physics Unit Test 04",status:"evaluated",started_at:"2026-06-27T09:00:00Z",score:78,maximum_marks:100,percentage:78,correct_count:32,incorrect_count:6,unanswered_count:2} as AttemptResult,
- {attempt_id:"a3",paper_title:"Chemistry Concept Check",status:"evaluated",started_at:"2026-06-11T09:00:00Z",score:71,maximum_marks:100,percentage:71,correct_count:29,incorrect_count:8,unanswered_count:3} as AttemptResult,
- {attempt_id:"a4",paper_title:"Foundation Diagnostic",status:"evaluated",started_at:"2026-05-12T09:00:00Z",score:58,maximum_marks:100,percentage:58,correct_count:24,incorrect_count:12,unanswered_count:4} as AttemptResult,
+ {attempt_id:"a1",paper_id:"demo-paper",paper_title:"NEET Full Syllabus Mock 01",status:"submitted",started_at:"2026-07-14T09:00:00Z",submitted_at:"2026-07-14T12:00:00Z",score:604,maximum_marks:720,percentage:83.9,correct_count:151,incorrect_count:25,unanswered_count:4,result_mode:"score_only"},
+ {attempt_id:"a2",paper_id:"demo-paper-2",paper_title:"Physics Unit Test 04",status:"submitted",started_at:"2026-06-27T09:00:00Z",submitted_at:"2026-06-27T10:00:00Z",score:78,maximum_marks:100,percentage:78,correct_count:32,incorrect_count:6,unanswered_count:2,result_mode:"score_and_answers"},
+ {attempt_id:"a3",paper_id:"demo-paper-3",paper_title:"Chemistry Concept Check",status:"submitted",started_at:"2026-06-11T09:00:00Z",submitted_at:"2026-06-11T10:00:00Z",score:71,maximum_marks:100,percentage:71,correct_count:29,incorrect_count:8,unanswered_count:3,result_mode:"score_only"},
+ {attempt_id:"a4",paper_id:"demo-paper-4",paper_title:"Foundation Diagnostic",status:"submitted",started_at:"2026-05-12T09:00:00Z",submitted_at:"2026-05-12T10:00:00Z",score:58,maximum_marks:100,percentage:58,correct_count:24,incorrect_count:12,unanswered_count:4,result_mode:"score_only"},
 ];
 
 export function StudentResults(){
@@ -24,7 +24,7 @@ export function StudentResults(){
     {key:"paper",label:"Assessment",value:row=>row.paper_title,render:row=><><strong>{row.paper_title}</strong><small>{new Date(row.started_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</small></>},
     {key:"status",label:"Status",value:row=>row.status,render:row=><span className="so-status success">{row.status}</span>,filter:{label:"statuses",value:row=>row.status}},
     {key:"score",label:"Marks",value:row=>row.score,render:row=>`${row.score}/${row.maximum_marks}`,align:"right"},
-    {key:"percentage",label:<MetricLabel {...metricDefinitions.trend}>Score %</MetricLabel>,value:row=>row.percentage,render:row=>`${Number(row.percentage).toFixed(1)}%`,align:"right"},
+    {key:"percentage",label:<MetricLabel {...metricDefinitions.score}>Score %</MetricLabel>,value:row=>row.percentage,render:row=>`${Number(row.percentage).toFixed(1)}%`,align:"right"},
     {key:"correct",label:"Correct",value:row=>row.correct_count,align:"right"},
     {key:"incorrect",label:"Incorrect",value:row=>row.incorrect_count,render:row=><span style={{color:"#9A6508",fontWeight:750}}>{row.incorrect_count}</span>,align:"right"},
     {key:"unanswered",label:"Unanswered",value:row=>row.unanswered_count,align:"right"},
