@@ -1,0 +1,21 @@
+.segment-distribution{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
+.segment-distribution>div{border:1px solid #DCE9E7;background:#F7F9F7;border-radius:12px;padding:16px;display:grid;gap:4px}
+.segment-distribution strong{font-size:26px;color:#0E5A5A}
+.segment-distribution span{font-size:13px;color:#526168;font-weight:700}
+.segment-result-card{border:1px solid #BFD7D4;background:linear-gradient(135deg,#EDF5F4,#F7F9F7);border-radius:14px;padding:18px;margin-top:14px}
+.segment-result-card>span{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#0E5A5A}
+.segment-result-card h3{font-size:25px;margin:7px 0;color:#14232B}
+.segment-result-card p{color:#46565E;line-height:1.65;margin:0 0 10px}
+.segment-result-card small{color:#6B7980}
+.segment-criteria{display:grid;gap:10px;margin-top:16px}
+.segment-criteria>div{display:flex;gap:11px;align-items:flex-start;border:1px solid #DCE9E7;border-radius:11px;padding:13px;background:#fff}
+.segment-criteria>div.passed{border-color:#A9D4C8;background:#F1F8F5}
+.segment-criteria>div.pending{border-color:#F2D08C;background:#FFF9EC}
+.segment-criteria svg{width:18px;height:18px;margin-top:2px;color:#0E5A5A;flex:0 0 auto}
+.segment-criteria .pending svg{color:#B57A0A}
+.segment-criteria div div{display:grid;gap:3px}
+.segment-criteria strong{font-size:14px;color:#14232B}
+.segment-criteria span{font-size:13px;color:#46565E}
+.segment-criteria small{font-size:12px;color:#6B7980}
+@media(max-width:720px){.segment-distribution{grid-template-columns:1fr 1fr}.segment-result-card h3{font-size:21px}}
+@media(max-width:440px){.segment-distribution{grid-template-columns:1fr}}
