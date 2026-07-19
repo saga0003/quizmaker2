@@ -1,6 +1,6 @@
 {
-  "name": "scholaros-school-platform",
-  "version": "4.0.0",
+  "name": "evidara-school-platform",
+  "version": "6.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
