@@ -1,10 +1,22 @@
-# ScholarOS — School Assessment Intelligence
+# Evidara — Evidence-Driven Student Development
 
-ScholarOS is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
+Evidara is a subscription-based school assessment and student-intelligence platform for Grades 8–12. It turns assessment evidence into clear, responsible development pathways for school leaders, teachers, students and parents.
 
-## Major integrated release
+## Version 6
 
-This release rebuilds the functionality of the supplied offline testing platform inside ScholarOS without retaining its earlier visual design. It includes:
+This release applies the Evidara brand system and adds the first cross-school evidence layer:
+
+- Anonymous shared-paper benchmarks using the exact same paper version
+- Aggregate-only comparison with a minimum privacy sample of 20 valid attempts
+- No public school leaderboard, student identity, contact details or response-sheet disclosure
+- Metric information controls explaining meaning, evidence window, usefulness and limitations
+- Transparent, temporary student segment definitions and next actions
+- Search, filtering and click-to-sort behaviour for product tables
+- Evidara badges and downloadable/printable student certificates
+- Brand-aligned colours, typography, spacing, accessibility and language
+- Versioned metric, segment, achievement and certificate database foundations
+
+Existing integrated capabilities remain available:
 
 - School and master question banks
 - Manual MCQ, multi-correct, numerical and image-based questions
@@ -19,12 +31,20 @@ This release rebuilds the functionality of the supplied offline testing platform
 - Automatic evaluation and student result history
 - Student score, percentile, speed, error, mastery and intervention analytics
 - Annual school subscriptions and seat limits
-- FREE school-created tests with no per-test fee
-- COMPLIMENTARY previous-year resources unlocked by an active subscription
+- Free school-created tests with no additional per-test fee
+- Complimentary previous-year resources during an active subscription
 - Board, grade and preparation-track eligibility
-- Individual promotion and Promote All
-- Individual revoke and Revoke All
-- Permanent bulk-promotion exclusion for revoked students
+- Individual and bulk promotion
+- Individual and bulk revoke
+- Permanent promotion exclusion for revoked students
+
+## Brand source of truth
+
+Engineering rules are maintained in:
+
+`docs/EVIDARA_BRAND_SYSTEM.md`
+
+The approved Evidara Brand Book v1.0 remains the source of truth for the master logo, colour system, typography, reports, certificates, dashboards, accessibility and co-branding. Product decisions follow this order: clarity, evidence, humanity and consistency.
 
 ## Local development
 
@@ -33,22 +53,27 @@ npm install
 npm run dev
 ```
 
-## Production build
+## Validation
 
 ```bash
+npm run typecheck
 npm run build
-npm start
 ```
+
+The GitHub Actions workflow `.github/workflows/evidara-v6-ci.yml` runs both checks on the Evidara V6 branch and pull requests to `main`.
 
 ## Supabase setup
 
-Apply the SQL files in the `supabase` directory in numeric order. The latest subscription, resource and promotion model is in:
+Apply SQL files in the `supabase` directory in numeric order. Version 6 adds:
 
-`supabase/08_version_5_school_subscription_lifecycle.sql`
+- `supabase/11_shared_benchmarks.sql`
+- `supabase/12_benchmark_aggregate_function.sql`
+- `supabase/13_metrics_segments_achievements.sql`
 
-Configure the values in `.env.example` through Vercel environment variables. Never commit service-role or payment secrets.
+Configure `.env.example` values through Vercel environment variables. Never commit service-role, payment or private integration secrets.
 
 ## Business terminology
 
 - **Free:** school-created tests carry no additional per-test charge within an active annual school subscription.
-- **Complimentary:** previous-year board and entrance resources are included with an active subscription; they are not public free downloads.
+- **Complimentary:** previous-year board and entrance resources are included during an active subscription; they are not public free downloads.
+- **Private benchmark:** a school sees its own named students, while the broader comparison exposes only privacy-thresholded aggregate evidence.
