@@ -6,16 +6,21 @@ alter table public.organizations
 
 -- Use the latest roster board as a safe migration default where possible.
 update public.organizations organization
-set board = latest.board
-from lateral (
+set board = (
   select membership.board
   from public.student_school_memberships membership
   where membership.organization_id = organization.id
+    and membership.board is not null
   order by membership.academic_year desc, membership.updated_at desc
   limit 1
-) latest
+)
 where organization.board = 'Other'
-  and latest.board is not null;
+  and exists (
+    select 1
+    from public.student_school_memberships membership
+    where membership.organization_id = organization.id
+      and membership.board is not null
+  );
 
 -- Replace the compatibility function so it targets the foundation schema's
 -- school_type column rather than the obsolete institute_type name.
