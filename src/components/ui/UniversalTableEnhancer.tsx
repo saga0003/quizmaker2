@@ -4,21 +4,43 @@ import { useEffect } from "react";
 
 type Direction = "asc" | "desc";
 
+const refreshers = new WeakMap<HTMLTableElement, () => void>();
+
 function cellValue(row: HTMLTableRowElement, index: number) {
   return (row.cells[index]?.innerText || "").trim();
+}
+
+function indianDateValue(value: string) {
+  const match = value.trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return timestamp;
 }
 
 function comparable(value: string) {
   const cleaned = value.replace(/[₹,%+]/g, "").replace(/,/g, "").trim();
   const numeric = Number(cleaned);
   if (cleaned && Number.isFinite(numeric)) return { type: "number" as const, value: numeric };
+  const indianDate = indianDateValue(value);
+  if (indianDate !== null) return { type: "number" as const, value: indianDate };
   const date = Date.parse(value);
   if (/\d/.test(value) && Number.isFinite(date)) return { type: "number" as const, value: date };
   return { type: "text" as const, value: value.toLocaleLowerCase() };
 }
 
 function enhance(table: HTMLTableElement) {
-  if (table.dataset.evidaraEnhanced === "true" || table.classList.contains("ev-sortable-table")) return;
+  const existingRefresh = refreshers.get(table);
+  if (existingRefresh) {
+    existingRefresh();
+    return;
+  }
+  if (table.classList.contains("ev-sortable-table")) return;
+
   const body = table.tBodies[0];
   const headerRow = table.tHead?.rows[0];
   if (!body || !headerRow || body.rows.length === 0) return;
@@ -64,6 +86,7 @@ function enhance(table: HTMLTableElement) {
   function rows() { return Array.from(body.rows); }
 
   function refreshValueOptions() {
+    const previous = value.value;
     value.replaceChildren();
     const all = document.createElement("option");
     all.value = "";
@@ -83,6 +106,7 @@ function enhance(table: HTMLTableElement) {
       value.append(option);
     });
     value.disabled = false;
+    if (values.includes(previous)) value.value = previous;
   }
 
   function applyFilters() {
@@ -96,6 +120,7 @@ function enhance(table: HTMLTableElement) {
     }
   }
 
+  refreshers.set(table, applyFilters);
   search.addEventListener("input", applyFilters);
   column.addEventListener("change", () => { refreshValueOptions(); applyFilters(); });
   value.addEventListener("change", applyFilters);
@@ -114,6 +139,7 @@ function enhance(table: HTMLTableElement) {
     control.append(text, indicator);
     control.setAttribute("aria-label", `Sort by ${label}`);
     cell.replaceChildren(control);
+    cell.setAttribute("aria-sort", "none");
 
     let direction: Direction = "asc";
     control.addEventListener("click", () => {
@@ -121,6 +147,7 @@ function enhance(table: HTMLTableElement) {
         if (other !== control) {
           const icon = other.querySelector("i");
           if (icon) icon.textContent = "↕";
+          other.closest("th")?.setAttribute("aria-sort", "none");
         }
       }
       const sorted = rows().sort((first, second) => {
@@ -133,8 +160,9 @@ function enhance(table: HTMLTableElement) {
       });
       for (const row of sorted) body.append(row);
       indicator.textContent = direction === "asc" ? "↑" : "↓";
-      control.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
+      cell.setAttribute("aria-sort", direction === "asc" ? "ascending" : "descending");
       direction = direction === "asc" ? "desc" : "asc";
+      applyFilters();
     });
   });
 }
