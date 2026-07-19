@@ -31,6 +31,12 @@ jobs:
           grep -q "public.exam_attempts" supabase/11_shared_benchmarks.sql
           ! grep -q "public.assessments" supabase/11_shared_benchmarks.sql
           ! grep -q "public.attempts" supabase/11_shared_benchmarks.sql
+          grep -q "start_benchmark_attempt" supabase/13_benchmark_cloud_operations.sql
+          grep -q "sync_benchmark_contribution_from_attempt" supabase/13_benchmark_cloud_operations.sql
+          grep -q "first-submission-only" supabase/15_benchmark_security_and_lifecycle_hardening.sql
+          grep -q '"version": "6.6.0"' package.json
+      - name: ESLint
+        run: npm run lint
       - name: TypeScript
         run: npm run typecheck
       - name: Production build
