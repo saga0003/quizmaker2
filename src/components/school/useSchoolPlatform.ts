@@ -11,6 +11,25 @@ import {
 
 type CloudPayload = { mode: "cloud"; manager: boolean; state: SchoolPlatformState };
 
+const unavailableCloudState: SchoolPlatformState = {
+  school: {
+    id: "",
+    name: "School workspace unavailable",
+    board: "Other",
+    city: "",
+    subscription: {
+      planName: "ScholarOS Annual School Access",
+      status: "expired",
+      startsAt: new Date().toISOString().slice(0, 10),
+      endsAt: new Date().toISOString().slice(0, 10),
+      seatLimit: 0,
+      resourceAccess: "limited",
+    },
+  },
+  students: [],
+  resources: [],
+};
+
 export function useSchoolPlatform() {
   const { session, configured } = useAuth();
   const [state, setState] = useState<SchoolPlatformState>(defaultSchoolPlatformState);
@@ -49,16 +68,20 @@ export function useSchoolPlatform() {
       setState(loadSchoolPlatformState());
       setMode("demo");
       setManager(true);
+      setError(null);
       setReady(true);
       return;
     }
+
     setSyncing(true);
     try {
       applyCloud(await requestCloud("GET"));
     } catch (cloudError) {
-      setState(loadSchoolPlatformState());
-      setMode("demo");
-      setManager(true);
+      // Fail closed for authenticated cloud accounts. Never show demo students as if
+      // they belonged to a real school when the cloud request or mapping fails.
+      setState(unavailableCloudState);
+      setMode("cloud");
+      setManager(false);
       setError(cloudError instanceof Error ? cloudError.message : "Cloud data is unavailable.");
     } finally {
       setSyncing(false);
@@ -78,6 +101,7 @@ export function useSchoolPlatform() {
 
   const execute = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     if (mode !== "cloud") return null;
+    if (!manager) throw new Error("School-manager permission is required.");
     setSyncing(true);
     try {
       const result = await requestCloud("POST", { action, ...payload });
@@ -90,7 +114,7 @@ export function useSchoolPlatform() {
     } finally {
       setSyncing(false);
     }
-  }, [applyCloud, mode, requestCloud]);
+  }, [applyCloud, manager, mode, requestCloud]);
 
   function reset() {
     if (mode === "demo") update(structuredClone(defaultSchoolPlatformState));
