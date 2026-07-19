@@ -2,21 +2,37 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.1
+## Version 6.2
 
-This release establishes the Evidara identity while retaining the existing testing, subscription and student-lifecycle functionality.
+This release makes Evidara's visible metrics understandable and replaces the broken logo implementation with clean, transparent PNG variants supplied for light and dark backgrounds.
 
-Brand implementation includes:
+Version 6.2 includes:
 
-- Approved Evidara horizontal master artwork
-- Evidara Teal, Insight Amber, Midnight Ink, Cloud White and Evidence Mist design tokens
-- Brand-aligned homepage, login, navigation and role dashboards
-- Evidara demo identities for Super Admin, School Admin, Teacher and Student
-- Accessible focus states and minimum 44 px interactive targets
-- Updated product language based on clarity, evidence, humanity and consistency
-- The original Evidara Brand Book stored under `docs/brand/`
+- Transparent PNG Evidara logo for light backgrounds
+- Transparent PNG Evidara logo for dark backgrounds
+- Standalone transparent Evidara emblem for compact and icon use
+- No white holding card or rectangular clipped background around the logo
+- Accessible information controls beside important metrics
+- Metric definitions stating what each measure means
+- Calculation and evidence-window explanations
+- Responsible-use notes to prevent overclaiming
+- Transparent student development-segment rules
+- Segment recalculation and recommended-next-action explanations
+- Public `/metric-guide/` reference page
+- Metric-guide navigation for Super Admin, School Admin, Teacher and Student workspaces
+- Metric explanations on platform, school and student overview dashboards
+- Expanded explanations throughout student intelligence analytics
 
-Existing product capabilities include:
+## Evidence principles
+
+- A metric must show what it means, how it is evaluated and why it is useful.
+- A percentile is specific to the participating group and exact assessment context.
+- A trend is an observation across comparable evidence, not a prediction.
+- A readiness index is a navigation aid, not a diagnosis.
+- A development segment is temporary and must never become a permanent student label.
+- Recoverable marks are an evidence estimate, not a guaranteed improvement.
+
+## Existing product capabilities
 
 - School and master question banks
 - Manual MCQ, multi-correct, numerical and image-based questions

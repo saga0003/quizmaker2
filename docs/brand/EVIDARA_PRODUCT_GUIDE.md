@@ -41,11 +41,36 @@ The interface must never turn one score into a permanent judgement of a student.
 
 ## Logo rules
 
-- Use the approved master artwork in `public/brand/evidara-master.svg`.
-- Do not redraw, stretch, recolour, rotate or add effects.
-- Maintain clear space around the mark.
-- On dark navigation surfaces, place the approved master artwork on a clean white holding panel until the approved dark-background export is added.
+Approved product exports:
+
+- `public/brand/evidara-logo-light.png` — horizontal lockup for light or Cloud White surfaces
+- `public/brand/evidara-logo-dark.png` — horizontal lockup for Midnight Ink or Evidara Teal surfaces
+- `public/brand/evidara-emblem.png` — compact navigation, favicon and icon use
+
+Implementation rules:
+
+- PNG assets use transparent backgrounds so the surrounding product surface remains continuous.
+- Never place the logo inside an unnecessary white rectangle, holding card or clipped screenshot-style panel.
+- Select the variant that belongs to the surrounding surface instead of recolouring with CSS.
+- Do not redraw, stretch, rotate, add shadows or apply visual effects.
+- Maintain clear space around the complete lockup.
+- Use the emblem only when the horizontal lockup does not fit or the context is intentionally compact.
+
+The earlier `public/brand/evidara-master.svg` is retained only as historical artwork and must not be used by the live product.
+
+## Metric transparency rules
+
+Every important number must explain:
+
+1. What it means
+2. How it is evaluated
+3. Why it is useful
+4. Any responsible-use limitation
+
+Definitions are stored centrally in `src/lib/evidaraMetrics.ts` and displayed through `src/components/ui/MetricInfo.tsx`.
+
+Development segments are temporary evidence groupings. They are recalculated after every valid comparable assessment and must never be described as fixed intelligence, identity or potential.
 
 ## Release boundary
 
-Version 6.1 is a brand-only release. Benchmarking, metric explanations, universal sorting, segments, badges and certificates are intentionally deferred to later versions.
+Version 6.2 includes the PNG logo correction, metric explanations and transparent segment definitions. Universal table sorting, anonymous shared-paper benchmarking, badges and certificates remain separate later releases.

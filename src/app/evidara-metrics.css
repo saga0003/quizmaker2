@@ -1,0 +1,35 @@
+.ev-metric-label{display:inline-flex;align-items:center;gap:5px;min-width:0}
+.ev-metric-info{position:relative;display:inline-flex;vertical-align:middle;flex:0 0 auto}
+.ev-info-trigger{width:26px;height:26px;min-height:26px;border:0;border-radius:50%;display:grid;place-items:center;background:#E7ECEB;color:#44545C;padding:0;line-height:1}
+.ev-info-trigger:hover,.ev-info-trigger[aria-expanded="true"]{background:#DCE9E7;color:#0E5A5A}
+.ev-info-panel{position:absolute;z-index:120;top:32px;right:0;width:min(370px,calc(100vw - 40px));background:#fff;border:1px solid #DCE9E7;border-radius:12px;box-shadow:0 18px 46px rgba(20,35,43,.2);padding:16px;text-align:left;text-transform:none;letter-spacing:normal;color:#44545C;font-size:13px;font-weight:500;line-height:1.5}
+.ev-info-panel>strong{display:block;color:#14232B;font-size:16px;margin-bottom:10px}
+.ev-info-panel>span{display:grid;gap:3px;padding:9px 0;border-top:1px solid #E7ECEB}
+.ev-info-panel b{color:#0E5A5A;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.so-stat .ev-metric-label{color:#6B7980;font-size:11px}
+.so-stat .ev-info-trigger{width:23px;height:23px;min-height:23px}
+.analytics-command .ev-info-trigger,.so-hero-card .ev-info-trigger{background:rgba(255,255,255,.16);color:#fff}
+.analytics-command .ev-info-trigger:hover,.analytics-command .ev-info-trigger[aria-expanded="true"],.so-hero-card .ev-info-trigger:hover,.so-hero-card .ev-info-trigger[aria-expanded="true"]{background:rgba(255,255,255,.28);color:#fff}
+.analytics-command .ev-info-panel,.so-hero-card .ev-info-panel{color:#44545C}
+.analytics-command .so-inline-stats span,.so-hero-card .so-inline-stats span{display:flex;align-items:center;gap:4px}
+.analytics-command .ev-info-panel,.so-hero-card .ev-info-panel{right:auto;left:0}
+.readiness-ring .ev-metric-label{justify-content:center;flex-wrap:wrap}
+.readiness-ring .ev-info-panel{right:0;left:auto}
+.ev-dark-metric-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ev-dark-metric-title h2{margin:7px 0}
+.ev-evidence-window{display:block;color:#6B7980;font-size:12px;font-weight:500;line-height:1.45;margin-top:-6px}
+.ev-segment-definition{display:grid;gap:6px;margin:8px 0 18px}
+.ev-segment-definition>span{font-size:11px;font-weight:800;color:#0E5A5A;text-transform:uppercase;letter-spacing:.08em;margin-top:8px}
+.ev-segment-definition p{margin:0;color:#44545C;line-height:1.55}
+.ev-metric-guide-intro{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,.6fr);gap:20px;align-items:stretch}
+.ev-guide-principle{background:#14232B;color:#fff;border-radius:16px;padding:24px;display:grid;align-content:center}
+.ev-guide-principle h2{margin:6px 0 9px;color:#fff}.ev-guide-principle p{margin:0;color:#DCE9E7;line-height:1.6}
+.ev-metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ev-metric-card{background:#fff;border:1px solid #E7ECEB;border-radius:12px;padding:18px;display:grid;gap:11px}
+.ev-metric-card header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ev-metric-card h3{margin:0;color:#14232B}.ev-metric-card p{margin:0;color:#44545C;line-height:1.55;font-size:14px}
+.ev-metric-card dl{display:grid;gap:10px;margin:0}.ev-metric-card dl div{border-top:1px solid #E7ECEB;padding-top:9px}.ev-metric-card dt{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:#0E5A5A}.ev-metric-card dd{margin:4px 0 0;color:#44545C;font-size:13px;line-height:1.5}
+.ev-segment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.ev-segment-card{background:#fff;border:1px solid #DCE9E7;border-radius:12px;padding:18px}.ev-segment-card h3{margin:4px 0 10px;color:#14232B}.ev-segment-card p{font-size:13px;color:#44545C;line-height:1.5}.ev-segment-card strong{display:block;color:#0E5A5A;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-top:13px}
+.ev-guide-link{display:inline-flex;align-items:center;gap:7px;color:#0E5A5A;font-weight:800;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:900px){.ev-metric-guide-intro,.ev-metric-grid,.ev-segment-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.ev-info-panel{position:fixed;left:20px!important;right:20px!important;top:auto;bottom:20px;width:auto;max-height:72vh;overflow:auto}.ev-metric-label{align-items:flex-start}}

@@ -24,7 +24,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .rm-input:focus,.so-input:focus{border-color:#2164D6;box-shadow:0 0 0 3px rgba(33,100,214,.14)}
 .rm-label,.so-kicker{color:#0E5A5A}
 .so-sidebar{background:#14232B}
-.so-sidebar-brand>a{display:flex;background:#fff;border-radius:10px;padding:7px 9px;max-width:215px}
+.so-sidebar-brand>a{display:flex;align-items:center;max-width:225px;padding:0;background:transparent;border-radius:0}
 .so-workspace{background:#0E5A5A;border-color:#3E7B7B}
 .so-nav a{min-height:44px;border-radius:8px}
 .so-nav a:hover,.so-nav a.active{background:#0E5A5A}
@@ -47,9 +47,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .so-notice.info{background:#EDF5F8;border-color:#C9DFE9;color:#2E6D8B}
 .preview-top,.pricing-story,.public-footer{background:#14232B}
 .preview-chart i{background:#0E5A5A}.preview-chart i:last-child{background:#F2B84B}
-.ev-logo{display:block;height:48px;max-width:290px;overflow:hidden}
+.ev-logo{display:block;height:52px;max-width:310px;overflow:visible;line-height:0}
 .ev-logo img{display:block;height:100%;width:auto;max-width:100%;object-fit:contain;object-position:left center}
+.ev-logo.light{filter:none}
+.ev-logo.dark{height:50px;max-width:300px}
 .ev-logo.compact{width:44px;height:44px;max-width:44px}
-.ev-logo.compact img{height:44px;width:auto;max-width:none}
-.public-footer .ev-logo{background:#fff;border-radius:10px;padding:6px 8px;height:54px}
-@media(max-width:760px){.so-content{padding:20px}.so-page-head h1{font-size:32px}.ev-logo{height:42px;max-width:240px}}
+.ev-logo.compact img{height:44px;width:44px;max-width:44px;object-fit:contain}
+.so-sidebar .ev-logo.dark{height:44px;max-width:205px}
+.public-footer .ev-logo{background:transparent;border-radius:0;padding:0;height:48px;max-width:280px}
+.login-grid .ev-logo.dark{height:56px;max-width:320px}
+@media(max-width:760px){.so-content{padding:20px}.so-page-head h1{font-size:32px}.ev-logo{height:44px;max-width:245px}.ev-logo.dark{height:43px;max-width:240px}.login-grid .ev-logo.dark{height:48px;max-width:270px}}
