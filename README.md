@@ -2,35 +2,47 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.2
+## Version 6.3
 
-This release makes Evidara's visible metrics understandable and replaces the broken logo implementation with clean, transparent PNG variants supplied for light and dark backgrounds.
+This release gives operational tables one consistent way to search, filter and sort records while preserving the V6.2 logo, metric explanations and transparent student-segment rules.
 
-Version 6.2 includes:
+Version 6.3 includes:
+
+- Universal table search across rendered records
+- Exact-value filtering by a selected column
+- Ascending and descending sorting from eligible column headings
+- Numeric handling for marks, percentages, currency and counts
+- Date-aware sorting when a table contains dates
+- Automatic enhancement of existing Evidara `so-table` interfaces
+- Action and interactive columns protected from inappropriate sorting
+- Keyboard-focus styling and accessible labels for every data control
+- Mobile-friendly full-width controls
+- Print layouts that exclude table-control toolbars
+- Public `/data-guide/` reference page
+- Data Controls navigation in Super Admin, School Admin, Teacher and Student workspaces
+- Clear guidance that view controls do not modify records or bypass role boundaries
+
+## Preserved from Version 6.2
 
 - Transparent PNG Evidara logo for light backgrounds
 - Transparent PNG Evidara logo for dark backgrounds
 - Standalone transparent Evidara emblem for compact and icon use
 - No white holding card or rectangular clipped background around the logo
 - Accessible information controls beside important metrics
-- Metric definitions stating what each measure means
-- Calculation and evidence-window explanations
+- Metric calculation and evidence-window explanations
 - Responsible-use notes to prevent overclaiming
 - Transparent student development-segment rules
-- Segment recalculation and recommended-next-action explanations
 - Public `/metric-guide/` reference page
-- Metric-guide navigation for Super Admin, School Admin, Teacher and Student workspaces
-- Metric explanations on platform, school and student overview dashboards
-- Expanded explanations throughout student intelligence analytics
 
-## Evidence principles
+## Evidence and data principles
 
 - A metric must show what it means, how it is evaluated and why it is useful.
 - A percentile is specific to the participating group and exact assessment context.
 - A trend is an observation across comparable evidence, not a prediction.
-- A readiness index is a navigation aid, not a diagnosis.
 - A development segment is temporary and must never become a permanent student label.
-- Recoverable marks are an evidence estimate, not a guaranteed improvement.
+- Search, filtering and sorting only change the current view; they do not edit stored records.
+- Table controls operate only on records already available to the signed-in role.
+- High-impact decisions should be based on the complete underlying record, not a filtered list alone.
 
 ## Existing product capabilities
 
@@ -66,8 +78,6 @@ npm run dev
 npm run typecheck
 npm run build
 ```
-
-The V6.2 release passed the focused GitHub validation workflows and generated all 47 Next.js routes in the Vercel build, including `/metric-guide/`.
 
 ## Supabase setup
 
