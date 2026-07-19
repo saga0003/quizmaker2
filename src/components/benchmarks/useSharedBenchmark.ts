@@ -4,7 +4,7 @@ import {supabase} from "@/lib/supabase";
 export type BenchmarkRow={id:string;paper_id:string;title:string;share_token:string;paper_version:number;is_active:boolean;minimum_sample_size:number};
 export type PaperRow={id:string;title:string;exam_type:string};
 export type Snapshot={available:boolean;valid_attempts:number;minimum_sample_size:number;average_percentage:number|null;distribution:{band:string;attempts:number}[];school_attempts:number;school_average_percentage:number|null;school_cohort_percentile:number|null};
-export type StudentRow={student_id:string;student_name:string;grade:string;score:number;maximum_marks:number;percentage:number;percentile:number;submitted_at:string;segment_label:string};
+export type StudentRow={student_id:string;student_name:string;grade:string;score:number;maximum_marks:number;percentage:number;percentile:number|null;submitted_at:string;segment_label:string};
 export function useSharedBenchmark(organizationId?:string|null,scopeLoading=false){
  const [benchmarks,setBenchmarks]=useState<BenchmarkRow[]>([]),[papers,setPapers]=useState<PaperRow[]>([]),[selectedId,setSelectedId]=useState(""),[paperToShare,setPaperToShare]=useState("");
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[students,setStudents]=useState<StudentRow[]>([]),[loading,setLoading]=useState(Boolean(supabase)),[busy,setBusy]=useState(""),[error,setError]=useState("");
