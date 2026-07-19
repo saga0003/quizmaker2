@@ -4,6 +4,7 @@ import "./globals.css";
 import "./evidara-brand.css";
 import "./evidara-metrics.css";
 import "./evidara-tables.css";
+import "./evidara-segments.css";
 import { AuthProvider } from "@/context/AuthProvider";
 import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 
