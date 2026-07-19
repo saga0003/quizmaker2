@@ -9,6 +9,8 @@ This release applies the Evidara brand system and adds the first cross-school ev
 - Anonymous shared-paper benchmarks using the exact same paper version
 - Aggregate-only comparison with a minimum privacy sample of 20 valid attempts
 - No public school leaderboard, student identity, contact details or response-sheet disclosure
+- Server-derived benchmark facts recorded atomically during shared exam submission
+- Persisted school controls to create, pause and resume benchmark links
 - Metric information controls explaining meaning, evidence window, usefulness and limitations
 - Transparent, temporary student segment definitions and next actions
 - Search, filtering and click-to-sort behaviour for product tables
@@ -66,9 +68,12 @@ The GitHub Actions workflow `.github/workflows/evidara-v6-ci.yml` runs both chec
 
 Apply SQL files in the `supabase` directory in numeric order. Version 6 adds:
 
-- `supabase/11_shared_benchmarks.sql`
-- `supabase/12_benchmark_aggregate_function.sql`
-- `supabase/13_metrics_segments_achievements.sql`
+- `supabase/11_shared_benchmarks.sql` — benchmark metadata and private fact storage
+- `supabase/12_benchmark_aggregate_function.sql` — anonymous privacy-thresholded snapshot
+- `supabase/13_metrics_segments_achievements.sql` — explained metrics, segments, badges and certificates
+- `supabase/14_secure_benchmark_access.sql` — authorised school creation and sharing controls
+- `supabase/15_trusted_benchmark_attempts.sql` — token route, linked attempts and atomic trusted submission
+- `supabase/16_school_benchmark_reporting.sql` — private school rows and thresholded wider comparison
 
 Configure `.env.example` values through Vercel environment variables. Never commit service-role, payment or private integration secrets.
 
