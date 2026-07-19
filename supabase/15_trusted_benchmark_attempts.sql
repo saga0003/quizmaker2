@@ -59,6 +59,21 @@ $$;
 revoke all on function public.record_my_shared_benchmark_attempt(uuid,uuid) from public;
 grant execute on function public.record_my_shared_benchmark_attempt(uuid,uuid) to authenticated;
 
+-- Shared submissions use one database call. The exam result and benchmark fact either both complete
+-- in this transaction or the call fails; a later optional page visit is not required.
+create or replace function public.submit_shared_benchmark_attempt(p_attempt_id uuid,p_benchmark_id uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_result jsonb;
+begin
+ select public.submit_exam_attempt(p_attempt_id) into v_result;
+ perform public.record_my_shared_benchmark_attempt(p_benchmark_id,p_attempt_id);
+ return v_result;
+end;
+$$;
+revoke all on function public.submit_shared_benchmark_attempt(uuid,uuid) from public;
+grant execute on function public.submit_shared_benchmark_attempt(uuid,uuid) to authenticated;
+
+-- Repair helper for attempts submitted before this migration was applied.
 create or replace function public.sync_my_shared_benchmark_facts()
 returns integer language plpgsql security definer set search_path=public as $$
 declare l record;v_count integer:=0;
