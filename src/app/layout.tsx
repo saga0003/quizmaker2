@@ -4,7 +4,9 @@ import "./globals.css";
 import "./evidara.css";
 import "./evidara-logo.css";
 import "./evidara-analytics.css";
+import "./evidara-tables.css";
 import { AuthProvider } from "@/context/AuthProvider";
+import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 
 export const metadata: Metadata = {
   title: "Evidara — Evidence-Driven Student Development",
@@ -13,5 +15,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>;
+  return <html lang="en"><body><AuthProvider><UniversalTableEnhancer/>{children}</AuthProvider></body></html>;
 }
