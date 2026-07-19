@@ -3,6 +3,7 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./evidara.css";
 import "./evidara-logo.css";
+import "./evidara-analytics.css";
 import { AuthProvider } from "@/context/AuthProvider";
 
 export const metadata: Metadata = {
