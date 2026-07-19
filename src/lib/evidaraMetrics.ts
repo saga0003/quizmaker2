@@ -7,6 +7,20 @@ export type MetricDefinition = {
 };
 
 export const metricDefinitions = {
+  participation: {
+    title: "Assessment participation",
+    definition: "The percentage of eligible assigned learners who submitted a valid attempt during the assessment window.",
+    evaluatedFrom: "Valid submitted attempts divided by the active eligible roster assigned to the paper. Revoked, ineligible and invalid attempts are excluded.",
+    whyItMatters: "It shows whether the available performance evidence represents most of the intended cohort or only a small subset.",
+    caution: "A high participation rate improves coverage but does not by itself indicate learning quality or improvement.",
+  },
+  score: {
+    title: "Assessment score",
+    definition: "Marks earned under the paper's published scoring and negative-marking rules.",
+    evaluatedFrom: "Correct, incorrect and unattempted responses evaluated against the exact question paper version.",
+    whyItMatters: "It summarises performance on that assessment and supports comparison with the learner's own previous comparable papers.",
+    caution: "Scores from papers with different difficulty, syllabus coverage or maximum marks should not be compared without context.",
+  },
   trend: {
     title: "Improvement trend",
     definition: "The direction and size of change across repeated comparable assessments.",
