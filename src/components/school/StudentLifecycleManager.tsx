@@ -26,7 +26,7 @@ import { useSchoolPlatform } from "./useSchoolPlatform";
 const tracks: StudentTrack[] = ["Foundation", "Boards", "Olympiad", "NEET", "JEE", "KCET"];
 
 export function StudentLifecycleManager() {
-  const { state, update, ready, mode, syncing, error, execute } = useSchoolPlatform();
+  const { state, update, ready, mode, manager, syncing, error, execute } = useSchoolPlatform();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [targetYear, setTargetYear] = useState("2027-28");
@@ -42,6 +42,7 @@ export function StudentLifecycleManager() {
   if (!ready) return <div className="so-card so-pad">Loading students…</div>;
 
   const currentYear = state.students.find((student) => student.status === "active")?.academicYear || "2026-27";
+  const canManage = mode === "demo" || manager;
 
   async function addStudent(form: FormData) {
     const name = String(form.get("name") || "").trim();
@@ -143,11 +144,12 @@ export function StudentLifecycleManager() {
       </div>
       <div className="so-action-row">
         <span className={`so-status ${mode === "cloud" ? "success" : "neutral"}`}><Cloud size={14}/> {mode === "cloud" ? "Cloud roster" : "Demo roster"}</span>
-        <button className="so-btn so-btn-primary" disabled={syncing} onClick={() => setShowAdd((value) => !value)}><Plus size={17}/> Add student</button>
+        <button className="so-btn so-btn-primary" disabled={syncing || !canManage} onClick={() => setShowAdd((value) => !value)}><Plus size={17}/> Add student</button>
       </div>
     </div>
 
     {error && <div className="so-notice warning"><Ban/><span><strong>Cloud notice:</strong> {error}</span></div>}
+    {mode === "cloud" && !manager && !error && <div className="so-notice info"><LockKeyhole/><span>This account has read-only student access. School roster changes require an authorised school manager.</span></div>}
 
     <div className="so-grid so-grid-4">
       <div className="so-stat"><Users/><strong>{state.students.length}</strong><span>Total records</span></div>
@@ -159,19 +161,19 @@ export function StudentLifecycleManager() {
     <section className="so-card so-pad so-mt rollover-panel">
       <div>
         <span className="so-kicker">TARGET ACADEMIC YEAR</span>
-        <select className="so-input" value={targetYear} onChange={(event) => setTargetYear(event.target.value)}>
+        <select className="so-input" value={targetYear} disabled={!canManage} onChange={(event) => setTargetYear(event.target.value)}>
           <option>2027-28</option><option>2028-29</option><option>2029-30</option>
         </select>
       </div>
       <div className="so-action-row">
-        <button className="so-btn so-btn-primary" disabled={syncing || active === 0} onClick={() => void promoteAll()}><GraduationCap size={17}/> Promote all eligible</button>
-        <button className="so-btn so-btn-danger" disabled={syncing || active === 0} onClick={() => void revokeAll()}><UserMinus size={17}/> Revoke all active</button>
+        <button className="so-btn so-btn-primary" disabled={syncing || active === 0 || !canManage} onClick={() => void promoteAll()}><GraduationCap size={17}/> Promote all eligible</button>
+        <button className="so-btn so-btn-danger" disabled={syncing || active === 0 || !canManage} onClick={() => void revokeAll()}><UserMinus size={17}/> Revoke all active</button>
       </div>
     </section>
 
     <div className="so-notice warning so-mt"><Ban/> <span><strong>Permanent bulk exclusion:</strong> once a student is revoked, Promote All and individual promotion cannot add that student again. The cloud database enforces the lock.</span></div>
 
-    {showAdd && <form className="so-card so-pad so-mt" onSubmit={(event) => {
+    {showAdd && canManage && <form className="so-card so-pad so-mt" onSubmit={(event) => {
       event.preventDefault();
       void addStudent(new FormData(event.currentTarget)).catch((actionError) => alert(actionError instanceof Error ? actionError.message : "Unable to add student."));
     }}>
@@ -197,12 +199,12 @@ export function StudentLifecycleManager() {
       <td><strong>{student.name}</strong><small>{student.parentName}{student.parentPhone ? ` · ${student.parentPhone}` : ""}</small></td>
       <td>{student.academicYear}</td>
       <td>Grade {student.grade}-{student.section}</td>
-      <td><div className="track-pills">{tracks.map((track) => <button type="button" key={track} disabled={student.status !== "active" || syncing} onClick={() => void changeTracks(student.id, track).catch((actionError) => alert(actionError instanceof Error ? actionError.message : "Unable to update tracks."))} className={student.tracks.includes(track) ? "active" : ""}>{track}</button>)}</div></td>
+      <td><div className="track-pills">{tracks.map((track) => <button type="button" key={track} disabled={student.status !== "active" || syncing || !canManage} onClick={() => void changeTracks(student.id, track).catch((actionError) => alert(actionError instanceof Error ? actionError.message : "Unable to update tracks."))} className={student.tracks.includes(track) ? "active" : ""}>{track}</button>)}</div></td>
       <td><span className={`so-status ${student.status === "active" ? "success" : student.status === "revoked" ? "danger" : "neutral"}`}>{student.status}</span>{student.promotionLocked && <small><LockKeyhole size={12}/> promotion locked</small>}</td>
-      <td><div className="so-action-row">{student.status === "active" && <>
+      <td><div className="so-action-row">{student.status === "active" && canManage && <>
         <button className="so-btn so-btn-small so-btn-primary" disabled={syncing} onClick={() => void promoteOne(student.id).catch((actionError) => alert(actionError instanceof Error ? actionError.message : "Unable to promote student."))}><GraduationCap size={14}/> Promote</button>
         <button className="so-btn so-btn-small so-btn-danger" disabled={syncing} onClick={() => void revokeOne(student.id, student.name).catch((actionError) => alert(actionError instanceof Error ? actionError.message : "Unable to revoke student."))}><UserMinus size={14}/> Revoke</button>
-      </>}{student.status === "revoked" && <span className="locked-copy"><LockKeyhole size={14}/> Locked from promotion</span>}{student.status === "completed" && <span className="locked-copy"><GraduationCap size={14}/> Academic cycle complete</span>}</div></td>
+      </>}{student.status === "active" && !canManage && <span className="locked-copy"><LockKeyhole size={14}/> Read only</span>}{student.status === "revoked" && <span className="locked-copy"><LockKeyhole size={14}/> Locked from promotion</span>}{student.status === "completed" && <span className="locked-copy"><GraduationCap size={14}/> Academic cycle complete</span>}</div></td>
     </tr>)}</tbody></table></div>
   </div>;
 }
