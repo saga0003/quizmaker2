@@ -9,7 +9,7 @@ export type CloudBenchmarkPublication = {
   version_fingerprint: string;
   grade_label: string | null;
   preparation_track: string | null;
-  access_code: string;
+  access_code: string | null;
   status: "draft" | "published" | "closed" | "cancelled";
   privacy_minimum: number;
   privacy_minimum_schools: number;
@@ -20,6 +20,7 @@ export type CloudBenchmarkPublication = {
   published_at: string | null;
   closed_at: string | null;
   created_at: string;
+  can_manage: boolean;
 };
 
 export type BenchmarkPaperOption = {
@@ -65,6 +66,9 @@ export type CloudBenchmarkCohortRow = {
   status: string;
   submitted_at: string;
   violation_count: number;
+  contribution_id: string | null;
+  is_valid: boolean;
+  exclusion_reason: string | null;
 };
 
 async function accessToken() {
