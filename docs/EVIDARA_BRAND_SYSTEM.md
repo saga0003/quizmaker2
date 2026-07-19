@@ -144,12 +144,17 @@ For co-branding, Evidara appears first on Evidara-owned material. The partner-sc
 
 ## Logo governance
 
-The approved master artwork is the source of truth. Do not stretch, recolour, rotate, shadow, crowd or rearrange the logo. The product component in `src/components/Logo.tsx` is an implementation placeholder until the approved exported master assets are committed under `public/brand/`.
+The approved master artwork is the source of truth. Do not stretch, recolour, rotate, shadow, crowd, retype or rearrange the logo.
 
-Required production assets:
+The product now renders `public/brand/evidara-master.svg` through `src/components/Logo.tsx`; the wordmark is no longer recreated with CSS. This asset was prepared from the approved master lockup in the supplied Brand Book for the Version 6 digital interface.
 
-- `public/brand/evidara-master.svg`
-- `public/brand/evidara-master-dark.svg`
-- `public/brand/evidara-symbol.svg`
+The committed SVG is a lightweight wrapper around a high-quality embedded digital image. It is suitable for the web pilot, but the original vector master supplied by the brand designer should replace it later without changing component usage.
 
-Once those files are committed, replace the placeholder component with direct image usage rather than recreating the wordmark.
+Planned source-asset handoff:
+
+- `public/brand/evidara-master.svg` — committed and in use;
+- reversed master artwork — add when the original vector export is supplied;
+- standalone symbol artwork — add when the original vector export is supplied;
+- print-ready PDF/EPS source — retain outside the web bundle for production artwork.
+
+On dark product surfaces, place the approved master lockup on a quiet white holding panel rather than recolouring or reconstructing it.
