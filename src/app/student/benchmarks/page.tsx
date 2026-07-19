@@ -1,5 +1,5 @@
 import { DashboardShell } from "@/components/DashboardShell";
 import { ProtectedPage } from "@/components/ProtectedPage";
-import { StudentBenchmarkWorkspace } from "@/components/benchmarks/StudentBenchmarkWorkspace";
+import { StudentBenchmarkRouter } from "@/components/benchmarks/BenchmarkWorkspaceRouter";
 
-export default function Page(){return <ProtectedPage allowed="student"><DashboardShell kind="student"><StudentBenchmarkWorkspace/></DashboardShell></ProtectedPage>}
+export default function Page(){return <ProtectedPage allowed="student"><DashboardShell kind="student"><StudentBenchmarkRouter/></DashboardShell></ProtectedPage>}
