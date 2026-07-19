@@ -17,7 +17,8 @@ begin
   union all select 4,'Below 40%',count(*) from public.benchmark_attempt_facts where benchmark_id=b.id and is_valid and score/max_marks<.4
  ) bands;
  return jsonb_build_object('available',v_total>=b.minimum_sample_size,'reason',case when v_total<b.minimum_sample_size then 'privacy_minimum_not_reached' else null end,'paper_title',b.title,'paper_version',b.paper_version,'valid_attempts',v_total,'minimum_sample_size',b.minimum_sample_size,'average_percentage',case when v_total>=b.minimum_sample_size then round(v_avg,2) else null end,'median_percentage',case when v_total>=b.minimum_sample_size then round(v_median,2) else null end,'distribution',case when v_total>=b.minimum_sample_size then coalesce(v_distribution,'[]'::jsonb) else '[]'::jsonb end,'school_attempts',v_school_count,'school_average_percentage',case when v_school_count>0 then round(v_school_avg,2) else null end,'school_cohort_percentile',case when v_total>=b.minimum_sample_size then v_percentile else null end,'privacy',jsonb_build_object('school_identities_disclosed',false,'student_identities_disclosed',false,'row_level_responses_disclosed',false));
-end$$;
+end;
+$$;
 grant execute on function public.get_school_shared_benchmark_snapshot(uuid) to authenticated;
 
 create or replace function public.list_school_benchmark_students(p_benchmark_id uuid)
