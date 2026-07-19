@@ -17,7 +17,7 @@ export function BenchmarkPublisher({onCreated}:Props){
   const [paperVersion,setPaperVersion]=useState("Version 1.0");
   const [gradeLabel,setGradeLabel]=useState("Grade 10");
   const [preparationTrack,setPreparationTrack]=useState("School assessment");
-  const [accessCode,setAccessCode]=useState(newAccessCode);
+  const [accessCode,setAccessCode]=useState("");
   const [opensAt,setOpensAt]=useState("");
   const [closesAt,setClosesAt]=useState("");
   const [publishNow,setPublishNow]=useState(true);
@@ -26,6 +26,7 @@ export function BenchmarkPublisher({onCreated}:Props){
   const [saving,setSaving]=useState(false);
 
   useEffect(()=>{
+    setAccessCode(newAccessCode());
     if(!isSupabaseConfigured)return;
     void benchmarkRequest<{papers:BenchmarkPaperOption[]}>("?includePapers=true")
       .then(payload=>{setPapers(payload.papers||[]);if(payload.papers?.[0]){setPaperId(payload.papers[0].id);setTitle(payload.papers[0].title);}})
