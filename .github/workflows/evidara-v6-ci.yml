@@ -26,6 +26,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: TypeScript
-        run: npm run typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          code=$?
+          tail -120 typecheck.log
+          exit $code
+      - name: Upload TypeScript log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-typecheck-log
+          path: typecheck.log
       - name: Production build
-        run: npm run build
+        if: steps.typecheck.outcome == 'success'
+        shell: bash
+        run: |
+          set +e
+          npm run build > production-build.log 2>&1
+          code=$?
+          tail -160 production-build.log
+          exit $code
+      - name: Upload production build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-production-build-log
+          path: production-build.log
+          if-no-files-found: ignore
