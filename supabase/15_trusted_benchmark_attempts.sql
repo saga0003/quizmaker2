@@ -21,7 +21,8 @@ begin
  if p.id is null then return jsonb_build_object('available',false,'reason','paper_not_available');end if;
  s:=public.get_shared_benchmark_snapshot(p_share_token);
  return jsonb_build_object('available',true,'benchmark_id',b.id,'share_token',b.share_token,'paper_id',p.id,'paper_title',b.title,'paper_version',b.paper_version,'exam_type',p.exam_type,'duration_minutes',p.duration_minutes,'total_marks',p.total_marks,'total_questions',p.total_questions,'opens_at',b.opens_at,'closes_at',b.closes_at,'minimum_sample_size',b.minimum_sample_size,'snapshot',s,'privacy',jsonb_build_object('school_identity_disclosed',false,'student_identity_disclosed',false,'individual_response_disclosed',false));
-end$$;
+end;
+$$;
 revoke all on function public.get_shared_benchmark_landing(uuid) from public;
 grant execute on function public.get_shared_benchmark_landing(uuid) to anon,authenticated;
 
@@ -35,7 +36,8 @@ begin
  select public.start_exam_attempt(b.paper_id,null) into v_attempt;
  insert into public.benchmark_attempt_links(benchmark_id,attempt_id,student_id) values(b.id,v_attempt,auth.uid()) on conflict(attempt_id,student_id) do nothing;
  return jsonb_build_object('attempt_id',v_attempt,'benchmark_id',b.id,'paper_id',b.paper_id);
-end$$;
+end;
+$$;
 grant execute on function public.start_shared_benchmark_attempt(uuid) to authenticated;
 
 create or replace function public.record_my_shared_benchmark_attempt(p_benchmark_id uuid,p_attempt_id uuid)
@@ -52,7 +54,8 @@ begin
  values(b.id,p_attempt_id::text,auth.uid(),v_org,r.score,r.maximum_marks,r.percentage,true,r.submitted_at)
  on conflict(benchmark_id,attempt_key) do update set score=excluded.score,max_marks=excluded.max_marks,accuracy=excluded.accuracy,organization_id=excluded.organization_id,is_valid=true,invalid_reason=null,submitted_at=excluded.submitted_at;
  return true;
-end$$;
+end;
+$$;
 revoke all on function public.record_my_shared_benchmark_attempt(uuid,uuid) from public;
 grant execute on function public.record_my_shared_benchmark_attempt(uuid,uuid) to authenticated;
 
@@ -68,7 +71,8 @@ begin
   end;
  end loop;
  return v_count;
-end$$;
+end;
+$$;
 grant execute on function public.sync_my_shared_benchmark_facts() to authenticated;
 
 comment on function public.record_my_shared_benchmark_attempt(uuid,uuid) is 'Derives score and validity from the authenticated completed exam attempt. Client-provided marks are never accepted.';
