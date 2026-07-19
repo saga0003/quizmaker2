@@ -1,0 +1,10 @@
+.ev-auto-table-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0}
+.ev-auto-table-tools input,.ev-auto-table-tools select{min-height:44px;border:1px solid #DCE9E7;border-radius:8px;background:#fff;color:#14232B;padding:0 12px;font:inherit}
+.ev-auto-table-tools input{flex:1;min-width:220px}
+.ev-auto-table-tools select{min-width:160px}
+.ev-auto-table-tools input:focus,.ev-auto-table-tools select:focus{border-color:#2164D6;box-shadow:0 0 0 3px rgba(33,100,214,.14);outline:0}
+.ev-auto-sort{width:100%;min-height:44px;border:0;background:transparent;color:inherit;display:flex;align-items:center;justify-content:flex-start;gap:7px;padding:12px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;text-align:left}
+.ev-auto-sort i{font-style:normal;color:#6B7980;font-size:13px}
+.ev-auto-sort:hover{background:#EDF5F4;color:#0E5A5A}
+.ev-auto-sort[aria-sort="ascending"],.ev-auto-sort[aria-sort="descending"]{color:#0E5A5A;background:#EDF5F4}
+@media(max-width:620px){.ev-auto-table-tools input,.ev-auto-table-tools select{min-width:100%;width:100%}}
