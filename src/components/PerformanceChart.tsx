@@ -1,0 +1,4 @@
+"use client";
+import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
+const data=[{test:"T1",score:486,physics:42,chemistry:56,biology:71},{test:"T2",score:512,physics:49,chemistry:61,biology:73},{test:"T3",score:535,physics:57,chemistry:64,biology:75},{test:"T4",score:558,physics:63,chemistry:68,biology:78},{test:"T5",score:584,physics:70,chemistry:72,biology:81}];
+export function PerformanceChart(){return <div style={{width:"100%",height:310}}><ResponsiveContainer><LineChart data={data} margin={{top:10,right:14,left:-15,bottom:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="test"/><YAxis/><Tooltip/><Legend/><Line type="monotone" dataKey="score" stroke="#131e35" strokeWidth={3}/><Line type="monotone" dataKey="physics" stroke="#f6b100"/><Line type="monotone" dataKey="chemistry" stroke="#137a3a"/><Line type="monotone" dataKey="biology" stroke="#7a5af8"/></LineChart></ResponsiveContainer></div>}

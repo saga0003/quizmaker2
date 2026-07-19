@@ -1,49 +1,54 @@
-# ScholarOS — Student Intelligence Platform
+# ScholarOS — School Assessment Intelligence
 
-ScholarOS is a multi-school assessment and learning-intelligence product for Grades 8–12.
+ScholarOS is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Product roles
+## Major integrated release
 
-- **Super Admin:** multi-school tenancy, cloud operations, assessment quality, consent and permissioned opportunity intelligence.
-- **Organisation Admin:** question quality, test operations, student cohorts and reporting.
-- **School Admin:** grade and section performance, high-potential students and teacher interventions.
-- **Student:** assessments, secure server scoring, post-test diagnosis, speed/accuracy analysis and a measurable learning plan.
+This release rebuilds the functionality of the supplied offline testing platform inside ScholarOS without retaining its earlier visual design. It includes:
 
-## Version 3
+- School and master question banks
+- Manual MCQ, multi-correct, numerical and image-based questions
+- LaTeX questions and solutions
+- CSV, XLSX and image-ZIP imports
+- Review workflow and question versioning
+- Section-based paper builder
+- Manual, hybrid and automatic question selection foundations
+- Duration, marks, negative marks, schedules, access codes and result modes
+- Secure attempts, autosave, timer, question palette and mark for review
+- Tab, blur and fullscreen event logging
+- Automatic evaluation and student result history
+- Student score, percentile, speed, error, mastery and intervention analytics
+- Annual school subscriptions and seat limits
+- FREE school-created tests with no per-test fee
+- COMPLIMENTARY previous-year resources unlocked by an active subscription
+- Board, grade and preparation-track eligibility
+- Individual promotion and Promote All
+- Individual revoke and Revoke All
+- Permanent bulk-promotion exclusion for revoked students
 
-Version 3 adds a hybrid-cloud production layer without disabling the working browser pilot:
+## Local development
 
-- Supabase email/password and magic-link authentication support
-- Authenticated Vercel server functions
-- Versioned multi-device workspace synchronization
-- Role-filtered organisation, school and student data
-- Optimistic conflict protection
-- Server-side student scoring
-- Redacted student question payloads with no browser answer keys
-- Tenant-aware row-level security migration
-- Cloud health and operations dashboard
-- Automatic local-pilot fallback when cloud credentials are absent
+```bash
+npm install
+npm run dev
+```
 
-Version 2 workflows remain operational in local mode, including school onboarding, student import, question creation, assessment publishing, completed attempts, analytics, interventions, consent controls and CSV exports.
-
-## Local run
+## Production build
 
 ```bash
 npm run build
-python3 -m http.server 3000 --directory dist
+npm start
 ```
 
-Static local hosting runs the pilot interface. Vercel server functions are required for `/api/config`, `/api/health`, `/api/sync` and `/api/attempts`.
+## Supabase setup
 
-## Cloud activation
+Apply the SQL files in the `supabase` directory in numeric order. The latest subscription, resource and promotion model is in:
 
-1. Apply `supabase/schema.sql`.
-2. Apply `supabase/migrations/003_cloud_sync_and_rls.sql`.
-3. Configure `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
-4. Redeploy and verify `/api/health`.
+`supabase/08_version_5_school_subscription_lifecycle.sql`
 
-See `docs/V3_CLOUD_SETUP.md` for the complete setup and account-mapping instructions.
+Configure the values in `.env.example` through Vercel environment variables. Never commit service-role or payment secrets.
 
-## Data principles
+## Business terminology
 
-Academic evidence is never treated as marketing consent. Odoo exports contain only records backed by explicit programme-counselling permission. Student cloud clients do not receive answer keys; scoring occurs on the server.
+- **Free:** school-created tests carry no additional per-test charge within an active annual school subscription.
+- **Complimentary:** previous-year board and entrance resources are included with an active subscription; they are not public free downloads.

@@ -1,5 +1,2 @@
 import { NextResponse } from "next/server";
-
-export async function GET() {
-  return NextResponse.json({ message: "Good!" });
-}
+export async function GET(){const configured=Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL&&process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);return NextResponse.json({healthy:true,release:"4.0",mode:configured?"supabase":"interactive-demo",modules:["question-bank","imports","paper-builder","secure-exam","analytics","subscriptions","promotion","resources"]},{headers:{"Cache-Control":"no-store"}})}
