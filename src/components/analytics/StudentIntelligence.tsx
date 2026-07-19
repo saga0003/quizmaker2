@@ -34,7 +34,7 @@ export function StudentIntelligence(){
   const historyColumns:DataColumn<(typeof trend)[number]>[] = [
     { key:"test", label:"Assessment", value:row=>row.test, render:row=><><strong>{row.test}</strong><small>{row.date}</small></>, filter:{label:"subjects",value:row=>row.subject} },
     { key:"subject", label:"Subject", value:row=>row.subject, filter:{label:"subjects",value:row=>row.subject} },
-    { key:"score", label:"Score", value:row=>row.score, render:row=>`${row.score}%`, align:"right" },
+    { key:"score", label:<MetricLabel {...metricDefinitions.score}>Score</MetricLabel>, value:row=>row.score, render:row=>`${row.score}%`, align:"right" },
     { key:"accuracy", label:"Accuracy", value:row=>row.accuracy, render:row=>`${row.accuracy}%`, align:"right" },
     { key:"speed", label:<MetricLabel {...metricDefinitions.speed}>Speed index</MetricLabel>, value:row=>row.speed, align:"right" },
     { key:"percentile", label:<MetricLabel {...metricDefinitions.percentile}>Percentile</MetricLabel>, value:row=>row.percentile, render:row=>`${row.percentile}th`, align:"right" },
@@ -53,7 +53,7 @@ export function StudentIntelligence(){
   return <div>
     <div className="so-page-head"><div><span className="so-kicker">STUDENT EVIDENCE</span><h1>Progress, context and the next step</h1><p>Each measure explains what it means, how it was evaluated and what it can responsibly support. Current evidence covers five comparable assessments from 12 May to 14 July.</p></div><span className="so-status success">5 assessments analysed</span></div>
 
-    <section className="analytics-command"><div><span className="so-kicker light">CURRENT DEVELOPMENT SEGMENT</span><div className="ev-dark-metric-title"><h2>{segment.label}</h2><MetricInfo {...metricDefinitions.segment}/></div><p>{segment.rule}</p><div className="so-inline-stats"><div><strong>84%</strong><span><MetricLabel {...metricDefinitions.mastery}>latest score</MetricLabel></span></div><div><strong>91st</strong><span><MetricLabel {...metricDefinitions.percentile}>percentile</MetricLabel></span></div><div><strong>+26</strong><span><MetricLabel {...metricDefinitions.trend}>score gain</MetricLabel></span></div><div><strong>76</strong><span><MetricLabel {...metricDefinitions.speed}>speed index</MetricLabel></span></div></div></div><div className="readiness-ring"><strong>82</strong><span><MetricLabel {...metricDefinitions.readiness}>readiness index</MetricLabel></span></div></section>
+    <section className="analytics-command"><div><span className="so-kicker light">CURRENT DEVELOPMENT SEGMENT</span><div className="ev-dark-metric-title"><h2>{segment.label}</h2><MetricInfo {...metricDefinitions.segment}/></div><p>{segment.rule}</p><div className="so-inline-stats"><div><strong>84%</strong><span><MetricLabel {...metricDefinitions.score}>latest score</MetricLabel></span></div><div><strong>91st</strong><span><MetricLabel {...metricDefinitions.percentile}>percentile</MetricLabel></span></div><div><strong>+26</strong><span><MetricLabel {...metricDefinitions.trend}>score gain</MetricLabel></span></div><div><strong>76</strong><span><MetricLabel {...metricDefinitions.speed}>speed index</MetricLabel></span></div></div></div><div className="readiness-ring"><strong>82</strong><span><MetricLabel {...metricDefinitions.readiness}>readiness index</MetricLabel></span></div></section>
 
     <div className="so-grid so-grid-4 so-mt">
       <div className="so-stat"><CheckCircle2/><strong>42/50</strong><span>Correct answers</span></div>
