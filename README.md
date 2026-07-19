@@ -2,85 +2,91 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.4
+## Version 6.6
 
-Version 6.4 converts student development segments from static labels into a transparent, versioned evidence engine.
+Version 6.6 connects private shared-paper benchmarks to Evidara’s real question-paper and secure exam-attempt engine.
 
 Included in this release:
 
-- Central deterministic segment evaluator
-- Published rule version `2026.07-v1`
-- Minimum evidence requirement of three comparable assessments
-- Exact observed values and qualifying thresholds
-- Evidence-window and calculation timestamp disclosure
-- Automatic recalculation guidance after new valid evidence
-- School cohort distribution and student-level evidence review
-- Student-facing explanation of the current pattern
-- Super Admin governance page showing rule order and responsible-use boundaries
-- Segment tables integrated with V6.3 search, filtering and sorting
-- Clear distinction between sufficient and limited evidence
-- Teaching and practice recommendations attached to each current pattern
-- Explicit prohibition on using segments for admission, discipline, promotion, fees, scholarships, access control or prediction
+- Cloud benchmark publishing from an existing published school paper
+- Server-calculated SHA-256 paper fingerprints
+- Student joining through a private access code
+- Secure benchmark attempts through the existing live exam route
+- Automatic contribution creation after submission
+- Automatic exclusion for timing, integrity, score and fingerprint failures
+- First-submission-only contribution rules
+- Private named cohort evidence for each participating school
+- Anonymous external averages, medians, percentiles and score bands
+- Minimum 20 external attempts from at least 3 external schools
+- Small-cell suppression below 10 records
+- Publisher-only access codes and lifecycle controls
+- School review of its own student contributions
+- Super Admin review requirement for automatic integrity exclusions
+- Locked paper, section and question content while a benchmark is published or closed
+- Cloud-aware school, student and Super Admin benchmark workspaces
 
-New routes:
+## Benchmark privacy principles
 
-- `/school/segments/`
-- `/student/segment/`
-- `/admin/segments/`
+- Students do not receive a catalogue of other schools’ access codes.
+- School staff see only benchmarks they publish or in which their own students participated.
+- A school can never see another school’s named students, answer sheets or exact attempts.
+- External comparison excludes the requesting school’s own cohort.
+- No public school leaderboard is produced.
+- Benchmark evidence cannot decide admission, discipline, promotion, fees, scholarship, access or employment.
 
-## Segment method
+## New cloud migrations
 
-- A learner with fewer than three comparable assessments receives **Not enough evidence**.
-- Published rules are evaluated in a documented order.
-- The first fully matched rule becomes the current development pattern.
-- The learner and school can inspect the evidence values, thresholds, evidence window and active rule version.
-- New valid evidence can change the pattern immediately.
-- A segment describes a current evidence pattern, not intelligence, character, ability or future potential.
+Apply the Supabase SQL files in numeric order through:
 
-## Preserved from earlier versions
+- `supabase/11_shared_benchmarks.sql`
+- `supabase/12_benchmark_aggregate_function.sql`
+- `supabase/13_benchmark_cloud_operations.sql`
+- `supabase/14_benchmark_operation_hardening.sql`
+- `supabase/15_benchmark_security_and_lifecycle_hardening.sql`
+- `supabase/16_benchmark_fingerprint_lock_hardening.sql`
 
-- Transparent PNG Evidara logo variants for light and dark backgrounds
-- Accessible metric information controls and `/metric-guide/`
-- Universal table search, filtering and sorting with `/data-guide/`
+## Main routes
+
+- `/school/benchmarks/`
+- `/school/benchmarks/publish/`
+- `/student/benchmarks/`
+- `/admin/benchmarks/`
+- `/api/benchmarks`
+
+## Preserved capabilities
+
+- Evidara transparent PNG branding
+- Metric explanations and responsible-use guidance
+- Universal table search, filtering and sorting
+- Versioned student development patterns
 - School and master question banks
-- Manual and bulk question import workflows
-- Secure assessments and automatic evaluation
+- Manual and bulk question imports
+- Secure assessments, autosave and automatic evaluation
 - Student analytics and intervention planning
 - Annual school subscriptions and seat limits
 - Free school-created tests within an active annual plan
 - Complimentary previous-year resources during an active subscription
-- Board, grade and preparation-track eligibility
-- Individual and bulk student promotion and revocation
-- Permanent promotion exclusion for revoked students
+- Academic-year promotion and permanent revocation protection
 
-## Evidence and data principles
-
-- Measure what matters and explain what the data can—and cannot—say.
-- A percentile is specific to the participating group and assessment context.
-- A trend is an observation, not a prediction.
-- A development segment is temporary and must never become a permanent student label.
-- Search, filtering and sorting change only the current view.
-- High-impact decisions must use the complete underlying record and appropriate human review.
-
-## Development
+## Development and validation
 
 ```bash
-npm install
+npm ci
 npm run dev
-```
-
-## Validation
-
-```bash
+npm run lint
 npm run typecheck
 npm run build
 ```
 
-## Supabase setup
+## Cloud activation boundary
 
-Apply SQL files in the `supabase` directory in numeric order. Configure `.env.example` values through Vercel environment variables. Never commit service-role, payment or private integration secrets.
+The application continues to provide demo workspaces when Supabase is not configured. Live shared benchmarks require:
 
-## Business terminology
+- all migrations through `16_benchmark_fingerprint_lock_hardening.sql`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-- **Free:** school-created tests carry no additional per-test charge within an active annual school subscription.
-- **Complimentary:** previous-year board and entrance resources are included during an active subscription; they are not public free downloads.
+Never expose the service-role key to browser code.
+
+Automatic Vercel Git deployment remains paused. Validate with GitHub Actions and test through GitHub Codespaces before intentionally publishing production.
