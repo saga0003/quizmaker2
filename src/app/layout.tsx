@@ -1,3 +1,15 @@
-import type { Metadata } from "next";import "katex/dist/katex.min.css";import "./globals.css";import { AuthProvider } from "@/context/AuthProvider";
-export const metadata:Metadata={title:"ScholarOS — School Assessment Intelligence",description:"Subscription-based school testing, previous-year resources, secure exams and deep student analytics for Grades 8–12.",icons:{icon:"/icon.svg"}};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>}
+import type { Metadata } from "next";
+import "katex/dist/katex.min.css";
+import "./globals.css";
+import "./evidara.css";
+import { AuthProvider } from "@/context/AuthProvider";
+
+export const metadata: Metadata = {
+  title: "Evidara — Evidence-Driven Student Development",
+  description: "School assessments, anonymous shared-paper benchmarks and student intelligence that turn evidence into responsible next steps.",
+  icons: { icon: "/icon.svg" },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>;
+}
