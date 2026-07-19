@@ -41,6 +41,7 @@ V6.6 connects shared-paper benchmarks to the production question-paper and exam-
 - An earlier ordinary attempt on the same paper does not consume the benchmark opportunity.
 - Each learner contributes only the first submitted benchmark attempt for a publication.
 - Backfill can refresh validation for the same attempt without replacing it with a later attempt.
+- Every paper field included in the fingerprint is immutable after benchmark publication.
 
 ## Database migrations
 
@@ -51,6 +52,7 @@ Apply migrations in numeric order through:
 - `13_benchmark_cloud_operations.sql`
 - `14_benchmark_operation_hardening.sql`
 - `15_benchmark_security_and_lifecycle_hardening.sql`
+- `16_benchmark_fingerprint_lock_hardening.sql`
 
 ## Cloud routes
 
