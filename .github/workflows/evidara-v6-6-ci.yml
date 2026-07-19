@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - evidara-v6-6-cloud-benchmarks
+      - evidara-v6-6-release-docs
   pull_request:
     branches:
       - main
@@ -34,6 +35,8 @@ jobs:
           grep -q "start_benchmark_attempt" supabase/13_benchmark_cloud_operations.sql
           grep -q "sync_benchmark_contribution_from_attempt" supabase/13_benchmark_cloud_operations.sql
           grep -q "first-submission-only" supabase/15_benchmark_security_and_lifecycle_hardening.sql
+          grep -q "old.title is distinct from new.title" supabase/16_benchmark_fingerprint_lock_hardening.sql
+          grep -q "old.exam_type is distinct from new.exam_type" supabase/16_benchmark_fingerprint_lock_hardening.sql
           grep -q '"version": "6.6.0"' package.json
       - name: ESLint report
         id: eslint
