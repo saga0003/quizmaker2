@@ -1,10 +1,22 @@
-# ScholarOS — School Assessment Intelligence
+# Evidara — Evidence-Driven Student Development
 
-ScholarOS is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
+Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Major integrated release
+## Version 6.1
 
-This release rebuilds the functionality of the supplied offline testing platform inside ScholarOS without retaining its earlier visual design. It includes:
+This release establishes the Evidara identity while retaining the existing testing, subscription and student-lifecycle functionality.
+
+Brand implementation includes:
+
+- Approved Evidara horizontal master artwork
+- Evidara Teal, Insight Amber, Midnight Ink, Cloud White and Evidence Mist design tokens
+- Brand-aligned homepage, login, navigation and role dashboards
+- Evidara demo identities for Super Admin, School Admin, Teacher and Student
+- Accessible focus states and minimum 44 px interactive targets
+- Updated product language based on clarity, evidence, humanity and consistency
+- The original Evidara Brand Book stored under `docs/brand/`
+
+Existing product capabilities include:
 
 - School and master question banks
 - Manual MCQ, multi-correct, numerical and image-based questions
@@ -15,40 +27,35 @@ This release rebuilds the functionality of the supplied offline testing platform
 - Manual, hybrid and automatic question selection foundations
 - Duration, marks, negative marks, schedules, access codes and result modes
 - Secure attempts, autosave, timer, question palette and mark for review
-- Tab, blur and fullscreen event logging
 - Automatic evaluation and student result history
 - Student score, percentile, speed, error, mastery and intervention analytics
 - Annual school subscriptions and seat limits
-- FREE school-created tests with no per-test fee
-- COMPLIMENTARY previous-year resources unlocked by an active subscription
+- Free school-created tests with no additional per-test fee
+- Complimentary previous-year resources during an active subscription
 - Board, grade and preparation-track eligibility
-- Individual promotion and Promote All
-- Individual revoke and Revoke All
-- Permanent bulk-promotion exclusion for revoked students
+- Individual and bulk promotion
+- Individual and bulk revoke
+- Permanent promotion exclusion for revoked students
 
-## Local development
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Production build
+## Validation
 
 ```bash
+npm run typecheck
 npm run build
-npm start
 ```
 
 ## Supabase setup
 
-Apply the SQL files in the `supabase` directory in numeric order. The latest subscription, resource and promotion model is in:
-
-`supabase/08_version_5_school_subscription_lifecycle.sql`
-
-Configure the values in `.env.example` through Vercel environment variables. Never commit service-role or payment secrets.
+Apply SQL files in the `supabase` directory in numeric order. Configure `.env.example` values through Vercel environment variables. Never commit service-role, payment or private integration secrets.
 
 ## Business terminology
 
 - **Free:** school-created tests carry no additional per-test charge within an active annual school subscription.
-- **Complimentary:** previous-year board and entrance resources are included with an active subscription; they are not public free downloads.
+- **Complimentary:** previous-year board and entrance resources are included during an active subscription; they are not public free downloads.
