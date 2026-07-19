@@ -67,6 +67,8 @@ npm run typecheck
 npm run build
 ```
 
+The V6.2 release passed the focused GitHub validation workflows and generated all 47 Next.js routes in the Vercel build, including `/metric-guide/`.
+
 ## Supabase setup
 
 Apply SQL files in the `supabase` directory in numeric order. Configure `.env.example` values through Vercel environment variables. Never commit service-role, payment or private integration secrets.
