@@ -1,0 +1,19 @@
+.ev-logo{display:inline-flex;align-items:center;gap:10px;color:#14232B;height:auto;max-width:none}
+.ev-logo-symbol{position:relative;width:44px;height:44px;border:3px solid #0E5A5A;border-radius:50%;display:block;flex:0 0 auto}
+.ev-logo-symbol:before,.ev-logo-symbol:after{content:"";position:absolute;background:#0E5A5A}
+.ev-logo-symbol:before{width:3px;height:50px;left:18px;top:-6px}
+.ev-logo-symbol:after{width:50px;height:3px;left:-6px;top:18px}
+.ev-logo-symbol i{position:absolute;width:8px;height:25px;background:#0E5A5A;left:15px;top:12px;border-radius:5px 5px 1px 1px;transform:rotate(39deg);transform-origin:bottom center;z-index:2}
+.ev-logo-symbol b{position:absolute;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:15px solid #F2B84B;left:26px;top:3px;transform:rotate(42deg);z-index:3}
+.ev-logo-symbol em{position:absolute;width:10px;height:10px;border:2px solid #fff;background:#0E5A5A;border-radius:50%;left:15px;top:16px;z-index:4}
+.ev-logo-symbol span{position:absolute;width:24px;height:12px;border-bottom:5px solid #0E5A5A;border-radius:0 0 50% 50%;left:6px;bottom:3px;transform:rotate(7deg);z-index:1}
+.ev-logo-copy{display:grid;gap:1px;line-height:1}
+.ev-logo-copy strong{font-size:26px;font-weight:800;letter-spacing:-.045em;color:inherit}
+.ev-logo-copy small{font-size:8px;font-weight:700;letter-spacing:.02em;color:#0E5A5A;text-transform:none;white-space:nowrap}
+.ev-logo.compact .ev-logo-symbol{width:38px;height:38px;transform:scale(.86);transform-origin:left center}
+.ev-logo.compact .ev-logo-copy{display:none}
+.ev-logo.reversed{color:#fff}.ev-logo.reversed .ev-logo-copy small{color:#DCE9E7}
+.ev-logo.reversed .ev-logo-symbol{border-color:#fff}.ev-logo.reversed .ev-logo-symbol:before,.ev-logo.reversed .ev-logo-symbol:after,.ev-logo.reversed .ev-logo-symbol i,.ev-logo.reversed .ev-logo-symbol span{background:#fff;border-color:#fff}
+.so-sidebar .ev-logo{color:#fff}.so-sidebar .ev-logo-copy small{color:#DCE9E7}.so-sidebar .ev-logo-symbol{border-color:#fff}.so-sidebar .ev-logo-symbol:before,.so-sidebar .ev-logo-symbol:after,.so-sidebar .ev-logo-symbol i{background:#fff}.so-sidebar .ev-logo-symbol span{border-color:#fff;background:transparent}
+.ev-certificate-logo .ev-logo{justify-content:flex-start}.ev-certificate-logo .ev-logo-copy strong{font-size:38px}.ev-certificate-logo .ev-logo-copy small{font-size:11px}
+@media(max-width:760px){.ev-logo-copy strong{font-size:22px}.ev-logo-copy small{font-size:7px}}
