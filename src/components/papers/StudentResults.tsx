@@ -1,12 +1,35 @@
 "use client";
-import { useEffect, useState } from "react";
-import { BarChart3, CheckCircle2, Clock3, LoaderCircle, XCircle } from "lucide-react";
+
+import { useEffect, useMemo, useState } from "react";
+import { BarChart3, LoaderCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { AttemptResult } from "@/types/papers";
+import { SortableDataTable, type DataColumn } from "@/components/ui/SortableDataTable";
+import { MetricLabel } from "@/components/ui/MetricInfo";
+import { metricDefinitions } from "@/lib/evidaraMetrics";
+
+const demoRows:AttemptResult[]=[
+ {attempt_id:"a1",paper_title:"NEET Full Syllabus Mock 01",status:"evaluated",started_at:"2026-07-14T09:00:00Z",score:604,maximum_marks:720,percentage:83.9,correct_count:151,incorrect_count:25,unanswered_count:4} as AttemptResult,
+ {attempt_id:"a2",paper_title:"Physics Unit Test 04",status:"evaluated",started_at:"2026-06-27T09:00:00Z",score:78,maximum_marks:100,percentage:78,correct_count:32,incorrect_count:6,unanswered_count:2} as AttemptResult,
+ {attempt_id:"a3",paper_title:"Chemistry Concept Check",status:"evaluated",started_at:"2026-06-11T09:00:00Z",score:71,maximum_marks:100,percentage:71,correct_count:29,incorrect_count:8,unanswered_count:3} as AttemptResult,
+ {attempt_id:"a4",paper_title:"Foundation Diagnostic",status:"evaluated",started_at:"2026-05-12T09:00:00Z",score:58,maximum_marks:100,percentage:58,correct_count:24,incorrect_count:12,unanswered_count:4} as AttemptResult,
+];
 
 export function StudentResults(){
   const [rows,setRows]=useState<AttemptResult[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
-  useEffect(()=>{load()},[]);
-  async function load(){if(!supabase){setLoading(false);return;}const {data,error}=await supabase.rpc("list_my_attempt_results");if(error)setError(error.message);else setRows((data||[]) as AttemptResult[]);setLoading(false)}
-  return <div><div><span className="rm-label">Performance history</span><h1 style={{margin:"5px 0",fontSize:34,color:"#131e35"}}>My test results</h1><p style={{margin:0,color:"#667085"}}>Every submitted paper is stored for progress comparison in the analytics version.</p></div>{error&&<div style={{marginTop:14,padding:12,background:"#fef3f2",color:"#b42318",borderRadius:12}}>{error}</div>}{loading?<div style={{padding:45,textAlign:"center",color:"#667085"}}><LoaderCircle className="spin"/> Loading results…</div>:rows.length===0?<div className="rm-card" style={{padding:45,textAlign:"center",marginTop:18}}><BarChart3 size={32} color="#98a2b3"/><h3>No submitted tests yet</h3><p style={{color:"#667085"}}>Complete a published question paper to create your first result.</p></div>:<div style={{display:"grid",gap:13,marginTop:18}}>{rows.map(row=><article key={row.attempt_id} className="rm-card" style={{padding:18}}><div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"start",flexWrap:"wrap"}}><div><span className="rm-label">{row.status}</span><h3 style={{margin:"5px 0",color:"#131e35"}}>{row.paper_title}</h3><div style={{fontSize:12,color:"#667085"}}><Clock3 size={14}/> {new Date(row.started_at).toLocaleString()}</div></div><div style={{textAlign:"right"}}><strong style={{fontSize:28,color:row.percentage>=50?"#137a3a":"#b42318"}}>{row.score}/{row.maximum_marks}</strong><div style={{fontSize:13,color:"#667085"}}>{row.percentage}%</div></div></div><div className="result-grid" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9,marginTop:14}}><div style={{padding:11,background:"#ecfdf3",borderRadius:10,color:"#137a3a"}}><CheckCircle2 size={16}/> <strong>{row.correct_count}</strong> Correct</div><div style={{padding:11,background:"#fef3f2",borderRadius:10,color:"#b42318"}}><XCircle size={16}/> <strong>{row.incorrect_count}</strong> Incorrect</div><div style={{padding:11,background:"#f2f4f7",borderRadius:10,color:"#667085"}}><strong>{row.unanswered_count}</strong> Unanswered</div></div></article>)}</div>}<style>{`@media(max-width:560px){.result-grid{grid-template-columns:1fr!important}}`}</style></div>
+  useEffect(()=>{void load()},[]);
+  async function load(){if(!supabase){setRows(demoRows);setLoading(false);return}const {data,error:loadError}=await supabase.rpc("list_my_attempt_results");if(loadError)setError(loadError.message);else setRows((data||[]) as AttemptResult[]);setLoading(false)}
+
+  const columns=useMemo<DataColumn<AttemptResult>[]>(()=>[
+    {key:"paper",label:"Assessment",value:row=>row.paper_title,render:row=><><strong>{row.paper_title}</strong><small>{new Date(row.started_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</small></>},
+    {key:"status",label:"Status",value:row=>row.status,render:row=><span className="so-status success">{row.status}</span>,filter:{label:"statuses",value:row=>row.status}},
+    {key:"score",label:"Marks",value:row=>row.score,render:row=>`${row.score}/${row.maximum_marks}`,align:"right"},
+    {key:"percentage",label:<MetricLabel {...metricDefinitions.trend}>Score %</MetricLabel>,value:row=>row.percentage,render:row=>`${Number(row.percentage).toFixed(1)}%`,align:"right"},
+    {key:"correct",label:"Correct",value:row=>row.correct_count,align:"right"},
+    {key:"incorrect",label:"Incorrect",value:row=>row.incorrect_count,render:row=><span style={{color:"#9A6508",fontWeight:750}}>{row.incorrect_count}</span>,align:"right"},
+    {key:"unanswered",label:"Unanswered",value:row=>row.unanswered_count,align:"right"},
+    {key:"date",label:"Date",value:row=>new Date(row.started_at),render:row=>new Date(row.started_at).toLocaleDateString("en-IN"),align:"right"},
+  ],[]);
+
+  return <div><div className="so-page-head"><div><span className="so-kicker">PERFORMANCE HISTORY</span><h1>My assessment results</h1><p>Search and sort by test, marks, percentage, date or response outcome. Use the analytics view to understand why the result changed and what should happen next.</p></div><span className="so-status neutral">{rows.length} result cycles</span></div>{error&&<div className="so-notice warning">{error}</div>}{loading?<div style={{padding:45,textAlign:"center",color:"#6B7980"}}><LoaderCircle className="spin"/> Loading results…</div>:rows.length===0?<div className="so-card so-pad" style={{textAlign:"center"}}><BarChart3 size={32} color="#AEB8BC"/><h3>No submitted tests yet</h3><p style={{color:"#6B7980"}}>Complete a published question paper to create your first evidence cycle.</p></div>:<section className="so-card so-pad"><SortableDataTable rows={rows} columns={columns} rowKey={row=>row.attempt_id} searchText={row=>`${row.paper_title} ${row.status} ${row.score} ${row.percentage}`} searchPlaceholder="Search test, marks, percentage or status" initialSortKey="date" initialSortDirection="desc"/></section>}</div>;
 }
