@@ -6,12 +6,16 @@ export async function GET() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const configured = Boolean(supabaseUrl && supabasePublicKey);
+  const serverReady = Boolean(configured && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const healthy = !configured || serverReady;
 
   return NextResponse.json(
     {
-      healthy: true,
-      release: "4.0.1",
-      mode: configured ? "supabase" : "interactive-demo",
+      healthy,
+      release: "6.7.0",
+      configured,
+      serverReady,
+      mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
       modules: [
         "question-bank",
         "imports",
@@ -21,8 +25,15 @@ export async function GET() {
         "subscriptions",
         "promotion",
         "resources",
+        "shared-benchmarks",
+        "achievements",
+        "verifiable-certificates",
       ],
+      issue: healthy ? null : "SUPABASE_SERVICE_ROLE_KEY is required for authenticated server operations.",
     },
-    { headers: { "Cache-Control": "no-store" } },
+    {
+      status: healthy ? 200 : 503,
+      headers: { "Cache-Control": "no-store" },
+    },
   );
 }
