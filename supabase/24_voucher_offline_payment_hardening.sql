@@ -254,12 +254,12 @@ declare
 begin
   if not public.is_super_admin() then raise exception 'Super-admin access required.'; end if;
   if v_code !~ '^[A-Z0-9_-]{4,32}$' then raise exception 'Voucher code must contain 4–32 letters, numbers, hyphens or underscores.'; end if;
-  if p_discount_percent < 1 or p_discount_percent > 100 then raise exception 'Discount must be between 1% and 100%.'; end if;
+  if p_discount_percent < 1 or p_discount_percent > 100 then raise exception 'Discount must be between 1%% and 100%%.'; end if;
   if p_usage_limit is not null and p_usage_limit < 1 then raise exception 'Usage limit must be positive.'; end if;
   if coalesce(p_per_user_limit, 0) < 1 then raise exception 'Per-user limit must be positive.'; end if;
   if p_usage_limit is not null and p_per_user_limit > p_usage_limit then raise exception 'Per-user limit cannot exceed total usage limit.'; end if;
   if p_starts_at is not null and p_ends_at is not null and p_ends_at <= p_starts_at then raise exception 'Voucher end time must be after its start time.'; end if;
-  if p_discount_percent = 100 and v_email is null and p_organization_id is null then raise exception 'A 100% voucher must be assigned to an email address or school.'; end if;
+  if p_discount_percent = 100 and v_email is null and p_organization_id is null then raise exception 'A 100%% voucher must be assigned to an email address or school.'; end if;
   if p_purpose = 'offline_payment' and (v_offline_reference is null or coalesce(p_offline_amount_paise, 0) <= 0) then
     raise exception 'Offline-payment vouchers require a payment reference and amount.';
   end if;
@@ -344,7 +344,7 @@ begin
 
   if v_order.voucher_id is null or v_order.amount_paise <> 0 then raise exception 'Order is not eligible for voucher fulfilment.'; end if;
   select * into v_voucher from public.voucher_codes where id = v_order.voucher_id for update;
-  if not found or v_voucher.discount_percent <> 100 then raise exception 'A valid 100% voucher is required.'; end if;
+  if not found or v_voucher.discount_percent <> 100 then raise exception 'A valid 100%% voucher is required.'; end if;
   if not v_voucher.active then raise exception 'Voucher is inactive.'; end if;
   if v_voucher.starts_at is not null and v_voucher.starts_at > now() then raise exception 'Voucher is not active yet.'; end if;
   if v_voucher.ends_at is not null and v_voucher.ends_at < now() then raise exception 'Voucher has expired.'; end if;
