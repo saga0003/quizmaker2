@@ -48,6 +48,9 @@ jobs:
           grep -q "#0E5A5A" src/app/api/certificates/route.ts
           grep -q "#F2B84B" src/app/api/certificates/route.ts
           grep -q "not a prediction, permanent label or guarantee" src/app/api/certificates/route.ts
+          grep -q "certificate_withdrawn" src/app/api/certificates/route.ts
+          grep -q "url.origin" src/app/api/certificates/route.ts
+          ! grep -q 'issued_at,status,revoked_at,revoked_reason' src/app/api/certificates/route.ts
           ! grep -qi "#7456e8" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
           ! grep -qi "#18b7a0" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
           grep -q "22_achievement_certificate_restore_hardening.sql" README.md
