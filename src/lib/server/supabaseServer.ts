@@ -7,13 +7,14 @@ const publicKey =
   "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
+export const isPublicSupabaseConfigured = Boolean(supabaseUrl && publicKey);
 export const isServerSupabaseConfigured = Boolean(
-  supabaseUrl && publicKey && serviceKey,
+  isPublicSupabaseConfigured && serviceKey,
 );
 
 export function createServiceClient(): SupabaseClient {
   if (!isServerSupabaseConfigured) {
-    throw new Error("ScholarOS cloud environment is not configured.");
+    throw Object.assign(new Error("Evidara server-side Supabase environment is incomplete."), { status: 503 });
   }
   return createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -21,8 +22,8 @@ export function createServiceClient(): SupabaseClient {
 }
 
 export function createRequestClient(accessToken: string): SupabaseClient {
-  if (!supabaseUrl || !publicKey) {
-    throw new Error("ScholarOS public Supabase environment is not configured.");
+  if (!isPublicSupabaseConfigured) {
+    throw Object.assign(new Error("Evidara public Supabase environment is not configured."), { status: 503 });
   }
   return createClient(supabaseUrl, publicKey, {
     global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -36,6 +37,10 @@ export async function authenticateRequest(request: Request): Promise<{
   client: SupabaseClient;
   admin: SupabaseClient;
 }> {
+  if (isPublicSupabaseConfigured && !isServerSupabaseConfigured) {
+    throw Object.assign(new Error("Evidara cloud is partially configured. Add the server service-role key before using authenticated cloud operations."), { status: 503 });
+  }
+
   const authorization = request.headers.get("authorization") ?? "";
   const accessToken = authorization.startsWith("Bearer ")
     ? authorization.slice(7)
