@@ -28,6 +28,13 @@ function xml(value: string) {
   return value.replace(/[<>&"']/g, (character) => xmlEntities[character] ?? character);
 }
 
+function publicSnapshot(certificate: PublicCertificate): PublicCertificate {
+  return {
+    ...certificate,
+    revoked_reason: certificate.status === "revoked" ? "certificate_withdrawn" : null,
+  };
+}
+
 function wrap(value: string, maximum = 78) {
   const words = value.trim().split(/\s+/);
   const lines: string[] = [];
@@ -54,11 +61,12 @@ async function approvedLogoDataUri() {
   return cachedApprovedLogo;
 }
 
-function certificateSvg(certificate: PublicCertificate, approvedLogo: string | null) {
+function certificateSvg(certificate: PublicCertificate, approvedLogo: string | null, origin: string) {
   const issued = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(certificate.issued_at));
   const evidenceLines = wrap(certificate.evidence_summary);
   const revoked = certificate.status === "revoked";
-  const logoHref = approvedLogo ?? "/brand/evidara-logo-light.png";
+  const logoHref = approvedLogo ?? `${origin}/brand/evidara-logo-light.png`;
+  const verificationUrl = `${origin}/verify/certificate/${encodeURIComponent(certificate.verification_code)}/`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1131" viewBox="0 0 1600 1131" role="img" aria-label="Evidara achievement certificate">
   <defs>
@@ -75,7 +83,7 @@ function certificateSvg(certificate: PublicCertificate, approvedLogo: string | n
   <path d="M90 920 C300 830 470 985 650 930" fill="none" stroke="#DCE9E7" stroke-width="10" opacity="0.66"/>
   <circle cx="238" cy="884" r="6" fill="#F2B84B"/>
 
-  <image href="${logoHref}" x="118" y="104" width="400" height="148" preserveAspectRatio="xMinYMid meet"/>
+  <image href="${xml(logoHref)}" x="118" y="104" width="400" height="148" preserveAspectRatio="xMinYMid meet"/>
   <g font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="end">
     <text x="1450" y="146" font-size="14" font-weight="700" letter-spacing="2.2" fill="#44545C">EVIDENCE-BACKED RECOGNITION</text>
     <text x="1450" y="176" font-size="13" fill="#6B7980">Private · Verifiable · Rule ${xml(certificate.rule_version)}</text>
@@ -102,7 +110,7 @@ function certificateSvg(certificate: PublicCertificate, approvedLogo: string | n
     <text x="132" y="988">Issued: ${xml(issued)}</text>
     <text x="132" y="1015">Rule version: ${xml(certificate.rule_version)}</text>
     <text x="1468" y="988" text-anchor="end">Certificate: ${xml(certificate.certificate_number)}</text>
-    <text x="1468" y="1015" text-anchor="end">Verify: /verify/certificate/${xml(certificate.verification_code)}/</text>
+    <text x="1468" y="1015" text-anchor="end">Verify: ${xml(verificationUrl)}</text>
   </g>
   <text x="800" y="1044" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" fill="#6B7980">This certificate recognises the cited evidence only. It is not a prediction, permanent label or guarantee of a future result.</text>
 
@@ -111,19 +119,22 @@ function certificateSvg(certificate: PublicCertificate, approvedLogo: string | n
 }
 
 async function loadCertificate(code: string): Promise<PublicCertificate | null> {
-  if (!isPublicSupabaseConfigured) return demoPublicCertificates[code] ?? null;
+  if (!isPublicSupabaseConfigured) {
+    const certificate = demoPublicCertificates[code] ?? null;
+    return certificate ? publicSnapshot(certificate) : null;
+  }
   if (!isServerSupabaseReady) {
     throw Object.assign(new Error("Evidara cloud is partially configured. Certificate verification requires the server service-role key."), { status: 503 });
   }
   const admin = createServiceClient();
   const { data, error } = await admin
     .from("achievement_certificates")
-    .select("certificate_number,verification_code,student_name_snapshot,organization_name_snapshot,achievement_title_snapshot,achievement_description_snapshot,rule_version,evidence_summary,issued_at,status,revoked_at,revoked_reason")
+    .select("certificate_number,verification_code,student_name_snapshot,organization_name_snapshot,achievement_title_snapshot,achievement_description_snapshot,rule_version,evidence_summary,issued_at,status,revoked_at")
     .eq("verification_code", code)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return {
+  return publicSnapshot({
     certificate_number: data.certificate_number,
     verification_code: data.verification_code,
     student_name: data.student_name_snapshot,
@@ -135,8 +146,8 @@ async function loadCertificate(code: string): Promise<PublicCertificate | null> 
     issued_at: data.issued_at,
     status: data.status,
     revoked_at: data.revoked_at,
-    revoked_reason: data.revoked_reason,
-  } as PublicCertificate;
+    revoked_reason: null,
+  } as PublicCertificate);
 }
 
 export async function GET(request: Request) {
@@ -149,7 +160,7 @@ export async function GET(request: Request) {
 
     if (url.searchParams.get("format") === "svg") {
       const approvedLogo = await approvedLogoDataUri();
-      return new NextResponse(certificateSvg(certificate, approvedLogo), {
+      return new NextResponse(certificateSvg(certificate, approvedLogo, url.origin), {
         status: 200,
         headers: {
           ...verificationHeaders,
