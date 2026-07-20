@@ -73,6 +73,7 @@ function CheckRow({ item }: { item: ReadinessCheck }) {
 
 export function SystemReadinessDashboard() {
   const { session, configured } = useAuth();
+  const accessToken = session?.access_token;
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; action?: string | null; details?: string | null } | null>(null);
@@ -82,7 +83,7 @@ export function SystemReadinessDashboard() {
     setError(null);
     try {
       const response = await fetch("/api/admin/readiness", {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
         cache: "no-store",
       });
       const payload = await response.json() as ReadinessReport & { error?: string; action?: string | null; details?: string | null };
@@ -104,7 +105,7 @@ export function SystemReadinessDashboard() {
     } finally {
       setBusy(false);
     }
-  }, [session?.access_token]);
+  }, [accessToken]);
 
   useEffect(() => {
     void load();
