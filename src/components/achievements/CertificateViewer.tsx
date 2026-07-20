@@ -32,7 +32,7 @@ export function CertificateViewer({code}:{code?:string}){
 
   if(loading)return <main className={styles.verifyPage}><div className={styles.loading}><div><LoaderCircle className="spin"/><p>Verifying Evidara certificate…</p></div></div></main>;
 
-  if(error||!certificate)return <main className={styles.verifyPage}><div className={styles.verifyNav}><Link href="/"><Logo/></Link></div><section className={styles.verificationForm}><ShieldAlert size={34} color="#b42318"/><span className="so-kicker">VERIFICATION FAILED</span><h1>Certificate not found</h1><p>{error||"No Evidara certificate matches this verification code."}</p><Link className={styles.primaryButton} href="/verify/certificate/">Try another code</Link></section></main>;
+  if(error||!certificate)return <main className={styles.verifyPage}><div className={styles.verifyNav}><Link href="/"><Logo/></Link></div><section className={styles.verificationForm}><ShieldAlert size={34} color="#B54747"/><span className="so-kicker">VERIFICATION FAILED</span><h1>Certificate not found</h1><p>{error||"No Evidara certificate matches this verification code."}</p><Link className={styles.primaryButton} href="/verify/certificate/">Try another code</Link></section></main>;
 
   const revoked=certificate.status==="revoked";
   return <main className={styles.verifyPage}>
@@ -46,6 +46,7 @@ export function CertificateViewer({code}:{code?:string}){
       <div className={styles.awardTitle}>{certificate.achievement_title}</div><p className={styles.awardDescription}>{certificate.achievement_description}</p><p className={styles.evidenceSummary}>{certificate.evidence_summary}</p>
       <div className={styles.seal}><ShieldCheck size={48}/></div>
       <div className={styles.certificateMeta}><div><strong>Issued</strong><br/>{new Date(certificate.issued_at).toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric",timeZone:"UTC"})}<br/>Rule {certificate.rule_version}</div><div><strong>{certificate.certificate_number}</strong><br/>Verification code<br/>{certificate.verification_code}</div></div>
+      <div className={styles.certificateNote}>This certificate recognises the cited evidence only. It is not a prediction, permanent label or guarantee of a future result.</div>
     </div></article></div>
     {revoked&&<div className={`${styles.notice} ${styles.noticeError}`} style={{maxWidth:1180,margin:"18px auto 0"}}><ShieldAlert size={17}/><span>Revoked on {certificate.revoked_at?new Date(certificate.revoked_at).toLocaleDateString("en-IN"):"a recorded date"}. Reason: {certificate.revoked_reason?.replaceAll("_"," ")||"certificate withdrawn"}.</span></div>}
   </main>;
