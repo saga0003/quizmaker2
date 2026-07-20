@@ -2,7 +2,30 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.7
+## Version 6.7.1 production release
+
+Version 6.7.1 preserves the merged V6.7 achievement and certificate release and adds its production commerce and hosting layer:
+
+- Supabase-backed products, orders, payments and entitlements
+- Razorpay Standard Checkout with server-created Orders
+- mandatory server-side signature, amount, currency and captured-status verification
+- idempotent Razorpay webhook fulfilment
+- Super Admin percentage vouchers from 1% to 100%
+- account-, school-, product-, date- and usage-bound voucher controls
+- auditable offline-payment, scholarship and manual-access vouchers
+- zero-value entitlement fulfilment without creating fake gateway payments
+- Super Admin voucher register and redemption ledger
+- origin allow-listing for authenticated payment functions
+- Cloudflare Workers deployment through OpenNext
+- manual GitHub Actions workflows for Cloudflare and Supabase payment functions
+
+Production setup is documented in:
+
+```text
+docs/V6_7_PRODUCTION_SETUP.md
+```
+
+## Version 6.7 recognition
 
 Version 6.7 adds transparent, evidence-backed achievements and link-only verifiable certificates to the real assessment and shared-benchmark engine.
 
@@ -39,6 +62,25 @@ Included in this release:
 - Benchmark Distinction
 
 Every badge displays its rule version and evidence summary. Achievements recognise a specific result, milestone or current evidence window; they do not define intelligence, character, ability or future potential.
+
+## Voucher and offline-payment rules
+
+Only Super Admin can create or edit production vouchers.
+
+- Discounts are percentage-only.
+- The allowed range is 1–100%.
+- A 100% voucher must be assigned to an account email or school.
+- Offline-payment vouchers require the amount received and a transaction, receipt or invoice reference.
+- Partial vouchers reduce the Razorpay order amount.
+- A 100% voucher creates a zero-value internal order and an auditable redemption record.
+- Voucher constraints and totals are recalculated inside Postgres before the order is accepted.
+- Access is granted only by a captured Razorpay payment or the service-role-only voucher fulfilment function.
+
+Super Admin controls are available at:
+
+```text
+/admin/products/
+```
 
 ## Certificate brand standard
 
@@ -88,22 +130,52 @@ Apply all SQL files in numeric order through:
 - `supabase/21_achievement_concurrency_hardening.sql`
 - `supabase/22_achievement_certificate_restore_hardening.sql`
 - `supabase/23_achievement_benchmark_validity_hardening.sql`
+- `supabase/24_voucher_offline_payment_hardening.sql`
 
 ## Main V6.7 routes
 
 - `/student/achievements/`
 - `/school/achievements/`
 - `/admin/achievements/`
+- `/admin/products/`
+- `/products/`
 - `/verify/certificate/`
 - `/verify/certificate/[code]/`
 - `/api/achievements`
 - `/api/certificates`
+- `/api/config`
+- `/api/health`
 
 Demo verification code:
 
 ```text
 demo-evidara-2026
 ```
+
+## Payment Edge Functions
+
+- `create-razorpay-order`
+- `verify-razorpay-payment`
+- `razorpay-webhook`
+
+Razorpay credentials and the allowed application origins are stored as Supabase Edge Function secrets, not as browser variables.
+
+## Cloudflare deployment
+
+The full-stack Next.js application is configured for Cloudflare Workers with:
+
+- `wrangler.jsonc`
+- `@opennextjs/cloudflare`
+- `npm run cf:build`
+- `npm run cf:preview`
+- `npm run cf:deploy`
+
+Manual deployment workflows:
+
+- `Deploy Evidara to Cloudflare`
+- `Deploy Evidara Supabase Payment Functions`
+
+Automatic production deployment remains intentionally disabled. Production releases require a manual workflow run from the protected GitHub `production` environment.
 
 ## Preserved capabilities
 
@@ -130,19 +202,22 @@ npm run dev
 npm run lint
 npm run typecheck
 npm run build
+npm run cf:build
+npm run cf:preview
 ```
 
 ## Cloud activation boundary
 
-The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7 recognition requires:
+The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7.1 requires:
 
-- all migrations through `23_achievement_benchmark_validity_hardening.sql`
+- all migrations through `24_voucher_offline_payment_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- deployed Supabase payment Edge Functions
+- Razorpay Edge Function secrets
+- Cloudflare application variables and secrets
 
 When public Supabase settings exist without the server service-role key, Evidara reports `supabase-partial` and returns a 503 for authenticated server operations instead of silently selecting demo data.
 
-Never expose the service-role key to browser code.
-
-Automatic Vercel Git deployment remains paused. Validate with GitHub Actions and test through GitHub Codespaces before intentionally publishing production.
+Never expose the service-role key, Razorpay Key Secret, webhook secret, Supabase access token or Cloudflare API token to browser code or commit them to GitHub.
