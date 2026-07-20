@@ -27,62 +27,25 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify V6.8 baseline, readiness, commerce, privacy and deployment targets
+      - name: Generate production baseline report
         run: |
-          grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
-          grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
-          grep -q "visibility text not null default 'link_only'" supabase/17_achievement_badge_schema.sql
-          grep -q "revoke all on public.student_achievements from anon, authenticated" supabase/17_achievement_badge_schema.sql
-          grep -q "create aggregate public.max(uuid)" supabase/19_achievement_uuid_aggregate_compatibility.sql
-          grep -q "achievement.evidence_re_evaluated" supabase/20_achievement_evidence_audit_hardening.sql
-          grep -q "pg_advisory_xact_lock" supabase/21_achievement_concurrency_hardening.sql
-          grep -q "achievement_award_lock_key" supabase/21_achievement_concurrency_hardening.sql
-          grep -q "A newer active certificate already exists" supabase/22_achievement_certificate_restore_hardening.sql
-          grep -q "Restore the linked achievement" supabase/22_achievement_certificate_restore_hardening.sql
-          grep -q "achievement_exam_attempt_is_valid" supabase/23_achievement_benchmark_validity_hardening.sql
-          grep -q "contribution.is_valid = true" supabase/23_achievement_benchmark_validity_hardening.sql
-          grep -q "public.achievement_exam_attempt_is_valid(a.id, a.metadata)" supabase/23_achievement_benchmark_validity_hardening.sql
-          grep -q "discount_percent integer not null check (discount_percent between 1 and 100)" supabase/24_voucher_offline_payment_hardening.sql
-          grep -q "fulfill_voucher_order" supabase/24_voucher_offline_payment_hardening.sql
-          grep -q "100% voucher must be assigned" supabase/24_voucher_offline_payment_hardening.sql
-          grep -q "voucher_redemptions" supabase/24_voucher_offline_payment_hardening.sql
-          grep -q "APP_ORIGINS" supabase/functions/create-razorpay-order/index.ts
-          grep -q "evidara_order_id" supabase/functions/create-razorpay-order/index.ts
-          grep -q "free_access" supabase/functions/create-razorpay-order/index.ts
-          grep -q "payment signature verification failed" -i supabase/functions/verify-razorpay-payment/index.ts
-          grep -q "AdminVoucherManager" src/app/admin/products/page.tsx
-          grep -q "name: \"Evidara\"" src/components/commerce/ProductStore.tsx
-          grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
-          grep -q "supabase-partial" src/app/api/health/route.ts
-          grep -q "pageSize = 500" src/app/api/achievements/route.ts
-          grep -q "limit: 5000" src/app/api/achievements/route.ts
-          grep -q "chunks(achievementIds)" src/app/api/achievements/route.ts
-          grep -q "chunks(studentIds)" src/app/api/achievements/route.ts
-          grep -q "X-Robots-Tag" src/app/api/certificates/route.ts
-          grep -q "X-Robots-Tag" next.config.ts
-          grep -q "evidara-logo-light.png" src/app/api/certificates/route.ts
-          grep -q "outputFileTracingIncludes" next.config.ts
-          grep -q "#0E5A5A" src/app/api/certificates/route.ts
-          grep -q "#F2B84B" src/app/api/certificates/route.ts
-          grep -q "not a prediction, permanent label or guarantee" src/app/api/certificates/route.ts
-          grep -q "certificate_withdrawn" src/app/api/certificates/route.ts
-          grep -q "url.origin" src/app/api/certificates/route.ts
-          ! grep -q 'issued_at,status,revoked_at,revoked_reason' src/app/api/certificates/route.ts
-          ! grep -qi "#7456e8" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
-          ! grep -qi "#18b7a0" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
-          grep -q '"main": ".open-next/worker.js"' wrangler.jsonc
-          grep -q '"nodejs_compat"' wrangler.jsonc
-          grep -q "24_voucher_offline_payment_hardening.sql" README.md
-          grep -q '"version": "6.8.0"' package.json
-          grep -q 'release: "6.8.0"' src/app/api/health/route.ts
-          grep -q 'release: "6.8.0"' src/app/api/config/route.ts
-          grep -q 'ProtectedPage allowed="admin"' src/app/admin/readiness/page.tsx
-          grep -q 'fulfill_voucher_order' src/app/api/admin/readiness/route.ts
-          grep -q 'functions.invoke<RazorpayDiagnostic>("readiness-check"' src/app/api/admin/readiness/route.ts
-          grep -q 'startsWith("rzp_test_")' supabase/functions/readiness-check/index.ts
-          grep -q 'startsWith("rzp_live_")' supabase/functions/readiness-check/index.ts
-          grep -q 'evidara-v6-8-production-qa' .github/workflows/evidara-v6-8-qa.yml
-          ! grep -qi 'vercel' .github/workflows/evidara-v6-8-qa.yml
+          set +e
+          node scripts/production-baseline-smoke.mjs > production-baseline-report.txt 2>&1
+          echo "$?" > production-baseline-status.txt
+          cat production-baseline-report.txt
+          exit 0
+      - name: Upload production baseline report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v6-8-production-baseline
+          path: |
+            production-baseline-report.txt
+            production-baseline-status.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce production baseline
+        run: test "$(cat production-baseline-status.txt)" = "0"
       - name: ESLint report
         id: eslint
         continue-on-error: true
