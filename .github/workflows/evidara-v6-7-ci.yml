@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify V6.7 schema, privacy, scale and brand targets
+      - name: Verify V6.7 schema, privacy, evidence, scale and brand targets
         run: |
           grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
           grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
@@ -39,6 +39,9 @@ jobs:
           grep -q "achievement_award_lock_key" supabase/21_achievement_concurrency_hardening.sql
           grep -q "A newer active certificate already exists" supabase/22_achievement_certificate_restore_hardening.sql
           grep -q "Restore the linked achievement" supabase/22_achievement_certificate_restore_hardening.sql
+          grep -q "achievement_exam_attempt_is_valid" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "contribution.is_valid = true" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "public.achievement_exam_attempt_is_valid(a.id, a.metadata)" supabase/23_achievement_benchmark_validity_hardening.sql
           grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
           grep -q "supabase-partial" src/app/api/health/route.ts
           grep -q "pageSize = 500" src/app/api/achievements/route.ts
@@ -57,7 +60,7 @@ jobs:
           ! grep -q 'issued_at,status,revoked_at,revoked_reason' src/app/api/certificates/route.ts
           ! grep -qi "#7456e8" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
           ! grep -qi "#18b7a0" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
-          grep -q "22_achievement_certificate_restore_hardening.sql" README.md
+          grep -q "23_achievement_benchmark_validity_hardening.sql" README.md
           grep -q '"version": "6.7.0"' package.json
       - name: ESLint report
         id: eslint
