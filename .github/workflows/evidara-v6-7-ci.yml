@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify V6.7 schema, privacy and brand targets
+      - name: Verify V6.7 schema, privacy, scale and brand targets
         run: |
           grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
           grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
@@ -41,6 +41,10 @@ jobs:
           grep -q "Restore the linked achievement" supabase/22_achievement_certificate_restore_hardening.sql
           grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
           grep -q "supabase-partial" src/app/api/health/route.ts
+          grep -q "pageSize = 500" src/app/api/achievements/route.ts
+          grep -q "limit: 5000" src/app/api/achievements/route.ts
+          grep -q "chunks(achievementIds)" src/app/api/achievements/route.ts
+          grep -q "chunks(studentIds)" src/app/api/achievements/route.ts
           grep -q "X-Robots-Tag" src/app/api/certificates/route.ts
           grep -q "X-Robots-Tag" next.config.ts
           grep -q "evidara-logo-light.png" src/app/api/certificates/route.ts
