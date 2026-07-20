@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import { createServiceClient, isPublicSupabaseConfigured, isServerSupabaseReady } from "@/lib/server/supabaseServer";
 import { demoPublicCertificates } from "@/lib/demoAchievements";
@@ -15,6 +17,8 @@ const xmlEntities: Record<string, string> = {
   "\"": "&quot;",
   "'": "&apos;",
 };
+
+let cachedApprovedLogo: string | null | undefined;
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers: verificationHeaders });
@@ -39,50 +43,70 @@ function wrap(value: string, maximum = 78) {
   return lines.slice(0, 3);
 }
 
-function certificateSvg(certificate: PublicCertificate) {
+async function approvedLogoDataUri() {
+  if (cachedApprovedLogo !== undefined) return cachedApprovedLogo;
+  try {
+    const logo = await readFile(path.join(process.cwd(), "public", "brand", "evidara-logo-light.png"));
+    cachedApprovedLogo = `data:image/png;base64,${logo.toString("base64")}`;
+  } catch {
+    cachedApprovedLogo = null;
+  }
+  return cachedApprovedLogo;
+}
+
+function certificateSvg(certificate: PublicCertificate, approvedLogo: string | null) {
   const issued = new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(certificate.issued_at));
   const evidenceLines = wrap(certificate.evidence_summary);
   const revoked = certificate.status === "revoked";
+  const logoHref = approvedLogo ?? "/brand/evidara-logo-light.png";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1131" viewBox="0 0 1600 1131" role="img" aria-label="Evidara achievement certificate">
   <defs>
-    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfcfe"/><stop offset="1" stop-color="#f1f6f7"/></linearGradient>
-    <linearGradient id="seal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#18b7a0"/><stop offset="1" stop-color="#7456e8"/></linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0b1324" flood-opacity="0.12"/></filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#14232B" flood-opacity="0.08"/></filter>
   </defs>
-  <rect width="1600" height="1131" fill="#e9eef3"/>
-  <rect x="44" y="44" width="1512" height="1043" rx="24" fill="url(#paper)" filter="url(#shadow)"/>
-  <rect x="66" y="66" width="1468" height="999" rx="18" fill="none" stroke="#0b1324" stroke-width="3"/>
-  <rect x="83" y="83" width="1434" height="965" rx="13" fill="none" stroke="#18b7a0" stroke-width="1.5" opacity="0.75"/>
-  <g transform="translate(132 118)">
-    <rect width="72" height="72" rx="20" fill="#0b1324"/>
-    <rect x="19" y="38" width="9" height="18" rx="4.5" fill="#18b7a0"/>
-    <rect x="32" y="21" width="9" height="35" rx="4.5" fill="#8d76ef"/>
-    <rect x="45" y="29" width="9" height="27" rx="4.5" fill="#f3ad5f"/>
-    <text x="94" y="31" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="800" fill="#0b1324">EVIDARA</text>
-    <text x="94" y="56" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing="2.3" fill="#697386">EVIDENCE-DRIVEN STUDENT DEVELOPMENT</text>
+  <rect width="1600" height="1131" fill="#DCE9E7"/>
+  <rect x="44" y="44" width="1512" height="1043" rx="22" fill="#F7F9F7" filter="url(#shadow)"/>
+  <rect x="66" y="66" width="1468" height="999" rx="17" fill="none" stroke="#0E5A5A" stroke-width="4"/>
+  <rect x="84" y="84" width="1432" height="963" rx="12" fill="none" stroke="#DCE9E7" stroke-width="2"/>
+
+  <path d="M1260 104 A260 260 0 0 1 1510 354" fill="none" stroke="#DCE9E7" stroke-width="12" opacity="0.72"/>
+  <path d="M1298 104 A220 220 0 0 1 1510 316" fill="none" stroke="#0E5A5A" stroke-width="2" opacity="0.25"/>
+  <circle cx="1438" cy="202" r="8" fill="#F2B84B"/>
+  <path d="M90 920 C300 830 470 985 650 930" fill="none" stroke="#DCE9E7" stroke-width="10" opacity="0.66"/>
+  <circle cx="238" cy="884" r="6" fill="#F2B84B"/>
+
+  <image href="${logoHref}" x="118" y="104" width="400" height="148" preserveAspectRatio="xMinYMid meet"/>
+  <g font-family="Inter, Arial, Helvetica, sans-serif" text-anchor="end">
+    <text x="1450" y="146" font-size="14" font-weight="700" letter-spacing="2.2" fill="#44545C">EVIDENCE-BACKED RECOGNITION</text>
+    <text x="1450" y="176" font-size="13" fill="#6B7980">Private · Verifiable · Rule ${xml(certificate.rule_version)}</text>
   </g>
-  <text x="800" y="286" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="29" letter-spacing="8" fill="#697386">CERTIFICATE OF ACHIEVEMENT</text>
-  <line x1="525" y1="318" x2="1075" y2="318" stroke="#18b7a0" stroke-width="3"/>
-  <text x="800" y="390" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#697386">This evidence-backed recognition is presented to</text>
-  <text x="800" y="480" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="64" font-weight="700" fill="#0b1324">${xml(certificate.student_name)}</text>
-  <text x="800" y="526" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#697386">of ${xml(certificate.organization_name)}</text>
-  <text x="800" y="617" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" letter-spacing="3" font-weight="800" fill="#7456e8">${xml(certificate.achievement_title.toUpperCase())}</text>
-  <text x="800" y="666" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#25324a">${xml(certificate.achievement_description)}</text>
-  ${evidenceLines.map((line, index) => `<text x="800" y="${723 + index * 30}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#697386">${xml(line)}</text>`).join("\n  ")}
-  <g transform="translate(800 850)">
-    <circle r="74" fill="url(#seal)"/>
-    <circle r="59" fill="none" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 6" opacity="0.9"/>
-    <path d="M-20 0l14 15 29-35" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-    <text y="42" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="800" letter-spacing="1.6" fill="#fff">VERIFIED EVIDENCE</text>
+
+  <text x="800" y="322" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="7" fill="#44545C">CERTIFICATE OF ACHIEVEMENT</text>
+  <line x1="584" y1="353" x2="1016" y2="353" stroke="#F2B84B" stroke-width="5" stroke-linecap="round"/>
+  <text x="800" y="414" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="19" fill="#6B7980">This evidence-backed recognition is presented to</text>
+  <text x="800" y="500" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="62" font-weight="800" fill="#14232B">${xml(certificate.student_name)}</text>
+  <text x="800" y="548" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="18" fill="#44545C">of ${xml(certificate.organization_name)}</text>
+  <text x="800" y="635" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="19" letter-spacing="3" font-weight="800" fill="#0E5A5A">${xml(certificate.achievement_title.toUpperCase())}</text>
+  <text x="800" y="684" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="22" fill="#14232B">${xml(certificate.achievement_description)}</text>
+  ${evidenceLines.map((line, index) => `<text x="800" y="${738 + index * 30}" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="17" fill="#44545C">${xml(line)}</text>`).join("\n  ")}
+
+  <g transform="translate(800 884)">
+    <circle r="70" fill="#0E5A5A"/>
+    <circle r="55" fill="none" stroke="#DCE9E7" stroke-width="2" stroke-dasharray="4 6"/>
+    <path d="M-18 12 L-2 -28 L18 12 L0 2 Z" fill="#F7F9F7"/>
+    <circle cx="18" cy="-20" r="7" fill="#F2B84B"/>
+    <text y="45" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="10" font-weight="800" letter-spacing="1.4" fill="#F7F9F7">VERIFIED EVIDENCE</text>
   </g>
-  <g font-family="Arial, Helvetica, sans-serif" fill="#697386" font-size="13">
-    <text x="145" y="988">Issued: ${xml(issued)}</text>
-    <text x="145" y="1015">Rule version: ${xml(certificate.rule_version)}</text>
-    <text x="1455" y="988" text-anchor="end">Certificate: ${xml(certificate.certificate_number)}</text>
-    <text x="1455" y="1015" text-anchor="end">Verify: /verify/certificate/${xml(certificate.verification_code)}/</text>
+
+  <g font-family="Inter, Arial, Helvetica, sans-serif" fill="#44545C" font-size="13">
+    <text x="132" y="988">Issued: ${xml(issued)}</text>
+    <text x="132" y="1015">Rule version: ${xml(certificate.rule_version)}</text>
+    <text x="1468" y="988" text-anchor="end">Certificate: ${xml(certificate.certificate_number)}</text>
+    <text x="1468" y="1015" text-anchor="end">Verify: /verify/certificate/${xml(certificate.verification_code)}/</text>
   </g>
-  ${revoked ? `<g transform="rotate(-18 800 560)"><rect x="480" y="490" width="640" height="140" rx="18" fill="#fff" fill-opacity="0.78" stroke="#b42318" stroke-width="8"/><text x="800" y="580" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="900" letter-spacing="12" fill="#b42318">REVOKED</text></g>` : ""}
+  <text x="800" y="1044" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="11" fill="#6B7980">This certificate recognises the cited evidence only. It is not a prediction, permanent label or guarantee of a future result.</text>
+
+  ${revoked ? `<g transform="rotate(-18 800 560)"><rect x="480" y="490" width="640" height="140" rx="18" fill="#F7F9F7" fill-opacity="0.9" stroke="#B54747" stroke-width="8"/><text x="800" y="580" text-anchor="middle" font-family="Inter, Arial, Helvetica, sans-serif" font-size="82" font-weight="900" letter-spacing="12" fill="#B54747">REVOKED</text></g>` : ""}
 </svg>`;
 }
 
@@ -124,7 +148,8 @@ export async function GET(request: Request) {
     if (!certificate) return json({ error: "No Evidara certificate matches this verification code." }, 404);
 
     if (url.searchParams.get("format") === "svg") {
-      return new NextResponse(certificateSvg(certificate), {
+      const approvedLogo = await approvedLogoDataUri();
+      return new NextResponse(certificateSvg(certificate, approvedLogo), {
         status: 200,
         headers: {
           ...verificationHeaders,
