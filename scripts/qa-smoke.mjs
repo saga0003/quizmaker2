@@ -60,7 +60,9 @@ expect("config release metadata", configRoute.includes('release: "6.8.0"'), "/ap
 const workflow = read(".github/workflows/evidara-v6-8-qa.yml");
 expect("branch-only QA trigger", workflow.includes("evidara-v6-8-production-qa"), "workflow must target the V6.8 QA branch");
 expect("workflow runs npm ci", workflow.includes("npm ci"), "workflow must use reproducible dependency installation");
-expect("workflow runs QA gate", workflow.includes("npm run qa"), "workflow must run the complete QA command");
+for (const command of ["npm run lint", "npm run typecheck", "npm run qa:smoke", "npm run build"]) {
+  expect(`workflow stage: ${command}`, workflow.includes(command), `workflow must run ${command}`);
+}
 for (const forbidden of ["vercel", "wrangler deploy", "supabase functions deploy", "npm run cf:deploy"]) {
   expect(`workflow has no deployment command: ${forbidden}`, !workflow.toLowerCase().includes(forbidden), "QA workflow must not deploy anything");
 }
