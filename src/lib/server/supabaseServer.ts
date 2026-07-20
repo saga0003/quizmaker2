@@ -8,12 +8,17 @@ const publicKey =
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
 export const isPublicSupabaseConfigured = Boolean(supabaseUrl && publicKey);
-export const isServerSupabaseConfigured = Boolean(
+export const isServerSupabaseReady = Boolean(
   isPublicSupabaseConfigured && serviceKey,
 );
 
+// Backward-compatible cloud-mode guard used by earlier API routes. It is true
+// whenever the browser is configured for Supabase, ensuring a missing server key
+// fails closed in authenticateRequest instead of silently selecting demo data.
+export const isServerSupabaseConfigured = isPublicSupabaseConfigured;
+
 export function createServiceClient(): SupabaseClient {
-  if (!isServerSupabaseConfigured) {
+  if (!isServerSupabaseReady) {
     throw Object.assign(new Error("Evidara server-side Supabase environment is incomplete."), { status: 503 });
   }
   return createClient(supabaseUrl, serviceKey, {
@@ -37,7 +42,7 @@ export async function authenticateRequest(request: Request): Promise<{
   client: SupabaseClient;
   admin: SupabaseClient;
 }> {
-  if (isPublicSupabaseConfigured && !isServerSupabaseConfigured) {
+  if (isPublicSupabaseConfigured && !isServerSupabaseReady) {
     throw Object.assign(new Error("Evidara cloud is partially configured. Add the server service-role key before using authenticated cloud operations."), { status: 503 });
   }
 
