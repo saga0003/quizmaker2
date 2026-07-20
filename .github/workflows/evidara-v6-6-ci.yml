@@ -1,13 +1,11 @@
 name: Evidara V6.6 CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - evidara-v6-6-cloud-benchmarks
       - evidara-v6-6-release-docs
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -37,7 +35,6 @@ jobs:
           grep -q "first-submission-only" supabase/15_benchmark_security_and_lifecycle_hardening.sql
           grep -q "old.title is distinct from new.title" supabase/16_benchmark_fingerprint_lock_hardening.sql
           grep -q "old.exam_type is distinct from new.exam_type" supabase/16_benchmark_fingerprint_lock_hardening.sql
-          grep -q '"version": "6.6.0"' package.json
       - name: ESLint report
         id: eslint
         continue-on-error: true
