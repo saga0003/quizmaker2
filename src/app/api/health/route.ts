@@ -12,10 +12,11 @@ export async function GET() {
   return NextResponse.json(
     {
       healthy,
-      release: "6.7.0",
+      release: "6.7.1",
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
+      deploymentTarget: "cloudflare-workers",
       modules: [
         "question-bank",
         "imports",
@@ -28,6 +29,9 @@ export async function GET() {
         "shared-benchmarks",
         "achievements",
         "verifiable-certificates",
+        "razorpay-commerce",
+        "percentage-vouchers",
+        "offline-payment-records",
       ],
       issue: healthy ? null : "SUPABASE_SERVICE_ROLE_KEY is required for authenticated server operations.",
     },
