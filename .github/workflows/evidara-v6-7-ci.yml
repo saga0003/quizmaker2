@@ -35,6 +35,8 @@ jobs:
           grep -q "revoke all on public.student_achievements from anon, authenticated" supabase/17_achievement_badge_schema.sql
           grep -q "create aggregate public.max(uuid)" supabase/19_achievement_uuid_aggregate_compatibility.sql
           grep -q "achievement.evidence_re_evaluated" supabase/20_achievement_evidence_audit_hardening.sql
+          grep -q "pg_advisory_xact_lock" supabase/21_achievement_concurrency_hardening.sql
+          grep -q "achievement_award_lock_key" supabase/21_achievement_concurrency_hardening.sql
           grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
           grep -q "supabase-partial" src/app/api/health/route.ts
           grep -q "X-Robots-Tag" src/app/api/certificates/route.ts
