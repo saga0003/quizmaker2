@@ -9,9 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run build",
-    "cf:build": "npx --yes @opennextjs/cloudflare@latest build",
-    "cf:preview": "npm run cf:build && npx --yes wrangler@latest dev",
-    "cf:deploy": "npm run cf:build && npx --yes wrangler@latest deploy"
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.3",
