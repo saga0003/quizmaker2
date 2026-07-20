@@ -96,4 +96,22 @@ jobs:
       - name: Next.js production build
         run: npm run build
       - name: Cloudflare OpenNext build
-        run: npm run cf:build
+        id: cloudflare
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run cf:build 2>&1 | tee cloudflare-open-next-build.log
+      - name: Upload Cloudflare build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-cloudflare-build-log
+          path: cloudflare-open-next-build.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce Cloudflare build
+        if: steps.cloudflare.outcome == 'failure'
+        run: |
+          tail -n 200 cloudflare-open-next-build.log
+          exit 1
