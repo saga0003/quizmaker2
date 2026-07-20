@@ -18,6 +18,12 @@ function incompleteCloudResponse() {
   return response({ error: "Evidara cloud is partially configured. Add SUPABASE_SERVICE_ROLE_KEY before using achievements or certificates." }, 503);
 }
 
+function chunks<T>(values: T[], size = 200) {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) result.push(values.slice(index, index + size));
+  return result;
+}
+
 async function achievementContext(request: Request) {
   const auth = await authenticateRequest(request);
   const { data: profile, error: profileError } = await auth.admin
@@ -103,28 +109,38 @@ async function loadDefinitions(ctx: Context) {
 }
 
 async function loadAchievementRows(ctx: Context, options: { studentId?: string; organizationId?: string; limit?: number }) {
-  let query = ctx.admin
-    .from("student_achievements")
-    .select("id,student_id,organization_id,definition_code,rule_version,source_type,source_id,evidence,status,awarded_at,last_evaluated_at,revoked_at,revoked_reason")
-    .order("awarded_at", { ascending: false })
-    .limit(options.limit ?? 500);
-  if (options.studentId) query = query.eq("student_id", options.studentId);
-  if (options.organizationId) query = query.eq("organization_id", options.organizationId);
-  const { data, error } = await query;
-  if (error) throw error;
+  const maximum = Math.min(Math.max(options.limit ?? 500, 1), 5000);
+  const pageSize = 500;
+  const achievements: RawAchievement[] = [];
 
-  const achievements = (data ?? []) as RawAchievement[];
+  for (let start = 0; start < maximum; start += pageSize) {
+    const requested = Math.min(pageSize, maximum - start);
+    let query = ctx.admin
+      .from("student_achievements")
+      .select("id,student_id,organization_id,definition_code,rule_version,source_type,source_id,evidence,status,awarded_at,last_evaluated_at,revoked_at,revoked_reason")
+      .order("awarded_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(start, start + requested - 1);
+    if (options.studentId) query = query.eq("student_id", options.studentId);
+    if (options.organizationId) query = query.eq("organization_id", options.organizationId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as RawAchievement[];
+    achievements.push(...page);
+    if (page.length < requested) break;
+  }
+
   const definitions = await loadDefinitions(ctx);
   const definitionMap = new Map(definitions.map((item) => [item.code, item]));
   const achievementIds = achievements.map((item) => item.id);
   const studentIds = [...new Set(achievements.map((item) => item.student_id))];
 
   const certificates = new Map<string, StudentAchievement["certificate"]>();
-  if (achievementIds.length) {
+  for (const batch of chunks(achievementIds)) {
     const { data: certificateRows, error: certificateError } = await ctx.admin
       .from("achievement_certificates")
       .select("id,achievement_id,certificate_number,verification_code,status,issued_at,revoked_at,revoked_reason")
-      .in("achievement_id", achievementIds)
+      .in("achievement_id", batch)
       .order("issued_at", { ascending: false });
     if (certificateError) throw certificateError;
     for (const item of certificateRows ?? []) {
@@ -133,11 +149,11 @@ async function loadAchievementRows(ctx: Context, options: { studentId?: string; 
   }
 
   const profiles = new Map<string, string>();
-  if (studentIds.length) {
+  for (const batch of chunks(studentIds)) {
     const { data: profileRows, error: profileError } = await ctx.admin
       .from("profiles")
       .select("id,full_name,username")
-      .in("id", studentIds);
+      .in("id", batch);
     if (profileError) throw profileError;
     for (const item of profileRows ?? []) {
       profiles.set(item.id, item.full_name || item.username || "Evidara Learner");
@@ -211,7 +227,7 @@ export async function GET(request: Request) {
 
     if (scope === "school") {
       if (!ctx.manager) return response({ error: "School staff access required." }, 403);
-      const rows = await loadAchievementRows(ctx, { organizationId: ctx.organizationId, limit: 750 });
+      const rows = await loadAchievementRows(ctx, { organizationId: ctx.organizationId, limit: 5000 });
       return response({
         mode: "cloud",
         rows,
