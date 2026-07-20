@@ -58,6 +58,7 @@ Apply all SQL files in numeric order through:
 - `supabase/16_benchmark_fingerprint_lock_hardening.sql`
 - `supabase/17_achievement_badge_schema.sql`
 - `supabase/18_achievement_certificate_operations.sql`
+- `supabase/19_achievement_uuid_aggregate_compatibility.sql`
 
 ## Main V6.7 routes
 
@@ -106,7 +107,7 @@ npm run build
 
 The application continues to provide demonstration workspaces when Supabase is not configured. Live V6.7 recognition requires:
 
-- all migrations through `18_achievement_certificate_operations.sql`
+- all migrations through `19_achievement_uuid_aggregate_compatibility.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
