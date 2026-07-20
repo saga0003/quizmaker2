@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateRequest, isPublicSupabaseConfigured, isServerSupabaseConfigured } from "@/lib/server/supabaseServer";
+import { authenticateRequest, isPublicSupabaseConfigured, isServerSupabaseReady } from "@/lib/server/supabaseServer";
 import { demoAchievementDefinitions, demoSchoolAchievements, demoStudentAchievements } from "@/lib/demoAchievements";
 import type { AchievementDefinition, AchievementGovernanceRow, SchoolAchievementRow, StudentAchievement } from "@/lib/achievementClient";
 
@@ -200,7 +200,7 @@ export async function GET(request: Request) {
       }
       return response({ mode: "demo", rows: demoStudentAchievements, definitions: demoAchievementDefinitions });
     }
-    if (!isServerSupabaseConfigured) return incompleteCloudResponse();
+    if (!isServerSupabaseReady) return incompleteCloudResponse();
 
     const ctx = await achievementContext(request);
 
@@ -246,7 +246,7 @@ export async function POST(request: Request) {
       if (action === "issue_certificate") return response({ mode: "demo", certificate: demoStudentAchievements[1].certificate });
       return response({ mode: "demo", message: "Demo achievement action completed." });
     }
-    if (!isServerSupabaseConfigured) return incompleteCloudResponse();
+    if (!isServerSupabaseReady) return incompleteCloudResponse();
 
     const ctx = await achievementContext(request);
 
