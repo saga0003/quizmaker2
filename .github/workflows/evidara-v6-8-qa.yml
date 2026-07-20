@@ -1,0 +1,46 @@
+name: Evidara V6.8 Production QA
+
+on:
+  push:
+    branches:
+      - evidara-v6-8-production-qa
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v6-8-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-qa:
+    name: Lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run Evidara V6.8 QA gate
+        run: npm run qa
+
+      - name: Record non-deployment boundary
+        run: |
+          echo "QA completed for $GITHUB_SHA"
+          echo "This workflow does not publish, deploy, merge, or change external infrastructure."
