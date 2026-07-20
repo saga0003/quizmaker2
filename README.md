@@ -10,6 +10,7 @@ Included in this release:
 
 - Eight published achievement rules under rule version `2026.07-v1`
 - Automatic evaluation after submitted exam attempts and benchmark contributions
+- Concurrency-safe first-award creation across submission, refresh and backfill workflows
 - Evidence snapshots containing the exact observed values and source record
 - Immutable before-and-after audit history for evidence and rule-version changes
 - Automatic revocation when a current evidence-window rule is no longer satisfied
@@ -63,6 +64,7 @@ Apply all SQL files in numeric order through:
 - `supabase/18_achievement_certificate_operations.sql`
 - `supabase/19_achievement_uuid_aggregate_compatibility.sql`
 - `supabase/20_achievement_evidence_audit_hardening.sql`
+- `supabase/21_achievement_concurrency_hardening.sql`
 
 ## Main V6.7 routes
 
@@ -111,7 +113,7 @@ npm run build
 
 The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7 recognition requires:
 
-- all migrations through `20_achievement_evidence_audit_hardening.sql`
+- all migrations through `21_achievement_concurrency_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
