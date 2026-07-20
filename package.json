@@ -1,6 +1,6 @@
 {
   "name": "evidara-school-platform",
-  "version": "6.7.0",
+  "version": "6.7.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "cf:build": "npx --yes @opennextjs/cloudflare@latest build",
+    "cf:preview": "npm run cf:build && npx --yes wrangler@latest dev",
+    "cf:deploy": "npm run cf:build && npx --yes wrangler@latest deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.3",
