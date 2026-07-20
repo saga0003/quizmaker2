@@ -56,12 +56,14 @@ Certificates include a snapshot of:
 
 The verification link is bearer-style and `link_only`. Anyone with the code can confirm the limited certificate snapshot and whether it is active or revoked. Both the HTML verification route and API response use noindex, nofollow and noarchive controls.
 
+The database retains the complete internal reason for withdrawal and audit review. Public verification intentionally replaces that free-text reason with the neutral state `certificate_withdrawn`, preventing private school notes or allegations from being disclosed to a link holder.
+
 Download options:
 
 - brand-book-compliant SVG certificate
 - browser print / Save as PDF
 
-The SVG embeds the approved transparent Evidara logo and uses Evidara Teal, Insight Amber, Cloud White, Evidence Mist and Midnight Ink with Inter-compatible typography. It includes a visible note that the recognition is evidence-specific and is not a prediction, permanent label or guarantee.
+The SVG embeds the approved transparent Evidara logo and uses Evidara Teal, Insight Amber, Cloud White, Evidence Mist and Midnight Ink with Inter-compatible typography. It includes a visible note that the recognition is evidence-specific and is not a prediction, permanent label or guarantee. The downloaded SVG prints the complete verification URL rather than a deployment-relative path.
 
 Revoked certificates continue to verify as revoked instead of disappearing. An active eligible achievement can issue a new certificate while the revoked historical certificate remains verifiable.
 
