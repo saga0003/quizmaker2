@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: evidara-v6-8-qa-${{ github.ref }}
@@ -36,6 +36,28 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Sync V6.8 lockfile release metadata
+        if: github.event_name == 'push' && github.ref == 'refs/heads/evidara-v6-8-production-qa'
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'package-lock.json';
+          const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+          lock.version = '6.8.0';
+          if (lock.packages && lock.packages['']) lock.packages[''].version = '6.8.0';
+          fs.writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
+          NODE
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already identifies Evidara 6.8.0"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Sync Evidara V6.8 package lock metadata"
+          git push origin HEAD:evidara-v6-8-production-qa
 
       - name: Upload release manifests
         uses: actions/upload-artifact@v4
