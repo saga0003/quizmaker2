@@ -1,0 +1,66 @@
+name: Deploy Evidara Supabase Payment Functions
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: evidara-supabase-payment-functions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      APP_ORIGINS: ${{ secrets.EVIDARA_APP_ORIGINS }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || (echo "Missing SUPABASE_ACCESS_TOKEN" && exit 1)
+          test -n "$SUPABASE_PROJECT_ID" || (echo "Missing SUPABASE_PROJECT_ID" && exit 1)
+          test -n "$RAZORPAY_KEY_ID" || (echo "Missing RAZORPAY_KEY_ID" && exit 1)
+          test -n "$RAZORPAY_KEY_SECRET" || (echo "Missing RAZORPAY_KEY_SECRET" && exit 1)
+          test -n "$RAZORPAY_WEBHOOK_SECRET" || (echo "Missing RAZORPAY_WEBHOOK_SECRET" && exit 1)
+          test -n "$APP_ORIGINS" || (echo "Missing EVIDARA_APP_ORIGINS" && exit 1)
+
+      - name: Store Edge Function secrets
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const lines = [
+            `RAZORPAY_KEY_ID=${process.env.RAZORPAY_KEY_ID}`,
+            `RAZORPAY_KEY_SECRET=${process.env.RAZORPAY_KEY_SECRET}`,
+            `RAZORPAY_WEBHOOK_SECRET=${process.env.RAZORPAY_WEBHOOK_SECRET}`,
+            `APP_ORIGINS=${process.env.APP_ORIGINS}`,
+          ];
+          fs.writeFileSync('/tmp/evidara-functions.env', `${lines.join('\n')}\n`, { mode: 0o600 });
+          NODE
+          npx --yes supabase@latest secrets set --project-ref "$SUPABASE_PROJECT_ID" --env-file /tmp/evidara-functions.env
+          rm -f /tmp/evidara-functions.env
+
+      - name: Deploy authenticated order function
+        run: npx --yes supabase@latest functions deploy create-razorpay-order --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy authenticated payment verification
+        run: npx --yes supabase@latest functions deploy verify-razorpay-payment --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy public Razorpay webhook receiver
+        run: npx --yes supabase@latest functions deploy razorpay-webhook --project-ref "$SUPABASE_PROJECT_ID" --no-verify-jwt
+
+      - name: Deployment summary
+        run: |
+          echo "Supabase payment functions deployed."
+          echo "Migration 24 must already be applied before vouchers are used."
