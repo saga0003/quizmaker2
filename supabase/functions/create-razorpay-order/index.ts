@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
         .select("organization_id")
         .eq("user_id", user.id)
         .eq("is_active", true)
-        .in("member_role", ["institute_owner", "institute_admin", "school_owner", "school_admin"])
+        .in("member_role", ["institute_owner", "institute_admin"])
         .limit(1)
         .maybeSingle();
 
