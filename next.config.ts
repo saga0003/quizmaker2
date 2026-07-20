@@ -8,12 +8,24 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+const verificationHeaders = [
+  ...securityHeaders,
+  { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, noimageindex" },
+  { key: "Cache-Control", value: "private, no-store, max-age=0" },
+];
+
 const nextConfig: NextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
   experimental: { cpus: 2 },
+  outputFileTracingIncludes: {
+    "/api/certificates": ["./public/brand/evidara-logo-light.png"],
+  },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      { source: "/verify/certificate/:path*", headers: verificationHeaders },
+    ];
   },
 };
 

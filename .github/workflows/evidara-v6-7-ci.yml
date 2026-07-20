@@ -1,0 +1,85 @@
+name: Evidara V6.7 CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: evidara-v6-7-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify V6.7 schema, privacy, evidence, scale and brand targets
+        run: |
+          grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
+          grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
+          grep -q "visibility text not null default 'link_only'" supabase/17_achievement_badge_schema.sql
+          grep -q "revoke all on public.student_achievements from anon, authenticated" supabase/17_achievement_badge_schema.sql
+          grep -q "create aggregate public.max(uuid)" supabase/19_achievement_uuid_aggregate_compatibility.sql
+          grep -q "achievement.evidence_re_evaluated" supabase/20_achievement_evidence_audit_hardening.sql
+          grep -q "pg_advisory_xact_lock" supabase/21_achievement_concurrency_hardening.sql
+          grep -q "achievement_award_lock_key" supabase/21_achievement_concurrency_hardening.sql
+          grep -q "A newer active certificate already exists" supabase/22_achievement_certificate_restore_hardening.sql
+          grep -q "Restore the linked achievement" supabase/22_achievement_certificate_restore_hardening.sql
+          grep -q "achievement_exam_attempt_is_valid" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "contribution.is_valid = true" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "public.achievement_exam_attempt_is_valid(a.id, a.metadata)" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
+          grep -q "supabase-partial" src/app/api/health/route.ts
+          grep -q "pageSize = 500" src/app/api/achievements/route.ts
+          grep -q "limit: 5000" src/app/api/achievements/route.ts
+          grep -q "chunks(achievementIds)" src/app/api/achievements/route.ts
+          grep -q "chunks(studentIds)" src/app/api/achievements/route.ts
+          grep -q "X-Robots-Tag" src/app/api/certificates/route.ts
+          grep -q "X-Robots-Tag" next.config.ts
+          grep -q "evidara-logo-light.png" src/app/api/certificates/route.ts
+          grep -q "outputFileTracingIncludes" next.config.ts
+          grep -q "#0E5A5A" src/app/api/certificates/route.ts
+          grep -q "#F2B84B" src/app/api/certificates/route.ts
+          grep -q "not a prediction, permanent label or guarantee" src/app/api/certificates/route.ts
+          grep -q "certificate_withdrawn" src/app/api/certificates/route.ts
+          grep -q "url.origin" src/app/api/certificates/route.ts
+          ! grep -q 'issued_at,status,revoked_at,revoked_reason' src/app/api/certificates/route.ts
+          ! grep -qi "#7456e8" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
+          ! grep -qi "#18b7a0" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
+          grep -q "23_achievement_benchmark_validity_hardening.sql" README.md
+          grep -q '"version": "6.7.0"' package.json
+      - name: ESLint report
+        id: eslint
+        continue-on-error: true
+        run: npm run lint -- --format json --output-file eslint-v6-7-report.json
+      - name: Upload ESLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v6-7-eslint
+          path: eslint-v6-7-report.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Enforce ESLint
+        if: steps.eslint.outcome == 'failure'
+        run: |
+          node -e 'const report=require("./eslint-v6-7-report.json"); for(const file of report){for(const issue of file.messages){console.error(`${file.filePath}:${issue.line}:${issue.column} ${issue.ruleId} ${issue.message}`)}}'
+          exit 1
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build

@@ -1,12 +1,10 @@
 name: Evidara V6.3 CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - evidara-v6-3-data-controls
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: read
