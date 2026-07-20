@@ -53,7 +53,7 @@ contains("supabase/23_achievement_benchmark_validity_hardening.sql", "contributi
 contains("supabase/23_achievement_benchmark_validity_hardening.sql", "public.achievement_exam_attempt_is_valid(a.id, a.metadata)");
 contains("supabase/24_voucher_offline_payment_hardening.sql", "discount_percent integer not null check (discount_percent between 1 and 100)");
 contains("supabase/24_voucher_offline_payment_hardening.sql", "fulfill_voucher_order");
-contains("supabase/24_voucher_offline_payment_hardening.sql", "100% voucher must be assigned");
+contains("supabase/24_voucher_offline_payment_hardening.sql", "check (discount_percent < 100 or allowed_email is not null or organization_id is not null)", "100% voucher account-or-school binding constraint");
 contains("supabase/24_voucher_offline_payment_hardening.sql", "voucher_redemptions");
 contains("supabase/functions/create-razorpay-order/index.ts", "APP_ORIGINS");
 contains("supabase/functions/create-razorpay-order/index.ts", "evidara_order_id");
