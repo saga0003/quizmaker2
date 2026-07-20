@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateRequest, isServerSupabaseConfigured } from "@/lib/server/supabaseServer";
+import { authenticateRequest, isPublicSupabaseConfigured, isServerSupabaseConfigured } from "@/lib/server/supabaseServer";
 import { demoAchievementDefinitions, demoSchoolAchievements, demoStudentAchievements } from "@/lib/demoAchievements";
 import type { AchievementDefinition, AchievementGovernanceRow, SchoolAchievementRow, StudentAchievement } from "@/lib/achievementClient";
 
@@ -12,6 +12,10 @@ function response(data: unknown, status = 200) {
 function fail(error: unknown) {
   const value = error as { message?: string; status?: number; details?: string };
   return response({ error: value.message ?? "Unexpected Evidara achievement error.", details: value.details ?? null }, value.status ?? 500);
+}
+
+function incompleteCloudResponse() {
+  return response({ error: "Evidara cloud is partially configured. Add SUPABASE_SERVICE_ROLE_KEY before using achievements or certificates." }, 503);
 }
 
 async function achievementContext(request: Request) {
@@ -175,7 +179,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const scope = url.searchParams.get("scope") ?? "student";
 
-    if (!isServerSupabaseConfigured) {
+    if (!isPublicSupabaseConfigured) {
       if (scope === "school") {
         return response({
           mode: "demo",
@@ -196,6 +200,7 @@ export async function GET(request: Request) {
       }
       return response({ mode: "demo", rows: demoStudentAchievements, definitions: demoAchievementDefinitions });
     }
+    if (!isServerSupabaseConfigured) return incompleteCloudResponse();
 
     const ctx = await achievementContext(request);
 
@@ -237,10 +242,11 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const action = String(body.action ?? "evaluate");
 
-    if (!isServerSupabaseConfigured) {
+    if (!isPublicSupabaseConfigured) {
       if (action === "issue_certificate") return response({ mode: "demo", certificate: demoStudentAchievements[1].certificate });
       return response({ mode: "demo", message: "Demo achievement action completed." });
     }
+    if (!isServerSupabaseConfigured) return incompleteCloudResponse();
 
     const ctx = await achievementContext(request);
 
