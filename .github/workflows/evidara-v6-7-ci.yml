@@ -31,6 +31,7 @@ jobs:
           grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
           grep -q "visibility text not null default 'link_only'" supabase/17_achievement_badge_schema.sql
           grep -q "revoke all on public.student_achievements from anon, authenticated" supabase/17_achievement_badge_schema.sql
+          grep -q "create aggregate public.max(uuid)" supabase/19_achievement_uuid_aggregate_compatibility.sql
           grep -q "X-Robots-Tag" src/app/api/certificates/route.ts
           grep -q '"version": "6.7.0"' package.json
       - name: ESLint report
