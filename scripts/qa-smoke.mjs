@@ -25,6 +25,14 @@ expect("package version", packageJson.version === "6.8.0", `expected 6.8.0, rece
 expect("QA command", packageJson.scripts?.qa === "npm run lint && npm run typecheck && npm run qa:smoke && npm run build", "package.json must run lint, typecheck, smoke checks and build");
 expect("check alias", packageJson.scripts?.check === "npm run qa", "npm run check must use the V6.8 QA gate");
 
+const packageLock = JSON.parse(read("package-lock.json") || "{}");
+expect("lockfile release version", packageLock.version === "6.8.0", `expected root lockfile version 6.8.0, received ${packageLock.version ?? "missing"}`);
+expect(
+  "lockfile workspace version",
+  packageLock.packages?.[""]?.version === "6.8.0",
+  `expected workspace lockfile version 6.8.0, received ${packageLock.packages?.[""]?.version ?? "missing"}`,
+);
+
 const migration24 = read("supabase/24_voucher_offline_payment_hardening.sql");
 for (const marker of ["create table if not exists public.voucher_codes", "create table if not exists public.voucher_redemptions", "create or replace function public.fulfill_voucher_order", "payment_source"]) {
   expect(`migration 24 marker: ${marker}`, migration24.includes(marker), "required migration 24 capability is missing");
