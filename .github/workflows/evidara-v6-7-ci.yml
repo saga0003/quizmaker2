@@ -1,4 +1,4 @@
-name: Evidara V6.7 CI
+name: Evidara V6.7 Production CI
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify V6.7 schema, privacy, evidence, scale and brand targets
+      - name: Verify V6.7 recognition, commerce, privacy and deployment targets
         run: |
           grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
           grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
@@ -42,6 +42,16 @@ jobs:
           grep -q "achievement_exam_attempt_is_valid" supabase/23_achievement_benchmark_validity_hardening.sql
           grep -q "contribution.is_valid = true" supabase/23_achievement_benchmark_validity_hardening.sql
           grep -q "public.achievement_exam_attempt_is_valid(a.id, a.metadata)" supabase/23_achievement_benchmark_validity_hardening.sql
+          grep -q "discount_percent integer not null check (discount_percent between 1 and 100)" supabase/24_voucher_offline_payment_hardening.sql
+          grep -q "fulfill_voucher_order" supabase/24_voucher_offline_payment_hardening.sql
+          grep -q "100% voucher must be assigned" supabase/24_voucher_offline_payment_hardening.sql
+          grep -q "voucher_redemptions" supabase/24_voucher_offline_payment_hardening.sql
+          grep -q "APP_ORIGINS" supabase/functions/create-razorpay-order/index.ts
+          grep -q "evidara_order_id" supabase/functions/create-razorpay-order/index.ts
+          grep -q "free_access" supabase/functions/create-razorpay-order/index.ts
+          grep -q "payment signature verification failed" -i supabase/functions/verify-razorpay-payment/index.ts
+          grep -q "AdminVoucherManager" src/app/admin/products/page.tsx
+          grep -q "name: \"Evidara\"" src/components/commerce/ProductStore.tsx
           grep -q "isServerSupabaseReady" src/lib/server/supabaseServer.ts
           grep -q "supabase-partial" src/app/api/health/route.ts
           grep -q "pageSize = 500" src/app/api/achievements/route.ts
@@ -60,8 +70,10 @@ jobs:
           ! grep -q 'issued_at,status,revoked_at,revoked_reason' src/app/api/certificates/route.ts
           ! grep -qi "#7456e8" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
           ! grep -qi "#18b7a0" src/app/api/certificates/route.ts src/components/achievements/Achievements.module.css
-          grep -q "23_achievement_benchmark_validity_hardening.sql" README.md
-          grep -q '"version": "6.7.0"' package.json
+          grep -q '"main": ".open-next/worker.js"' wrangler.jsonc
+          grep -q '"nodejs_compat"' wrangler.jsonc
+          grep -q "24_voucher_offline_payment_hardening.sql" README.md
+          grep -q '"version": "6.7.1"' package.json
       - name: ESLint report
         id: eslint
         continue-on-error: true
@@ -81,5 +93,5 @@ jobs:
           exit 1
       - name: TypeScript
         run: npm run typecheck
-      - name: Production build
+      - name: Next.js production build
         run: npm run build
