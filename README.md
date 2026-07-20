@@ -10,6 +10,7 @@ Included in this release:
 
 - Eight published achievement rules under rule version `2026.07-v1`
 - Automatic evaluation after submitted exam attempts and benchmark contributions
+- Invalid or pending benchmark contributions cannot support assessment-derived achievements
 - Concurrency-safe first-award creation across submission, refresh and backfill workflows
 - Evidence snapshots containing the exact observed values and source record
 - Immutable before-and-after audit history for evidence and rule-version changes
@@ -17,6 +18,7 @@ Included in this release:
 - Auditable school revocation and Super Admin restoration boundaries
 - Student achievement and certificate workspace
 - School recognition review, backfill, issuance, withdrawal and reissue workspace
+- Paged school retrieval with batched certificate and learner lookups
 - Super Admin achievement-rule governance
 - Link-only certificate verification with active and revoked states
 - Brand-book-compliant SVG certificate download using the approved Evidara logo
@@ -85,6 +87,7 @@ Apply all SQL files in numeric order through:
 - `supabase/20_achievement_evidence_audit_hardening.sql`
 - `supabase/21_achievement_concurrency_hardening.sql`
 - `supabase/22_achievement_certificate_restore_hardening.sql`
+- `supabase/23_achievement_benchmark_validity_hardening.sql`
 
 ## Main V6.7 routes
 
@@ -133,7 +136,7 @@ npm run build
 
 The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7 recognition requires:
 
-- all migrations through `22_achievement_certificate_restore_hardening.sql`
+- all migrations through `23_achievement_benchmark_validity_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
