@@ -37,8 +37,27 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Lint application
-        run: npm run lint
+      - name: Generate ESLint report
+        run: |
+          set +e
+          npm run lint > eslint-report.txt 2>&1
+          echo "$?" > eslint-status.txt
+          cat eslint-report.txt
+          exit 0
+
+      - name: Upload ESLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v6-8-eslint
+          path: |
+            eslint-report.txt
+            eslint-status.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce ESLint
+        run: test "$(cat eslint-status.txt)" = "0"
 
       - name: Typecheck application
         run: npm run typecheck
