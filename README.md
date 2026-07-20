@@ -11,15 +11,17 @@ Included in this release:
 - Eight published achievement rules under rule version `2026.07-v1`
 - Automatic evaluation after submitted exam attempts and benchmark contributions
 - Evidence snapshots containing the exact observed values and source record
+- Immutable before-and-after audit history for evidence and rule-version changes
 - Automatic revocation when a current evidence-window rule is no longer satisfied
 - Auditable school revocation and Super Admin restoration boundaries
 - Student achievement and certificate workspace
-- School recognition review, backfill, issuance and withdrawal workspace
+- School recognition review, backfill, issuance, withdrawal and reissue workspace
 - Super Admin achievement-rule governance
 - Link-only certificate verification with active and revoked states
 - Branded SVG certificate download
 - Browser print and Save as PDF support
-- Search-engine exclusion for certificate verification pages
+- Search-engine exclusion for certificate verification pages and responses
+- Fail-closed partial cloud configuration
 - No public school or student leaderboard
 
 ## Published recognition rules
@@ -42,8 +44,9 @@ Every badge displays its rule version and evidence summary. Achievements recogni
 - Super Admin receives rule-level governance counts.
 - Raw award evidence, certificate rows and audit events remain server-only.
 - Verification is bearer-style and `link_only`.
-- Verification pages return `noindex`, `nofollow` and `noarchive` directives.
+- Verification pages and APIs return `noindex`, `nofollow` and `noarchive` controls.
 - A revoked certificate continues to verify as revoked instead of disappearing.
+- A new certificate may be issued from an active eligible achievement while the revoked historical record remains visible.
 - Recognition cannot decide admission, discipline, promotion, fees, scholarship, access or employment.
 
 ## Supabase migrations
@@ -59,6 +62,7 @@ Apply all SQL files in numeric order through:
 - `supabase/17_achievement_badge_schema.sql`
 - `supabase/18_achievement_certificate_operations.sql`
 - `supabase/19_achievement_uuid_aggregate_compatibility.sql`
+- `supabase/20_achievement_evidence_audit_hardening.sql`
 
 ## Main V6.7 routes
 
@@ -105,12 +109,14 @@ npm run build
 
 ## Cloud activation boundary
 
-The application continues to provide demonstration workspaces when Supabase is not configured. Live V6.7 recognition requires:
+The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7 recognition requires:
 
-- all migrations through `19_achievement_uuid_aggregate_compatibility.sql`
+- all migrations through `20_achievement_evidence_audit_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+
+When public Supabase settings exist without the server service-role key, Evidara reports `supabase-partial` and returns a 503 for authenticated server operations instead of silently selecting demo data.
 
 Never expose the service-role key to browser code.
 
