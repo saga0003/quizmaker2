@@ -58,10 +58,19 @@ The verification link is bearer-style and `link_only`. Anyone with the code can 
 
 Download options:
 
-- branded SVG certificate
+- brand-book-compliant SVG certificate
 - browser print / Save as PDF
 
+The SVG embeds the approved transparent Evidara logo and uses Evidara Teal, Insight Amber, Cloud White, Evidence Mist and Midnight Ink with Inter-compatible typography. It includes a visible note that the recognition is evidence-specific and is not a prediction, permanent label or guarantee.
+
 Revoked certificates continue to verify as revoked instead of disappearing. An active eligible achievement can issue a new certificate while the revoked historical certificate remains verifiable.
+
+Certificate restoration is deliberately stricter than issuance:
+
+- only Super Admin can restore a revoked certificate
+- the linked achievement must first be active
+- a historical certificate cannot be restored while a replacement certificate is active
+- withdrawal and restoration remain recorded in the immutable audit history
 
 ## Privacy and governance
 
@@ -98,7 +107,8 @@ Apply in numeric order after V6.6:
 - `19_achievement_uuid_aggregate_compatibility.sql`
 - `20_achievement_evidence_audit_hardening.sql`
 - `21_achievement_concurrency_hardening.sql`
+- `22_achievement_certificate_restore_hardening.sql`
 
-Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes. Migration 21 serializes first-award creation for one learner, school and rule.
+Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes. Migration 21 serializes first-award creation for one learner, school and rule. Migration 22 prevents conflicting historical-certificate restoration and requires the linked achievement to be active.
 
 Vercel automatic deployment remains paused. Test through GitHub Actions and GitHub Codespaces before intentionally publishing production.
