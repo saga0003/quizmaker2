@@ -26,6 +26,21 @@ Every achievement stores:
 
 Every later change to the rule version, source record or observed values writes an immutable audit event containing both the previous and current evidence snapshot.
 
+## Valid evidence boundary
+
+Assessment-derived awards use ordinary submitted attempts and benchmark-linked attempts only when the linked contribution exists and is currently valid.
+
+A benchmark contribution that is pending, automatically excluded or manually invalidated cannot support:
+
+- First Evidence
+- Assessment Excellence
+- Perfect Score
+- Growth Milestone
+- Consistent Performer
+- Integrity Streak
+
+When a contribution becomes invalid, the benchmark update trigger re-evaluates the learner. Unsupported awards and their active certificates are automatically revoked. A later valid contribution can restore an automatically revoked badge, while a replacement certificate must be issued explicitly.
+
 ## Automatic refresh
 
 Achievement evaluation runs after:
@@ -38,6 +53,10 @@ Achievement evaluation runs after:
 Evidence-window achievements can be automatically revoked when the current evidence no longer meets the published rule. A later valid evaluation can restore an automatically revoked award. Manual school revocation requires Super Admin restoration.
 
 Initial award creation is concurrency-safe. Overlapping submission, refresh and backfill evaluations acquire a transaction lock for the exact learner, organization and rule before the first insert, preventing duplicate-key failures from rolling back assessment submission.
+
+## School-scale retrieval
+
+The school workspace retrieves recognition rows in stable 500-row pages, supports up to 5,000 award records in the current operational view, and batches certificate and learner-profile lookups. This avoids the previous single-query 750-row ceiling and oversized `IN` filters for normal school subscription sizes.
 
 ## Certificates
 
@@ -110,7 +129,8 @@ Apply in numeric order after V6.6:
 - `20_achievement_evidence_audit_hardening.sql`
 - `21_achievement_concurrency_hardening.sql`
 - `22_achievement_certificate_restore_hardening.sql`
+- `23_achievement_benchmark_validity_hardening.sql`
 
-Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes. Migration 21 serializes first-award creation for one learner, school and rule. Migration 22 prevents conflicting historical-certificate restoration and requires the linked achievement to be active.
+Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes. Migration 21 serializes first-award creation for one learner, school and rule. Migration 22 prevents conflicting historical-certificate restoration and requires the linked achievement to be active. Migration 23 requires a currently valid contribution before any benchmark-linked exam attempt can support an assessment-derived award.
 
 Vercel automatic deployment remains paused. Test through GitHub Actions and GitHub Codespaces before intentionally publishing production.
