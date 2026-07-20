@@ -128,15 +128,15 @@ async function loadAchievementRows(ctx: Context, options: { studentId?: string; 
     }
   }
 
-  const profiles = new Map<string, { name: string; email: string | null }>();
+  const profiles = new Map<string, string>();
   if (studentIds.length) {
     const { data: profileRows, error: profileError } = await ctx.admin
       .from("profiles")
-      .select("id,full_name,username,email")
+      .select("id,full_name,username")
       .in("id", studentIds);
     if (profileError) throw profileError;
     for (const item of profileRows ?? []) {
-      profiles.set(item.id, { name: item.full_name || item.username || "Evidara Learner", email: item.email ?? null });
+      profiles.set(item.id, item.full_name || item.username || "Evidara Learner");
     }
   }
 
@@ -147,8 +147,8 @@ async function loadAchievementRows(ctx: Context, options: { studentId?: string; 
       ...item,
       definition,
       certificate: certificates.get(item.id) ?? null,
-      student_name: profiles.get(item.student_id)?.name ?? "Evidara Learner",
-      student_email: profiles.get(item.student_id)?.email ?? null,
+      student_name: profiles.get(item.student_id) ?? "Evidara Learner",
+      student_email: null,
     }];
   }) as SchoolAchievementRow[];
 }
