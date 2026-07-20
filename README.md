@@ -2,7 +2,30 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.7.1 production release
+## Version 6.8.0 production QA release
+
+Version 6.8.0 preserves the merged V6.7.1 production-commerce baseline and adds a production QA and launch-readiness layer:
+
+- protected Super Admin system-readiness dashboard at `/admin/readiness/`
+- Supabase public configuration, service-role, database and Auth Admin diagnostics
+- migration 24 table, order-column and `fulfill_voucher_order` readiness checks
+- Razorpay Test Mode key-format, credential-pair, webhook-secret and origin allow-list diagnostics
+- authenticated `readiness-check` Supabase Edge Function that never returns secret values
+- shared role and protected-route access contracts with deterministic smoke cases
+- clear configuration and API remediation messages
+- branch-only GitHub Actions QA and production CI workflows
+- Codespaces production QA and Test Mode transaction checklist
+- standard Next.js and Cloudflare OpenNext build validation
+- no Vercel integration, automatic deployment or automatic merge
+
+Production QA procedures are documented in:
+
+```text
+docs/V6_8_CODESPACES_QA.md
+docs/V6_8_RELEASE_NOTES.md
+```
+
+## Version 6.7.1 production baseline
 
 Version 6.7.1 preserves the merged V6.7 achievement and certificate release and adds its production commerce and hosting layer:
 
@@ -132,17 +155,19 @@ Apply all SQL files in numeric order through:
 - `supabase/23_achievement_benchmark_validity_hardening.sql`
 - `supabase/24_voucher_offline_payment_hardening.sql`
 
-## Main V6.7 routes
+## Main V6.8 routes
 
 - `/student/achievements/`
 - `/school/achievements/`
 - `/admin/achievements/`
 - `/admin/products/`
+- `/admin/readiness/`
 - `/products/`
 - `/verify/certificate/`
 - `/verify/certificate/[code]/`
 - `/api/achievements`
 - `/api/certificates`
+- `/api/admin/readiness`
 - `/api/config`
 - `/api/health`
 
@@ -152,13 +177,14 @@ Demo verification code:
 demo-evidara-2026
 ```
 
-## Payment Edge Functions
+## Payment and readiness Edge Functions
 
 - `create-razorpay-order`
 - `verify-razorpay-payment`
 - `razorpay-webhook`
+- `readiness-check`
 
-Razorpay credentials and the allowed application origins are stored as Supabase Edge Function secrets, not as browser variables.
+Razorpay credentials and the allowed application origins are stored as Supabase Edge Function secrets, not as browser variables. The V6.8 readiness function reports only safe booleans, counts and status messages.
 
 ## Cloudflare deployment
 
@@ -201,21 +227,25 @@ npm ci
 npm run dev
 npm run lint
 npm run typecheck
+npm run qa:smoke
+npm run qa
 npm run build
 npm run cf:build
 npm run cf:preview
 ```
 
+The branch-only QA workflow does not deploy, merge or change external infrastructure. Complete the real Supabase, migration 24, role-routing and Razorpay Test Mode checks in `docs/V6_8_CODESPACES_QA.md` before launch.
+
 ## Cloud activation boundary
 
-The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7.1 requires:
+The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.8.0 requires:
 
 - all migrations through `24_voucher_offline_payment_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- deployed Supabase payment Edge Functions
-- Razorpay Edge Function secrets
+- deployed Supabase payment and readiness Edge Functions
+- Razorpay Edge Function secrets in Test Mode during QA
 - Cloudflare application variables and secrets
 
 When public Supabase settings exist without the server service-role key, Evidara reports `supabase-partial` and returns a 503 for authenticated server operations instead of silently selecting demo data.

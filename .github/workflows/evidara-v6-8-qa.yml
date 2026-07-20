@@ -1,0 +1,84 @@
+name: Evidara V6.8 Production QA
+
+on:
+  push:
+    branches:
+      - evidara-v6-8-production-qa
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v6-8-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-qa:
+    name: Lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Upload release manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v6-8-release-manifests
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Generate ESLint report
+        run: |
+          set +e
+          npm run lint > eslint-report.txt 2>&1
+          echo "$?" > eslint-status.txt
+          cat eslint-report.txt
+          exit 0
+
+      - name: Upload ESLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v6-8-eslint
+          path: |
+            eslint-report.txt
+            eslint-status.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce ESLint
+        run: test "$(cat eslint-status.txt)" = "0"
+
+      - name: Typecheck application
+        run: npm run typecheck
+
+      - name: Run V6.8 smoke checks
+        run: npm run qa:smoke
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Record non-deployment boundary
+        run: |
+          echo "QA completed for $GITHUB_SHA"
+          echo "This workflow does not publish, deploy, merge, or change external infrastructure."
