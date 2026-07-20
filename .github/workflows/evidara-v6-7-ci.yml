@@ -1,4 +1,4 @@
-name: Evidara V6.7 Production CI
+name: Evidara V6.8 Production CI
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - main
 
 concurrency:
-  group: evidara-v6-7-${{ github.event.pull_request.number || github.ref }}
+  group: evidara-v6-8-baseline-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -27,7 +27,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify V6.7 recognition, commerce, privacy and deployment targets
+      - name: Verify V6.8 baseline, readiness, commerce, privacy and deployment targets
         run: |
           grep -q "public.exam_attempts" supabase/18_achievement_certificate_operations.sql
           grep -q "public.benchmark_contributions" supabase/18_achievement_certificate_operations.sql
@@ -73,23 +73,32 @@ jobs:
           grep -q '"main": ".open-next/worker.js"' wrangler.jsonc
           grep -q '"nodejs_compat"' wrangler.jsonc
           grep -q "24_voucher_offline_payment_hardening.sql" README.md
-          grep -q '"version": "6.7.1"' package.json
+          grep -q '"version": "6.8.0"' package.json
+          grep -q 'release: "6.8.0"' src/app/api/health/route.ts
+          grep -q 'release: "6.8.0"' src/app/api/config/route.ts
+          grep -q 'ProtectedPage allowed="admin"' src/app/admin/readiness/page.tsx
+          grep -q 'fulfill_voucher_order' src/app/api/admin/readiness/route.ts
+          grep -q 'functions.invoke<RazorpayDiagnostic>("readiness-check"' src/app/api/admin/readiness/route.ts
+          grep -q 'startsWith("rzp_test_")' supabase/functions/readiness-check/index.ts
+          grep -q 'startsWith("rzp_live_")' supabase/functions/readiness-check/index.ts
+          grep -q 'evidara-v6-8-production-qa' .github/workflows/evidara-v6-8-qa.yml
+          ! grep -qi 'vercel' .github/workflows/evidara-v6-8-qa.yml
       - name: ESLint report
         id: eslint
         continue-on-error: true
-        run: npm run lint -- --format json --output-file eslint-v6-7-report.json
+        run: npm run lint -- --format json --output-file eslint-v6-8-report.json
       - name: Upload ESLint report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: evidara-v6-7-eslint
-          path: eslint-v6-7-report.json
+          name: evidara-v6-8-baseline-eslint
+          path: eslint-v6-8-report.json
           if-no-files-found: error
           retention-days: 3
       - name: Enforce ESLint
         if: steps.eslint.outcome == 'failure'
         run: |
-          node -e 'const report=require("./eslint-v6-7-report.json"); for(const file of report){for(const issue of file.messages){console.error(`${file.filePath}:${issue.line}:${issue.column} ${issue.ruleId} ${issue.message}`)}}'
+          node -e 'const report=require("./eslint-v6-8-report.json"); for(const file of report){for(const issue of file.messages){console.error(`${file.filePath}:${issue.line}:${issue.column} ${issue.ruleId} ${issue.message}`)}}'
           exit 1
       - name: TypeScript
         run: npm run typecheck
@@ -106,7 +115,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: evidara-cloudflare-build-log
+          name: evidara-v6-8-cloudflare-build-log
           path: cloudflare-open-next-build.log
           if-no-files-found: error
           retention-days: 3
