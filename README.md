@@ -2,41 +2,53 @@
 
 Evidara is a subscription-based assessment and student-intelligence platform for schools serving Grades 8–12.
 
-## Version 6.6
+## Version 6.7
 
-Version 6.6 connects private shared-paper benchmarks to Evidara’s real question-paper and secure exam-attempt engine.
+Version 6.7 adds transparent, evidence-backed achievements and link-only verifiable certificates to the real assessment and shared-benchmark engine.
 
 Included in this release:
 
-- Cloud benchmark publishing from an existing published school paper
-- Server-calculated SHA-256 paper fingerprints
-- Student joining through a private access code
-- Secure benchmark attempts through the existing live exam route
-- Automatic contribution creation after submission
-- Automatic exclusion for timing, integrity, score and fingerprint failures
-- First-submission-only contribution rules
-- Private named cohort evidence for each participating school
-- Anonymous external averages, medians, percentiles and score bands
-- Minimum 20 external attempts from at least 3 external schools
-- Small-cell suppression below 10 records
-- Publisher-only access codes and lifecycle controls
-- School review of its own student contributions
-- Super Admin review requirement for automatic integrity exclusions
-- Locked paper, section and question content while a benchmark is published or closed
-- Cloud-aware school, student and Super Admin benchmark workspaces
+- Eight published achievement rules under rule version `2026.07-v1`
+- Automatic evaluation after submitted exam attempts and benchmark contributions
+- Evidence snapshots containing the exact observed values and source record
+- Automatic revocation when a current evidence-window rule is no longer satisfied
+- Auditable school revocation and Super Admin restoration boundaries
+- Student achievement and certificate workspace
+- School recognition review, backfill, issuance and withdrawal workspace
+- Super Admin achievement-rule governance
+- Link-only certificate verification with active and revoked states
+- Branded SVG certificate download
+- Browser print and Save as PDF support
+- Search-engine exclusion for certificate verification pages
+- No public school or student leaderboard
 
-## Benchmark privacy principles
+## Published recognition rules
 
-- Students do not receive a catalogue of other schools’ access codes.
-- School staff see only benchmarks they publish or in which their own students participated.
-- A school can never see another school’s named students, answer sheets or exact attempts.
-- External comparison excludes the requesting school’s own cohort.
-- No public school leaderboard is produced.
-- Benchmark evidence cannot decide admission, discipline, promotion, fees, scholarship, access or employment.
+- First Evidence
+- Assessment Excellence
+- Perfect Score
+- Growth Milestone
+- Consistent Performer
+- Integrity Streak
+- Shared Benchmark Participant
+- Benchmark Distinction
 
-## New cloud migrations
+Every badge displays its rule version and evidence summary. Achievements recognise a specific result, milestone or current evidence window; they do not define intelligence, character, ability or future potential.
 
-Apply the Supabase SQL files in numeric order through:
+## Certificate privacy principles
+
+- Students see only their own achievements and certificates.
+- School staff see only learners linked to their organization.
+- Super Admin receives rule-level governance counts.
+- Raw award evidence, certificate rows and audit events remain server-only.
+- Verification is bearer-style and `link_only`.
+- Verification pages return `noindex`, `nofollow` and `noarchive` directives.
+- A revoked certificate continues to verify as revoked instead of disappearing.
+- Recognition cannot decide admission, discipline, promotion, fees, scholarship, access or employment.
+
+## Supabase migrations
+
+Apply all SQL files in numeric order through:
 
 - `supabase/11_shared_benchmarks.sql`
 - `supabase/12_benchmark_aggregate_function.sql`
@@ -44,17 +56,29 @@ Apply the Supabase SQL files in numeric order through:
 - `supabase/14_benchmark_operation_hardening.sql`
 - `supabase/15_benchmark_security_and_lifecycle_hardening.sql`
 - `supabase/16_benchmark_fingerprint_lock_hardening.sql`
+- `supabase/17_achievement_badge_schema.sql`
+- `supabase/18_achievement_certificate_operations.sql`
 
-## Main routes
+## Main V6.7 routes
 
-- `/school/benchmarks/`
-- `/school/benchmarks/publish/`
-- `/student/benchmarks/`
-- `/admin/benchmarks/`
-- `/api/benchmarks`
+- `/student/achievements/`
+- `/school/achievements/`
+- `/admin/achievements/`
+- `/verify/certificate/`
+- `/verify/certificate/[code]/`
+- `/api/achievements`
+- `/api/certificates`
+
+Demo verification code:
+
+```text
+demo-evidara-2026
+```
 
 ## Preserved capabilities
 
+- Private exact-version shared benchmarks
+- Anonymous thresholded external comparison
 - Evidara transparent PNG branding
 - Metric explanations and responsible-use guidance
 - Universal table search, filtering and sorting
@@ -80,9 +104,9 @@ npm run build
 
 ## Cloud activation boundary
 
-The application continues to provide demo workspaces when Supabase is not configured. Live shared benchmarks require:
+The application continues to provide demonstration workspaces when Supabase is not configured. Live V6.7 recognition requires:
 
-- all migrations through `16_benchmark_fingerprint_lock_hardening.sql`
+- all migrations through `18_achievement_certificate_operations.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
