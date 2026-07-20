@@ -28,17 +28,26 @@ jobs:
       - name: Check out the requested revision
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run Evidara V6.8 QA gate
-        run: npm run qa
+      - name: Lint application
+        run: npm run lint
+
+      - name: Typecheck application
+        run: npm run typecheck
+
+      - name: Run V6.8 smoke checks
+        run: npm run qa:smoke
+
+      - name: Build production application
+        run: npm run build
 
       - name: Record non-deployment boundary
         run: |
