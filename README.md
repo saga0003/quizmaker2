@@ -61,6 +61,7 @@ The downloadable and printable certificate follows the approved Evidara brand bo
 - Raw award evidence, certificate rows and audit events remain server-only.
 - Verification is bearer-style and `link_only`.
 - Verification pages and APIs return `noindex`, `nofollow` and `noarchive` controls.
+- Public verification reports only a neutral withdrawn state; internal free-text withdrawal reasons remain private in the audit record.
 - A revoked certificate continues to verify as revoked instead of disappearing.
 - A new certificate may be issued from an active eligible achievement while the revoked historical record remains visible.
 - Only Super Admin can restore a withdrawn certificate.
