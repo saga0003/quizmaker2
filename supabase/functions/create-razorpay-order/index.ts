@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
         }
 
         const reservationCutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-        let usageQuery = admin
+        const usageQuery = admin
           .from("orders")
           .select("id,status,created_at,user_id")
           .eq("voucher_id", voucher.id)
