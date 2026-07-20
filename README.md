@@ -19,7 +19,7 @@ Included in this release:
 - School recognition review, backfill, issuance, withdrawal and reissue workspace
 - Super Admin achievement-rule governance
 - Link-only certificate verification with active and revoked states
-- Branded SVG certificate download
+- Brand-book-compliant SVG certificate download using the approved Evidara logo
 - Browser print and Save as PDF support
 - Search-engine exclusion for certificate verification pages and responses
 - Fail-closed partial cloud configuration
@@ -38,7 +38,22 @@ Included in this release:
 
 Every badge displays its rule version and evidence summary. Achievements recognise a specific result, milestone or current evidence window; they do not define intelligence, character, ability or future potential.
 
-## Certificate privacy principles
+## Certificate brand standard
+
+The downloadable and printable certificate follows the approved Evidara brand book:
+
+- approved transparent Evidara PNG logo, embedded into the downloaded SVG
+- Evidara Teal `#0E5A5A`
+- Insight Amber `#F2B84B`
+- Cloud White `#F7F9F7`
+- Evidence Mist `#DCE9E7`
+- Midnight Ink `#14232B`
+- Inter with Arial, Helvetica and system fallbacks
+- calm compass-path and evidence-point motifs
+- no unapproved purple gradient, imitation logo or decorative success promise
+- a visible responsible-use note explaining that the certificate is not a prediction, permanent label or guarantee
+
+## Certificate privacy and lifecycle principles
 
 - Students see only their own achievements and certificates.
 - School staff see only learners linked to their organization.
@@ -48,6 +63,9 @@ Every badge displays its rule version and evidence summary. Achievements recogni
 - Verification pages and APIs return `noindex`, `nofollow` and `noarchive` controls.
 - A revoked certificate continues to verify as revoked instead of disappearing.
 - A new certificate may be issued from an active eligible achievement while the revoked historical record remains visible.
+- Only Super Admin can restore a withdrawn certificate.
+- A historical certificate cannot be restored while a newer active certificate exists.
+- The linked achievement must be active before a certificate can be restored.
 - Recognition cannot decide admission, discipline, promotion, fees, scholarship, access or employment.
 
 ## Supabase migrations
@@ -65,6 +83,7 @@ Apply all SQL files in numeric order through:
 - `supabase/19_achievement_uuid_aggregate_compatibility.sql`
 - `supabase/20_achievement_evidence_audit_hardening.sql`
 - `supabase/21_achievement_concurrency_hardening.sql`
+- `supabase/22_achievement_certificate_restore_hardening.sql`
 
 ## Main V6.7 routes
 
@@ -113,7 +132,7 @@ npm run build
 
 The application provides demonstration workspaces only when no public Supabase configuration exists. Live V6.7 recognition requires:
 
-- all migrations through `21_achievement_concurrency_hardening.sql`
+- all migrations through `22_achievement_certificate_restore_hardening.sql`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
