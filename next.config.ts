@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
   experimental: { cpus: 2 },
+  outputFileTracingIncludes: {
+    "/api/certificates": ["./public/brand/evidara-logo-light.png"],
+  },
   async headers() {
     return [
       { source: "/(.*)", headers: securityHeaders },
