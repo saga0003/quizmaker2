@@ -37,6 +37,8 @@ Achievement evaluation runs after:
 
 Evidence-window achievements can be automatically revoked when the current evidence no longer meets the published rule. A later valid evaluation can restore an automatically revoked award. Manual school revocation requires Super Admin restoration.
 
+Initial award creation is concurrency-safe. Overlapping submission, refresh and backfill evaluations acquire a transaction lock for the exact learner, organization and rule before the first insert, preventing duplicate-key failures from rolling back assessment submission.
+
 ## Certificates
 
 Only certificate-eligible active achievements can issue certificates.
@@ -95,7 +97,8 @@ Apply in numeric order after V6.6:
 - `18_achievement_certificate_operations.sql`
 - `19_achievement_uuid_aggregate_compatibility.sql`
 - `20_achievement_evidence_audit_hardening.sql`
+- `21_achievement_concurrency_hardening.sql`
 
-Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes.
+Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. Migration 20 preserves immutable before-and-after history whenever a current achievement’s rule version, source or evidence changes. Migration 21 serializes first-award creation for one learner, school and rule.
 
 Vercel automatic deployment remains paused. Test through GitHub Actions and GitHub Codespaces before intentionally publishing production.
