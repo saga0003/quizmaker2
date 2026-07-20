@@ -8,18 +8,20 @@ const verificationHeaders = {
   "X-Robots-Tag": "noindex, nofollow, noarchive",
 };
 
+const xmlEntities: Record<string, string> = {
+  "<": "&lt;",
+  ">": "&gt;",
+  "&": "&amp;",
+  "\"": "&quot;",
+  "'": "&apos;",
+};
+
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers: verificationHeaders });
 }
 
 function xml(value: string) {
-  return value.replace(/[<>&"']/g, (character) => ({
-    "<": "&lt;",
-    ">": "&gt;",
-    "&": "&amp;",
-    "\"": "&quot;",
-    "'": "&apos;",
-  })[character] ?? character);
+  return value.replace(/[<>&"']/g, (character) => xmlEntities[character] ?? character);
 }
 
 function wrap(value: string, maximum = 78) {
