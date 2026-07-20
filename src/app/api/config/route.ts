@@ -10,17 +10,25 @@ export async function GET() {
 
   return NextResponse.json(
     {
-      release: "6.7.0",
+      release: "6.7.1",
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
       subscriptionModel: "annual-school",
+      deploymentTarget: "cloudflare-workers",
       publicKeyType: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         ? "publishable"
         : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
           ? "anon"
           : null,
-      modules: ["shared-benchmarks", "achievements", "verifiable-certificates"],
+      modules: [
+        "shared-benchmarks",
+        "achievements",
+        "verifiable-certificates",
+        "razorpay-commerce",
+        "percentage-vouchers",
+        "offline-payment-records",
+      ],
     },
     { headers: { "Cache-Control": "no-store" } },
   );
