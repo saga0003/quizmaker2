@@ -90,5 +90,8 @@ Apply in numeric order after V6.6:
 
 - `17_achievement_badge_schema.sql`
 - `18_achievement_certificate_operations.sql`
+- `19_achievement_uuid_aggregate_compatibility.sql`
+
+Migration 19 provides a portable UUID aggregate used only to retain a representative source-attempt identifier from recent evidence windows. It avoids depending on database-version-specific `max(uuid)` availability.
 
 Vercel automatic deployment remains paused. Test through GitHub Actions and GitHub Codespaces before intentionally publishing production.
