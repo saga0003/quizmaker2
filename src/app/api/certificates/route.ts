@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceClient, isPublicSupabaseConfigured, isServerSupabaseConfigured } from "@/lib/server/supabaseServer";
+import { createServiceClient, isPublicSupabaseConfigured, isServerSupabaseReady } from "@/lib/server/supabaseServer";
 import { demoPublicCertificates } from "@/lib/demoAchievements";
 import type { PublicCertificate } from "@/lib/achievementClient";
 
@@ -88,7 +88,7 @@ function certificateSvg(certificate: PublicCertificate) {
 
 async function loadCertificate(code: string): Promise<PublicCertificate | null> {
   if (!isPublicSupabaseConfigured) return demoPublicCertificates[code] ?? null;
-  if (!isServerSupabaseConfigured) {
+  if (!isServerSupabaseReady) {
     throw Object.assign(new Error("Evidara cloud is partially configured. Certificate verification requires the server service-role key."), { status: 503 });
   }
   const admin = createServiceClient();
