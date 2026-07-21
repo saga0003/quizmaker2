@@ -1,44 +1,40 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import "katex/dist/katex.min.css";
 import "./globals.css";
+import "./evidara-brand.css";
+import "./evidara-metrics.css";
+import "./evidara-tables.css";
+import "./evidara-segments.css";
+import "./evidara-benchmarks.css";
+import { AuthProvider } from "@/context/AuthProvider";
+import { V7AuthBridge } from "@/components/evidara/v7-auth-bridge";
+import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Evidara — Evidence-Driven Student Development",
+  title: "Evidara V7 — Evidence-Driven Student Development",
   description: "Subscription-based school assessments, previous-year resources, secure exams and student intelligence for Grades 8–12.",
   icons: {
     icon: "/brand/evidara-emblem.png",
     apple: "/brand/evidara-emblem.png",
   },
   openGraph: {
-    title: "Evidara — Evidence-Driven Student Development",
+    title: "Evidara V7 — Evidence-Driven Student Development",
     description: "Subscription-based school assessments, previous-year resources, secure exams and student intelligence for Grades 8–12.",
     type: "website",
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
-      >
-        {children}
-        <Toaster />
+      <body className="bg-background text-foreground antialiased">
+        <AuthProvider>
+          <V7AuthBridge />
+          <UniversalTableEnhancer />
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );
