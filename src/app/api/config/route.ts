@@ -10,19 +10,22 @@ export async function GET() {
 
   return NextResponse.json(
     {
-      release: "6.8.0",
+      release: "7.0.0",
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
       subscriptionModel: "annual-school",
       deploymentTarget: "cloudflare-workers",
       qaRelease: true,
+      interface: "v7-super-ui",
       publicKeyType: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         ? "publishable"
         : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
           ? "anon"
           : null,
       modules: [
+        "v7-interactive-interface",
+        "supabase-auth",
         "shared-benchmarks",
         "achievements",
         "verifiable-certificates",
