@@ -22,6 +22,9 @@ function expect(label, condition, message) {
 }
 
 const packageJson = JSON.parse(read("package.json") || "{}");
+const rolesSource = read("src/lib/roles.ts");
+const roleMigration = read("supabase/25_role_access_control.sql");
+
 expect("package version", packageJson.version === "7.0.0", `expected 7.0.0, received ${packageJson.version ?? "missing"}`);
 expect("Supabase dependency", Boolean(packageJson.dependencies?.["@supabase/supabase-js"]), "@supabase/supabase-js is missing");
 expect("Prisma dependency removed", !packageJson.dependencies?.prisma && !packageJson.dependencies?.["@prisma/client"], "Prisma packages must not be present");
@@ -30,6 +33,10 @@ expect("V7 interface", exists("src/components/evidara/landing-page.tsx") && exis
 expect("Supabase auth bridge", exists("src/components/evidara/v7-auth-bridge.tsx") && read("src/components/evidara/v7-auth-bridge.tsx").includes("useAuth"), "V7 Supabase auth bridge is missing");
 expect("V7 login uses Supabase", read("src/components/evidara/login-page.tsx").includes("signInWithPassword") && read("src/components/evidara/login-page.tsx").includes("signInWithOAuth"), "V7 login is not connected to Supabase");
 expect("V7 release health", read("src/app/api/health/route.ts").includes('release: "7.0.0"'), "health endpoint is not reporting V7");
+expect("five canonical roles", ["super_admin", "evidara_admin", "school_admin", "school_teacher", "student"].every((role) => rolesSource.includes(`\"${role}\"`)), "one or more canonical roles are missing");
+expect("role permission model", rolesSource.includes("hasEvidaraPermission") && rolesSource.includes("canAccessEvidaraWorkspace"), "role permission helpers are missing");
+expect("role migration", exists("supabase/25_role_access_control.sql") && roleMigration.includes("assign_evidara_role_by_email"), "Supabase role migration or assignment RPC is missing");
+expect("school role isolation", read("src/app/api/school-platform/route.ts").includes("schoolStaff") && read("src/app/api/school-platform/route.ts").includes("School Admin permission is required"), "school teacher/admin boundaries are missing");
 expect("Prisma schema removed", !exists("prisma/schema.prisma"), "temporary Prisma schema still exists");
 expect("SQLite database removed", !exists("db/custom.db"), "temporary SQLite database still exists");
 expect("Template database client removed", !exists("src/lib/db.ts"), "temporary Prisma client still exists");
