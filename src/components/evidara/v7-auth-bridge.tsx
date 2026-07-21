@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthProvider';
+import { normalizeEvidaraRole } from '@/lib/roles';
 import { cloudRoleToV7Role, useAppStore } from '@/store/use-app-store';
 
 export function V7AuthBridge() {
@@ -26,7 +27,8 @@ export function V7AuthBridge() {
       return;
     }
 
-    const role = cloudRoleToV7Role(profile?.role);
+    const accessRole = normalizeEvidaraRole(profile?.role);
+    const role = cloudRoleToV7Role(accessRole);
     setCloudUser({
       id: user.id,
       name:
@@ -37,6 +39,7 @@ export function V7AuthBridge() {
         'Evidara user',
       email: user.email || '',
       role,
+      accessRole,
       avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || undefined,
     });
     setAuthReady(true);
