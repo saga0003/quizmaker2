@@ -1,5 +1,7 @@
 'use client';
 
+import { ShoppingBag } from 'lucide-react';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { AppSidebar } from '@/components/evidara/app-sidebar';
 import LandingPage from '@/components/evidara/landing-page';
@@ -38,7 +40,6 @@ import {
 function ViewRouter() {
   const { view } = useAppStore();
 
-  // Student views
   if (view === 'student-dashboard') return <StudentDashboard />;
   if (view === 'student-tests') return <StudentTestsView />;
   if (view === 'student-analytics') return <StudentAnalyticsView />;
@@ -48,7 +49,6 @@ function ViewRouter() {
   if (view === 'student-resources') return <StudentResourcesView />;
   if (view === 'student-purchases') return <StudentPurchasesView />;
 
-  // School views
   if (view === 'school-dashboard') return <SchoolDashboardView />;
   if (view === 'school-questions') return <SchoolQuestionsView />;
   if (view === 'school-papers') return <SchoolPapersView />;
@@ -59,7 +59,6 @@ function ViewRouter() {
   if (view === 'school-benchmarks') return <SchoolBenchmarksView />;
   if (view === 'school-segments') return <SchoolSegmentsView />;
 
-  // Admin views
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-questions') return <AdminQuestionsView />;
   if (view === 'admin-papers') return <AdminPapersView />;
@@ -72,7 +71,6 @@ function ViewRouter() {
   return null;
 }
 
-// Placeholder for student purchases view
 function StudentPurchasesView() {
   return (
     <div className="space-y-6">
@@ -95,25 +93,29 @@ function StudentPurchasesView() {
   );
 }
 
-import { ShoppingBag } from 'lucide-react';
-
 export default function Home() {
-  const { view, user, sidebarOpen } = useAppStore();
+  const { view, user, sidebarOpen, authReady } = useAppStore();
 
-  // Public pages (no sidebar)
+  if (isSupabaseConfigured && !authReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#F7F9F7]">
+        <div className="rounded-2xl border border-[#DCE9E7] bg-white px-8 py-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#DCE9E7] border-t-[#0E5A5A]" />
+          <strong className="text-[#14232B]">Connecting to Evidara cloud…</strong>
+          <p className="mt-1 text-sm text-[#6B7980]">Confirming your Supabase session and workspace.</p>
+        </div>
+      </main>
+    );
+  }
+
   if (view === 'landing') return <LandingPage />;
   if (view === 'login' || view === 'register-school') return <LoginPage />;
 
-  // Authenticated pages (with sidebar)
   if (user) {
     return (
       <div className="min-h-screen bg-[#F7F9F7]">
         <AppSidebar />
-        <main
-          className={`transition-all duration-300 ${
-            sidebarOpen ? 'ml-64' : 'ml-[68px]'
-          }`}
-        >
+        <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-[68px]'}`}>
           <div className="mx-auto max-w-7xl p-6 lg:p-8">
             <ViewRouter />
           </div>
@@ -122,6 +124,5 @@ export default function Home() {
     );
   }
 
-  // Fallback
   return <LandingPage />;
 }
