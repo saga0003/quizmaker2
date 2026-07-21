@@ -2,6 +2,10 @@
 
 import { create } from 'zustand';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import {
+  normalizeEvidaraRole,
+  type EvidaraRole,
+} from '@/lib/roles';
 
 export type UserRole = 'student' | 'school' | 'admin' | null;
 export type AppView =
@@ -39,18 +43,14 @@ export interface AppUser {
   name: string;
   email: string;
   role: Exclude<UserRole, null>;
+  accessRole: EvidaraRole;
   avatar?: string;
 }
 
 export function cloudRoleToV7Role(role?: string | null): Exclude<UserRole, null> {
-  if (role === 'super_admin') return 'admin';
-  if (
-    role?.startsWith('school_') ||
-    role?.startsWith('institute_') ||
-    ['teacher', 'reviewer', 'invigilator'].includes(role ?? '')
-  ) {
-    return 'school';
-  }
+  const normalized = normalizeEvidaraRole(role);
+  if (normalized === 'super_admin' || normalized === 'evidara_admin') return 'admin';
+  if (normalized === 'school_admin' || normalized === 'school_teacher') return 'school';
   return 'student';
 }
 
@@ -85,7 +85,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     const current = get();
-    const sameIdentity = current.user?.id === user.id && current.user?.role === user.role;
+    const sameIdentity =
+      current.user?.id === user.id &&
+      current.user?.role === user.role &&
+      current.user?.accessRole === user.accessRole;
     const authenticatedView = !['landing', 'login', 'register-school'].includes(current.view);
     set({
       user,
@@ -97,9 +100,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   login: (role) => {
     if (isSupabaseConfigured) return;
     const users: Record<Exclude<UserRole, null>, AppUser> = {
-      student: { id: 'demo-student', name: 'Aarav Sharma', email: 'aarav@greenvalley.edu', role: 'student' },
-      school: { id: 'demo-school', name: 'Green Valley High', email: 'admin@greenvalley.edu', role: 'school' },
-      admin: { id: 'demo-admin', name: 'Evidara Admin', email: 'admin@evidara.com', role: 'admin' },
+      student: {
+        id: 'demo-student',
+        name: 'Aarav Sharma',
+        email: 'aarav@greenvalley.edu',
+        role: 'student',
+        accessRole: 'student',
+      },
+      school: {
+        id: 'demo-school',
+        name: 'Green Valley High',
+        email: 'admin@greenvalley.edu',
+        role: 'school',
+        accessRole: 'school_admin',
+      },
+      admin: {
+        id: 'demo-admin',
+        name: 'Evidara Admin',
+        email: 'admin@evidara.com',
+        role: 'admin',
+        accessRole: 'super_admin',
+      },
     };
     set({ user: users[role], view: defaultViewForRole(role), sidebarOpen: true, authReady: true });
   },
