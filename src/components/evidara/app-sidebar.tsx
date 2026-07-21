@@ -1,6 +1,7 @@
 'use client';
 
-import { useAppStore, type AppView, type UserRole } from '@/store/use-app-store';
+import { useAppStore, type AppView } from '@/store/use-app-store';
+import { evidaraRoleLabel } from '@/lib/roles';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -20,17 +21,12 @@ import {
   FolderOpen,
   ShoppingBag,
   Users,
-  School,
-  Settings,
   Package,
   CreditCard,
-  Activity,
   PieChart,
-  Shield,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Layers,
 } from 'lucide-react';
 
 interface NavItem {
@@ -73,24 +69,26 @@ const adminNav: NavItem[] = [
   { label: 'Segments', icon: PieChart, view: 'admin-segments' },
 ];
 
-const roleLabels: Record<string, string> = {
-  student: 'Student',
-  school: 'School Admin',
-  admin: 'Super Admin',
-};
-
-const navMap: Record<string, NavItem[]> = {
-  student: studentNav,
-  school: schoolNav,
-  admin: adminNav,
-};
+function navigationForUser(role: 'student' | 'school' | 'admin', accessRole: string) {
+  if (role === 'student') return studentNav;
+  if (role === 'school') {
+    if (accessRole === 'school_teacher') {
+      return schoolNav.filter((item) => item.view !== 'school-subscription');
+    }
+    return schoolNav;
+  }
+  if (accessRole === 'evidara_admin') {
+    return adminNav.filter((item) => item.view !== 'admin-products');
+  }
+  return adminNav;
+}
 
 export function AppSidebar() {
   const { user, view, setView, logout, sidebarOpen, setSidebarOpen } = useAppStore();
   if (!user) return null;
 
-  const role = user.role as string;
-  const nav = navMap[role] || [];
+  const nav = navigationForUser(user.role, user.accessRole);
+  const roleLabel = evidaraRoleLabel(user.accessRole);
 
   return (
     <aside
@@ -98,7 +96,6 @@ export function AppSidebar() {
         sidebarOpen ? 'w-64' : 'w-[68px]'
       }`}
     >
-      {/* Header */}
       <div className="flex h-16 items-center justify-between px-4">
         {sidebarOpen && (
           <div className="flex items-center gap-3">
@@ -128,16 +125,14 @@ export function AppSidebar() {
 
       <Separator className="bg-white/10" />
 
-      {/* Workspace label */}
       {sidebarOpen && (
         <div className="px-4 pt-4 pb-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">
-            {roleLabels[role] || ''}
+            {roleLabel}
           </span>
         </div>
       )}
 
-      {/* Navigation */}
       <ScrollArea className="flex-1 px-2 py-2">
         <nav className="flex flex-col gap-1">
           {nav.map((item) => {
@@ -175,7 +170,6 @@ export function AppSidebar() {
         </nav>
       </ScrollArea>
 
-      {/* Footer / Account */}
       <Separator className="bg-white/10" />
       <div className="p-3">
         {sidebarOpen ? (
@@ -192,14 +186,14 @@ export function AppSidebar() {
             </Avatar>
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-white">{user.name}</p>
-              <p className="truncate text-xs text-white/50">{user.email}</p>
+              <p className="truncate text-xs text-white/50">{roleLabel} · {user.email}</p>
             </div>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={logout}
+                  onClick={() => void logout()}
                   className="h-8 w-8 shrink-0 text-white/40 hover:bg-white/10 hover:text-[#B54747]"
                 >
                   <LogOut className="h-4 w-4" />
@@ -214,7 +208,7 @@ export function AppSidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={logout}
+                onClick={() => void logout()}
                 className="mx-auto flex h-10 w-10 text-white/40 hover:bg-white/10 hover:text-[#B54747]"
               >
                 <LogOut className="h-5 w-5" />
