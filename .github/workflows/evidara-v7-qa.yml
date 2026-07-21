@@ -1,0 +1,66 @@
+name: Evidara V7 Supabase QA
+
+on:
+  push:
+    branches:
+      - evidara-v7-super-ui
+  pull_request:
+    branches:
+      - evidara-v6-8-production-qa
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v7-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Install, lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out V7
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install V7 dependencies and generate lockfile
+        run: npm install --no-audit --no-fund
+
+      - name: Upload generated npm lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v7-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: V7 Supabase smoke checks
+        run: npm run qa:smoke
+
+      - name: Next.js production build
+        run: npm run build
+
+      - name: Cloudflare OpenNext build
+        run: npm run cf:build
+
+      - name: Confirm non-deployment boundary
+        run: echo "Evidara V7 QA completed without deployment or merge."
