@@ -5,7 +5,6 @@ import type {
   QuestionOptionInput,
   QuestionPayload,
   QuestionStatus,
-  QuestionTestType,
   QuestionType,
 } from "@/types/questions";
 
@@ -15,9 +14,6 @@ const acceptedTypes = new Set<QuestionType>([
 ]);
 const acceptedDifficulties = new Set<QuestionDifficulty>([
   "very_easy", "easy", "moderate", "difficult", "very_difficult",
-]);
-const acceptedTestTypes = new Set<QuestionTestType>([
-  "full_length", "part_test", "chapter_test", "topic_test", "custom",
 ]);
 const acceptedStatuses = new Set<QuestionStatus>(["draft", "in_review", "approved"]);
 const acceptedLanguages = new Set(["english", "kannada", "hindi", "bilingual"]);
@@ -121,9 +117,6 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
     const status = normalizedStatus(raw.status);
     const language = normalizedLanguage(raw.language);
     const answer = normalize(raw.correct_answer);
-    const rawTestType = slugValue(raw.test_type || "chapter_test") || "chapter_test";
-    const testType = (acceptedTestTypes.has(rawTestType as QuestionTestType) ? rawTestType : "custom") as QuestionTestType;
-    const customTestType = normalize(raw.custom_test_type || (testType === "custom" && rawTestType !== "custom" ? raw.test_type : ""));
     const exams = splitList(raw.exam_types || raw.exam_type);
 
     if (stem.length < 5) errors.push("Question text is missing or too short.");
@@ -134,7 +127,6 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
     if (!acceptedLanguages.has(language.toLowerCase())) errors.push(`Unsupported language '${normalize(raw.language)}'.`);
     if (!answer) errors.push("Correct answer is required.");
     if (!exams.length) errors.push("At least one exam type is required.");
-    if (testType === "custom" && !customTestType) errors.push("custom_test_type is required when test_type is custom.");
 
     const optionKeys = ["A", "B", "C", "D", "E", "F"];
     const parsedAnswer = answerKeys(answer, questionType);
@@ -203,8 +195,6 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
         import_chapter: normalize(raw.chapter),
         import_topic: normalize(raw.topic),
         question_image_filename: normalize(raw.question_image_filename || raw.question_image),
-        test_type: testType,
-        custom_test_type: customTestType || undefined,
         match_pairs: matchPairs.length ? matchPairs : undefined,
       },
       options,
@@ -214,11 +204,10 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
   });
 }
 
-// The default template is intentionally simple. Match the Following remains
-// available in the manual editor, but its many paired columns are excluded from
-// Excel/CSV so ordinary users can understand and validate the sheet quickly.
+// Questions remain reusable. Test/series classification is selected later while
+// creating a paper or test series, so it is deliberately excluded here.
 export const bulkQuestionTemplateHeaders = [
-  "exam_types", "test_type", "custom_test_type", "class_level", "subject", "chapter", "topic", "question_type", "difficulty",
+  "exam_types", "class_level", "subject", "chapter", "topic", "question_type", "difficulty",
   "question", "question_latex", "question_image",
   "option_a", "option_a_latex", "option_a_image",
   "option_b", "option_b_latex", "option_b_image",
