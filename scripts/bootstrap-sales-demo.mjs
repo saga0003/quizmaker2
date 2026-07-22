@@ -23,22 +23,39 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 
 const accountDefinitions = [
   {
+    key: "super_admin",
+    email: "hemasagar333@gmail.com",
+    fullName: "Hema Sagar",
+    role: "super_admin",
+    scope: "platform",
+  },
+  {
+    key: "evidara_admin",
+    email: "evidaraadmin@demo.evidara.app",
+    fullName: "Evidara Demo Company Admin",
+    role: "evidara_admin",
+    scope: "platform",
+  },
+  {
     key: "school_admin",
     email: `sales.schooladmin@${emailDomain}`,
     fullName: "Evidara Demo School Admin",
     role: "school_admin",
+    scope: "school",
   },
   {
     key: "school_teacher",
     email: `sales.teacher@${emailDomain}`,
     fullName: "Evidara Demo School Teacher",
     role: "school_teacher",
+    scope: "school",
   },
   {
     key: "student",
     email: `sales.student@${emailDomain}`,
     fullName: "Evidara Demo Student",
     role: "student",
+    scope: "school",
   },
 ];
 
@@ -98,6 +115,19 @@ async function createOrResetUser({ email, password, fullName, role }) {
   return user;
 }
 
+async function assignPlatformRole(email, role) {
+  const { error } = await supabase.rpc("assign_evidara_role_by_email", {
+    p_email: email,
+    p_role: role,
+  });
+
+  if (error) {
+    throw new Error(
+      `${error.message} Apply supabase/25_role_access_control.sql and supabase/26_v7_role_compatibility.sql before running the demo bootstrap.`,
+    );
+  }
+}
+
 function missingRequiredColumn(message) {
   return message.match(/null value in column ["']([^"']+)["']/i)?.[1] || null;
 }
@@ -115,6 +145,7 @@ async function createDemoSchoolForLiveSchema(schoolAdminUserId) {
     code: "EVIDARA-DEMO",
     school_code: "EVIDARA-DEMO",
     school_type: "School",
+    institute_type: process.env.DEMO_INSTITUTE_TYPE || "school",
     type: "School",
     organization_type: "school",
     city: process.env.DEMO_SCHOOL_CITY || "Bengaluru",
@@ -231,16 +262,7 @@ async function assignSchoolRole(email, schoolId, role) {
 }
 
 async function assignStudent(email, userId, schoolId) {
-  const { error } = await supabase.rpc("assign_evidara_role_by_email", {
-    p_email: email,
-    p_role: "student",
-  });
-
-  if (error) {
-    throw new Error(
-      `${error.message} Apply supabase/25_role_access_control.sql and supabase/26_v7_role_compatibility.sql before running the demo bootstrap.`,
-    );
-  }
+  await assignPlatformRole(email, "student");
 
   const { error: membershipError } = await supabase
     .from("student_school_memberships")
@@ -268,6 +290,59 @@ async function assignStudent(email, userId, schoolId) {
   if (membershipError) throw new Error(membershipError.message);
 }
 
+async function writeAccessFiles({ accounts, school = null, taxonomy = null, setupStatus }) {
+  const generatedAt = new Date().toISOString();
+  const credentials = accounts.map((account) => ({
+    role: account.role,
+    email: account.email,
+    password: account.password,
+    user_id: account.user.id,
+    school_id: account.scope === "school" ? school?.id ?? null : null,
+    school_name: account.scope === "school" ? school?.name ?? null : null,
+  }));
+
+  const text = [
+    "EVIDARA V7 DEMO ACCESS",
+    `Generated: ${generatedAt}`,
+    `Setup status: ${setupStatus}`,
+    school ? `School: ${school.name}` : "School: pending",
+    school ? `School UUID: ${school.id}` : "School UUID: pending",
+    taxonomy ? `Question taxonomy: ${taxonomy.ready ? "READY" : "CHECK REQUIRED"}` : "Question taxonomy: pending",
+    taxonomy ? `Taxonomy note: ${taxonomy.note}` : "Taxonomy note: school setup not completed yet",
+    "",
+    ...credentials.flatMap((account) => [
+      `${account.role.toUpperCase()}`,
+      `Email: ${account.email}`,
+      `Password: ${account.password}`,
+      `User UUID: ${account.user_id}`,
+      account.school_id ? `School UUID: ${account.school_id}` : "Platform account: not linked to a school",
+      "",
+    ]),
+    "Security note: rerun npm run demo:bootstrap to rotate generated passwords.",
+    "Do not share the Super Admin password with the general sales team.",
+  ].join("\n");
+
+  await writeFile(passwordOutput, text, { encoding: "utf8" });
+  await writeFile(
+    jsonOutput,
+    JSON.stringify(
+      {
+        generated_at: generatedAt,
+        setup_status: setupStatus,
+        school,
+        taxonomy,
+        accounts: credentials,
+      },
+      null,
+      2,
+    ),
+    { encoding: "utf8" },
+  );
+  await Promise.all([chmod(passwordOutput, 0o600), chmod(jsonOutput, 0o600)]);
+
+  return credentials;
+}
+
 async function run() {
   const preparedAccounts = [];
 
@@ -277,12 +352,24 @@ async function run() {
     preparedAccounts.push({ ...account, password, user });
   }
 
+  const platformAccounts = preparedAccounts.filter((account) => account.scope === "platform");
+  for (const account of platformAccounts) {
+    await assignPlatformRole(account.email, account.role);
+  }
+
+  await writeAccessFiles({
+    accounts: platformAccounts,
+    setupStatus: "PLATFORM ACCOUNTS READY; SCHOOL ACCOUNTS PENDING",
+  });
+
   const schoolAdmin = preparedAccounts.find((account) => account.role === "school_admin");
   if (!schoolAdmin) throw new Error("School Admin demo account definition is missing.");
 
   const school = await ensureDemoSchool(schoolAdmin.user.id);
 
   for (const account of preparedAccounts) {
+    if (account.scope === "platform") continue;
+
     if (account.role === "school_admin" || account.role === "school_teacher") {
       await assignSchoolRole(account.email, school.id, account.role);
     } else {
@@ -291,44 +378,15 @@ async function run() {
   }
 
   const taxonomy = await ensureBasicTaxonomy();
-  const generatedAt = new Date().toISOString();
-  const credentials = preparedAccounts.map((account) => ({
-    role: account.role,
-    email: account.email,
-    password: account.password,
-    user_id: account.user.id,
-    school_id: school.id,
-    school_name: school.name,
-  }));
-
-  const text = [
-    "EVIDARA V7 SALES DEMO ACCESS",
-    `Generated: ${generatedAt}`,
-    `School: ${school.name}`,
-    `School UUID: ${school.id}`,
-    `School created by bootstrap: ${school.created ? "YES" : "NO"}`,
-    `Question taxonomy: ${taxonomy.ready ? "READY" : "CHECK REQUIRED"}`,
-    `Taxonomy note: ${taxonomy.note}`,
-    "",
-    ...credentials.flatMap((account) => [
-      `${account.role.toUpperCase()}`,
-      `Email: ${account.email}`,
-      `Password: ${account.password}`,
-      `User UUID: ${account.user_id}`,
-      "",
-    ]),
-    "Security note: rerun npm run demo:bootstrap to rotate all three passwords.",
-  ].join("\n");
-
-  await writeFile(passwordOutput, text, { encoding: "utf8" });
-  await writeFile(
-    jsonOutput,
-    JSON.stringify({ generated_at: generatedAt, school, taxonomy, accounts: credentials }, null, 2),
-    { encoding: "utf8" },
-  );
-  await Promise.all([chmod(passwordOutput, 0o600), chmod(jsonOutput, 0o600)]);
+  const credentials = await writeAccessFiles({
+    accounts: preparedAccounts,
+    school,
+    taxonomy,
+    setupStatus: "ALL FIVE DEMO ACCOUNTS READY",
+  });
 
   console.log(`Created or reset ${credentials.length} Supabase demo accounts.`);
+  console.log(`Platform accounts: hemasagar333@gmail.com and evidaraadmin@demo.evidara.app.`);
   console.log(`Demo school: ${school.name} (${school.id}).`);
   console.log(`Credentials were written to ${passwordOutput} and ${jsonOutput}.`);
   console.log("Passwords were not committed to GitHub and are not printed to the terminal.");
@@ -336,5 +394,6 @@ async function run() {
 
 run().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
+  console.error(`Platform credentials may already be available in ${passwordOutput}.`);
   process.exit(1);
 });
