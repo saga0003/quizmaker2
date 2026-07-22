@@ -12,17 +12,21 @@ export async function GET() {
   return NextResponse.json(
     {
       healthy,
-      release: "7.0.0",
+      release: "7.1.0",
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
       deploymentTarget: "cloudflare-workers",
       qaRelease: true,
-      interface: "v7-super-ui",
+      interface: "v7-1-question-stabilization",
       modules: [
         "v7-interactive-interface",
         "supabase-auth",
         "question-bank",
+        "question-import-preflight",
+        "question-image-zip-import",
+        "question-taxonomy-inline-create",
+        "cross-role-question-visibility",
         "imports",
         "paper-builder",
         "secure-exam",
@@ -41,7 +45,7 @@ export async function GET() {
         "razorpay-test-mode-diagnostics",
         "protected-route-smoke-checks",
       ],
-      issue: healthy ? null : "SUPABASE_SERVICE_ROLE_KEY is required for authenticated server operations and V7 launch diagnostics.",
+      issue: healthy ? null : "SUPABASE_SERVICE_ROLE_KEY is required for authenticated server operations and V7.1 launch diagnostics.",
     },
     {
       status: healthy ? 200 : 503,
