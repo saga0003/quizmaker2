@@ -56,19 +56,50 @@ function removeQuestionTestTypeUi() {
     }
   });
 
+  document.querySelectorAll('[role="option"]').forEach((option) => {
+    if (textOf(option) === 'topic serial') hide(option);
+  });
+}
+
+function normalizeQuestionTable() {
   document.querySelectorAll('table').forEach((table) => {
     const headers = Array.from(table.querySelectorAll('thead th'));
-    const testTypeIndex = headers.findIndex((header) => textOf(header) === 'test type');
-    if (testTypeIndex < 0) return;
-    hide(headers[testTypeIndex]);
-    table.querySelectorAll('tbody tr').forEach((row) => hide(row.children.item(testTypeIndex)));
+    const questionIndex = headers.findIndex((header) => textOf(header) === 'question');
+    const ownershipIndex = headers.findIndex((header) => textOf(header).includes('school / ownership'));
+    if (questionIndex < 0 || ownershipIndex < 0) return;
+
+    const serialIndex = headers.findIndex((header) => textOf(header) === 'topic serial' || textOf(header) === 'serial no.');
+    if (serialIndex >= 0) headers[serialIndex].textContent = 'S.No.';
+
+    const typeIndex = headers.findIndex((header) => textOf(header) === 'type / test' || textOf(header) === 'question type');
+    if (typeIndex >= 0) headers[typeIndex].textContent = 'Question type';
+
+    const rows = Array.from(table.querySelectorAll('tbody tr')).filter((row) => row.querySelectorAll('td').length > 1);
+    rows.forEach((row, visibleIndex) => {
+      if (serialIndex >= 0) {
+        const cell = row.children.item(serialIndex);
+        const badge = cell?.querySelector('[data-slot="badge"]') || cell?.querySelector('span');
+        if (badge) badge.textContent = String(visibleIndex + 1);
+        cell?.querySelectorAll('p').forEach((label) => hide(label));
+      }
+      if (typeIndex >= 0) {
+        const cell = row.children.item(typeIndex);
+        const details = cell?.querySelectorAll('p');
+        if (details && details.length > 1) hide(details.item(1));
+      }
+    });
   });
+}
+
+function applyQuestionPolicies() {
+  removeQuestionTestTypeUi();
+  normalizeQuestionTable();
 }
 
 export function QuestionBankPolicy() {
   useEffect(() => {
-    removeQuestionTestTypeUi();
-    const observer = new MutationObserver(removeQuestionTestTypeUi);
+    applyQuestionPolicies();
+    const observer = new MutationObserver(applyQuestionPolicies);
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
