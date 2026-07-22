@@ -89,7 +89,7 @@ async function snapshot(ctx: AccessContext, requestedOrganizationId: string | nu
     : ctx.organizationId;
 
   const [{ data: organizations, error: organizationError }, { data: settings, error: settingsError }] = await Promise.all([
-    ctx.admin.from('organizations').select('id,name,city,state,status').order('name'),
+    ctx.admin.from('organizations').select('id,name').order('name'),
     ctx.admin
       .from('module_access_settings')
       .select('id,organization_id,role,module_key,enabled,updated_at')
@@ -105,7 +105,7 @@ async function snapshot(ctx: AccessContext, requestedOrganizationId: string | nu
     .order('full_name')
     .limit(2000);
 
-  let memberRows: Array<{ organization_id: string; user_id: string; member_role: string; is_active: boolean; organizations?: { name: string } | null }> = [];
+  let memberRows: Array<{ organization_id: string; user_id: string; member_role: string; is_active: boolean; organizations?: Array<{ name: string }> | null }> = [];
   if (!ctx.platformAdmin) {
     const { data: members, error: memberError } = await ctx.admin
       .from('organization_members')
@@ -144,7 +144,7 @@ async function snapshot(ctx: AccessContext, requestedOrganizationId: string | nu
     const list = memberships.get(member.user_id) || [];
     list.push({
       organizationId: member.organization_id,
-      organizationName: member.organizations?.name || 'School',
+      organizationName: member.organizations?.[0]?.name || 'School',
       role: normalizeEvidaraRole(member.member_role),
     });
     memberships.set(member.user_id, list);
@@ -234,6 +234,13 @@ export async function POST(request: Request) {
       if (roleError) throw new Error(roleError.message);
 
       if (role === 'school_admin' || role === 'school_teacher') {
+        const { error: deactivateOldError } = await ctx.admin
+          .from('organization_members')
+          .update({ is_active: false })
+          .eq('user_id', userId)
+          .neq('organization_id', organizationId);
+        if (deactivateOldError) throw new Error(deactivateOldError.message);
+
         const { error: memberError } = await ctx.admin.from('organization_members').upsert({
           organization_id: organizationId,
           user_id: userId,
