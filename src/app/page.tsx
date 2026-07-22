@@ -35,6 +35,7 @@ import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
+import { AccessControlView } from '@/components/evidara/access-control-view';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -66,6 +67,7 @@ function ViewRouter() {
   if (view === 'school-achievements') return <SchoolAchievementsView />;
   if (view === 'school-benchmarks') return <SchoolBenchmarksView />;
   if (view === 'school-segments') return <SchoolSegmentsView />;
+  if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
@@ -75,6 +77,7 @@ function ViewRouter() {
   if (view === 'admin-achievements') return <AdminAchievementsView />;
   if (view === 'admin-benchmarks') return <AdminBenchmarksView />;
   if (view === 'admin-segments') return <AdminSegmentsView />;
+  if (view === 'admin-access') return <AccessControlView kind="admin" />;
 
   return null;
 }
