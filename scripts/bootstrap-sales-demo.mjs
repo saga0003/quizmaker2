@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, writeFile } from "node:fs/promises";
 import process from "node:process";
 
@@ -88,6 +88,7 @@ async function createOrResetUser({ email, password, fullName, role }) {
     role,
     updated_at: new Date().toISOString(),
   });
+
   if (profileError) {
     throw new Error(
       `${profileError.message} Apply supabase/25_role_access_control.sql and supabase/26_v7_role_compatibility.sql first.`,
@@ -95,6 +96,77 @@ async function createOrResetUser({ email, password, fullName, role }) {
   }
 
   return user;
+}
+
+function missingRequiredColumn(message) {
+  return message.match(/null value in column ["']([^"']+)["']/i)?.[1] || null;
+}
+
+function missingSchemaColumn(message) {
+  return message.match(/Could not find the '([^']+)' column of 'organizations'/i)?.[1] || null;
+}
+
+async function createDemoSchoolForLiveSchema(schoolAdminUserId) {
+  const now = new Date().toISOString();
+  const candidateValues = {
+    id: randomUUID(),
+    name: demoSchoolName,
+    slug: demoSchoolSlug,
+    code: "EVIDARA-DEMO",
+    school_code: "EVIDARA-DEMO",
+    school_type: "School",
+    type: "School",
+    organization_type: "school",
+    city: process.env.DEMO_SCHOOL_CITY || "Bengaluru",
+    state: process.env.DEMO_SCHOOL_STATE || "Karnataka",
+    country: "India",
+    phone: process.env.DEMO_SCHOOL_PHONE || "0000000000",
+    email: `school@${emailDomain}`,
+    address: "Evidara sales demonstration workspace",
+    student_count_range: "1-100",
+    status: "active",
+    is_active: true,
+    active: true,
+    created_by: schoolAdminUserId,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const payload = { name: demoSchoolName };
+  const attemptedRequiredColumns = new Set();
+
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    const { data, error } = await supabase
+      .from("organizations")
+      .insert(payload)
+      .select("id,name")
+      .single();
+
+    if (!error && data) return { ...data, created: true };
+
+    const message = error?.message || "Unable to create the dedicated sales demo school.";
+    const unknownColumn = missingSchemaColumn(message);
+    if (unknownColumn && Object.hasOwn(payload, unknownColumn)) {
+      delete payload[unknownColumn];
+      continue;
+    }
+
+    const requiredColumn = missingRequiredColumn(message);
+    if (requiredColumn && !attemptedRequiredColumns.has(requiredColumn)) {
+      attemptedRequiredColumns.add(requiredColumn);
+      if (Object.hasOwn(candidateValues, requiredColumn)) {
+        payload[requiredColumn] = candidateValues[requiredColumn];
+        continue;
+      }
+    }
+
+    throw new Error(
+      `${message} The live organizations schema requires a field the demo bootstrap cannot infer safely. ` +
+      `Set DEMO_SCHOOL_ID to an existing organization UUID and run the command again.`,
+    );
+  }
+
+  throw new Error("Unable to create the demo school after checking the live organizations schema.");
 }
 
 async function ensureDemoSchool(schoolAdminUserId) {
@@ -111,31 +183,14 @@ async function ensureDemoSchool(schoolAdminUserId) {
   const { data: existing, error: existingError } = await supabase
     .from("organizations")
     .select("id,name")
-    .eq("slug", demoSchoolSlug)
+    .eq("name", demoSchoolName)
+    .limit(1)
     .maybeSingle();
+
   if (existingError) throw new Error(existingError.message);
   if (existing) return { ...existing, created: false };
 
-  const { data: created, error: createError } = await supabase
-    .from("organizations")
-    .insert({
-      name: demoSchoolName,
-      slug: demoSchoolSlug,
-      school_type: "School",
-      city: process.env.DEMO_SCHOOL_CITY || "Bengaluru",
-      state: process.env.DEMO_SCHOOL_STATE || "Karnataka",
-      phone: process.env.DEMO_SCHOOL_PHONE || "0000000000",
-      student_count_range: "1-100",
-      status: "active",
-      created_by: schoolAdminUserId,
-    })
-    .select("id,name")
-    .single();
-
-  if (createError || !created) {
-    throw new Error(createError?.message || "Unable to create the dedicated sales demo school.");
-  }
-  return { ...created, created: true };
+  return createDemoSchoolForLiveSchema(schoolAdminUserId);
 }
 
 async function ensureBasicTaxonomy() {
@@ -144,6 +199,7 @@ async function ensureBasicTaxonomy() {
     .select("id")
     .eq("is_active", true)
     .limit(1);
+
   if (error) return { ready: false, note: error.message };
   if ((data || []).length) return { ready: true, note: "Existing taxonomy retained." };
 
@@ -154,6 +210,7 @@ async function ensureBasicTaxonomy() {
     { name: "Biology", code: "BIO", is_active: true, display_order: 4 },
     { name: "Logical Reasoning", code: "LOGIC", is_active: true, display_order: 5 },
   ];
+
   const { error: insertError } = await supabase.from("subjects").insert(rows);
   if (insertError) return { ready: false, note: insertError.message };
   return { ready: true, note: "Seeded the basic V7 subject taxonomy." };
@@ -165,6 +222,7 @@ async function assignSchoolRole(email, schoolId, role) {
     p_organization_id: schoolId,
     p_role: role,
   });
+
   if (error) {
     throw new Error(
       `${error.message} Apply supabase/25_role_access_control.sql and supabase/26_v7_role_compatibility.sql before running the demo bootstrap.`,
@@ -177,6 +235,7 @@ async function assignStudent(email, userId, schoolId) {
     p_email: email,
     p_role: "student",
   });
+
   if (error) {
     throw new Error(
       `${error.message} Apply supabase/25_role_access_control.sql and supabase/26_v7_role_compatibility.sql before running the demo bootstrap.`,
@@ -205,6 +264,7 @@ async function assignStudent(email, userId, schoolId) {
       },
       { onConflict: "organization_id,student_id,academic_year" },
     );
+
   if (membershipError) throw new Error(membershipError.message);
 }
 
@@ -219,6 +279,7 @@ async function run() {
 
   const schoolAdmin = preparedAccounts.find((account) => account.role === "school_admin");
   if (!schoolAdmin) throw new Error("School Admin demo account definition is missing.");
+
   const school = await ensureDemoSchool(schoolAdmin.user.id);
 
   for (const account of preparedAccounts) {
