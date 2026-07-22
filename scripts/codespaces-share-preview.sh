@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT="${PORT:-20241}"
+PORT="${PORT:-20242}"
 ORIGIN="http://127.0.0.1:${PORT}"
 STARTED_SERVER=0
 NEXT_PID=""
