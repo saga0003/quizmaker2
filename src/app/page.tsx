@@ -34,6 +34,16 @@ import {
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
+import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
+
+function SchoolQuestionWorkspace() {
+  return (
+    <div className="space-y-6">
+      <SchoolQuestionReview />
+      <LiveQuestionBank kind="school" />
+    </div>
+  );
+}
 
 function ViewRouter() {
   const { view } = useAppStore();
@@ -48,7 +58,7 @@ function ViewRouter() {
   if (view === 'student-purchases') return <StudentPurchasesView />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view === 'school-questions') return <LiveQuestionBank kind="school" />;
+  if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
