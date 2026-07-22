@@ -13,9 +13,10 @@ function failure(error: unknown) {
 export async function POST(request: Request) {
   try {
     const auth = await authenticateRequest(request);
-    const body = await request.json() as { questionId?: string; status?: string };
+    const body = await request.json() as { questionId?: string; status?: string; note?: string };
     const questionId = String(body.questionId ?? "");
     const status = String(body.status ?? "");
+    const note = String(body.note ?? "").trim().slice(0, 1000);
 
     if (!questionId || !["approved", "rejected"].includes(status)) {
       throw Object.assign(new Error("A question and an approved or rejected decision are required."), { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
 
     const { data: question, error: questionError } = await auth.admin
       .from("questions")
-      .select("id,organization_id,status")
+      .select("id,organization_id,status,metadata")
       .eq("id", questionId)
       .single();
     if (questionError || !question) {
@@ -65,9 +66,21 @@ export async function POST(request: Request) {
       }
     }
 
+    const decidedAt = new Date().toISOString();
+    const existingMetadata = question.metadata && typeof question.metadata === "object" && !Array.isArray(question.metadata)
+      ? question.metadata as Record<string, unknown>
+      : {};
+    const metadata = {
+      ...existingMetadata,
+      reviewed_at: decidedAt,
+      reviewed_by: auth.user.id,
+      review_note: note || undefined,
+      ...(status === "approved" ? { published_at: existingMetadata.published_at || decidedAt } : {}),
+    };
+
     const { error: updateError } = await auth.admin
       .from("questions")
-      .update({ status, updated_at: new Date().toISOString() })
+      .update({ status, metadata, updated_at: decidedAt })
       .eq("id", questionId);
     if (updateError) throw new Error(updateError.message);
 
@@ -77,11 +90,11 @@ export async function POST(request: Request) {
       action: `question.${status}`,
       entity_type: "question",
       entity_id: questionId,
-      metadata: { previous_status: question.status, interface: "v7" },
+      metadata: { previous_status: question.status, decision_note: note || null, interface: "v7" },
     });
 
     return NextResponse.json(
-      { ok: true, questionId, status },
+      { ok: true, questionId, status, decidedAt },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
