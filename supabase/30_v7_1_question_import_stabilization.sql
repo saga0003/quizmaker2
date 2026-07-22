@@ -237,14 +237,11 @@ begin
       using errcode = '42501';
   end if;
 
-  normalized_format := case lower(coalesce(p_format, ''))
-    when 'csv' then 'csv'
-    when 'xlsx' then 'xlsx'
-    when 'xls' then 'xlsx'
-    when 'tex' then 'latex'
-    when 'txt' then 'latex'
-    when 'json' then 'other'
-    else 'other'
+  normalized_format := case
+    when lower(coalesce(p_format, '')) in (
+      'csv', 'xlsx', 'xls', 'docx', 'pdf', 'tex', 'txt', 'json', 'image_zip'
+    ) then lower(p_format)
+    else 'json'
   end;
 
   insert into public.question_import_batches (
@@ -314,12 +311,12 @@ begin
   set
     status = case
       when imported_count = 0 and failed_count > 0 then 'failed'
+      when failed_count > 0 then 'completed_with_errors'
       else 'completed'
     end,
     imported_rows = imported_count,
     failed_rows = failed_count,
     completed_at = now(),
-    error_report = case when failed_count > 0 then error_items else null end,
     metadata = metadata || jsonb_build_object('errors', error_items)
   where id = batch_id;
 
