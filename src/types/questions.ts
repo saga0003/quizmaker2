@@ -43,6 +43,9 @@ export type QuestionMetadata = {
   import_topic?: string;
   question_image_filename?: string;
   import_format?: string;
+  import_file?: string;
+  published_at?: string;
+  review_note?: string;
   [key: string]: unknown;
 };
 
@@ -107,6 +110,7 @@ export type QuestionRow = {
   question_options?: QuestionOptionInput[];
   subjects?: { name: string; code: string } | null;
   chapters?: { name: string } | null;
+  topics?: { name: string } | null;
   organizations?: { id: string; name: string } | null;
   profiles?: { full_name: string | null } | null;
 };
