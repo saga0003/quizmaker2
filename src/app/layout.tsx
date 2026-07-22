@@ -8,6 +8,7 @@ import "./evidara-segments.css";
 import "./evidara-benchmarks.css";
 import { AuthProvider } from "@/context/AuthProvider";
 import { V7AuthBridge } from "@/components/evidara/v7-auth-bridge";
+import { QuestionBankPolicy } from "@/components/evidara/question-bank-policy";
 import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-background text-foreground antialiased">
         <AuthProvider>
           <V7AuthBridge />
+          <QuestionBankPolicy />
           <UniversalTableEnhancer />
           {children}
           <Toaster />
