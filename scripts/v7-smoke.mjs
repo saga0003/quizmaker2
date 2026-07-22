@@ -27,6 +27,8 @@ const roleMigration = read("supabase/25_role_access_control.sql");
 const compatibilityMigration = read("supabase/26_v7_role_compatibility.sql");
 const pageRouter = read("src/app/page.tsx");
 const questionBank = read("src/components/evidara/live-question-bank.tsx");
+const questionEditor = read("src/components/evidara/question-editor-dialog.tsx");
+const questionImporter = read("src/components/evidara/question-bulk-import-dialog.tsx");
 const paperCatalogue = read("src/components/evidara/live-paper-catalogue.tsx");
 const studentTests = read("src/components/evidara/live-student-tests.tsx");
 const demoBootstrap = read("scripts/bootstrap-sales-demo.mjs");
@@ -44,7 +46,15 @@ expect("role permission model", rolesSource.includes("hasEvidaraPermission") && 
 expect("role migration", exists("supabase/25_role_access_control.sql") && roleMigration.includes("assign_evidara_role_by_email"), "Supabase role migration or assignment RPC is missing");
 expect("role compatibility migration", compatibilityMigration.includes("compatible_member_role") && compatibilityMigration.includes("is_evidara_school_staff"), "V7 legacy permission compatibility is missing");
 expect("school role isolation", read("src/app/api/school-platform/route.ts").includes("schoolStaff") && read("src/app/api/school-platform/route.ts").includes("School Admin permission is required"), "school teacher/admin boundaries are missing");
-expect("live V7 question bank", questionBank.includes("save_question") && questionBank.includes("Question Bank") && questionBank.includes("Table"), "V7 question table or save flow is missing");
+expect(
+  "live V7 question bank",
+  questionBank.includes("QuestionEditorDialog")
+    && questionBank.includes("QuestionBulkImportDialog")
+    && questionBank.includes("School-Created Questions")
+    && questionEditor.includes("save_question")
+    && questionImporter.includes("bulk_import_questions"),
+  "V7 question table, editor or import save flow is missing",
+);
 expect("live V7 paper builder", paperCatalogue.includes("save_question_paper") && paperCatalogue.includes("set_question_paper_status") && paperCatalogue.includes("Paper Sections"), "V7 paper table or builder is missing");
 expect("live V7 student tests", studentTests.includes("list_available_papers") && studentTests.includes("start_exam_attempt"), "student live test catalogue is missing");
 expect("live workspace routing", pageRouter.includes("LiveQuestionBank") && pageRouter.includes("LivePaperCatalogue") && pageRouter.includes("LiveStudentTests"), "V7 live workspaces are not routed");
