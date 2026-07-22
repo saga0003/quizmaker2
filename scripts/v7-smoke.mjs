@@ -22,12 +22,14 @@ function expect(label, condition, message) {
 }
 
 const packageJson = JSON.parse(read("package.json") || "{}");
+const health = read("src/app/api/health/route.ts");
 const rolesSource = read("src/lib/roles.ts");
 const roleMigration = read("supabase/25_role_access_control.sql");
 const compatibilityMigration = read("supabase/26_v7_role_compatibility.sql");
 const accessMigration = read("supabase/27_v7_question_access_governance.sql");
 const completionMigration = read("supabase/28_v7_question_module_completion.sql");
 const reusableQuestionMigration = read("supabase/29_remove_question_test_classification.sql");
+const stabilizationMigration = read("supabase/30_v7_1_question_import_stabilization.sql");
 const pageRouter = read("src/app/page.tsx");
 const questionBank = read("src/components/evidara/live-question-bank.tsx");
 const questionEditor = read("src/components/evidara/question-editor-dialog.tsx");
@@ -46,7 +48,8 @@ const paperCatalogue = read("src/components/evidara/live-paper-catalogue.tsx");
 const studentTests = read("src/components/evidara/live-student-tests.tsx");
 const demoBootstrap = read("scripts/bootstrap-sales-demo.mjs");
 
-expect("package version", packageJson.version === "7.0.0", `expected 7.0.0, received ${packageJson.version ?? "missing"}`);
+expect("package version", packageJson.version === "7.1.0", `expected 7.1.0, received ${packageJson.version ?? "missing"}`);
+expect("V7.1 release health", health.includes('release: "7.1.0"') && health.includes('interface: "v7-1-question-stabilization"'), "health endpoint is not reporting V7.1");
 expect("Supabase dependency", Boolean(packageJson.dependencies?.["@supabase/supabase-js"]), "@supabase/supabase-js is missing");
 expect("Prisma dependency removed", !packageJson.dependencies?.prisma && !packageJson.dependencies?.["@prisma/client"], "Prisma packages must not be present");
 expect("Cloudflare adapter restored", Boolean(packageJson.devDependencies?.["@opennextjs/cloudflare"]), "Cloudflare OpenNext adapter is missing");
@@ -54,36 +57,58 @@ expect("V7 interface", exists("src/components/evidara/landing-page.tsx") && exis
 expect("Supabase auth bridge", exists("src/components/evidara/v7-auth-bridge.tsx") && read("src/components/evidara/v7-auth-bridge.tsx").includes("useAuth"), "V7 Supabase auth bridge is missing");
 expect("V7 login uses Supabase", read("src/components/evidara/login-page.tsx").includes("signInWithPassword") && read("src/components/evidara/login-page.tsx").includes("signInWithOAuth"), "V7 login is not connected to Supabase");
 expect("PKCE OAuth callback", supabaseClient.includes('flowType: "pkce"') && authCallback.includes("exchangeCodeForSession"), "Google OAuth is not using a secure preview-safe PKCE callback");
-expect("V7 release health", read("src/app/api/health/route.ts").includes('release: "7.0.0"'), "health endpoint is not reporting V7");
 expect("five canonical roles", ["super_admin", "evidara_admin", "school_admin", "school_teacher", "student"].every((role) => rolesSource.includes(`"${role}"`)), "one or more canonical roles are missing");
 expect("role permission model", rolesSource.includes("hasEvidaraPermission") && rolesSource.includes("canAccessEvidaraWorkspace"), "role permission helpers are missing");
-expect("role migration", exists("supabase/25_role_access_control.sql") && roleMigration.includes("assign_evidara_role_by_email"), "Supabase role migration or assignment RPC is missing");
+expect("role migration", roleMigration.includes("assign_evidara_role_by_email"), "Supabase role migration or assignment RPC is missing");
 expect("role compatibility migration", compatibilityMigration.includes("compatible_member_role") && compatibilityMigration.includes("is_evidara_school_staff"), "V7 legacy permission compatibility is missing");
 expect("question access migration", accessMigration.includes("module_access_settings") && accessMigration.includes("question_import_batches"), "question module access migration is missing");
 expect("question publication migration", completionMigration.includes("enforce_question_publication_permissions") && completionMigration.includes("Teachers can save a draft"), "question publication role guard is missing");
 expect("reusable question policy", questionPolicy.includes("QuestionBankPolicy") && reusableQuestionMigration.includes("strip_question_test_classification") && reusableQuestionMigration.includes("custom_test_type"), "test classification is still coupled to question records");
+expect(
+  "V7.1 role compatibility",
+  stabilizationMigration.includes("function public.btrim(value public.app_role)")
+    && stabilizationMigration.includes("questions_v71_role_visibility"),
+  "V7.1 app_role trimming or cross-role question visibility is missing",
+);
+expect(
+  "V7.1 import preflight",
+  stabilizationMigration.includes("question_import_preflight_v71")
+    && stabilizationMigration.includes("bulk_import_questions_v71")
+    && stabilizationMigration.includes("question-assets"),
+  "V7.1 database preflight, friendly import wrapper or image bucket setup is missing",
+);
 expect("school role isolation", read("src/app/api/school-platform/route.ts").includes("schoolStaff") && read("src/app/api/school-platform/route.ts").includes("School Admin permission is required"), "school teacher/admin boundaries are missing");
 expect(
-  "live V7 question bank",
+  "live V7.1 question bank",
   questionBank.includes("QuestionEditorDialog")
     && questionBank.includes("QuestionBulkImportDialog")
     && questionBank.includes("QuestionReviewDialog")
     && questionBank.includes("QuestionTaxonomySettings")
     && questionBank.includes("School-Created Questions")
     && questionEditor.includes("save_question")
-    && questionImporter.includes("bulk_import_questions"),
-  "V7 question table, editor, review, settings or import flow is missing",
+    && questionImporter.includes("bulk_import_questions_v71"),
+  "V7.1 question table, editor, review, settings or import flow is missing",
 );
 expect("one-page question editor", !questionEditor.includes("TabsContent") && questionEditor.includes("Classification and use") && questionEditor.includes("Question content") && questionEditor.includes("Answer and options") && questionEditor.includes("Solution and assessment settings"), "question editor is not a single continuous workspace");
 expect("searchable taxonomy", questionEditor.includes("SearchableTaxonomySelect") && questionSettings.includes("A–Z sorting") && taxonomyApi.includes("createSubject") && taxonomyApi.includes("createChapter") && taxonomyApi.includes("createTopic"), "searchable subject, chapter and topic management is incomplete");
 expect("Super Admin subject governance", taxonomyApi.includes("Only Super Admin can add universal subjects") && questionSettings.includes("Only Super Admin"), "subject creation is not restricted to Super Admin");
 expect("device question preview", questionPreview.includes("Mobile") && questionPreview.includes("Tablet") && questionPreview.includes("Laptop") && questionReview.includes("QuestionDevicePreview"), "mobile, tablet and laptop question preview is missing");
-expect("editable bulk review", questionImporter.includes("Question navigator") && questionImporter.includes("Next question") && questionImporter.includes("Jump to first error") && questionImporter.includes("updateRaw"), "bulk question correction and navigation are missing");
-expect("validated Excel template", workbook.includes("dataValidations") && workbook.includes("evidara-question-import-template.xlsx") && workbook.includes("downloadQuestionImageZipTemplate") && importParser.includes("bulkQuestionTemplateHeaders"), "validated Excel and image ZIP template support is missing");
+expect(
+  "V7.1 editable bulk review",
+  questionImporter.includes("Question navigator")
+    && questionImporter.includes("Next question")
+    && questionImporter.includes("updateRaw")
+    && questionImporter.includes("Matching image ZIP")
+    && questionImporter.includes("Create all missing taxonomy")
+    && questionImporter.includes("Are you sure you want to cancel this import"),
+  "bulk correction, image ZIP, taxonomy creation or discard confirmation is incomplete",
+);
+expect("validated V7.1 Excel template", workbook.includes("dataValidations") && workbook.includes("evidara-v7-1-question-import-template.xlsx") && workbook.includes("downloadQuestionImageZipTemplate") && importParser.includes("bulkQuestionTemplateHeaders"), "validated V7.1 Excel and image ZIP template support is missing");
 expect("simple import template", !importParser.slice(importParser.indexOf("bulkQuestionTemplateHeaders")).includes("match_left_a"), "Match the Following columns must not appear in the simple Excel/CSV template");
 expect("test type removed from question template", !importParser.slice(importParser.indexOf("bulkQuestionTemplateHeaders")).includes('"test_type"') && !workbook.includes("Test Types"), "test type must be selected while creating a test series, not while importing questions");
+expect("simple visible serials", questionPolicy.includes("S.No.") && questionPolicy.includes("visibleIndex + 1") && !questionPolicy.includes("topic serial numbers"), "question rows are not visibly numbered 1, 2, 3 in current order");
 expect("school-only question export", exportSource.includes("Evidara master questions cannot be exported") && exportSource.includes("questions.csv") && exportSource.includes("image-links.csv") && questionBank.includes("Export School ZIP"), "school-only question ZIP export is incomplete");
-expect("topic serial and date filters", questionBank.includes("Topic Serial") && questionBank.includes("Published date") && questionBank.includes("dateFrom") && questionBank.includes("dateTo"), "topic serial numbers or exact publication-date filters are missing");
+expect("publication-date filters", questionBank.includes("Published date") && questionBank.includes("dateFrom") && questionBank.includes("dateTo"), "exact publication-date filters are missing");
 expect("teacher publication guard", questionEditor.includes("Teachers can save drafts") && questionBank.includes("school_teacher") && completionMigration.includes("new.status not in ('draft', 'in_review')"), "teacher draft/review-only publication boundary is missing");
 expect("live V7 paper builder", paperCatalogue.includes("save_question_paper") && paperCatalogue.includes("set_question_paper_status") && paperCatalogue.includes("Paper Sections"), "V7 paper table or builder is missing");
 expect("live V7 student tests", studentTests.includes("list_available_papers") && studentTests.includes("start_exam_attempt"), "student live test catalogue is missing");
@@ -96,10 +121,10 @@ expect("Template database client removed", !exists("src/lib/db.ts"), "temporary 
 expect("Cloudflare configuration", read("wrangler.jsonc").includes('"main": ".open-next/worker.js"'), "Cloudflare worker configuration is missing");
 
 if (failures.length) {
-  console.error(`Evidara V7 smoke checks failed: ${failures.length}`);
+  console.error(`Evidara V7.1 smoke checks failed: ${failures.length}`);
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`Evidara V7 smoke checks passed (${passes.length} checks).`);
+console.log(`Evidara V7.1 smoke checks passed (${passes.length} checks).`);
 for (const item of passes) console.log(`✓ ${item}`);
