@@ -2,6 +2,7 @@
 
 import { useAppStore, type AppView } from '@/store/use-app-store';
 import { evidaraRoleLabel } from '@/lib/roles';
+import { useModuleAccess, type EvidaraModuleKey } from '@/hooks/use-module-access';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -27,53 +28,57 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
   icon: React.ElementType;
   view: AppView;
+  moduleKey?: EvidaraModuleKey;
 }
 
 const studentNav: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, view: 'student-dashboard' },
-  { label: 'Tests', icon: BookOpen, view: 'student-tests' },
-  { label: 'Analytics', icon: BarChart3, view: 'student-analytics' },
-  { label: 'Results', icon: FileText, view: 'student-results' },
-  { label: 'Achievements', icon: Trophy, view: 'student-achievements' },
-  { label: 'Benchmarks', icon: Target, view: 'student-benchmarks' },
-  { label: 'Resources', icon: FolderOpen, view: 'student-resources' },
-  { label: 'Purchases', icon: ShoppingBag, view: 'student-purchases' },
+  { label: 'Tests', icon: BookOpen, view: 'student-tests', moduleKey: 'papers' },
+  { label: 'Analytics', icon: BarChart3, view: 'student-analytics', moduleKey: 'analytics' },
+  { label: 'Results', icon: FileText, view: 'student-results', moduleKey: 'analytics' },
+  { label: 'Achievements', icon: Trophy, view: 'student-achievements', moduleKey: 'achievements' },
+  { label: 'Benchmarks', icon: Target, view: 'student-benchmarks', moduleKey: 'benchmarks' },
+  { label: 'Resources', icon: FolderOpen, view: 'student-resources', moduleKey: 'resources' },
+  { label: 'Purchases', icon: ShoppingBag, view: 'student-purchases', moduleKey: 'subscriptions' },
 ];
 
 const schoolNav: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, view: 'school-dashboard' },
-  { label: 'Questions', icon: BookOpen, view: 'school-questions' },
-  { label: 'Papers', icon: FileText, view: 'school-papers' },
-  { label: 'Students', icon: Users, view: 'school-students' },
-  { label: 'Subscription', icon: CreditCard, view: 'school-subscription' },
-  { label: 'Resources', icon: FolderOpen, view: 'school-resources' },
-  { label: 'Achievements', icon: Trophy, view: 'school-achievements' },
-  { label: 'Benchmarks', icon: Target, view: 'school-benchmarks' },
-  { label: 'Segments', icon: PieChart, view: 'school-segments' },
+  { label: 'Questions', icon: BookOpen, view: 'school-questions', moduleKey: 'questions' },
+  { label: 'Papers', icon: FileText, view: 'school-papers', moduleKey: 'papers' },
+  { label: 'Students', icon: Users, view: 'school-students', moduleKey: 'students' },
+  { label: 'Subscription', icon: CreditCard, view: 'school-subscription', moduleKey: 'subscriptions' },
+  { label: 'Resources', icon: FolderOpen, view: 'school-resources', moduleKey: 'resources' },
+  { label: 'Achievements', icon: Trophy, view: 'school-achievements', moduleKey: 'achievements' },
+  { label: 'Benchmarks', icon: Target, view: 'school-benchmarks', moduleKey: 'benchmarks' },
+  { label: 'Segments', icon: PieChart, view: 'school-segments', moduleKey: 'analytics' },
+  { label: 'Access Control', icon: ShieldCheck, view: 'school-access' },
 ];
 
 const adminNav: NavItem[] = [
   { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },
-  { label: 'Questions', icon: BookOpen, view: 'admin-questions' },
-  { label: 'Papers', icon: FileText, view: 'admin-papers' },
-  { label: 'Products', icon: Package, view: 'admin-products' },
-  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions' },
-  { label: 'Achievements', icon: Trophy, view: 'admin-achievements' },
-  { label: 'Benchmarks', icon: Target, view: 'admin-benchmarks' },
-  { label: 'Segments', icon: PieChart, view: 'admin-segments' },
+  { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },
+  { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },
+  { label: 'Products', icon: Package, view: 'admin-products', moduleKey: 'subscriptions' },
+  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },
+  { label: 'Achievements', icon: Trophy, view: 'admin-achievements', moduleKey: 'achievements' },
+  { label: 'Benchmarks', icon: Target, view: 'admin-benchmarks', moduleKey: 'benchmarks' },
+  { label: 'Segments', icon: PieChart, view: 'admin-segments', moduleKey: 'analytics' },
+  { label: 'Access & Accounts', icon: ShieldCheck, view: 'admin-access' },
 ];
 
 function navigationForUser(role: 'student' | 'school' | 'admin', accessRole: string) {
   if (role === 'student') return studentNav;
   if (role === 'school') {
     if (accessRole === 'school_teacher') {
-      return schoolNav.filter((item) => item.view !== 'school-subscription');
+      return schoolNav.filter((item) => item.view !== 'school-subscription' && item.view !== 'school-access');
     }
     return schoolNav;
   }
@@ -85,9 +90,10 @@ function navigationForUser(role: 'student' | 'school' | 'admin', accessRole: str
 
 export function AppSidebar() {
   const { user, view, setView, logout, sidebarOpen, setSidebarOpen } = useAppStore();
+  const { canAccess } = useModuleAccess();
   if (!user) return null;
 
-  const nav = navigationForUser(user.role, user.accessRole);
+  const nav = navigationForUser(user.role, user.accessRole).filter((item) => canAccess(item.moduleKey));
   const roleLabel = evidaraRoleLabel(user.accessRole);
 
   return (
@@ -150,18 +156,14 @@ export function AppSidebar() {
               >
                 <Icon className={`h-[18px] w-[18px] shrink-0 ${isActive ? 'text-white' : 'text-white/50 group-hover:text-white'}`} />
                 {sidebarOpen && <span>{item.label}</span>}
-                {isActive && sidebarOpen && (
-                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#F2B84B]" />
-                )}
+                {isActive && sidebarOpen && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#F2B84B]" />}
               </button>
             );
             if (!sidebarOpen) {
               return (
                 <Tooltip key={item.view} delayDuration={0}>
                   <TooltipTrigger asChild>{button}</TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium">
-                    {item.label}
-                  </TooltipContent>
+                  <TooltipContent side="right" className="font-medium">{item.label}</TooltipContent>
                 </Tooltip>
               );
             }
@@ -178,7 +180,7 @@ export function AppSidebar() {
               <AvatarFallback className="bg-[#0E5A5A] text-xs font-semibold text-white">
                 {user.name
                   .split(' ')
-                  .map((n) => n[0])
+                  .map((name) => name[0])
                   .join('')
                   .slice(0, 2)
                   .toUpperCase()}
