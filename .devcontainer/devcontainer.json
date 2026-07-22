@@ -2,16 +2,14 @@
   "name": "Evidara Development",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "postCreateCommand": "npm ci",
-  "forwardPorts": [3000, 8080],
+  "postStartCommand": "bash .devcontainer/configure-preview-port.sh",
+  "forwardPorts": [20241],
   "portsAttributes": {
-    "3000": {
-      "label": "Evidara local preview",
-      "onAutoForward": "notify"
-    },
-    "8080": {
-      "label": "Evidara fallback preview",
+    "20241": {
+      "label": "Evidara V7 preview",
       "onAutoForward": "openPreview",
-      "protocol": "http"
+      "protocol": "http",
+      "visibility": "public"
     }
   },
   "customizations": {
