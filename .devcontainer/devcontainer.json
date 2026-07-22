@@ -6,9 +6,9 @@
   },
   "postCreateCommand": "npm ci",
   "postStartCommand": "bash .devcontainer/configure-preview-port.sh",
-  "forwardPorts": [20241],
+  "forwardPorts": [20242],
   "portsAttributes": {
-    "20241": {
+    "20242": {
       "label": "Evidara V7 preview",
       "onAutoForward": "openPreview",
       "protocol": "http",
