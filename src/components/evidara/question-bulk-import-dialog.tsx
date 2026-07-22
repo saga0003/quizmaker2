@@ -175,9 +175,12 @@ export function QuestionBulkImportDialog({
     if (!localReferences.length) return payloads;
     if (!imageZip) throw new Error(`${localReferences.length} local image reference(s) were found. Attach the matching image ZIP.`);
     if (!supabase || !user) throw new Error('Sign in before uploading question images.');
+    const zipFile = imageZip;
+    const client = supabase;
+    const activeUser = user;
 
     setStage('Opening image ZIP…');
-    const zip = await readZip(await imageZip.arrayBuffer());
+    const zip = await readZip(await zipFile.arrayBuffer());
     const entries = [...zip.values()];
     const byName = new Map(entries.map((entry) => [baseName(entry.name), entry]));
     const uploaded = new Map<string, string>();
@@ -187,17 +190,17 @@ export function QuestionBulkImportDialog({
       const key = baseName(value);
       if (uploaded.has(key)) return uploaded.get(key)!;
       const entry = byName.get(key);
-      if (!entry) throw new Error(`Image '${value}' was referenced but was not found inside ${imageZip.name}.`);
+      if (!entry) throw new Error(`Image '${value}' was referenced but was not found inside ${zipFile.name}.`);
       const { blob, mime } = normalizeImageBytes(entry.bytes, key);
-      const path = `${user.id}/imports/${crypto.randomUUID()}-${safeImageFileName(key)}`;
+      const path = `${activeUser.id}/imports/${crypto.randomUUID()}-${safeImageFileName(key)}`;
       setStage(`Uploading ${key}…`);
-      const { error: uploadError } = await supabase.storage.from('question-assets').upload(path, blob, {
+      const { error: uploadError } = await client.storage.from('question-assets').upload(path, blob, {
         upsert: false,
         contentType: mime,
         cacheControl: '3600',
       });
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('question-assets').getPublicUrl(path);
+      const { data } = client.storage.from('question-assets').getPublicUrl(path);
       uploaded.set(key, data.publicUrl);
       return data.publicUrl;
     }
@@ -356,17 +359,17 @@ export function QuestionBulkImportDialog({
             <>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {[
-                  ['Rows detected', rows.length, FileSpreadsheet, '#14232B'],
-                  ['Ready', valid.length, CheckCircle2, '#0E5A5A'],
-                  ['Needs correction', invalid.length, XCircle, '#B54747'],
-                  ['Image references', imageReferences, FileArchive, '#8A5F00'],
-                ].map(([label, value, Icon, tone]) => (
-                  <div key={String(label)} className="rounded-xl border border-[#E7ECEB] bg-white p-4">
+                  { label: 'Rows detected', value: rows.length, Icon: FileSpreadsheet, tone: '#14232B' },
+                  { label: 'Ready', value: valid.length, Icon: CheckCircle2, tone: '#0E5A5A' },
+                  { label: 'Needs correction', value: invalid.length, Icon: XCircle, tone: '#B54747' },
+                  { label: 'Image references', value: imageReferences, Icon: FileArchive, tone: '#8A5F00' },
+                ].map(({ label, value, Icon, tone }) => (
+                  <div key={label} className="rounded-xl border border-[#E7ECEB] bg-white p-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-[#6B7980]">{String(label)}</span>
-                      <Icon className="h-4 w-4" style={{ color: String(tone) }} />
+                      <span className="text-xs text-[#6B7980]">{label}</span>
+                      <Icon className="h-4 w-4" style={{ color: tone }} />
                     </div>
-                    <strong className="mt-2 block text-2xl" style={{ color: String(tone) }}>{String(value)}</strong>
+                    <strong className="mt-2 block text-2xl" style={{ color: tone }}>{value}</strong>
                   </div>
                 ))}
               </div>
