@@ -68,18 +68,19 @@ function normalizeQuestionTable() {
     const ownershipIndex = headers.findIndex((header) => textOf(header).includes('school / ownership'));
     if (questionIndex < 0 || ownershipIndex < 0) return;
 
-    const serialIndex = headers.findIndex((header) => textOf(header) === 'topic serial' || textOf(header) === 'serial no.');
-    if (serialIndex >= 0) headers[serialIndex].textContent = 'S.No.';
+    const serialIndex = headers.findIndex((header) => ['topic serial', 'serial no.', 's.no.'].includes(textOf(header)));
+    if (serialIndex >= 0 && headers[serialIndex].textContent !== 'S.No.') headers[serialIndex].textContent = 'S.No.';
 
     const typeIndex = headers.findIndex((header) => textOf(header) === 'type / test' || textOf(header) === 'question type');
-    if (typeIndex >= 0) headers[typeIndex].textContent = 'Question type';
+    if (typeIndex >= 0 && headers[typeIndex].textContent !== 'Question type') headers[typeIndex].textContent = 'Question type';
 
     const rows = Array.from(table.querySelectorAll('tbody tr')).filter((row) => row.querySelectorAll('td').length > 1);
     rows.forEach((row, visibleIndex) => {
       if (serialIndex >= 0) {
         const cell = row.children.item(serialIndex);
         const badge = cell?.querySelector('[data-slot="badge"]') || cell?.querySelector('span');
-        if (badge) badge.textContent = String(visibleIndex + 1);
+        const expected = String(visibleIndex + 1);
+        if (badge && badge.textContent !== expected) badge.textContent = expected;
         cell?.querySelectorAll('p').forEach((label) => hide(label));
       }
       if (typeIndex >= 0) {
