@@ -19,14 +19,18 @@ export default function CallbackPage() {
       }
 
       try {
-        const code = new URLSearchParams(window.location.search).get('code');
-        if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+        let { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        if (!data.session) {
+          const code = new URLSearchParams(window.location.search).get('code');
+          if (code) {
+            const exchange = await supabase.auth.exchangeCodeForSession(code);
+            if (exchange.error) throw exchange.error;
+            data = { session: exchange.data.session };
+          }
         }
 
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
         if (!data.session) throw new Error('Google sign-in completed, but no Evidara session was created.');
         if (cancelled) return;
 
