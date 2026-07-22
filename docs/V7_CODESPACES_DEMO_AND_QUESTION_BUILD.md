@@ -85,21 +85,7 @@ select to_regprocedure('public.is_evidara_school_manager(uuid)') is not null
 
 All four values must be `true`.
 
-## 3. Select the school used for the sales demo
-
-List schools:
-
-```sql
-select id, name, city, state
-from public.organizations
-order by created_at;
-```
-
-Copy the UUID of the school that the demo accounts should use.
-
-The bootstrap automatically uses the first school when `DEMO_SCHOOL_ID` is omitted. Supplying the UUID is safer when multiple schools exist.
-
-## 4. Generate the three demo accounts
+## 3. Generate the three demo accounts and demo school
 
 The required Codespaces secrets must already be available:
 
@@ -123,13 +109,19 @@ for (const name of [
 '
 ```
 
-Run with the selected school UUID:
+Run:
 
 ```bash
-DEMO_SCHOOL_ID="YOUR_SCHOOL_UUID" npm run demo:bootstrap
+npm run demo:bootstrap
 ```
 
-The command creates or resets these Supabase Auth accounts:
+When no `DEMO_SCHOOL_ID` is supplied, the command creates or reuses a dedicated organization named:
+
+```text
+Evidara Sales Demo School
+```
+
+It creates or resets these Supabase Auth accounts:
 
 ```text
 sales.schooladmin@demo.evidara.app
@@ -137,7 +129,15 @@ sales.teacher@demo.evidara.app
 sales.student@demo.evidara.app
 ```
 
-It writes the generated passwords and user UUIDs to:
+It also links the School Admin and School Teacher to the demo school, links the Student to Grade 10-A, and seeds basic subjects only when the subject table is empty.
+
+To connect the accounts to an existing school instead, run:
+
+```bash
+DEMO_SCHOOL_ID="YOUR_EXISTING_SCHOOL_UUID" npm run demo:bootstrap
+```
+
+The command writes the generated passwords and user UUIDs to:
 
 ```text
 .evidara-demo-access.txt
@@ -154,7 +154,7 @@ Copy the credentials into the approved password manager or controlled sales-team
 
 Running the command again rotates all three passwords.
 
-## 5. Start Evidara V7
+## 4. Start Evidara V7
 
 ```bash
 npm run dev
@@ -180,7 +180,7 @@ Expected values:
 }
 ```
 
-## 6. Test each sales role separately
+## 5. Test each sales role separately
 
 Use separate Incognito windows or browser profiles.
 
@@ -216,7 +216,7 @@ Expected:
 - Start/resume assessment
 - Own analytics, results, achievements, resources and access
 
-## 7. Test the core question-to-student flow
+## 6. Test the core question-to-student flow
 
 1. Sign in as School Teacher or School Admin.
 2. Open **Question Bank**.
@@ -237,7 +237,7 @@ Expected:
 
 School-created papers should use `organization` access for the linked demo student.
 
-## 8. Validate the build
+## 7. Validate the build
 
 Stop the development server and run:
 
