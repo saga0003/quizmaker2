@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT="${PORT:-8080}"
+PORT="${PORT:-20241}"
 ORIGIN="http://127.0.0.1:${PORT}"
 STARTED_SERVER=0
 NEXT_PID=""
@@ -62,8 +62,9 @@ if [[ ! -x "$CLOUDFLARED_BIN" ]]; then
 fi
 
 echo
-echo "Local Evidara check passed. Starting a temporary Cloudflare preview..."
-echo "Open the https://...trycloudflare.com URL printed below."
+echo "Local Evidara check passed on port ${PORT}. Starting a temporary Cloudflare preview..."
+echo "Codespaces direct URL: https://${CODESPACE_NAME:-your-codespace}-${PORT}.app.github.dev/"
+echo "Open the https://...trycloudflare.com URL printed below for the temporary tunnel."
 echo "Keep this terminal running while you test."
 echo
 
