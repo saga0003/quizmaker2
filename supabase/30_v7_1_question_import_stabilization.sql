@@ -224,6 +224,7 @@ declare
   sql_state text;
   friendly_message text;
   batch_id uuid;
+  normalized_format text;
 begin
   if jsonb_typeof(p_rows) <> 'array' then
     raise exception 'The reviewed import payload must be a JSON array.'
@@ -235,6 +236,16 @@ begin
     raise exception '%', coalesce(preflight ->> 'message', 'Question import preflight failed.')
       using errcode = '42501';
   end if;
+
+  normalized_format := case lower(coalesce(p_format, ''))
+    when 'csv' then 'csv'
+    when 'xlsx' then 'xlsx'
+    when 'xls' then 'xlsx'
+    when 'tex' then 'latex'
+    when 'txt' then 'latex'
+    when 'json' then 'other'
+    else 'other'
+  end;
 
   insert into public.question_import_batches (
     organization_id,
@@ -248,14 +259,14 @@ begin
     p_organization_id,
     auth.uid(),
     coalesce(nullif(pg_catalog.btrim(p_filename), ''), 'reviewed-question-import'),
-    case
-      when lower(coalesce(p_format, '')) in ('csv', 'xlsx', 'xls', 'json', 'tex', 'txt')
-        then lower(p_format)
-      else 'json'
-    end,
+    normalized_format,
     'importing',
     jsonb_array_length(p_rows),
-    jsonb_build_object('release', '7.1.0', 'reviewed_before_import', true)
+    jsonb_build_object(
+      'release', '7.1.0',
+      'reviewed_before_import', true,
+      'original_format', lower(coalesce(p_format, ''))
+    )
   ) returning id into batch_id;
 
   for row_item in
@@ -301,10 +312,14 @@ begin
 
   update public.question_import_batches
   set
-    status = case when failed_count = 0 then 'completed' else 'completed_with_errors' end,
+    status = case
+      when imported_count = 0 and failed_count > 0 then 'failed'
+      else 'completed'
+    end,
     imported_rows = imported_count,
     failed_rows = failed_count,
     completed_at = now(),
+    error_report = case when failed_count > 0 then error_items else null end,
     metadata = metadata || jsonb_build_object('errors', error_items)
   where id = batch_id;
 
