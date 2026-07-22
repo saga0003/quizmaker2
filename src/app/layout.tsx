@@ -13,14 +13,14 @@ import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Evidara V7 — Evidence-Driven Student Development",
+  title: "Evidara V7.1 — Evidence-Driven Student Development",
   description: "Subscription-based school assessments, previous-year resources, secure exams and student intelligence for Grades 8–12.",
   icons: {
     icon: "/brand/evidara-emblem.png",
     apple: "/brand/evidara-emblem.png",
   },
   openGraph: {
-    title: "Evidara V7 — Evidence-Driven Student Development",
+    title: "Evidara V7.1 — Evidence-Driven Student Development",
     description: "Subscription-based school assessments, previous-year resources, secure exams and student intelligence for Grades 8–12.",
     type: "website",
   },
