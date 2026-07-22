@@ -1,3 +1,10 @@
+-- Extend the original Version 1 enum before using the V7 role values.
+-- These statements intentionally run before the explicit transaction so each new
+-- enum value is committed and immediately safe to use by later constraints/functions.
+alter type public.app_role add value if not exists 'evidara_admin';
+alter type public.app_role add value if not exists 'school_admin';
+alter type public.app_role add value if not exists 'school_teacher';
+
 begin;
 
 -- Evidara V7 canonical roles:
@@ -9,7 +16,7 @@ alter table public.profiles
 
 update public.profiles
 set role = 'student'
-where role is null or btrim(role) = '';
+where role is null or btrim(role::text) = '';
 
 do $$
 declare
@@ -38,7 +45,7 @@ $$;
 alter table public.profiles
   add constraint profiles_role_allowed
   check (
-    role in (
+    role::text in (
       'super_admin',
       'evidara_admin',
       'school_admin',
@@ -91,7 +98,7 @@ begin
     alter table public.organization_members
       add constraint organization_members_member_role_allowed
       check (
-        member_role in (
+        member_role::text in (
           'school_admin',
           'school_teacher',
           'institute_owner',
@@ -113,7 +120,7 @@ stable
 security definer
 set search_path = public, auth
 as $$
-  select p.role
+  select p.role::text
   from public.profiles p
   where p.id = auth.uid()
   limit 1
@@ -177,8 +184,8 @@ begin
       source
     ) values (
       new.id,
-      old.role,
-      new.role,
+      old.role::text,
+      new.role::text,
       auth.uid(),
       case when auth.role() = 'service_role' then 'service_role' else 'profile_update' end
     );
@@ -220,7 +227,7 @@ begin
   end if;
 
   update public.profiles
-  set role = requested_role,
+  set role = requested_role::public.app_role,
       updated_at = now()
   where id = p_user_id;
 
@@ -292,7 +299,7 @@ begin
   target_user_id := public.assign_evidara_role_by_email(p_email, requested_role);
 
   update public.organization_members
-  set member_role = requested_role,
+  set member_role = requested_role::public.app_role,
       is_active = true,
       updated_at = now()
   where organization_id = p_organization_id
@@ -307,7 +314,7 @@ begin
     ) values (
       p_organization_id,
       target_user_id,
-      requested_role,
+      requested_role::public.app_role,
       true
     );
   end if;
