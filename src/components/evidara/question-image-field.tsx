@@ -57,9 +57,9 @@ export function QuestionImageField({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <GuidedLabel help={help}>{label}</GuidedLabel>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
         <div className="relative min-w-0 flex-1">
           <Link2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" />
           <Input
@@ -67,7 +67,7 @@ export function QuestionImageField({
             value={value}
             onChange={(event) => onChange(event.target.value)}
             placeholder="https://imagedelivery.net/... or another public HTTPS image"
-            className="border-[#E7ECEB] pl-9 pr-9"
+            className="min-w-0 border-[#E7ECEB] pl-9 pr-9"
           />
           {value && (
             <button
@@ -80,8 +80,8 @@ export function QuestionImageField({
             </button>
           )}
         </div>
-        <label>
-          <Button type="button" variant="outline" asChild className="border-[#E7ECEB]">
+        <label className="block w-full sm:w-auto">
+          <Button type="button" variant="outline" asChild className="w-full border-[#E7ECEB] sm:w-auto">
             <span className="cursor-pointer whitespace-nowrap">
               {busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
               Upload
@@ -118,7 +118,7 @@ export function QuestionImageField({
           )}
         </div>
       )}
-      {message && <p className={`text-xs ${message.includes('Uploaded') ? 'text-[#0E5A5A]' : 'text-[#B54747]'}`}>{message}</p>}
+      {message && <p className={`break-words text-xs ${message.includes('Uploaded') ? 'text-[#0E5A5A]' : 'text-[#B54747]'}`}>{message}</p>}
     </div>
   );
 }
