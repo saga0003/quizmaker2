@@ -8,7 +8,6 @@ import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
 import {
-  StudentTestsView,
   StudentAnalyticsView,
   StudentResultsView,
   StudentAchievementsView,
@@ -17,8 +16,6 @@ import {
 } from '@/components/evidara/student-views';
 import {
   SchoolDashboardView,
-  SchoolQuestionsView,
-  SchoolPapersView,
   SchoolStudentsView,
   SchoolSubscriptionView,
   SchoolResourcesView,
@@ -28,20 +25,21 @@ import {
 } from '@/components/evidara/school-views';
 import {
   AdminDashboardView,
-  AdminQuestionsView,
-  AdminPapersView,
   AdminProductsView,
   AdminSubscriptionsView,
   AdminAchievementsView,
   AdminBenchmarksView,
   AdminSegmentsView,
 } from '@/components/evidara/admin-views';
+import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
+import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
+import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 
 function ViewRouter() {
   const { view } = useAppStore();
 
   if (view === 'student-dashboard') return <StudentDashboard />;
-  if (view === 'student-tests') return <StudentTestsView />;
+  if (view === 'student-tests') return <LiveStudentTests />;
   if (view === 'student-analytics') return <StudentAnalyticsView />;
   if (view === 'student-results') return <StudentResultsView />;
   if (view === 'student-achievements') return <StudentAchievementsView />;
@@ -50,8 +48,8 @@ function ViewRouter() {
   if (view === 'student-purchases') return <StudentPurchasesView />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view === 'school-questions') return <SchoolQuestionsView />;
-  if (view === 'school-papers') return <SchoolPapersView />;
+  if (view === 'school-questions') return <LiveQuestionBank kind="school" />;
+  if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
   if (view === 'school-resources') return <SchoolResourcesView />;
@@ -60,8 +58,8 @@ function ViewRouter() {
   if (view === 'school-segments') return <SchoolSegmentsView />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
-  if (view === 'admin-questions') return <AdminQuestionsView />;
-  if (view === 'admin-papers') return <AdminPapersView />;
+  if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
+  if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
   if (view === 'admin-achievements') return <AdminAchievementsView />;
