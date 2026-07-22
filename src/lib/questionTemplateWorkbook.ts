@@ -80,20 +80,19 @@ const sample: Record<string, string | number> = {
 };
 
 const guideRows: Array<[string, string, string, string]> = [
-  ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin adds universal subjects.'],
-  ['chapter', 'Recommended', 'Choose the chapter belonging to the selected subject.', 'A missing chapter can be added inside Evidara before import.'],
-  ['topic', 'Optional', 'Choose the topic belonging to the selected chapter.', 'Recommended for analytics and dynamic topic-wise serial numbers.'],
-  ['question_type', 'Required', 'Use a dropdown value exactly as provided.', 'Match the Following remains available in the manual editor, not this simple template.'],
-  ['difficulty', 'Required', 'Use very_easy, easy, moderate, difficult or very_difficult.', 'Dropdown validation prevents spelling errors.'],
-  ['question', 'Required', 'Plain learner-facing question text.', 'Keep answers and internal notes out of this field.'],
-  ['question_latex', 'Optional', 'Paste only the mathematical or scientific LaTeX code.', 'The import review shows a live rendered preview.'],
-  ['question_image', 'Optional', 'Public HTTPS URL or exact filename included in the image ZIP.', 'Example: physics-q1.png'],
-  ['option_a to option_d', 'Required for MCQ', 'Enter option text; use the adjacent LaTeX/image columns when needed.', 'At least two options are required.'],
-  ['correct_answer', 'Required', 'A, B, C or D. Multiple-correct values use A|B.', 'Numerical/integer questions use the exact numeric answer.'],
-  ['status', 'Required', 'Draft, in_review or approved.', 'Teacher imports are always limited to draft/review by backend permissions.'],
-  ['exam_types', 'Recommended', 'Use NEET or multiple values separated by |.', 'Example: JEE Main|KCET'],
-  ['tags', 'Optional', 'Comma- or pipe-separated search keywords.', 'These improve search and automatic paper selection.'],
-  ['test classification', 'Not part of questions', 'Choose full length, part, chapter, topic or custom while creating the test series or paper.', 'A question can be reused across multiple test types.'],
+  ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin can add universal subjects.'],
+  ['chapter', 'Recommended', 'Choose a chapter or type a new chapter name.', 'V7.1 can create a missing chapter from the review screen.'],
+  ['topic', 'Optional', 'Choose a topic or type a new topic name.', 'V7.1 can create a missing topic from the review screen.'],
+  ['question_type', 'Required', 'Choose one exact dropdown value.', 'Match the Following remains in the manual editor, not this simple template.'],
+  ['difficulty', 'Required', 'Choose very_easy, easy, moderate, difficult or very_difficult.', 'The dropdown prevents spelling mistakes.'],
+  ['question', 'Required', 'Enter learner-facing question text.', 'Do not include the answer key in this field.'],
+  ['question_latex', 'Optional', 'Paste mathematical or scientific LaTeX only.', 'The V7.1 review screen renders it immediately.'],
+  ['question_image', 'Optional', 'Use a real public HTTPS URL or an exact image filename.', 'A local filename requires the matching Image ZIP during import.'],
+  ['option_a to option_d', 'Required for MCQ', 'Enter option text and optional LaTeX/image filename.', 'At least two answer options are required.'],
+  ['correct_answer', 'Required', 'A, B, C or D; multiple-correct uses A|B.', 'Numerical/integer questions use the exact numeric answer.'],
+  ['status', 'Required', 'Use draft, in_review or approved.', 'Teachers are always limited to Draft or In Review.'],
+  ['exam_types', 'Required', 'Use one exam or multiple values separated by |.', 'Example: JEE Main|KCET'],
+  ['tags', 'Optional', 'Use comma- or pipe-separated keywords.', 'Tags improve question search and automatic paper selection.'],
 ];
 
 function listRange(columnIndex: number, count: number) {
@@ -102,7 +101,7 @@ function listRange(columnIndex: number, count: number) {
 }
 
 function validation(type: 'list' | 'decimal' | 'whole', column: string, formula: string, prompt: string) {
-  return `<dataValidation type="${type}" allowBlank="1" showErrorMessage="1" showInputMessage="1" errorStyle="stop" errorTitle="Invalid value" error="Choose or enter a supported value." promptTitle="Evidara template" prompt="${escapeXml(prompt)}" sqref="${column}2:${column}500"><formula1>${escapeXml(formula)}</formula1></dataValidation>`;
+  return `<dataValidation type="${type}" allowBlank="1" showErrorMessage="1" showInputMessage="1" errorStyle="stop" errorTitle="Invalid value" error="Choose or enter a supported value." promptTitle="Evidara V7.1 template" prompt="${escapeXml(prompt)}" sqref="${column}2:${column}500"><formula1>${escapeXml(formula)}</formula1></dataValidation>`;
 }
 
 export async function buildQuestionTemplateWorkbook({
@@ -135,20 +134,20 @@ export async function buildQuestionTemplateWorkbook({
   const sampleRow = rowXml(2, bulkQuestionTemplateHeaders.map((header) => sample[header] ?? ''), 0);
   const lastColumn = columnName(bulkQuestionTemplateHeaders.length - 1);
   const widths = bulkQuestionTemplateHeaders.map((header, index) => {
-    const wide = ['question', 'solution'].includes(header) ? 42 : header.includes('image') || header.includes('latex') ? 28 : index < 10 ? 20 : 16;
+    const wide = ['question', 'solution'].includes(header) ? 42 : header.includes('image') || header.includes('latex') ? 28 : index < 8 ? 20 : 16;
     return `<col min="${index + 1}" max="${index + 1}" width="${wide}" customWidth="1"/>`;
   }).join('');
 
   const byHeader = new Map(bulkQuestionTemplateHeaders.map((header, index) => [header, columnName(index)]));
   const validations = [
     validation('list', byHeader.get('subject')!, listRange(0, orderedSubjects.length), 'Search or choose an existing subject.'),
-    validation('list', byHeader.get('chapter')!, listRange(1, orderedChapters.length), 'Choose a chapter already available in Evidara.'),
-    validation('list', byHeader.get('topic')!, listRange(2, orderedTopics.length), 'Choose an optional existing topic.'),
+    validation('list', byHeader.get('chapter')!, listRange(1, orderedChapters.length), 'Choose an existing chapter or type a new chapter name.'),
+    validation('list', byHeader.get('topic')!, listRange(2, orderedTopics.length), 'Choose an optional topic or type a new topic name.'),
     validation('list', byHeader.get('difficulty')!, listRange(3, fixedLists.difficulty.length), 'Choose the exact supported difficulty.'),
     validation('list', byHeader.get('question_type')!, listRange(4, fixedLists.question_type.length), 'Choose a supported simple question type.'),
     validation('list', byHeader.get('language')!, listRange(5, fixedLists.language.length), 'Choose the learner-facing language.'),
     validation('list', byHeader.get('status')!, listRange(6, fixedLists.status.length), 'Choose draft, in_review or approved.'),
-    validation('list', byHeader.get('correct_answer')!, listRange(7, fixedLists.correct_answer.length), 'Choose a common MCQ answer or type the exact numerical answer.'),
+    validation('list', byHeader.get('correct_answer')!, listRange(7, fixedLists.correct_answer.length), 'Choose a common MCQ answer or enter the exact numerical answer.'),
     validation('decimal', byHeader.get('marks')!, '0', 'Enter zero or a positive mark.'),
     validation('decimal', byHeader.get('negative_marks')!, '0', 'Enter zero or a positive deduction.'),
     validation('whole', byHeader.get('estimated_seconds')!, '1', 'Enter expected solving time in seconds.'),
@@ -205,26 +204,27 @@ export async function downloadQuestionTemplateWorkbook(input: {
   chapters: TaxonomyChapter[];
   topics: TaxonomyTopic[];
 }) {
-  downloadBlob(await buildQuestionTemplateWorkbook(input), 'evidara-question-import-template.xlsx');
+  downloadBlob(await buildQuestionTemplateWorkbook(input), 'evidara-v7-1-question-import-template.xlsx');
 }
 
 export async function downloadQuestionImageZipTemplate() {
   const guide = [
-    'EVIDARA QUESTION IMAGE ZIP TEMPLATE',
+    'EVIDARA V7.1 QUESTION IMAGE ZIP TEMPLATE',
     '',
     '1. Put every question and option image inside this ZIP.',
-    '2. Use simple unique names such as physics-q001.png, physics-q001-a.png and physics-q001-b.png.',
+    '2. Use simple unique names such as physics-q001.png and physics-q001-a.png.',
     '3. Enter the exact filename in the Excel question_image or option image column.',
-    '4. Evidara will upload the files and replace filenames with public URLs during import.',
-    '5. Supported browser upload image types depend on the Evidara image normalizer.',
+    '4. After selecting Excel, the Image ZIP selector remains visible in Evidara.',
+    '5. Evidara uploads images to the Supabase question-assets bucket and replaces filenames with public URLs.',
+    '6. Cloudflare R2 is optional and is not required for V7.1 imports.',
   ].join('\n');
   downloadBlob(await createZipBlob([
     { name: 'README.txt', data: guide },
-    { name: 'images/PLACE_IMAGES_HERE.txt', data: 'Replace this file with the images referenced by your Excel or CSV template.' },
-  ]), 'evidara-question-images-template.zip');
+    { name: 'images/PLACE_IMAGES_HERE.txt', data: 'Replace this file with the images referenced by the Excel or CSV template.' },
+  ]), 'evidara-v7-1-question-images-template.zip');
 }
 
 export function downloadQuestionImportGuide() {
   const guide = guideRows.map(([column, requirement, how, note]) => `${column}\nRequirement: ${requirement}\nHow: ${how}\nNote: ${note}\n`).join('\n');
-  downloadBlob(new Blob([`EVIDARA BULK QUESTION IMPORT GUIDE\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-question-import-guide.txt');
+  downloadBlob(new Blob([`EVIDARA V7.1 BULK QUESTION IMPORT GUIDE\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-v7-1-question-import-guide.txt');
 }
