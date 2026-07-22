@@ -29,6 +29,7 @@ export type AppView =
   | 'school-achievements'
   | 'school-benchmarks'
   | 'school-segments'
+  | 'school-access'
   | 'admin-dashboard'
   | 'admin-questions'
   | 'admin-papers'
@@ -36,7 +37,8 @@ export type AppView =
   | 'admin-subscriptions'
   | 'admin-achievements'
   | 'admin-benchmarks'
-  | 'admin-segments';
+  | 'admin-segments'
+  | 'admin-access';
 
 export interface AppUser {
   id: string;
