@@ -52,7 +52,7 @@ function removeQuestionTestTypeUi() {
   document.querySelectorAll('button, [role="combobox"]').forEach((control) => {
     const value = textOf(control);
     if (value === 'all test types' || value === 'select test type') {
-      hide(control.closest('.space-y-2') || control.parentElement);
+      hide(control.closest('.space-y-2') || control);
     }
   });
 
