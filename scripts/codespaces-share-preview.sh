@@ -5,6 +5,8 @@ PORT="${PORT:-8080}"
 ORIGIN="http://127.0.0.1:${PORT}"
 STARTED_SERVER=0
 NEXT_PID=""
+CLOUDFLARED_DIR="${HOME}/.local/bin"
+CLOUDFLARED_BIN="${CLOUDFLARED_DIR}/cloudflared"
 
 cleanup() {
   if [[ "$STARTED_SERVER" == "1" && -n "$NEXT_PID" ]]; then
@@ -41,10 +43,28 @@ else
   fi
 fi
 
+if [[ ! -x "$CLOUDFLARED_BIN" ]]; then
+  mkdir -p "$CLOUDFLARED_DIR"
+  case "$(uname -m)" in
+    x86_64|amd64) CF_ARCH="amd64" ;;
+    aarch64|arm64) CF_ARCH="arm64" ;;
+    *)
+      echo "Unsupported Codespaces architecture: $(uname -m)"
+      exit 1
+      ;;
+  esac
+
+  DOWNLOAD_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}"
+  echo "Downloading cloudflared for ${CF_ARCH} without an interactive prompt..."
+  curl -fL --retry 3 --retry-delay 2 "$DOWNLOAD_URL" -o "${CLOUDFLARED_BIN}.tmp"
+  chmod +x "${CLOUDFLARED_BIN}.tmp"
+  mv "${CLOUDFLARED_BIN}.tmp" "$CLOUDFLARED_BIN"
+fi
+
 echo
 echo "Local Evidara check passed. Starting a temporary Cloudflare preview..."
 echo "Open the https://...trycloudflare.com URL printed below."
 echo "Keep this terminal running while you test."
 echo
 
-npx wrangler tunnel quick-start "$ORIGIN"
+exec "$CLOUDFLARED_BIN" tunnel --url "$ORIGIN"
