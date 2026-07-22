@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -12,9 +12,13 @@ import {
   FileSpreadsheet,
   FileText,
   ImagePlus,
+  ListChecks,
   LoaderCircle,
   Plus,
+  Redo2,
   RefreshCw,
+  RotateCcw,
+  Undo2,
   Upload,
   XCircle,
 } from 'lucide-react';
@@ -49,6 +53,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -78,6 +91,33 @@ const normalizeName = (value: unknown) => String(value ?? '').trim().replace(/\s
 const nameKey = (value: unknown) => normalizeName(value).toLocaleLowerCase();
 const baseName = (value: string) => value.trim().split(/[\\/]/).pop()?.toLocaleLowerCase() || '';
 
+type EditPatch = {
+  index: number;
+  key: string;
+  before: unknown;
+  after: unknown;
+};
+
+type Preflight = {
+  ok: boolean;
+  role?: string;
+  can_import?: boolean;
+  storage_ready?: boolean;
+  message?: string;
+};
+
+type ResolvedRow = ParsedQuestionRow & {
+  missingChapter?: { name: string; subjectId: string };
+  missingTopic?: { name: string; chapterId: string };
+  warnings?: string[];
+};
+
+type ImportResult = {
+  imported: number;
+  failed: number;
+  errors?: Array<{ row?: number; error?: string } | string>;
+};
+
 function isRemoteUrl(value: string) {
   const clean = value.trim();
   if (!clean) return false;
@@ -93,7 +133,9 @@ function isPlaceholderImageUrl(value: string) {
   if (!isRemoteUrl(value)) return false;
   try {
     const host = new URL(value.trim()).hostname.toLocaleLowerCase();
-    return host === 'avatars.githubusercontent.com' || host.endsWith('.placeholder.com') || host === 'via.placeholder.com';
+    return host === 'avatars.githubusercontent.com'
+      || host.endsWith('.placeholder.com')
+      || host === 'via.placeholder.com';
   } catch {
     return false;
   }
@@ -151,20 +193,6 @@ function displayError(item: { row?: number; error?: string } | string) {
   return `${item.row ? `Question ${item.row}: ` : ''}${friendlyDatabaseError(item.error || 'Unknown database error')}`;
 }
 
-type Preflight = {
-  ok: boolean;
-  role?: string;
-  can_import?: boolean;
-  storage_ready?: boolean;
-  message?: string;
-};
-
-type ResolvedRow = ParsedQuestionRow & {
-  missingChapter?: { name: string; subjectId: string };
-  missingTopic?: { name: string; chapterId: string };
-  warnings?: string[];
-};
-
 export function QuestionBulkImportDialog({
   open,
   onOpenChange,
@@ -205,7 +233,13 @@ export function QuestionBulkImportDialog({
   const [notice, setNotice] = useState('');
   const [preflight, setPreflight] = useState<Preflight | null>(null);
   const [publishMaster, setPublishMaster] = useState(platformImport);
-  const [result, setResult] = useState<{ imported: number; failed: number; errors?: Array<{ row?: number; error?: string } | string> } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryRequested, setSummaryRequested] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const [undoStack, setUndoStack] = useState<EditPatch[]>([]);
+  const [redoStack, setRedoStack] = useState<EditPatch[]>([]);
 
   useEffect(() => { setLocalSubjects(subjects); }, [subjects]);
   useEffect(() => { setLocalChapters(chapters); }, [chapters]);
@@ -283,6 +317,8 @@ export function QuestionBulkImportDialog({
   }, [localImageReferences, zipNames]);
   const valid = useMemo(() => rows.filter((row) => row.payload && row.errors.length === 0 && !row.duplicate), [rows]);
   const invalid = useMemo(() => rows.filter((row) => !row.payload || row.errors.length > 0 || row.duplicate), [rows]);
+  const issueIndexes = useMemo(() => rows.map((row, index) => ({ row, index })).filter(({ row }) => row.errors.length > 0 || row.duplicate).map(({ index }) => index), [rows]);
+  const currentIssuePosition = issueIndexes.indexOf(currentIndex);
   const current = rows[currentIndex] || null;
   const currentPayload = current?.payload;
   const currentSubjectId = currentPayload?.subject_id || '';
@@ -291,6 +327,19 @@ export function QuestionBulkImportDialog({
   const currentTopics = orderedTopics.filter((topic) => !currentChapterId || topic.chapter_id === currentChapterId);
   const imageBlocked = localImageReferences.length > 0 && (!imageZip || missingZipFiles.length > 0);
   const importBlocked = !preflight?.ok || valid.length === 0 || imageBlocked || busy;
+  const missingTaxonomyCount = rows.filter((row) => row.missingChapter || row.missingTopic).length;
+
+  useEffect(() => {
+    if (summaryRequested && rows.length) {
+      setSummaryOpen(true);
+      setSummaryRequested(false);
+    }
+  }, [rows.length, summaryRequested]);
+
+  function clearEditHistory() {
+    setUndoStack([]);
+    setRedoStack([]);
+  }
 
   function reset() {
     setQuestionFile(null);
@@ -305,13 +354,25 @@ export function QuestionBulkImportDialog({
     setError('');
     setNotice('');
     setResult(null);
+    setSummaryOpen(false);
+    setSummaryRequested(false);
+    setResultOpen(false);
+    clearEditHistory();
+  }
+
+  function closeImmediately() {
+    reset();
+    setDiscardOpen(false);
+    onOpenChange(false);
   }
 
   function requestClose() {
     const hasWork = Boolean(questionFile || rawRows.length || imageZip || latexText.trim());
-    if (hasWork && !result && !window.confirm('Are you sure you want to cancel this import? The selected files and all review changes will be cleared.')) return;
-    reset();
-    onOpenChange(false);
+    if (hasWork && !result) {
+      setDiscardOpen(true);
+      return;
+    }
+    closeImmediately();
   }
 
   async function runPreflight() {
@@ -335,6 +396,7 @@ export function QuestionBulkImportDialog({
     setResult(null);
     setError('');
     setNotice('');
+    clearEditHistory();
     setBusy(true);
     setStage(`Reading ${file.name}…`);
     try {
@@ -343,7 +405,7 @@ export function QuestionBulkImportDialog({
       setRawRows(document.rows);
       setFormat(document.format);
       setCurrentIndex(0);
-      setNotice(`${document.rows.length} question${document.rows.length === 1 ? '' : 's'} detected. Review the highlighted issues before importing.`);
+      setSummaryRequested(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Evidara could not read this question file.');
     } finally {
@@ -385,13 +447,69 @@ export function QuestionBulkImportDialog({
       setCurrentIndex(0);
       setResult(null);
       setShowLatexWorkspace(false);
+      clearEditHistory();
+      setSummaryRequested(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Evidara could not understand the pasted LaTeX questions.');
     }
   }
 
   function updateRaw(key: string, value: unknown) {
+    const before = rawRows[currentIndex]?.[key];
+    if (Object.is(before, value)) return;
+    setUndoStack((existing) => [...existing, { index: currentIndex, key, before, after: value }].slice(-250));
+    setRedoStack([]);
     setRawRows((existing) => existing.map((row, index) => index === currentIndex ? { ...row, [key]: value } : row));
+  }
+
+  const undo = useCallback(() => {
+    const patch = undoStack.at(-1);
+    if (!patch) return;
+    setRawRows((existing) => existing.map((row, index) => index === patch.index ? { ...row, [patch.key]: patch.before } : row));
+    setCurrentIndex(patch.index);
+    setUndoStack((existing) => existing.slice(0, -1));
+    setRedoStack((existing) => [...existing, patch].slice(-250));
+  }, [undoStack]);
+
+  const redo = useCallback(() => {
+    const patch = redoStack.at(-1);
+    if (!patch) return;
+    setRawRows((existing) => existing.map((row, index) => index === patch.index ? { ...row, [patch.key]: patch.after } : row));
+    setCurrentIndex(patch.index);
+    setRedoStack((existing) => existing.slice(0, -1));
+    setUndoStack((existing) => [...existing, patch].slice(-250));
+  }, [redoStack]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+      } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleHistoryShortcut);
+    return () => window.removeEventListener('keydown', handleHistoryShortcut);
+  }, [open, redo, undo]);
+
+  function goToFirstIssue() {
+    if (!issueIndexes.length) return;
+    setCurrentIndex(issueIndexes[0]);
+  }
+
+  function goToIssue(direction: 1 | -1) {
+    if (!issueIndexes.length) return;
+    if (currentIssuePosition < 0) {
+      setCurrentIndex(direction > 0 ? issueIndexes[0] : issueIndexes[issueIndexes.length - 1]);
+      return;
+    }
+    const next = (currentIssuePosition + direction + issueIndexes.length) % issueIndexes.length;
+    setCurrentIndex(issueIndexes[next]);
   }
 
   async function postTaxonomy(action: 'createChapter' | 'createTopic', body: Record<string, unknown>) {
@@ -539,7 +657,9 @@ export function QuestionBulkImportDialog({
       return;
     }
     if (imageBlocked) {
-      setError(missingZipFiles.length ? `The image ZIP is missing: ${missingZipFiles.slice(0, 8).join(', ')}${missingZipFiles.length > 8 ? '…' : ''}` : 'Attach the matching image ZIP before importing.');
+      setError(missingZipFiles.length
+        ? `The image ZIP is missing: ${missingZipFiles.slice(0, 8).join(', ')}${missingZipFiles.length > 8 ? '…' : ''}`
+        : 'Attach the matching image ZIP before importing.');
       return;
     }
     if (!supabase || !user) {
@@ -555,7 +675,7 @@ export function QuestionBulkImportDialog({
     try {
       const payloads = valid.map((row) => {
         const payload = structuredClone(row.payload!);
-        payload.metadata = { ...(payload.metadata || {}), import_format: format, import_file: questionFile.name, release: '7.1.0' };
+        payload.metadata = { ...(payload.metadata || {}), import_format: format, import_file: questionFile.name, release: '7.1.1' };
         delete payload.metadata.test_type;
         delete payload.metadata.custom_test_type;
         if (!canPublish && payload.status === 'approved') payload.status = 'in_review';
@@ -573,9 +693,9 @@ export function QuestionBulkImportDialog({
         p_rows: payloads,
       });
       if (importError) throw new Error(friendlyDatabaseError(importError.message));
-      const summary = data as { imported: number; failed: number; errors?: Array<{ row?: number; error?: string } | string> };
+      const summary = data as ImportResult;
       setResult(summary);
-      setStage('');
+      setResultOpen(true);
       if (summary.imported > 0) await onImported();
     } catch (caught) {
       setError(caught instanceof Error ? friendlyDatabaseError(caught.message) : 'Question import failed.');
@@ -586,8 +706,9 @@ export function QuestionBulkImportDialog({
   }
 
   const previewOptions = currentPayload?.options || [];
-  const previewCorrect = Array.isArray(currentPayload?.correct_answer) ? currentPayload.correct_answer.join('|') : String(currentPayload?.correct_answer || '');
-  const missingTaxonomyCount = rows.filter((row) => row.missingChapter || row.missingTopic).length;
+  const previewCorrect = Array.isArray(currentPayload?.correct_answer)
+    ? currentPayload.correct_answer.join('|')
+    : String(currentPayload?.correct_answer || '');
   const statCards = [
     { label: 'Questions detected', value: rows.length, icon: FileSpreadsheet, tone: '#14232B' },
     { label: 'Ready to import', value: valid.length, icon: CheckCircle2, tone: '#0E5A5A' },
@@ -596,88 +717,129 @@ export function QuestionBulkImportDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <DialogContent className="max-h-[96vh] w-[96vw] max-w-[1540px] overflow-hidden border-[#E7ECEB] p-0">
-        <DialogHeader className="border-b border-[#E7ECEB] px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 pr-8 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <DialogTitle className="text-xl text-[#14232B]">Bulk Question Import and Review · V7.1</DialogTitle>
-              <DialogDescription className="mt-1 max-w-3xl">Upload Excel, attach its image ZIP when filenames are used, correct every issue here, and only then publish the reviewed questions.</DialogDescription>
+    <>
+      <Dialog open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
+        <DialogContent className="max-h-[96vh] w-[96vw] max-w-[1540px] overflow-hidden border-[#E7ECEB] p-0">
+          <DialogHeader className="border-b border-[#E7ECEB] px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-3 pr-8 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <DialogTitle className="text-xl text-[#14232B]">Bulk Question Import and Review · Final</DialogTitle>
+                <DialogDescription className="mt-1 max-w-3xl">Upload Excel, attach its image ZIP when filenames are used, navigate only the errors, undo changes when needed, and publish only after review.</DialogDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel</Button>
+                <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP Template</Button>
+                <Button type="button" variant="outline" size="sm" onClick={downloadQuestionImportGuide} className="border-[#E7ECEB]"><FileText className="mr-1.5 h-4 w-4" />Guide</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowLatexWorkspace((value) => !value)} className="border-[#E7ECEB]"><FileCode2 className="mr-1.5 h-4 w-4" />Paste LaTeX</Button>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel</Button>
-              <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP Template</Button>
-              <Button type="button" variant="outline" size="sm" onClick={downloadQuestionImportGuide} className="border-[#E7ECEB]"><FileText className="mr-1.5 h-4 w-4" />Guide</Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowLatexWorkspace((value) => !value)} className="border-[#E7ECEB]"><FileCode2 className="mr-1.5 h-4 w-4" />Paste LaTeX</Button>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
+            <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${preflight?.ok ? 'border-[#0E5A5A]/20 bg-[#DCE9E7]/50 text-[#0E5A5A]' : 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]'}`}>
+              <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2">{preflight?.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}<span>{preflight?.message || 'Checking database role, import function and image storage…'}</span></div><Button type="button" variant="ghost" size="sm" onClick={() => void runPreflight()} className="h-7 shrink-0 px-2"><RefreshCw className="mr-1 h-3.5 w-3.5" />Check again</Button></div>
             </div>
+
+            {error && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error}</div>}
+            {notice && !error && <div className="mb-4 rounded-xl border border-[#DCE9E7] bg-white px-4 py-3 text-sm text-[#0E5A5A]">{notice}</div>}
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#DCE9E7] bg-white p-5 text-center transition hover:border-[#0E5A5A]/50"><FileSpreadsheet className="h-9 w-9 text-[#0E5A5A]" /><strong className="mt-3 text-[#14232B]">1. Excel or question source</strong><p className="mt-1 max-w-md text-xs text-[#6B7980]">{questionFile ? questionFile.name : 'XLSX recommended. CSV, XLS, DOCX, text PDF, TEX, TXT and JSON are also supported.'}</p><span className="mt-3 rounded-lg bg-[#0E5A5A] px-3 py-2 text-xs font-semibold text-white">{questionFile ? 'Replace source file' : 'Choose source file'}</span><input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} /></label>
+              <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition ${localImageReferences.length && !imageZip ? 'border-[#B54747]/50 bg-[#FFF8F8]' : 'border-[#F2B84B]/50 bg-white hover:border-[#F2B84B]'}`}><ImagePlus className="h-9 w-9 text-[#8A5F00]" /><strong className="mt-3 text-[#14232B]">2. Matching image ZIP</strong><p className="mt-1 max-w-md text-xs leading-relaxed text-[#6B7980]">{imageZip ? `${imageZip.name}${zipNames ? ` · ${zipNames.size} files detected` : ''}` : localImageReferences.length ? `${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'} found. Choose the ZIP now.` : 'Optional when every image cell contains a real public HTTPS URL.'}</p><span className="mt-3 rounded-lg border border-[#E7ECEB] bg-white px-3 py-2 text-xs font-semibold text-[#14232B]">{imageZip ? 'Replace image ZIP' : 'Choose image ZIP'}</span><input hidden type="file" accept=".zip" onChange={(event) => event.target.files?.[0] && void attachImageZip(event.target.files[0])} /></label>
+            </div>
+
+            {missingZipFiles.length > 0 && <div className="mt-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]"><strong>The ZIP does not contain {missingZipFiles.length} referenced image file{missingZipFiles.length === 1 ? '' : 's'}.</strong><p className="mt-1 text-xs">Missing: {missingZipFiles.slice(0, 12).join(', ')}{missingZipFiles.length > 12 ? '…' : ''}</p></div>}
+
+            {showLatexWorkspace && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#14232B]">Paste structured LaTeX questions</strong><p className="text-xs text-[#6B7980]">Review the parsed fields and rendered question before import.</p></div><Button type="button" onClick={reviewPastedLatex} disabled={!latexText.trim()} className="bg-[#0E5A5A] text-white"><FileCode2 className="mr-2 h-4 w-4" />Review pasted LaTeX</Button></div><Textarea rows={10} value={latexText} onChange={(event) => setLatexText(event.target.value)} placeholder={'\\begin{question}\n\\subject{Physics}\n\\question{...}\n\\option[A]{...}\n\\answer{A}\n\\solution{...}\n\\end{question}'} className="mt-4 border-[#E7ECEB] font-mono text-xs" /></div>}
+
+            {busy && stage && <div className="mt-4 rounded-xl border border-[#DCE9E7] bg-white p-4"><div className="flex items-center gap-3 text-sm font-medium text-[#14232B]"><LoaderCircle className="h-5 w-5 animate-spin text-[#0E5A5A]" />{stage}</div><Progress value={65} className="mt-3 h-2" /></div>}
+
+            {!!rows.length && <>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{statCards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-xl border border-[#E7ECEB] bg-white p-4"><div className="flex items-center justify-between"><span className="text-xs text-[#6B7980]">{label}</span><Icon className="h-4 w-4" style={{ color: tone }} /></div><strong className="mt-2 block text-2xl" style={{ color: tone }}>{value}</strong></div>)}</div>
+
+              {missingTaxonomyCount > 0 && <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-4 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#8A5F00]">{missingTaxonomyCount} question{missingTaxonomyCount === 1 ? '' : 's'} refer to a chapter or topic that is not in Evidara.</strong><p className="mt-1 text-xs text-[#6B7980]">Add each item while reviewing, or create all unique missing chapters and topics now.</p></div><Button type="button" onClick={() => void createAllMissingTaxonomy()} disabled={busy} className="shrink-0 bg-[#8A5F00] text-white hover:bg-[#704D00]"><Plus className="mr-2 h-4 w-4" />Create all missing taxonomy</Button></div>}
+
+              {platformImport && <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-[#DCE9E7] bg-white p-4"><input type="checkbox" checked={publishMaster} onChange={(event) => setPublishMaster(event.target.checked)} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-[#14232B]">Publish Evidara master questions immediately</strong><span className="mt-1 block text-xs text-[#6B7980]">Enabled by default for Super Admin and Evidara Admin so approved master questions appear to School Admins and Teachers.</span></span></label>}
+
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#E7ECEB] bg-white p-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" disabled={currentIndex <= 0} onClick={() => setCurrentIndex((value) => Math.max(0, value - 1))} className="border-[#E7ECEB]"><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button>
+                  <Button type="button" variant="outline" size="sm" disabled={currentIndex >= rows.length - 1} onClick={() => setCurrentIndex((value) => Math.min(rows.length - 1, value + 1))} className="border-[#E7ECEB]">Next question<ChevronRight className="ml-1 h-4 w-4" /></Button>
+                  <Button type="button" variant="outline" size="sm" disabled={!issueIndexes.length} onClick={goToFirstIssue} className="border-[#B54747]/30 text-[#B54747]"><ListChecks className="mr-1.5 h-4 w-4" />First issue</Button>
+                  <Button type="button" variant="outline" size="sm" disabled={!issueIndexes.length} onClick={() => goToIssue(-1)} className="border-[#B54747]/30 text-[#B54747]">Previous issue</Button>
+                  <Button type="button" variant="outline" size="sm" disabled={!issueIndexes.length} onClick={() => goToIssue(1)} className="border-[#B54747]/30 text-[#B54747]">Next issue</Button>
+                  {issueIndexes.length > 0 && <Select value={String(currentIssuePosition >= 0 ? currentIndex : issueIndexes[0])} onValueChange={(value) => setCurrentIndex(Number(value))}><SelectTrigger className="h-9 w-[150px] border-[#B54747]/30 text-[#B54747]"><SelectValue placeholder="Jump to issue" /></SelectTrigger><SelectContent>{issueIndexes.map((index) => <SelectItem key={index} value={String(index)}>Question {index + 1}</SelectItem>)}</SelectContent></Select>}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={undo} disabled={!undoStack.length} title="Undo (Ctrl+Z)"><Undo2 className="mr-1.5 h-4 w-4" />Undo</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={redo} disabled={!redoStack.length} title="Redo (Ctrl+Shift+Z or Ctrl+Y)"><Redo2 className="mr-1.5 h-4 w-4" />Redo</Button>
+                  <span className="text-xs text-[#6B7980]">Question <strong className="text-[#14232B]">{currentIndex + 1}</strong> of {rows.length}{issueIndexes.length ? ` · ${issueIndexes.length} with issues` : ' · no issues'}</span>
+                </div>
+              </div>
+
+              {current && currentPayload && <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[230px_minmax(0,1fr)_minmax(360px,.62fr)]">
+                <aside className="min-w-0 rounded-2xl border border-[#E7ECEB] bg-white p-3 xl:sticky xl:top-0 xl:max-h-[72vh] xl:self-start xl:overflow-y-auto"><strong className="text-sm text-[#14232B]">Question navigator</strong><p className="mt-1 text-xs text-[#6B7980]">Red rows need correction. Use the issue buttons to skip directly between them.</p><div className="mt-3 space-y-1.5">{rows.map((row, index) => <button key={`${row.rowNumber}-${index}`} type="button" onClick={() => setCurrentIndex(index)} className={`flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${index === currentIndex ? 'border-[#0E5A5A] bg-[#DCE9E7]/45' : row.errors.length || row.duplicate ? 'border-[#B54747]/20 bg-[#B54747]/5' : 'border-[#E7ECEB] hover:border-[#0E5A5A]/30'}`}><span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${row.errors.length || row.duplicate ? 'bg-[#B54747] text-white' : 'bg-[#DCE9E7] text-[#0E5A5A]'}`}>{index + 1}</span><span className="min-w-0"><span className="line-clamp-2 block text-xs font-medium text-[#14232B]">{String(row.raw.question || row.raw.stem_text || 'Untitled question')}</span><span className={`mt-0.5 block text-[10px] ${row.errors.length || row.duplicate ? 'text-[#B54747]' : 'text-[#0E5A5A]'}`}>{row.errors.length || row.duplicate ? `${row.errors.length} issue${row.errors.length === 1 ? '' : 's'}` : 'Ready'}</span></span></button>)}</div></aside>
+
+                <main className="min-w-0 space-y-4">
+                  {current.errors.length > 0 && <div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 p-3"><div className="flex items-center gap-2 text-sm font-semibold text-[#B54747]"><AlertCircle className="h-4 w-4" />Correct these items before Import</div><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#B54747]">{current.errors.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
+                  {!!current.warnings?.length && <div className="rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-3 text-xs text-[#8A5F00]">{current.warnings.join(' ')}</div>}
+
+                  <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Classification</strong><p className="text-xs text-[#6B7980]">Search existing taxonomy or add a missing chapter/topic from this question.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="space-y-2"><GuidedLabel required help="Subjects are universal. Only Super Admin can create a missing subject from Question Settings.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>
+                    <div className="space-y-2"><GuidedLabel help="Choose an existing chapter or use the Excel chapter name.">Chapter</GuidedLabel><SearchableTaxonomySelect value={currentChapterId} onValueChange={(chapterId) => { const chapter = orderedChapters.find((item) => item.id === chapterId); updateRaw('chapter', chapter?.name || ''); updateRaw('topic', ''); }} options={currentChapters.map((chapter) => ({ value: chapter.id, label: chapter.name }))} placeholder="Search chapter" disabled={!currentSubjectId} allowClear clearLabel="No chapter" /><Input value={rawText(current.raw, 'chapter')} onChange={(event) => { updateRaw('chapter', event.target.value); updateRaw('topic', ''); }} placeholder="Chapter name from Excel" className="border-[#E7ECEB]" />{current.missingChapter && <Button type="button" size="sm" onClick={() => void createCurrentChapter()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add chapter “{current.missingChapter.name}”</Button>}</div>
+                    <div className="space-y-2"><GuidedLabel help="Topic is optional but recommended.">Topic</GuidedLabel><SearchableTaxonomySelect value={currentPayload.topic_id || ''} onValueChange={(topicId) => { const topic = orderedTopics.find((item) => item.id === topicId); updateRaw('topic', topic?.name || ''); }} options={currentTopics.map((topic) => ({ value: topic.id, label: topic.name }))} placeholder="Search topic" disabled={!currentChapterId} allowClear clearLabel="No topic" /><Input value={rawText(current.raw, 'topic')} onChange={(event) => updateRaw('topic', event.target.value)} placeholder="Optional topic name" className="border-[#E7ECEB]" />{current.missingTopic && <Button type="button" size="sm" onClick={() => void createCurrentTopic()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add topic “{current.missingTopic.name}”</Button>}</div>
+                    <div className="space-y-2"><GuidedLabel required help="Choose the way a learner answers this question.">Question type</GuidedLabel><Select value={currentPayload.question_type} onValueChange={(value) => updateRaw('question_type', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{simpleQuestionTypes.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><GuidedLabel required help="Difficulty is used for paper balancing and analytics.">Difficulty</GuidedLabel><Select value={currentPayload.difficulty} onValueChange={(value) => updateRaw('difficulty', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{difficulties.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><GuidedLabel help="Teachers may use Draft or In Review only.">Status</GuidedLabel><Select value={currentPayload.status} onValueChange={(value) => updateRaw('status', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{(canPublish ? ['draft', 'in_review', 'approved'] : ['draft', 'in_review']).map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><GuidedLabel required help="Use | between multiple examinations.">Exam types</GuidedLabel><Input value={rawText(current.raw, 'exam_types')} onChange={(event) => updateRaw('exam_types', event.target.value)} placeholder="NEET|KCET" className="border-[#E7ECEB]" /></div>
+                    <div className="space-y-2"><GuidedLabel help="Grade or class used for filters.">Class level</GuidedLabel><Input value={rawText(current.raw, 'class_level')} onChange={(event) => updateRaw('class_level', event.target.value)} className="border-[#E7ECEB]" /></div>
+                  </div></div>
+
+                  <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Question, LaTeX and image</strong><p className="text-xs text-[#6B7980]">Edit here and verify the rendered result on the right.</p></div><div className="space-y-4"><div className="space-y-2"><GuidedLabel required help="Complete learner-facing question text.">Question text</GuidedLabel><Textarea rows={6} value={rawText(current.raw, 'question') || rawText(current.raw, 'stem_text')} onChange={(event) => updateRaw('question', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Paste and correct question LaTeX directly.">Question LaTeX</GuidedLabel><Textarea rows={3} value={rawText(current.raw, 'question_latex') || rawText(current.raw, 'stem_latex')} onChange={(event) => updateRaw('question_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div><div className="space-y-2"><GuidedLabel help="Use a real public HTTPS URL or the exact filename inside the selected ZIP.">Question image</GuidedLabel><Input value={rawText(current.raw, 'question_image')} onChange={(event) => updateRaw('question_image', event.target.value)} placeholder="physics-q1.png or https://…" className="border-[#E7ECEB]" /></div></div></div>
+
+                  <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Options and correct answer</strong><p className="text-xs text-[#6B7980]">Review text, LaTeX and image filename for every option.</p></div>{['a', 'b', 'c', 'd'].map((key) => <div key={key} className="mb-3 rounded-xl border border-[#E7ECEB] bg-[#F7F9F7]/45 p-3 last:mb-0"><div className="mb-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#0E5A5A] text-xs font-bold text-white">{key.toUpperCase()}</div><div className="grid gap-2 lg:grid-cols-3"><Input value={rawText(current.raw, `option_${key}`)} onChange={(event) => updateRaw(`option_${key}`, event.target.value)} placeholder={`Option ${key.toUpperCase()} text`} className="border-[#E7ECEB] bg-white" /><Input value={rawText(current.raw, `option_${key}_latex`)} onChange={(event) => updateRaw(`option_${key}_latex`, event.target.value)} placeholder="Optional LaTeX" className="border-[#E7ECEB] bg-white font-mono text-xs" /><Input value={rawText(current.raw, `option_${key}_image`)} onChange={(event) => updateRaw(`option_${key}_image`, event.target.value)} placeholder="Image filename or URL" className="border-[#E7ECEB] bg-white text-xs" /></div></div>)}<div className="mt-4 max-w-sm space-y-2"><GuidedLabel required help="A, B, C or D. Multiple correct uses A|B. Numerical questions use the exact number.">Correct answer</GuidedLabel><Input value={rawText(current.raw, 'correct_answer')} onChange={(event) => updateRaw('correct_answer', event.target.value)} className="border-[#E7ECEB]" /></div></div>
+
+                  <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Solution and remaining details</strong></div><div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2"><GuidedLabel help="Human-readable solution.">Solution</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution')} onChange={(event) => updateRaw('solution', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Optional solution LaTeX.">Solution LaTeX</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution_latex')} onChange={(event) => updateRaw('solution_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div></div><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks for a correct answer.">Marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'marks')} onChange={(event) => updateRaw('marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Incorrect-answer deduction.">Negative marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'negative_marks')} onChange={(event) => updateRaw('negative_marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected solving time.">Expected seconds</GuidedLabel><Input type="number" value={rawText(current.raw, 'estimated_seconds')} onChange={(event) => updateRaw('estimated_seconds', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Learner-facing language.">Language</GuidedLabel><Select value={currentPayload.language} onValueChange={(value) => updateRaw('language', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{languages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div></div><div className="mt-4 grid gap-4 md:grid-cols-3"><div className="space-y-2"><GuidedLabel help="Question source.">Source</GuidedLabel><Input value={rawText(current.raw, 'source')} onChange={(event) => updateRaw('source', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Source year.">Source year</GuidedLabel><Input type="number" value={rawText(current.raw, 'source_year')} onChange={(event) => updateRaw('source_year', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Comma- or pipe-separated search tags.">Tags</GuidedLabel><Input value={rawText(current.raw, 'tags')} onChange={(event) => updateRaw('tags', event.target.value)} className="border-[#E7ECEB]" /></div></div></div>
+                </main>
+
+                <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start"><QuestionDevicePreview value={{ stemText: currentPayload.stem_text, stemLatex: currentPayload.stem_latex || '', imageUrl: isRemoteUrl(currentPayload.question_image_url || '') ? currentPayload.question_image_url : '', passageText: currentPayload.passage_text || '', questionType: currentPayload.question_type, options: previewOptions, numericAnswer: previewCorrect, subject: orderedSubjects.find((subject) => subject.id === currentPayload.subject_id)?.name || rawText(current.raw, 'subject'), chapter: orderedChapters.find((chapter) => chapter.id === currentPayload.chapter_id)?.name || rawText(current.raw, 'chapter'), topic: orderedTopics.find((topic) => topic.id === currentPayload.topic_id)?.name || rawText(current.raw, 'topic'), difficulty: currentPayload.difficulty, showCorrectAnswer: true }} /></aside>
+              </div>}
+            </>}
           </div>
-        </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
-          <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${preflight?.ok ? 'border-[#0E5A5A]/20 bg-[#DCE9E7]/50 text-[#0E5A5A]' : 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]'}`}>
-            <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2">{preflight?.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}<span>{preflight?.message || 'Checking database role, import function and image storage…'}</span></div><Button type="button" variant="ghost" size="sm" onClick={() => void runPreflight()} className="h-7 shrink-0 px-2"><RefreshCw className="mr-1 h-3.5 w-3.5" />Check again</Button></div>
-          </div>
+          <DialogFooter className="border-t border-[#E7ECEB] bg-white px-4 py-3 sm:px-6 sm:py-4">
+            <div className="mr-auto hidden max-w-2xl text-xs text-[#6B7980] md:block">{rows.length ? `${valid.length} ready · ${invalid.length} need correction${localImageReferences.length ? ` · ${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'}` : ''}. Ctrl+Z undoes your latest review edit.` : 'Choose an Excel file or paste structured LaTeX questions.'}</div>
+            <Button variant="outline" onClick={requestClose} className="border-[#E7ECEB]">{result ? 'Close' : 'Cancel'}</Button>
+            {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          {(error || result) && <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${error || result?.failed ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#0E5A5A]/20 bg-[#DCE9E7]/50 text-[#0E5A5A]'}`}>{error || `Import completed: ${result?.imported || 0} added, ${result?.failed || 0} failed.`}{!!result?.errors?.length && <details className="mt-2"><summary className="cursor-pointer font-semibold">Show questions that were not added</summary><ol className="mt-2 list-decimal space-y-1 pl-5">{result.errors.slice(0, 100).map((item, index) => <li key={index}>{displayError(item)}</li>)}</ol></details>}</div>}
-          {notice && !error && <div className="mb-4 rounded-xl border border-[#DCE9E7] bg-white px-4 py-3 text-sm text-[#0E5A5A]">{notice}</div>}
+      <AlertDialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-2xl">
+          <div className="bg-[#14232B] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0E5A5A]"><ListChecks className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">{rows.length} questions detected</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">The file has been analysed before anything is saved. Start with the first question or jump directly to the first issue.</AlertDialogDescription></AlertDialogHeader></div>
+          <div className="grid gap-3 px-6 py-5 sm:grid-cols-4">{statCards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-xl border border-[#E7ECEB] bg-[#F7F9F7] p-3"><Icon className="h-4 w-4" style={{ color: tone }} /><strong className="mt-2 block text-2xl" style={{ color: tone }}>{value}</strong><span className="text-xs text-[#6B7980]">{label}</span></div>)}</div>
+          <div className="px-6 pb-5 text-sm text-[#6B7980]">{invalid.length ? <p><strong className="text-[#B54747]">{invalid.length} question{invalid.length === 1 ? '' : 's'} need attention.</strong> Evidara will never import those rows until the highlighted fields are corrected.</p> : <p className="text-[#0E5A5A]"><strong>Every detected question passed the current review checks.</strong></p>}</div>
+          <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><Button type="button" variant="outline" onClick={() => { setCurrentIndex(0); setSummaryOpen(false); }}>Review from question 1</Button>{invalid.length > 0 && <Button type="button" onClick={() => { goToFirstIssue(); setSummaryOpen(false); }} className="bg-[#B54747] text-white hover:bg-[#9C3838]"><AlertCircle className="mr-2 h-4 w-4" />Fix first issue</Button>}</AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#DCE9E7] bg-white p-5 text-center transition hover:border-[#0E5A5A]/50"><FileSpreadsheet className="h-9 w-9 text-[#0E5A5A]" /><strong className="mt-3 text-[#14232B]">1. Excel or question source</strong><p className="mt-1 max-w-md text-xs text-[#6B7980]">{questionFile ? questionFile.name : 'XLSX recommended. CSV, XLS, DOCX, text PDF, TEX, TXT and JSON are also supported.'}</p><span className="mt-3 rounded-lg bg-[#0E5A5A] px-3 py-2 text-xs font-semibold text-white">{questionFile ? 'Replace source file' : 'Choose source file'}</span><input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} /></label>
-            <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition ${localImageReferences.length && !imageZip ? 'border-[#B54747]/50 bg-[#FFF8F8]' : 'border-[#F2B84B]/50 bg-white hover:border-[#F2B84B]'}`}><ImagePlus className="h-9 w-9 text-[#8A5F00]" /><strong className="mt-3 text-[#14232B]">2. Matching image ZIP</strong><p className="mt-1 max-w-md text-xs leading-relaxed text-[#6B7980]">{imageZip ? `${imageZip.name}${zipNames ? ` · ${zipNames.size} files detected` : ''}` : localImageReferences.length ? `${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'} found. Choose the ZIP now.` : 'Optional when every image cell contains a real public HTTPS URL.'}</p><span className="mt-3 rounded-lg border border-[#E7ECEB] bg-white px-3 py-2 text-xs font-semibold text-[#14232B]">{imageZip ? 'Replace image ZIP' : 'Choose image ZIP'}</span><input hidden type="file" accept=".zip" onChange={(event) => event.target.files?.[0] && void attachImageZip(event.target.files[0])} /></label>
-          </div>
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-lg">
+          <div className="bg-[#14232B] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F2B84B] text-[#14232B]"><RotateCcw className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Discard this import review?</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">The selected files, taxonomy corrections and all unsaved edits in this review will be cleared.</AlertDialogDescription></AlertDialogHeader></div>
+          <div className="px-6 py-5"><div className="rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-4 text-sm text-[#8A5F00]"><strong>{rows.length || 0} question{rows.length === 1 ? '' : 's'} currently in review</strong><p className="mt-1 text-xs">Choose “Continue reviewing” to return without losing anything.</p></div></div>
+          <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><AlertDialogCancel>Continue reviewing</AlertDialogCancel><Button type="button" variant="destructive" onClick={closeImmediately}><XCircle className="mr-2 h-4 w-4" />Discard import</Button></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          {missingZipFiles.length > 0 && <div className="mt-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]"><strong>The ZIP does not contain {missingZipFiles.length} referenced image file{missingZipFiles.length === 1 ? '' : 's'}.</strong><p className="mt-1 text-xs">Missing: {missingZipFiles.slice(0, 12).join(', ')}{missingZipFiles.length > 12 ? '…' : ''}</p></div>}
-
-          {showLatexWorkspace && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#14232B]">Paste structured LaTeX questions</strong><p className="text-xs text-[#6B7980]">Review the parsed fields and rendered question before import.</p></div><Button type="button" onClick={reviewPastedLatex} disabled={!latexText.trim()} className="bg-[#0E5A5A] text-white"><FileCode2 className="mr-2 h-4 w-4" />Review pasted LaTeX</Button></div><Textarea rows={10} value={latexText} onChange={(event) => setLatexText(event.target.value)} placeholder={'\\begin{question}\n\\subject{Physics}\n\\question{...}\n\\option[A]{...}\n\\answer{A}\n\\solution{...}\n\\end{question}'} className="mt-4 border-[#E7ECEB] font-mono text-xs" /></div>}
-
-          {busy && stage && <div className="mt-4 rounded-xl border border-[#DCE9E7] bg-white p-4"><div className="flex items-center gap-3 text-sm font-medium text-[#14232B]"><LoaderCircle className="h-5 w-5 animate-spin text-[#0E5A5A]" />{stage}</div><Progress value={65} className="mt-3 h-2" /></div>}
-
-          {!!rows.length && <>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{statCards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-xl border border-[#E7ECEB] bg-white p-4"><div className="flex items-center justify-between"><span className="text-xs text-[#6B7980]">{label}</span><Icon className="h-4 w-4" style={{ color: tone }} /></div><strong className="mt-2 block text-2xl" style={{ color: tone }}>{value}</strong></div>)}</div>
-
-            {missingTaxonomyCount > 0 && <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-4 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#8A5F00]">{missingTaxonomyCount} question{missingTaxonomyCount === 1 ? '' : 's'} refer to a chapter or topic that is not in Evidara.</strong><p className="mt-1 text-xs text-[#6B7980]">You may add each item while reviewing, or create all unique missing chapters and topics now.</p></div><Button type="button" onClick={() => void createAllMissingTaxonomy()} disabled={busy} className="shrink-0 bg-[#8A5F00] text-white hover:bg-[#704D00]"><Plus className="mr-2 h-4 w-4" />Create all missing taxonomy</Button></div>}
-
-            {platformImport && <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-[#DCE9E7] bg-white p-4"><input type="checkbox" checked={publishMaster} onChange={(event) => setPublishMaster(event.target.checked)} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-[#14232B]">Publish Evidara master questions immediately</strong><span className="mt-1 block text-xs text-[#6B7980]">Enabled by default for Super Admin and Evidara Admin so approved master questions appear to School Admins and Teachers. Turn it off to keep the imported statuses from Excel.</span></span></label>}
-
-            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#E7ECEB] bg-white p-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-2"><Button type="button" variant="outline" size="sm" disabled={currentIndex <= 0} onClick={() => setCurrentIndex((value) => Math.max(0, value - 1))} className="border-[#E7ECEB]"><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><Button type="button" variant="outline" size="sm" disabled={currentIndex >= rows.length - 1} onClick={() => setCurrentIndex((value) => Math.min(rows.length - 1, value + 1))} className="border-[#E7ECEB]">Next question<ChevronRight className="ml-1 h-4 w-4" /></Button></div><span className="text-xs text-[#6B7980]">Reviewing question <strong className="text-[#14232B]">{currentIndex + 1}</strong> of {rows.length}</span></div>
-
-            {current && currentPayload && <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[230px_minmax(0,1fr)_minmax(360px,.62fr)]">
-              <aside className="min-w-0 rounded-2xl border border-[#E7ECEB] bg-white p-3 xl:sticky xl:top-0 xl:max-h-[72vh] xl:self-start xl:overflow-y-auto"><strong className="text-sm text-[#14232B]">Question navigator</strong><p className="mt-1 text-xs text-[#6B7980]">The serial number always follows the current visible order.</p><div className="mt-3 space-y-1.5">{rows.map((row, index) => <button key={`${row.rowNumber}-${index}`} type="button" onClick={() => setCurrentIndex(index)} className={`flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition ${index === currentIndex ? 'border-[#0E5A5A] bg-[#DCE9E7]/45' : row.errors.length || row.duplicate ? 'border-[#B54747]/20 bg-[#B54747]/5' : 'border-[#E7ECEB] hover:border-[#0E5A5A]/30'}`}><span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${row.errors.length || row.duplicate ? 'bg-[#B54747] text-white' : 'bg-[#DCE9E7] text-[#0E5A5A]'}`}>{index + 1}</span><span className="min-w-0"><span className="line-clamp-2 block text-xs font-medium text-[#14232B]">{String(row.raw.question || row.raw.stem_text || 'Untitled question')}</span><span className={`mt-0.5 block text-[10px] ${row.errors.length || row.duplicate ? 'text-[#B54747]' : 'text-[#0E5A5A]'}`}>{row.errors.length || row.duplicate ? `${row.errors.length} issue${row.errors.length === 1 ? '' : 's'}` : 'Ready'}</span></span></button>)}</div></aside>
-
-              <main className="min-w-0 space-y-4">
-                {current.errors.length > 0 && <div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 p-3"><div className="flex items-center gap-2 text-sm font-semibold text-[#B54747]"><AlertCircle className="h-4 w-4" />Correct these items before Import</div><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[#B54747]">{current.errors.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
-                {!!current.warnings?.length && <div className="rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-3 text-xs text-[#8A5F00]">{current.warnings.join(' ')}</div>}
-
-                <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Classification</strong><p className="text-xs text-[#6B7980]">Search existing taxonomy or add a missing chapter/topic from this question.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <div className="space-y-2"><GuidedLabel required help="Subjects are universal. Only Super Admin can create a missing subject from Question Settings.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>
-                  <div className="space-y-2"><GuidedLabel help="Choose an existing chapter or type the Excel chapter name below.">Chapter</GuidedLabel><SearchableTaxonomySelect value={currentChapterId} onValueChange={(chapterId) => { const chapter = orderedChapters.find((item) => item.id === chapterId); updateRaw('chapter', chapter?.name || ''); updateRaw('topic', ''); }} options={currentChapters.map((chapter) => ({ value: chapter.id, label: chapter.name }))} placeholder="Search chapter" disabled={!currentSubjectId} allowClear clearLabel="No chapter" /><Input value={rawText(current.raw, 'chapter')} onChange={(event) => { updateRaw('chapter', event.target.value); updateRaw('topic', ''); }} placeholder="Chapter name from Excel" className="border-[#E7ECEB]" />{current.missingChapter && <Button type="button" size="sm" onClick={() => void createCurrentChapter()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add chapter “{current.missingChapter.name}”</Button>}</div>
-                  <div className="space-y-2"><GuidedLabel help="Topic is optional but recommended.">Topic</GuidedLabel><SearchableTaxonomySelect value={currentPayload.topic_id || ''} onValueChange={(topicId) => { const topic = orderedTopics.find((item) => item.id === topicId); updateRaw('topic', topic?.name || ''); }} options={currentTopics.map((topic) => ({ value: topic.id, label: topic.name }))} placeholder="Search topic" disabled={!currentChapterId} allowClear clearLabel="No topic" /><Input value={rawText(current.raw, 'topic')} onChange={(event) => updateRaw('topic', event.target.value)} placeholder="Optional topic name" className="border-[#E7ECEB]" />{current.missingTopic && <Button type="button" size="sm" onClick={() => void createCurrentTopic()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add topic “{current.missingTopic.name}”</Button>}</div>
-                  <div className="space-y-2"><GuidedLabel required help="Choose the way a learner answers this question.">Question type</GuidedLabel><Select value={currentPayload.question_type} onValueChange={(value) => updateRaw('question_type', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{simpleQuestionTypes.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><GuidedLabel required help="Difficulty is used for paper balancing and analytics.">Difficulty</GuidedLabel><Select value={currentPayload.difficulty} onValueChange={(value) => updateRaw('difficulty', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{difficulties.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><GuidedLabel help="Teachers may use Draft or In Review only.">Status</GuidedLabel><Select value={currentPayload.status} onValueChange={(value) => updateRaw('status', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{(canPublish ? ['draft', 'in_review', 'approved'] : ['draft', 'in_review']).map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><GuidedLabel required help="Use | between multiple examinations.">Exam types</GuidedLabel><Input value={rawText(current.raw, 'exam_types')} onChange={(event) => updateRaw('exam_types', event.target.value)} placeholder="NEET|KCET" className="border-[#E7ECEB]" /></div>
-                  <div className="space-y-2"><GuidedLabel help="Grade or class used for filters.">Class level</GuidedLabel><Input value={rawText(current.raw, 'class_level')} onChange={(event) => updateRaw('class_level', event.target.value)} className="border-[#E7ECEB]" /></div>
-                </div></div>
-
-                <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Question, LaTeX and image</strong><p className="text-xs text-[#6B7980]">Edit here and verify the rendered result on the right.</p></div><div className="space-y-4"><div className="space-y-2"><GuidedLabel required help="Complete learner-facing question text.">Question text</GuidedLabel><Textarea rows={6} value={rawText(current.raw, 'question') || rawText(current.raw, 'stem_text')} onChange={(event) => updateRaw('question', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Paste and correct question LaTeX directly.">Question LaTeX</GuidedLabel><Textarea rows={3} value={rawText(current.raw, 'question_latex') || rawText(current.raw, 'stem_latex')} onChange={(event) => updateRaw('question_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div><div className="space-y-2"><GuidedLabel help="Use a real public HTTPS URL or the exact filename inside the selected ZIP.">Question image</GuidedLabel><Input value={rawText(current.raw, 'question_image')} onChange={(event) => updateRaw('question_image', event.target.value)} placeholder="physics-q1.png or https://…" className="border-[#E7ECEB]" /></div></div></div>
-
-                <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Options and correct answer</strong><p className="text-xs text-[#6B7980]">Review text, LaTeX and image filename for every option.</p></div>{['a', 'b', 'c', 'd'].map((key) => <div key={key} className="mb-3 rounded-xl border border-[#E7ECEB] bg-[#F7F9F7]/45 p-3 last:mb-0"><div className="mb-2 flex h-7 w-7 items-center justify-center rounded-lg bg-[#0E5A5A] text-xs font-bold text-white">{key.toUpperCase()}</div><div className="grid gap-2 lg:grid-cols-3"><Input value={rawText(current.raw, `option_${key}`)} onChange={(event) => updateRaw(`option_${key}`, event.target.value)} placeholder={`Option ${key.toUpperCase()} text`} className="border-[#E7ECEB] bg-white" /><Input value={rawText(current.raw, `option_${key}_latex`)} onChange={(event) => updateRaw(`option_${key}_latex`, event.target.value)} placeholder="Optional LaTeX" className="border-[#E7ECEB] bg-white font-mono text-xs" /><Input value={rawText(current.raw, `option_${key}_image`)} onChange={(event) => updateRaw(`option_${key}_image`, event.target.value)} placeholder="Image filename or URL" className="border-[#E7ECEB] bg-white text-xs" /></div></div>)}<div className="mt-4 max-w-sm space-y-2"><GuidedLabel required help="A, B, C or D. Multiple correct uses A|B. Numerical questions use the exact number.">Correct answer</GuidedLabel><Input value={rawText(current.raw, 'correct_answer')} onChange={(event) => updateRaw('correct_answer', event.target.value)} className="border-[#E7ECEB]" /></div></div>
-
-                <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Solution and remaining details</strong></div><div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2"><GuidedLabel help="Human-readable solution.">Solution</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution')} onChange={(event) => updateRaw('solution', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Optional solution LaTeX.">Solution LaTeX</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution_latex')} onChange={(event) => updateRaw('solution_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div></div><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks for a correct answer.">Marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'marks')} onChange={(event) => updateRaw('marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Incorrect-answer deduction.">Negative marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'negative_marks')} onChange={(event) => updateRaw('negative_marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected solving time.">Expected seconds</GuidedLabel><Input type="number" value={rawText(current.raw, 'estimated_seconds')} onChange={(event) => updateRaw('estimated_seconds', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Learner-facing language.">Language</GuidedLabel><Select value={currentPayload.language} onValueChange={(value) => updateRaw('language', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{languages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div></div><div className="mt-4 grid gap-4 md:grid-cols-3"><div className="space-y-2"><GuidedLabel help="Question source.">Source</GuidedLabel><Input value={rawText(current.raw, 'source')} onChange={(event) => updateRaw('source', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Source year.">Source year</GuidedLabel><Input type="number" value={rawText(current.raw, 'source_year')} onChange={(event) => updateRaw('source_year', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Comma- or pipe-separated search tags.">Tags</GuidedLabel><Input value={rawText(current.raw, 'tags')} onChange={(event) => updateRaw('tags', event.target.value)} className="border-[#E7ECEB]" /></div></div></div>
-              </main>
-
-              <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start"><QuestionDevicePreview value={{ stemText: currentPayload.stem_text, stemLatex: currentPayload.stem_latex || '', imageUrl: isRemoteUrl(currentPayload.question_image_url || '') ? currentPayload.question_image_url : '', passageText: currentPayload.passage_text || '', questionType: currentPayload.question_type, options: previewOptions, numericAnswer: previewCorrect, subject: orderedSubjects.find((subject) => subject.id === currentPayload.subject_id)?.name || rawText(current.raw, 'subject'), chapter: orderedChapters.find((chapter) => chapter.id === currentPayload.chapter_id)?.name || rawText(current.raw, 'chapter'), topic: orderedTopics.find((topic) => topic.id === currentPayload.topic_id)?.name || rawText(current.raw, 'topic'), difficulty: currentPayload.difficulty, showCorrectAnswer: true }} /></aside>
-            </div>}
-          </>}
-        </div>
-
-        <DialogFooter className="border-t border-[#E7ECEB] bg-white px-4 py-3 sm:px-6 sm:py-4">
-          <div className="mr-auto hidden max-w-2xl text-xs text-[#6B7980] md:block">{rows.length ? `${valid.length} ready · ${invalid.length} need correction${localImageReferences.length ? ` · ${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'}` : ''}. Nothing is saved until Import.` : 'Choose an Excel file or paste structured LaTeX questions.'}</div>
-          <Button variant="outline" onClick={requestClose} className="border-[#E7ECEB]">{result ? 'Close' : 'Cancel'}</Button>
-          {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog open={resultOpen} onOpenChange={setResultOpen}>
+        <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-xl">
+          <div className="bg-[#14232B] px-6 py-5 text-white"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${result?.failed ? 'bg-[#F2B84B] text-[#14232B]' : 'bg-[#0E5A5A]'}`}>{result?.failed ? <AlertCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Import completed</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">{result?.imported || 0} added · {result?.failed || 0} not added</AlertDialogDescription></AlertDialogHeader></div>
+          <div className="px-6 py-5">{!!result?.errors?.length ? <div className="max-h-64 overflow-y-auto rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 p-4"><strong className="text-sm text-[#B54747]">Questions not added</strong><ol className="mt-3 list-decimal space-y-2 pl-5 text-xs text-[#B54747]">{result.errors.slice(0, 100).map((item, index) => <li key={index}>{displayError(item)}</li>)}</ol></div> : <p className="text-sm text-[#0E5A5A]">Every reviewed question was added successfully.</p>}</div>
+          <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><Button type="button" onClick={() => setResultOpen(false)} className="bg-[#0E5A5A] text-white">Return to review</Button></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
