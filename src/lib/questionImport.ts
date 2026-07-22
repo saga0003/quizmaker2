@@ -1,8 +1,10 @@
 import type {
   MatchFollowingPair,
   ParsedQuestionRow,
+  QuestionDifficulty,
   QuestionOptionInput,
   QuestionPayload,
+  QuestionStatus,
   QuestionTestType,
   QuestionType,
 } from "@/types/questions";
@@ -11,10 +13,14 @@ const acceptedTypes = new Set<QuestionType>([
   "single_correct", "multiple_correct", "numerical", "integer",
   "assertion_reason", "match_following", "passage", "image_based",
 ]);
-
+const acceptedDifficulties = new Set<QuestionDifficulty>([
+  "very_easy", "easy", "moderate", "difficult", "very_difficult",
+]);
 const acceptedTestTypes = new Set<QuestionTestType>([
   "full_length", "part_test", "chapter_test", "topic_test", "custom",
 ]);
+const acceptedStatuses = new Set<QuestionStatus>(["draft", "in_review", "approved"]);
+const acceptedLanguages = new Set(["english", "kannada", "hindi", "bilingual"]);
 
 const normalize = (value: unknown) => String(value ?? "").trim();
 const splitList = (value: unknown) => normalize(value).split(/[|,]/).map((x) => x.trim()).filter(Boolean);
@@ -22,13 +28,52 @@ const numberValue = (value: unknown, fallback: number) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
-const slugValue = (value: unknown) => normalize(value).toLowerCase().replace(/[\s-]+/g, "_");
+const slugValue = (value: unknown) => normalize(value).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+
+function normalizedQuestionType(value: unknown) {
+  const raw = slugValue(value || "single_correct");
+  const aliases: Record<string, QuestionType> = {
+    mcq: "single_correct",
+    single_mcq: "single_correct",
+    single_correct_mcq: "single_correct",
+    multiple_mcq: "multiple_correct",
+    multi_correct: "multiple_correct",
+    numeric: "numerical",
+    assertion_and_reason: "assertion_reason",
+    image: "image_based",
+  };
+  return (aliases[raw] || raw || "single_correct") as QuestionType;
+}
+
+function normalizedDifficulty(value: unknown) {
+  const raw = slugValue(value || "moderate");
+  const aliases: Record<string, QuestionDifficulty> = {
+    medium: "moderate",
+    hard: "difficult",
+    very_hard: "very_difficult",
+  };
+  return (aliases[raw] || raw || "moderate") as QuestionDifficulty;
+}
+
+function normalizedStatus(value: unknown) {
+  const raw = slugValue(value || "draft");
+  const aliases: Record<string, QuestionStatus> = {
+    review: "in_review",
+    pending_review: "in_review",
+    publish: "approved",
+    published: "approved",
+  };
+  return (aliases[raw] || raw || "draft") as QuestionStatus;
+}
+
+function normalizedLanguage(value: unknown) {
+  const raw = normalize(value || "English");
+  if (!raw) return "English";
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
 
 function answerKeys(answer: string, type: QuestionType) {
   if (type === "numerical" || type === "integer") return answer;
-  if (type === "match_following") {
-    return answer.toUpperCase().split(/[|,;]/).map((x) => x.trim()).filter(Boolean);
-  }
   return answer.toUpperCase().split(/[|,;]/).map((x) => x.trim()).filter(Boolean);
 }
 
@@ -71,16 +116,24 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
     const errors: string[] = [];
     const stem = normalize(raw.question || raw.stem_text);
     const subject = normalize(raw.subject);
-    const questionType = (slugValue(raw.question_type || "single_correct") || "single_correct") as QuestionType;
+    const questionType = normalizedQuestionType(raw.question_type);
+    const difficulty = normalizedDifficulty(raw.difficulty);
+    const status = normalizedStatus(raw.status);
+    const language = normalizedLanguage(raw.language);
     const answer = normalize(raw.correct_answer);
-    const rawTestType = slugValue(raw.test_type || "custom") || "custom";
+    const rawTestType = slugValue(raw.test_type || "chapter_test") || "chapter_test";
     const testType = (acceptedTestTypes.has(rawTestType as QuestionTestType) ? rawTestType : "custom") as QuestionTestType;
     const customTestType = normalize(raw.custom_test_type || (testType === "custom" && rawTestType !== "custom" ? raw.test_type : ""));
+    const exams = splitList(raw.exam_types || raw.exam_type);
 
     if (stem.length < 5) errors.push("Question text is missing or too short.");
     if (!subject) errors.push("Subject is required.");
-    if (!acceptedTypes.has(questionType)) errors.push(`Unsupported question_type: ${questionType}`);
+    if (!acceptedTypes.has(questionType)) errors.push(`Unsupported question_type '${normalize(raw.question_type)}'.`);
+    if (!acceptedDifficulties.has(difficulty)) errors.push(`Unsupported difficulty '${normalize(raw.difficulty)}'.`);
+    if (!acceptedStatuses.has(status)) errors.push(`Unsupported status '${normalize(raw.status)}'. Use draft, in_review or approved.`);
+    if (!acceptedLanguages.has(language.toLowerCase())) errors.push(`Unsupported language '${normalize(raw.language)}'.`);
     if (!answer) errors.push("Correct answer is required.");
+    if (!exams.length) errors.push("At least one exam type is required.");
     if (testType === "custom" && !customTestType) errors.push("custom_test_type is required when test_type is custom.");
 
     const optionKeys = ["A", "B", "C", "D", "E", "F"];
@@ -108,41 +161,42 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
       if (matchPairs.length < 2) errors.push("Match-the-following questions require at least two left and right pairs.");
       if (matchPairs.some((pair) => !pair.left_text && !pair.left_latex && !pair.left_image_url)) errors.push("Every match row needs left-side content.");
       if (matchPairs.some((pair) => !pair.right_text && !pair.right_latex && !pair.right_image_url)) errors.push("Every match row needs right-side content.");
-      if ((parsedAnswer as string[]).some((value) => !/^[A-F]\s*[-:=]\s*[1-6]$/i.test(value))) {
-        errors.push("Match answers must use mappings such as A-1|B-2|C-3.");
-      }
+      if ((parsedAnswer as string[]).some((value) => !/^[A-F]\s*[-:=]\s*[1-6]$/i.test(value))) errors.push("Match answers must use mappings such as A-1|B-2|C-3.");
     }
 
-    if (["single_correct", "multiple_correct", "assertion_reason", "image_based", "passage"].includes(questionType) && options.length < 2) {
-      errors.push("At least two answer options are required.");
-    }
-    if (["single_correct", "assertion_reason", "image_based", "passage"].includes(questionType) && correctKeys.size !== 1) {
-      errors.push("This question type must have exactly one correct option.");
-    }
+    if (["single_correct", "multiple_correct", "assertion_reason", "image_based", "passage"].includes(questionType) && options.length < 2) errors.push("At least two answer options are required.");
+    if (["single_correct", "assertion_reason", "image_based", "passage"].includes(questionType) && correctKeys.size !== 1) errors.push("This question type must have exactly one correct option.");
     if (questionType === "multiple_correct" && correctKeys.size < 1) errors.push("Multiple-correct questions need at least one correct option.");
-    if (questionType !== "match_following" && correctKeys.size && [...correctKeys].some((key) => !options.some((option) => option.option_key === key))) {
-      errors.push("Correct answer refers to a missing option.");
-    }
+    if (questionType !== "match_following" && correctKeys.size && [...correctKeys].some((key) => !options.some((option) => option.option_key === key))) errors.push("Correct answer refers to a missing option.");
+    if ((questionType === "numerical" || questionType === "integer") && !Number.isFinite(Number(answer))) errors.push("Numerical and integer answers must contain a valid number.");
+    if (questionType === "integer" && Number.isFinite(Number(answer)) && !Number.isInteger(Number(answer))) errors.push("Integer questions require a whole-number answer.");
+
+    const marks = numberValue(raw.marks, 4);
+    const negativeMarks = numberValue(raw.negative_marks, 1);
+    const expectedSeconds = numberValue(raw.estimated_seconds, 0);
+    if (marks < 0) errors.push("Marks cannot be negative.");
+    if (negativeMarks < 0) errors.push("Negative marks must be zero or positive.");
+    if (expectedSeconds < 0) errors.push("Expected seconds must be zero or positive.");
 
     const payload: QuestionPayload = {
-      question_type: questionType,
-      status: normalize(raw.status).toLowerCase() === "approved" ? "approved" : normalize(raw.status).toLowerCase() === "in_review" ? "in_review" : "draft",
-      difficulty: (slugValue(raw.difficulty) || "moderate") as QuestionPayload["difficulty"],
+      question_type: acceptedTypes.has(questionType) ? questionType : "single_correct",
+      status: acceptedStatuses.has(status) ? status : "draft",
+      difficulty: acceptedDifficulties.has(difficulty) ? difficulty : "moderate",
       stem_text: stem,
       stem_latex: normalize(raw.question_latex || raw.stem_latex),
       question_image_url: normalize(raw.question_image),
-      passage_text: normalize(raw.passage_text),
+      passage_text: normalize(raw.passage_text || raw.passage),
       solution_text: normalize(raw.solution || raw.solution_text),
       solution_latex: normalize(raw.solution_latex),
-      marks: numberValue(raw.marks, 4),
-      negative_marks: numberValue(raw.negative_marks, 1),
-      estimated_seconds: numberValue(raw.estimated_seconds, 0) || undefined,
+      marks,
+      negative_marks: negativeMarks,
+      estimated_seconds: expectedSeconds || undefined,
       correct_answer: parsedAnswer,
-      exam_types: splitList(raw.exam_types || raw.exam_type),
+      exam_types: exams,
       class_level: normalize(raw.class_level || raw.grade),
       source: normalize(raw.source),
       source_year: numberValue(raw.source_year, 0) || undefined,
-      language: normalize(raw.language) || "English",
+      language: acceptedLanguages.has(language.toLowerCase()) ? language : "English",
       tags: splitList(raw.tags),
       metadata: {
         import_subject: subject,
@@ -156,18 +210,22 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
       options,
     };
 
-    return { rowNumber: index + 2, raw, payload: errors.length ? undefined : payload, errors };
+    return { rowNumber: index + 2, raw, payload, errors };
   });
 }
 
-export const questionTemplateHeaders = [
+// The default template is intentionally simple. Match the Following remains
+// available in the manual editor, but its many paired columns are excluded from
+// Excel/CSV so ordinary users can understand and validate the sheet quickly.
+export const bulkQuestionTemplateHeaders = [
   "exam_types", "test_type", "custom_test_type", "class_level", "subject", "chapter", "topic", "question_type", "difficulty",
-  "question", "question_latex", "question_image", "option_a", "option_a_latex", "option_a_image",
-  "option_b", "option_b_latex", "option_b_image", "option_c", "option_c_latex", "option_c_image",
-  "option_d", "option_d_latex", "option_d_image", "correct_answer", "solution", "solution_latex",
-  "match_left_a", "match_left_a_latex", "match_left_a_image", "match_right_1", "match_right_1_latex", "match_right_1_image",
-  "match_left_b", "match_left_b_latex", "match_left_b_image", "match_right_2", "match_right_2_latex", "match_right_2_image",
-  "match_left_c", "match_left_c_latex", "match_left_c_image", "match_right_3", "match_right_3_latex", "match_right_3_image",
-  "match_left_d", "match_left_d_latex", "match_left_d_image", "match_right_4", "match_right_4_latex", "match_right_4_image",
+  "question", "question_latex", "question_image",
+  "option_a", "option_a_latex", "option_a_image",
+  "option_b", "option_b_latex", "option_b_image",
+  "option_c", "option_c_latex", "option_c_image",
+  "option_d", "option_d_latex", "option_d_image",
+  "correct_answer", "solution", "solution_latex",
   "marks", "negative_marks", "estimated_seconds", "language", "source", "source_year", "tags", "status",
 ];
+
+export const questionTemplateHeaders = bulkQuestionTemplateHeaders;
