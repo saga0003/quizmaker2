@@ -1,9 +1,10 @@
 -- Extend the original Version 1 enum before using the V7 role values.
--- These statements intentionally run before the explicit transaction so each new
--- enum value is committed and immediately safe to use by later constraints/functions.
+-- The explicit COMMIT is required because PostgreSQL does not allow a newly
+-- added enum value to be used until the transaction that added it has ended.
 alter type public.app_role add value if not exists 'evidara_admin';
 alter type public.app_role add value if not exists 'school_admin';
 alter type public.app_role add value if not exists 'school_teacher';
+commit;
 
 begin;
 
