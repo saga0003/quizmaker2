@@ -29,6 +29,10 @@
 /dev.log
 /server.log
 
+# generated sales demo credentials
+/.evidara-demo-access.txt
+/.evidara-demo-access.json
+
 # misc
 .DS_Store
 *.pem
