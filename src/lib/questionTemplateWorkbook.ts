@@ -38,7 +38,6 @@ function rowXml(row: number, values: unknown[], style = 0) {
 const fixedLists = {
   difficulty: ['very_easy', 'easy', 'moderate', 'difficult', 'very_difficult'],
   question_type: ['single_correct', 'multiple_correct', 'numerical', 'integer', 'assertion_reason', 'passage', 'image_based'],
-  test_type: ['full_length', 'part_test', 'chapter_test', 'topic_test', 'custom'],
   language: ['English', 'Kannada', 'Hindi', 'Bilingual'],
   status: ['draft', 'in_review', 'approved'],
   correct_answer: ['A', 'B', 'C', 'D', 'A|B', 'A|C', 'B|C', 'A|B|C'],
@@ -46,8 +45,6 @@ const fixedLists = {
 
 const sample: Record<string, string | number> = {
   exam_types: 'NEET',
-  test_type: 'chapter_test',
-  custom_test_type: '',
   class_level: 'Class 11',
   subject: 'Physics',
   chapter: 'Units and Measurements',
@@ -85,7 +82,7 @@ const sample: Record<string, string | number> = {
 const guideRows: Array<[string, string, string, string]> = [
   ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin adds universal subjects.'],
   ['chapter', 'Recommended', 'Choose the chapter belonging to the selected subject.', 'A missing chapter can be added inside Evidara before import.'],
-  ['topic', 'Optional', 'Choose the topic belonging to the selected chapter.', 'Recommended for topic tests and dynamic topic serial numbers.'],
+  ['topic', 'Optional', 'Choose the topic belonging to the selected chapter.', 'Recommended for analytics and dynamic topic-wise serial numbers.'],
   ['question_type', 'Required', 'Use a dropdown value exactly as provided.', 'Match the Following remains available in the manual editor, not this simple template.'],
   ['difficulty', 'Required', 'Use very_easy, easy, moderate, difficult or very_difficult.', 'Dropdown validation prevents spelling errors.'],
   ['question', 'Required', 'Plain learner-facing question text.', 'Keep answers and internal notes out of this field.'],
@@ -93,10 +90,10 @@ const guideRows: Array<[string, string, string, string]> = [
   ['question_image', 'Optional', 'Public HTTPS URL or exact filename included in the image ZIP.', 'Example: physics-q1.png'],
   ['option_a to option_d', 'Required for MCQ', 'Enter option text; use the adjacent LaTeX/image columns when needed.', 'At least two options are required.'],
   ['correct_answer', 'Required', 'A, B, C or D. Multiple-correct values use A|B.', 'Numerical/integer questions use the exact numeric answer.'],
-  ['test_type', 'Required', 'Use full_length, part_test, chapter_test, topic_test or custom.', 'Fill custom_test_type only when test_type is custom.'],
   ['status', 'Required', 'Draft, in_review or approved.', 'Teacher imports are always limited to draft/review by backend permissions.'],
   ['exam_types', 'Recommended', 'Use NEET or multiple values separated by |.', 'Example: JEE Main|KCET'],
   ['tags', 'Optional', 'Comma- or pipe-separated search keywords.', 'These improve search and automatic paper selection.'],
+  ['test classification', 'Not part of questions', 'Choose full length, part, chapter, topic or custom while creating the test series or paper.', 'A question can be reused across multiple test types.'],
 ];
 
 function listRange(columnIndex: number, count: number) {
@@ -126,13 +123,12 @@ export async function buildQuestionTemplateWorkbook({
     orderedTopics,
     fixedLists.difficulty,
     fixedLists.question_type,
-    fixedLists.test_type,
     fixedLists.language,
     fixedLists.status,
     fixedLists.correct_answer,
   ];
   const maxListRows = Math.max(1, ...listColumns.map((column) => column.length));
-  const listHeaders = ['Subjects', 'Chapters', 'Topics', 'Difficulty', 'Question Types', 'Test Types', 'Languages', 'Statuses', 'Common Answers'];
+  const listHeaders = ['Subjects', 'Chapters', 'Topics', 'Difficulty', 'Question Types', 'Languages', 'Statuses', 'Common Answers'];
   const listRows = Array.from({ length: maxListRows }, (_unused, index) => listColumns.map((column) => column[index] || ''));
 
   const headerRow = rowXml(1, bulkQuestionTemplateHeaders, 1);
@@ -150,10 +146,9 @@ export async function buildQuestionTemplateWorkbook({
     validation('list', byHeader.get('topic')!, listRange(2, orderedTopics.length), 'Choose an optional existing topic.'),
     validation('list', byHeader.get('difficulty')!, listRange(3, fixedLists.difficulty.length), 'Choose the exact supported difficulty.'),
     validation('list', byHeader.get('question_type')!, listRange(4, fixedLists.question_type.length), 'Choose a supported simple question type.'),
-    validation('list', byHeader.get('test_type')!, listRange(5, fixedLists.test_type.length), 'Choose the intended test classification.'),
-    validation('list', byHeader.get('language')!, listRange(6, fixedLists.language.length), 'Choose the learner-facing language.'),
-    validation('list', byHeader.get('status')!, listRange(7, fixedLists.status.length), 'Choose draft, in_review or approved.'),
-    validation('list', byHeader.get('correct_answer')!, listRange(8, fixedLists.correct_answer.length), 'Choose a common MCQ answer or type the exact numerical answer.'),
+    validation('list', byHeader.get('language')!, listRange(5, fixedLists.language.length), 'Choose the learner-facing language.'),
+    validation('list', byHeader.get('status')!, listRange(6, fixedLists.status.length), 'Choose draft, in_review or approved.'),
+    validation('list', byHeader.get('correct_answer')!, listRange(7, fixedLists.correct_answer.length), 'Choose a common MCQ answer or type the exact numerical answer.'),
     validation('decimal', byHeader.get('marks')!, '0', 'Enter zero or a positive mark.'),
     validation('decimal', byHeader.get('negative_marks')!, '0', 'Enter zero or a positive deduction.'),
     validation('whole', byHeader.get('estimated_seconds')!, '1', 'Enter expected solving time in seconds.'),
@@ -165,7 +160,7 @@ export async function buildQuestionTemplateWorkbook({
   <cols>${widths}</cols>
   <sheetData>${headerRow}${sampleRow}</sheetData>
   <autoFilter ref="A1:${lastColumn}500"/>
-  <dataValidations count="12">${validations}</dataValidations>
+  <dataValidations count="11">${validations}</dataValidations>
 </worksheet>`;
 
   const guideSheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
