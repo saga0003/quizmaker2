@@ -1,6 +1,6 @@
 {
   "name": "evidara-school-platform",
-  "version": "7.1.0",
+  "version": "7.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -62,7 +62,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.2",
-    "input-otp": "^1.4.2",
+    "input-otp": "^4.0.7",
     "katex": "^0.17.0",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
