@@ -35,13 +35,11 @@ import type {
   ParsedQuestionRow,
   QuestionDifficulty,
   QuestionPayload,
-  QuestionStatus,
   QuestionType,
   TaxonomyChapter,
   TaxonomySubject,
   TaxonomyTopic,
 } from '@/types/questions';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -61,7 +59,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { GuidedLabel, HelpIcon } from '@/components/evidara/question-help';
+import { GuidedLabel } from '@/components/evidara/question-help';
 import { QuestionDevicePreview } from '@/components/evidara/question-device-preview';
 import { SearchableTaxonomySelect } from '@/components/evidara/searchable-taxonomy-select';
 
@@ -128,7 +126,7 @@ function templateCsv() {
 }
 
 function downloadCsvTemplate() {
-  downloadBlob(new Blob([templateCsv()], { type: 'text/csv;charset=utf-8' }), 'evidara-v7-1-question-import-template.csv');
+  downloadBlob(new Blob([templateCsv()], { type: 'text/csv;charset=utf-8' }), 'evidara-question-import-template.csv');
 }
 
 function rawText(raw: Record<string, unknown>, key: string) {
@@ -500,6 +498,8 @@ export function QuestionBulkImportDialog({
     if (!imageZip) throw new Error(`${localReferences.length} local image reference${localReferences.length === 1 ? '' : 's'} found. Choose the matching image ZIP before importing.`);
     if (!supabase || !user) throw new Error('Sign in again before uploading question images.');
 
+    const client = supabase;
+    const activeUser = user;
     const zip = await readZip(await imageZip.arrayBuffer());
     const byName = new Map([...zip.values()].map((entry) => [baseName(entry.name), entry]));
     const uploaded = new Map<string, string>();
@@ -511,11 +511,11 @@ export function QuestionBulkImportDialog({
       const entry = byName.get(key);
       if (!entry) throw new Error(`Image '${value}' is referenced in Excel but is missing from ${imageZip?.name}.`);
       const { blob, mime } = normalizeImageBytes(entry.bytes, key);
-      const path = `${user.id}/imports/${crypto.randomUUID()}-${safeImageFileName(key)}`;
+      const path = `${activeUser.id}/imports/${crypto.randomUUID()}-${safeImageFileName(key)}`;
       setStage(`Uploading ${key}…`);
-      const { error: uploadError } = await supabase.storage.from('question-assets').upload(path, blob, { upsert: false, contentType: mime, cacheControl: '3600' });
+      const { error: uploadError } = await client.storage.from('question-assets').upload(path, blob, { upsert: false, contentType: mime, cacheControl: '3600' });
       if (uploadError) throw new Error(friendlyDatabaseError(uploadError.message));
-      const { data } = supabase.storage.from('question-assets').getPublicUrl(path);
+      const { data } = client.storage.from('question-assets').getPublicUrl(path);
       uploaded.set(key, data.publicUrl);
       return data.publicUrl;
     }
