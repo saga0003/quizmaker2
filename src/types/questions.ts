@@ -10,6 +10,7 @@ export type QuestionType =
 
 export type QuestionStatus = "draft" | "in_review" | "approved" | "rejected" | "archived";
 export type QuestionDifficulty = "very_easy" | "easy" | "moderate" | "difficult" | "very_difficult";
+export type QuestionTestType = "full_length" | "part_test" | "chapter_test" | "topic_test" | "custom";
 
 export type QuestionOptionInput = {
   option_key: string;
@@ -18,6 +19,31 @@ export type QuestionOptionInput = {
   image_url?: string;
   is_correct: boolean;
   display_order: number;
+};
+
+export type MatchFollowingPair = {
+  id: string;
+  left_key: string;
+  left_text: string;
+  left_latex?: string;
+  left_image_url?: string;
+  right_key: string;
+  right_text: string;
+  right_latex?: string;
+  right_image_url?: string;
+};
+
+export type QuestionMetadata = {
+  editor?: string;
+  test_type?: QuestionTestType;
+  custom_test_type?: string;
+  match_pairs?: MatchFollowingPair[];
+  import_subject?: string;
+  import_chapter?: string;
+  import_topic?: string;
+  question_image_filename?: string;
+  import_format?: string;
+  [key: string]: unknown;
 };
 
 export type QuestionPayload = {
@@ -43,7 +69,7 @@ export type QuestionPayload = {
   source_year?: number;
   language: string;
   tags: string[];
-  metadata?: Record<string, unknown>;
+  metadata?: QuestionMetadata;
   options: QuestionOptionInput[];
   change_note?: string;
 };
@@ -74,12 +100,15 @@ export type QuestionRow = {
   source_year: number | null;
   language: string;
   tags: string[];
+  metadata?: QuestionMetadata | null;
   version_number: number;
   created_at: string;
   updated_at: string;
   question_options?: QuestionOptionInput[];
   subjects?: { name: string; code: string } | null;
   chapters?: { name: string } | null;
+  organizations?: { id: string; name: string } | null;
+  profiles?: { full_name: string | null } | null;
 };
 
 export type TaxonomySubject = { id: string; name: string; code: string; organization_id: string | null };
