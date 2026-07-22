@@ -11,6 +11,7 @@
     "qa:smoke": "node scripts/v7-smoke.mjs",
     "qa": "npm run lint && npm run typecheck && npm run qa:smoke && npm run build",
     "check": "npm run qa",
+    "demo:bootstrap": "node scripts/bootstrap-sales-demo.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
