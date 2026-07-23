@@ -1,0 +1,24 @@
+name: V9 Source Export
+
+on:
+  push:
+    branches:
+      - evidara-v9-product-catalogue
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: zip -qr v9-source.zip . -x '.git/*' 'node_modules/*' '.next/*' '.open-next/*'
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v9-source
+          path: v9-source.zip
+          retention-days: 1
