@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQuestionScope } from "@/components/questions/useQuestionScope";
+import { PaperGenerationPanel } from "@/components/papers/PaperGenerationPanel";
 import type { TaxonomyChapter, TaxonomySubject, TaxonomyTopic } from "@/types/questions";
 import type {
   PaperCreationMode,
@@ -73,6 +74,7 @@ const steps = [
   { key: "programme", label: "Programme", icon: BookOpenCheck },
   { key: "sections", label: "Sections", icon: ListChecks },
   { key: "questions", label: "Questions", icon: Search },
+  { key: "blueprint", label: "Blueprint", icon: Sparkles },
   { key: "arrangement", label: "Arrangement", icon: GripVertical },
   { key: "rules", label: "Marks & rules", icon: Settings2 },
   { key: "preview", label: "Preview", icon: Eye },
@@ -1271,6 +1273,18 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
               </div>
               <div className="v8-pagination"><button disabled={bankPage <= 1} onClick={() => setBankPage((page) => Math.max(1, page - 1))}><ChevronLeft size={16} /> Previous</button><span>Page {bankPage} of {pageCount} · {bankTotal} questions</span><button disabled={bankPage >= pageCount} onClick={() => setBankPage((page) => Math.min(pageCount, page + 1))}>Next <ChevronRight size={16} /></button></div>
             </section>
+          )}
+
+          {activeStep === "blueprint" && (
+            <PaperGenerationPanel
+              paperId={paperId}
+              organizationId={kind === "admin" ? null : organizationId}
+              programmeCode={programmeCode}
+              subjects={subjects}
+              chapters={chapters}
+              topics={topics}
+              onGenerated={() => void load()}
+            />
           )}
 
           {activeStep === "arrangement" && (
