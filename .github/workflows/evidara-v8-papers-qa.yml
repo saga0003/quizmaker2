@@ -69,6 +69,14 @@ jobs:
           cat v8-phase1.txt
           exit 0
 
+      - name: Run V8 Phase 2 management smoke report
+        run: |
+          set +e
+          npm run qa:phase2 > v8-phase2.txt 2>&1
+          echo "$?" > v8-phase2.status
+          cat v8-phase2.txt
+          exit 0
+
       - name: Run Next.js build report
         run: |
           set +e
@@ -85,15 +93,15 @@ jobs:
           cat v8-cloudflare-build.txt
           exit 0
 
-      - name: Confirm Vercel is disabled
+      - name: Confirm Vercel remains disabled before Phase 3
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
           if (config.git?.deploymentEnabled !== false) {
-            throw new Error('Vercel deployment must remain disabled during V8 Papers development.');
+            throw new Error('Vercel deployment must remain disabled until V8 Phase 3 is complete.');
           }
-          console.log('Vercel deployment is disabled.');
+          console.log('Vercel deployment remains disabled during Phase 2.');
           NODE
 
       - name: Upload V8 QA reports
@@ -110,6 +118,8 @@ jobs:
             v8-smoke.status
             v8-phase1.txt
             v8-phase1.status
+            v8-phase2.txt
+            v8-phase2.status
             v8-next-build.txt
             v8-next-build.status
             v8-cloudflare-build.txt
@@ -123,8 +133,9 @@ jobs:
           test "$(cat v8-typecheck.status)" = "0"
           test "$(cat v8-smoke.status)" = "0"
           test "$(cat v8-phase1.status)" = "0"
+          test "$(cat v8-phase2.status)" = "0"
           test "$(cat v8-next-build.status)" = "0"
           test "$(cat v8-cloudflare-build.status)" = "0"
 
       - name: Confirm non-deployment boundary
-        run: echo "Evidara V8 Papers QA completed without Vercel, Cloudflare or production deployment."
+        run: echo "Evidara V8 Phase 2 QA completed without Vercel, Cloudflare or production deployment."
