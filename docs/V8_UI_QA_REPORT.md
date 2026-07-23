@@ -1,7 +1,8 @@
 # Evidara V8 Responsive UI — QA Report
 
-Validated commit: `bfcad37158e3ee361d0c0e85ff0704d0decc111b`
-Recorded at: 2026-07-23T09:30:46Z
+Validated commit: `a82ee3630b61e85417e83f61c0e802d6cca2b13d`
+Validated branch: `evidara-v8-papers`
+Recorded at: 2026-07-23T09:35:04Z
 Overall result: **false**
 
 | Gate | Status |
@@ -57,7 +58,7 @@ workerd compatibility_date: 2026-07-20
   · cpus: 2
 
   Creating an optimized production build ...
-✓ Compiled successfully in 10.8s
+✓ Compiled successfully in 9.8s
   Running TypeScript ...
 Failed to type check.
 
@@ -87,7 +88,7 @@ Error: Command failed: npm run build
   status: 1,
   signal: null,
   output: [ null, null, null ],
-  pid: 2653,
+  pid: 2666,
   stdout: null,
   stderr: null
 }
@@ -107,7 +108,7 @@ npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMExcep
 npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
 
-added 1054 packages in 23s
+added 1054 packages in 19s
 ```
 
 ## lint.txt
@@ -130,7 +131,7 @@ added 1054 packages in 23s
   · cpus: 2
 
   Creating an optimized production build ...
-✓ Compiled successfully in 10.6s
+✓ Compiled successfully in 9.5s
   Running TypeScript ...
 Failed to type check.
 
