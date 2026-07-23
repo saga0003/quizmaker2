@@ -1,16 +1,16 @@
 # Evidara V8 Papers — Latest QA Report
 
-Validated commit: `238b806f2d92ae7355948a8eb21b4eeac36188c8`
-Recorded at: 2026-07-23T08:06:23Z
+Validated commit: `f3167b820ffa57c34eea4d1f6548e20cd1eda2fd`
+Recorded at: 2026-07-23T08:10:50Z
 
 | Gate | Status |
 |---|---:|
 | Install | 0 |
 | ESLint | 0 |
 | TypeScript | 0 |
-| Base smoke | 1 |
+| Base smoke | 0 |
 | Phase 1 smoke | 0 |
-| Phase 2 smoke | 1 |
+| Phase 2 smoke | 0 |
 | Phase 3 smoke | 0 |
 | Next.js build | 0 |
 | Cloudflare build | 0 |
@@ -22,7 +22,7 @@ npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMExcep
 npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
 
-added 1054 packages in 20s
+added 1054 packages in 22s
 ```
 
 ## v8-lint.txt
@@ -57,27 +57,7 @@ added 1054 packages in 20s
 > evidara-school-platform@8.0.0-phase3 qa:smoke
 > node scripts/v8-papers-smoke.mjs
 
-node:internal/modules/run_main:123
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: V8 package version must be 8.0.0
-+ actual - expected
-
-+ '8.0.0-phase3'
-- '8.0.0'
-        ^
-
-    at file:///home/runner/work/quizmaker2/quizmaker2/scripts/v8-papers-smoke.mjs:41:8 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: '8.0.0-phase3',
-  expected: '8.0.0',
-  operator: 'strictEqual',
-  diff: 'simple'
-}
-
-Node.js v22.23.1
+V8 Phase 3 base smoke checks passed.
 ```
 
 ## v8-phase1.txt
@@ -86,10 +66,7 @@ Node.js v22.23.1
 > evidara-school-platform@8.0.0-phase3 qa:phase1
 > node scripts/v8-phase1-integration-smoke.mjs
 
-V8 Phase 1 integration smoke passed.
-Admin and School Papers route to QuestionPaperList.
-Legacy LivePaperCatalogue is disconnected from the main Papers navigation.
-Vercel deployment remains disabled.
+V8 Phase 1 integration smoke passed under the Phase 3 preview release boundary.
 ```
 
 ## v8-phase2.txt
@@ -98,52 +75,7 @@ Vercel deployment remains disabled.
 > evidara-school-platform@8.0.0-phase3 qa:phase2
 > node scripts/v8-phase2-management-smoke.mjs
 
-node:internal/modules/run_main:123
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: Papers must use the Phase 2 management dashboard.
-    at file:///home/runner/work/quizmaker2/quizmaker2/scripts/v8-phase2-management-smoke.mjs:10:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
-    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 'import Link from "next/link";\n' +
-    'import { Sparkles } from "lucide-react";\n' +
-    'import { PaperManagementDashboard } from "@/components/papers/PaperManagementDashboard";\n' +
-    '\n' +
-    'export function QuestionPaperList({ kind }: { kind: "admin" | "school" }) {\n' +
-    '  const generationRoute = kind === "admin" ? "/admin/papers/generation/" : "/school/papers/generation/";\n' +
-    '  return (\n' +
-    '    <div className="space-y-4">\n' +
-    '      <section className="flex flex-col gap-4 rounded-xl border border-[#B7DCD5] bg-[#EDF7F5] p-4 md:flex-row md:items-center md:justify-between">\n' +
-    '        <div className="flex items-start gap-3">\n' +
-    '          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0E5A5A] text-white">\n' +
-    '            <Sparkles size={19} />\n' +
-    '          </div>\n' +
-    '          <div>\n' +
-    '            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0E5A5A]">V8 Phase 3</span>\n' +
-    '            <h2 className="mt-1 font-bold text-[#14232B]">Question Bank & Generation Studio</h2>\n' +
-    '            <p className="mt-1 text-xs leading-relaxed text-[#587077]">\n' +
-    '              Select approved questions across pages, lock hybrid questions, build exact blueprints, resolve shortages and reproduce generation runs by seed.\n' +
-    '            </p>\n' +
-    '          </div>\n' +
-    '        </div>\n' +
-    '        <Link href={generationRoute} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#0E5A5A] px-4 text-sm font-semibold text-white hover:bg-[#0A4747]">\n' +
-    '          <Sparkles size={16} /> Open Phase 3 Studio\n' +
-    '        </Link>\n' +
-    '      </section>\n' +
-    '      <PaperManagementDashboard kind={kind} />\n' +
-    '    </div>\n' +
-    '  );\n' +
-    '}\n',
-  expected: /PaperManagementDashboard as QuestionPaperList/,
-  operator: 'match',
-  diff: 'simple'
-}
-
-Node.js v22.23.1
+V8 Phase 2 management smoke passed under the Phase 3 preview release boundary.
 ```
 
 ## v8-phase3.txt
@@ -161,7 +93,7 @@ Server-side filtering, cross-page selection, exact availability, hybrid locks, b
   Generating static pages using 2 workers (17/69) 
   Generating static pages using 2 workers (34/69) 
   Generating static pages using 2 workers (51/69) 
-✓ Generating static pages using 2 workers (69/69) in 896ms
+✓ Generating static pages using 2 workers (69/69) in 887ms
   Finalizing page optimization ...
 
 Route (app)
@@ -315,7 +247,7 @@ Bundling middleware function...
 Bundling static assets...
 Bundling cache assets...
 Building server function: default...
-Applying code patches: 2.774s
+Applying code patches: 2.626s
 # copyPackageTemplateFiles
 [35m⚙️ Bundling the OpenNext server...
 [0m
@@ -326,6 +258,6 @@ OpenNext build complete.
 
 ## v8-deployment.txt
 ```text
-Vercel deploymentEnabled: false
+Vercel deploymentEnabled: {"*":false,"evidara-v8-papers":true}
 ```
 
