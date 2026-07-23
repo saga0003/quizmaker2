@@ -1,6 +1,6 @@
 {
   "name": "evidara-school-platform",
-  "version": "8.0.0",
+  "version": "8.0.0-phase2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "qa:smoke": "node scripts/v8-papers-smoke.mjs",
     "qa:phase1": "node scripts/v8-phase1-integration-smoke.mjs",
-    "qa": "npm run lint && npm run typecheck && npm run qa:smoke && npm run qa:phase1 && npm run build",
+    "qa:phase2": "node scripts/v8-phase2-management-smoke.mjs",
+    "qa": "npm run lint && npm run typecheck && npm run qa:smoke && npm run qa:phase1 && npm run qa:phase2 && npm run build",
     "check": "npm run qa",
     "demo:bootstrap": "node scripts/bootstrap-sales-demo.mjs",
     "cf:build": "opennextjs-cloudflare build",
