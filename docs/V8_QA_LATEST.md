@@ -1,27 +1,28 @@
 # Evidara V8 Papers — Latest QA Report
 
-Validated commit: `d7c5cdf57feea81805c5bfd18eb298a773b4d5e6`
-Recorded at: 2026-07-23T08:01:10Z
+Validated commit: `758a7b16ab7b8cd48161de3a414d04546e7ed2f5`
+Recorded at: 2026-07-23T08:04:04Z
 
 | Gate | Status |
 |---|---:|
-| Install | 1 |
-| ESLint | 127 |
-| TypeScript | 1 |
+| Install | 0 |
+| ESLint | 0 |
+| TypeScript | 0 |
 | Base smoke | 1 |
 | Phase 1 smoke | 0 |
 | Phase 2 smoke | 1 |
 | Phase 3 smoke | 0 |
-| Next.js build | 127 |
-| Cloudflare build | 127 |
+| Next.js build | 0 |
+| Cloudflare build | 0 |
 
 ## v8-install.txt
 ```text
-npm error code ETARGET
-npm error notarget No matching version found for @radix-ui/react-progress@^1.2.9.
-npm error notarget In most cases you or one of your dependencies are requesting
-npm error notarget a package version that doesn't exist.
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-23T08_01_03_118Z-debug-0.log
+npm warn deprecated intersection-observer@0.10.0: The Intersection Observer polyfill is no longer needed and can safely be removed. Intersection Observer has been Baseline since 2019.
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
+
+added 1054 packages in 19s
 ```
 
 ## v8-lint.txt
@@ -30,91 +31,24 @@ npm error A complete log of this run can be found in: /home/runner/.npm/_logs/20
 > evidara-school-platform@8.0.0-phase3 lint
 > eslint
 
-sh: 1: eslint: not found
+
+/home/runner/work/quizmaker2/quizmaker2/src/components/commerce/AdminProductManager.tsx
+  20:2  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+
+/home/runner/work/quizmaker2/quizmaker2/src/components/papers/QuestionGenerationStudio.tsx
+  282:722  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+✖ 2 problems (0 errors, 2 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+
 ```
 
 ## v8-typecheck.txt
 ```text
-src/components/ui/resizable.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/resizable.tsx(4,34): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
-src/components/ui/resizable.tsx(5,37): error TS2307: Cannot find module 'react-resizable-panels' or its corresponding type declarations.
-src/components/ui/resizable.tsx(14,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/scroll-area.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/scroll-area.tsx(4,38): error TS2307: Cannot find module '@radix-ui/react-scroll-area' or its corresponding type declarations.
-src/components/ui/scroll-area.tsx(14,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/select.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/select.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-select' or its corresponding type declarations.
-src/components/ui/select.tsx(5,59): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
-src/components/ui/select.tsx(12,10): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/separator.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/separator.tsx(4,37): error TS2307: Cannot find module '@radix-ui/react-separator' or its corresponding type declarations.
-src/components/ui/separator.tsx(15,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/sheet.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/sheet.tsx(4,33): error TS2307: Cannot find module '@radix-ui/react-dialog' or its corresponding type declarations.
-src/components/ui/sheet.tsx(5,23): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
-src/components/ui/sheet.tsx(10,10): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/sidebar.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/sidebar.tsx(4,22): error TS2307: Cannot find module '@radix-ui/react-slot' or its corresponding type declarations.
-src/components/ui/sidebar.tsx(5,35): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
-src/components/ui/sidebar.tsx(6,31): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
-src/components/ui/sidebar.tsx(130,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/skeleton.tsx(3,44): error TS2503: Cannot find namespace 'React'.
-src/components/ui/skeleton.tsx(5,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/slider.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/slider.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-slider' or its corresponding type declarations.
-src/components/ui/slider.tsx(27,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/sonner.tsx(3,26): error TS2307: Cannot find module 'next-themes' or its corresponding type declarations.
-src/components/ui/sonner.tsx(4,49): error TS2307: Cannot find module 'sonner' or its corresponding type declarations.
-src/components/ui/sonner.tsx(10,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/sonner.tsx(18,14): error TS2503: Cannot find namespace 'React'.
-src/components/ui/switch.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/switch.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-switch' or its corresponding type declarations.
-src/components/ui/switch.tsx(13,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/table.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/table.tsx(9,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/tabs.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/tabs.tsx(4,32): error TS2307: Cannot find module '@radix-ui/react-tabs' or its corresponding type declarations.
-src/components/ui/tabs.tsx(13,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/textarea.tsx(1,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/textarea.tsx(7,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/toast.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/toast.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-toast' or its corresponding type declarations.
-src/components/ui/toast.tsx(5,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
-src/components/ui/toast.tsx(6,19): error TS2307: Cannot find module 'lucide-react' or its corresponding type declarations.
-src/components/ui/toast.tsx(16,3): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/toaster.tsx(17,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/toggle-group.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/toggle-group.tsx(4,39): error TS2307: Cannot find module '@radix-ui/react-toggle-group' or its corresponding type declarations.
-src/components/ui/toggle-group.tsx(5,35): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
-src/components/ui/toggle-group.tsx(26,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/toggle.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/toggle.tsx(4,34): error TS2307: Cannot find module '@radix-ui/react-toggle' or its corresponding type declarations.
-src/components/ui/toggle.tsx(5,40): error TS2307: Cannot find module 'class-variance-authority' or its corresponding type declarations.
-src/components/ui/toggle.tsx(39,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/components/ui/tooltip.tsx(3,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/components/ui/tooltip.tsx(4,35): error TS2307: Cannot find module '@radix-ui/react-tooltip' or its corresponding type declarations.
-src/components/ui/tooltip.tsx(13,5): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/context/AuthProvider.tsx(3,31): error TS2307: Cannot find module '@supabase/supabase-js' or its corresponding type declarations.
-src/context/AuthProvider.tsx(4,73): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/context/AuthProvider.tsx(20,56): error TS2503: Cannot find namespace 'React'.
-src/context/AuthProvider.tsx(54,10): error TS2875: This JSX tag requires the module path 'react/jsx-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
-src/hooks/use-mobile.ts(1,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/hooks/use-module-access.ts(3,46): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/hooks/use-toast.ts(4,24): error TS2307: Cannot find module 'react' or its corresponding type declarations.
-src/lib/server/supabaseServer.ts(1,62): error TS2307: Cannot find module '@supabase/supabase-js' or its corresponding type declarations.
-src/lib/server/supabaseServer.ts(3,21): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(5,3): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(6,3): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(8,20): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/supabase.ts(1,46): error TS2307: Cannot find module '@supabase/supabase-js' or its corresponding type declarations.
-src/lib/supabase.ts(3,13): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/supabase.ts(4,14): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/supabase.ts(4,66): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/utils.ts(1,39): error TS2307: Cannot find module 'clsx' or its corresponding type declarations.
-src/lib/utils.ts(2,25): error TS2307: Cannot find module 'tailwind-merge' or its corresponding type declarations.
-src/store/use-app-store.ts(3,24): error TS2307: Cannot find module 'zustand' or its corresponding type declarations.
-tailwind.config.ts(1,29): error TS2307: Cannot find module 'tailwindcss' or its corresponding type declarations.
-tailwind.config.ts(2,32): error TS2307: Cannot find module 'tailwindcss-animate' or its corresponding type declarations.
+
+> evidara-school-platform@8.0.0-phase3 typecheck
+> tsc --noEmit
+
 ```
 
 ## v8-smoke.txt
@@ -224,20 +158,170 @@ Server-side filtering, cross-page selection, exact availability, hybrid locks, b
 
 ## v8-next-build.txt
 ```text
+  Generating static pages using 2 workers (17/69) 
+  Generating static pages using 2 workers (34/69) 
+  Generating static pages using 2 workers (51/69) 
+✓ Generating static pages using 2 workers (69/69) in 885ms
+  Finalizing page optimization ...
 
-> evidara-school-platform@8.0.0-phase3 build
-> next build
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/achievements
+├ ○ /admin/benchmarks
+├ ○ /admin/papers
+├ ○ /admin/papers/generation
+├ ○ /admin/papers/new
+├ ○ /admin/papers/preview
+├ ○ /admin/products
+├ ○ /admin/questions
+├ ○ /admin/questions/import
+├ ○ /admin/questions/new
+├ ○ /admin/questions/review
+├ ○ /admin/readiness
+├ ○ /admin/segments
+├ ○ /admin/subscriptions
+├ ƒ /api/access-control
+├ ƒ /api/achievements
+├ ƒ /api/admin/readiness
+├ ƒ /api/benchmarks
+├ ƒ /api/certificates
+├ ƒ /api/config
+├ ƒ /api/health
+├ ƒ /api/question-taxonomy
+├ ƒ /api/questions/review
+├ ƒ /api/school-platform
+├ ○ /auth/callback
+├ ○ /contact
+├ ○ /data-guide
+├ ○ /deployment-check
+├ ○ /login
+├ ○ /metric-guide
+├ ○ /privacy
+├ ○ /products
+├ ○ /refund-policy
+├ ○ /reset-password
+├ ○ /school
+├ ○ /school/achievements
+├ ○ /school/benchmarks
+├ ○ /school/benchmarks/publish
+├ ○ /school/papers
+├ ○ /school/papers/generation
+├ ○ /school/papers/new
+├ ○ /school/papers/preview
+├ ○ /school/questions
+├ ○ /school/questions/import
+├ ○ /school/questions/new
+├ ○ /school/register
+├ ○ /school/resources
+├ ○ /school/segments
+├ ○ /school/students
+├ ○ /school/subscription
+├ ○ /setup-check
+├ ○ /student
+├ ○ /student/achievements
+├ ○ /student/analytics
+├ ○ /student/benchmarks
+├ ○ /student/purchases
+├ ○ /student/resources
+├ ○ /student/results
+├ ○ /student/segment
+├ ○ /student/tests
+├ ○ /student/tests/take
+├ ○ /terms
+├ ○ /trial
+├ ○ /verify/certificate
+└ ƒ /verify/certificate/[code]
 
-sh: 1: next: not found
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
 ```
 
 ## v8-cloudflare-build.txt
 ```text
+├ ○ /admin/products
+├ ○ /admin/questions
+├ ○ /admin/questions/import
+├ ○ /admin/questions/new
+├ ○ /admin/questions/review
+├ ○ /admin/readiness
+├ ○ /admin/segments
+├ ○ /admin/subscriptions
+├ ƒ /api/access-control
+├ ƒ /api/achievements
+├ ƒ /api/admin/readiness
+├ ƒ /api/benchmarks
+├ ƒ /api/certificates
+├ ƒ /api/config
+├ ƒ /api/health
+├ ƒ /api/question-taxonomy
+├ ƒ /api/questions/review
+├ ƒ /api/school-platform
+├ ○ /auth/callback
+├ ○ /contact
+├ ○ /data-guide
+├ ○ /deployment-check
+├ ○ /login
+├ ○ /metric-guide
+├ ○ /privacy
+├ ○ /products
+├ ○ /refund-policy
+├ ○ /reset-password
+├ ○ /school
+├ ○ /school/achievements
+├ ○ /school/benchmarks
+├ ○ /school/benchmarks/publish
+├ ○ /school/papers
+├ ○ /school/papers/generation
+├ ○ /school/papers/new
+├ ○ /school/papers/preview
+├ ○ /school/questions
+├ ○ /school/questions/import
+├ ○ /school/questions/new
+├ ○ /school/register
+├ ○ /school/resources
+├ ○ /school/segments
+├ ○ /school/students
+├ ○ /school/subscription
+├ ○ /setup-check
+├ ○ /student
+├ ○ /student/achievements
+├ ○ /student/analytics
+├ ○ /student/benchmarks
+├ ○ /student/purchases
+├ ○ /student/resources
+├ ○ /student/results
+├ ○ /student/segment
+├ ○ /student/tests
+├ ○ /student/tests/take
+├ ○ /terms
+├ ○ /trial
+├ ○ /verify/certificate
+└ ƒ /verify/certificate/[code]
 
-> evidara-school-platform@8.0.0-phase3 cf:build
-> opennextjs-cloudflare build
 
-sh: 1: opennextjs-cloudflare: not found
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+┌──────────────────────────────┐
+│ OpenNext — Generating bundle │
+└──────────────────────────────┘
+
+Bundling middleware function...
+Bundling static assets...
+Bundling cache assets...
+Building server function: default...
+Applying code patches: 2.663s
+# copyPackageTemplateFiles
+[35m⚙️ Bundling the OpenNext server...
+[0m
+[35mWorker saved in `.open-next/worker.js` 🚀
+[0m
+OpenNext build complete.
 ```
 
 ## v8-deployment.txt
