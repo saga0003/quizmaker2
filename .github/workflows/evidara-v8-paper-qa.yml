@@ -37,6 +37,8 @@ jobs:
           set +e
           {
             set -euxo pipefail
+            cp .github/workflows/evidara-v8-paper-qa.yml /tmp/current-v8-qa.yml
+            cp .github/workflows/v8-source-export.yml /tmp/current-v8-source.yml
             cat scripts/.v8-patch/part*.txt > /tmp/v8-settings.patch.gz.b64
             wc -c /tmp/v8-settings.patch.gz.b64
             sha256sum /tmp/v8-settings.patch.gz.b64
@@ -46,6 +48,8 @@ jobs:
             git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/evidara-v8-paper-qa.yml > .github/workflows/evidara-v8-paper-qa.yml
             git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/v8-source-export.yml > .github/workflows/v8-source-export.yml
             patch --batch --verbose -p1 < /tmp/v8-settings.patch
+            cp /tmp/current-v8-qa.yml .github/workflows/evidara-v8-paper-qa.yml
+            cp /tmp/current-v8-source.yml .github/workflows/v8-source-export.yml
             rm -rf scripts/.v8-patch
             node scripts/v8-paper-smoke.mjs
             git config user.name "Evidara V8 Automation"
@@ -53,8 +57,10 @@ jobs:
             git add -A
             git commit -m "Add configurable grades and academic settings"
             git push origin HEAD:evidara-v8-paper-builder
-          } > v8-apply.log 2>&1
-          echo "$?" > v8-apply.status
+          } > /tmp/v8-apply.log 2>&1
+          status="$?"
+          cp /tmp/v8-apply.log v8-apply.log
+          echo "$status" > v8-apply.status
           cat v8-apply.log
           exit 0
 
