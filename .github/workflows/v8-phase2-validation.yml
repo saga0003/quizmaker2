@@ -1,0 +1,74 @@
+name: One-time V8 Phase 2 Validation
+
+on:
+  push:
+    branches:
+      - evidara-v8-papers
+
+permissions:
+  contents: write
+
+jobs:
+  validate-phase2:
+    if: github.event.head_commit.message == 'Trigger V8 Phase 2 validation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: evidara-v8-papers
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run Phase 2 quality gates
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run qa:smoke
+          npm run qa:phase1
+          npm run qa:phase2
+          npm run build
+          npm run cf:build
+
+      - name: Confirm deployment remains disabled
+        run: |
+          node - <<'NODE'
+          const config = require('./vercel.json');
+          if (config.git?.deploymentEnabled !== false) throw new Error('Vercel must remain disabled through Phase 2.');
+          NODE
+
+      - name: Record Phase 2 validation
+        run: |
+          cat > docs/V8_PHASE_2_QA_PASSED.md <<EOF
+          # Evidara V8 Papers — Phase 2 QA Passed
+
+          Validated by GitHub Actions on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+
+          Passed:
+          - locked dependency installation
+          - ESLint
+          - TypeScript
+          - V8 base smoke contracts
+          - Phase 1 integration smoke
+          - Phase 2 paper-management smoke
+          - Next.js production build
+          - Cloudflare/OpenNext build
+          - Vercel-disabled assertion
+
+          Phase 2 includes draft duplication, new draft versions, templates, archive, restore, recoverable deletion and deleted-record restoration. No deployment was performed.
+          EOF
+          rm .github/workflows/v8-phase2-validation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/V8_PHASE_2_QA_PASSED.md .github/workflows/v8-phase2-validation.yml
+          git commit -m "Validate V8 Phase 2 paper management"
+          git push origin HEAD:evidara-v8-papers
