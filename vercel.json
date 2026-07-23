@@ -4,9 +4,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "git": {
-    "deploymentEnabled": {
-      "*": false,
-      "evidara-v7-super-ui": true
-    }
+    "deploymentEnabled": false
   }
 }
