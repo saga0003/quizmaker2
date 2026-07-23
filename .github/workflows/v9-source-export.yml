@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - evidara-v9-product-catalogue
+  pull_request:
+    branches:
+      - evidara-v8-paper-builder
   workflow_dispatch:
 
 permissions:
