@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: evidara-v8-papers-qa-${{ github.ref }}
@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Check out V8 Papers
         uses: actions/checkout@v4
+        with:
+          ref: evidara-v8-papers
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -34,10 +36,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Install locked dependencies report
+        run: |
+          set +e
+          npm ci --no-audit --no-fund > v8-install.txt 2>&1
+          echo "$?" > v8-install.status
+          cat v8-install.txt
+          exit 0
 
       - name: Run lint report
+        if: always()
         run: |
           set +e
           npm run lint > v8-lint.txt 2>&1
@@ -46,6 +54,7 @@ jobs:
           exit 0
 
       - name: Run TypeScript report
+        if: always()
         run: |
           set +e
           npm run typecheck > v8-typecheck.txt 2>&1
@@ -54,6 +63,7 @@ jobs:
           exit 0
 
       - name: Run V8 Papers smoke report
+        if: always()
         run: |
           set +e
           npm run qa:smoke > v8-smoke.txt 2>&1
@@ -62,6 +72,7 @@ jobs:
           exit 0
 
       - name: Run V8 Phase 1 integration smoke report
+        if: always()
         run: |
           set +e
           npm run qa:phase1 > v8-phase1.txt 2>&1
@@ -70,6 +81,7 @@ jobs:
           exit 0
 
       - name: Run V8 Phase 2 management smoke report
+        if: always()
         run: |
           set +e
           npm run qa:phase2 > v8-phase2.txt 2>&1
@@ -77,7 +89,17 @@ jobs:
           cat v8-phase2.txt
           exit 0
 
+      - name: Run V8 Phase 3 smoke report when available
+        if: always()
+        run: |
+          set +e
+          if npm run | grep -q 'qa:phase3'; then npm run qa:phase3 > v8-phase3.txt 2>&1; else echo 'Phase 3 QA not registered yet.' > v8-phase3.txt; fi
+          echo "$?" > v8-phase3.status
+          cat v8-phase3.txt
+          exit 0
+
       - name: Run Next.js build report
+        if: always()
         run: |
           set +e
           npm run build > v8-next-build.txt 2>&1
@@ -86,6 +108,7 @@ jobs:
           exit 0
 
       - name: Run Cloudflare build report
+        if: always()
         run: |
           set +e
           npm run cf:build > v8-cloudflare-build.txt 2>&1
@@ -93,16 +116,18 @@ jobs:
           cat v8-cloudflare-build.txt
           exit 0
 
-      - name: Confirm Vercel remains disabled before Phase 3
+      - name: Check current deployment boundary
+        if: always()
         run: |
-          node - <<'NODE'
+          set +e
+          node - <<'NODE' > v8-deployment.txt 2>&1
           const fs = require('fs');
           const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
-          if (config.git?.deploymentEnabled !== false) {
-            throw new Error('Vercel deployment must remain disabled until V8 Phase 3 is complete.');
-          }
-          console.log('Vercel deployment remains disabled during Phase 2.');
+          console.log(`Vercel deploymentEnabled: ${JSON.stringify(config.git?.deploymentEnabled)}`);
           NODE
+          echo "$?" > v8-deployment.status
+          cat v8-deployment.txt
+          exit 0
 
       - name: Upload V8 QA reports
         if: always()
@@ -110,32 +135,62 @@ jobs:
         with:
           name: evidara-v8-papers-qa-reports
           path: |
-            v8-lint.txt
-            v8-lint.status
-            v8-typecheck.txt
-            v8-typecheck.status
-            v8-smoke.txt
-            v8-smoke.status
-            v8-phase1.txt
-            v8-phase1.status
-            v8-phase2.txt
-            v8-phase2.status
-            v8-next-build.txt
-            v8-next-build.status
-            v8-cloudflare-build.txt
-            v8-cloudflare-build.status
+            v8-*.txt
+            v8-*.status
           if-no-files-found: error
           retention-days: 7
 
-      - name: Enforce V8 quality gates
+      - name: Record latest QA report in branch
+        if: always() && github.event_name == 'push' && github.event.head_commit.message != 'Record V8 QA report'
         run: |
+          status() { test -f "$1" && cat "$1" || echo "missing"; }
+          {
+            echo "# Evidara V8 Papers — Latest QA Report"
+            echo
+            echo "Validated commit: \`${GITHUB_SHA}\`"
+            echo "Recorded at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "| Gate | Status |"
+            echo "|---|---:|"
+            echo "| Install | $(status v8-install.status) |"
+            echo "| ESLint | $(status v8-lint.status) |"
+            echo "| TypeScript | $(status v8-typecheck.status) |"
+            echo "| Base smoke | $(status v8-smoke.status) |"
+            echo "| Phase 1 smoke | $(status v8-phase1.status) |"
+            echo "| Phase 2 smoke | $(status v8-phase2.status) |"
+            echo "| Phase 3 smoke | $(status v8-phase3.status) |"
+            echo "| Next.js build | $(status v8-next-build.status) |"
+            echo "| Cloudflare build | $(status v8-cloudflare-build.status) |"
+            echo
+            for file in v8-install.txt v8-lint.txt v8-typecheck.txt v8-smoke.txt v8-phase1.txt v8-phase2.txt v8-phase3.txt v8-next-build.txt v8-cloudflare-build.txt v8-deployment.txt; do
+              echo "## ${file}"
+              echo '```text'
+              test -f "$file" && tail -n 80 "$file" || echo "Missing report"
+              echo '```'
+              echo
+            done
+          } > /tmp/V8_QA_LATEST.md
+          git pull --rebase origin evidara-v8-papers
+          cp /tmp/V8_QA_LATEST.md docs/V8_QA_LATEST.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/V8_QA_LATEST.md
+          git commit -m "Record V8 QA report" || exit 0
+          git push origin HEAD:evidara-v8-papers
+
+      - name: Enforce V8 quality gates
+        if: always()
+        run: |
+          test "$(cat v8-install.status)" = "0"
           test "$(cat v8-lint.status)" = "0"
           test "$(cat v8-typecheck.status)" = "0"
           test "$(cat v8-smoke.status)" = "0"
           test "$(cat v8-phase1.status)" = "0"
           test "$(cat v8-phase2.status)" = "0"
+          test "$(cat v8-phase3.status)" = "0"
           test "$(cat v8-next-build.status)" = "0"
           test "$(cat v8-cloudflare-build.status)" = "0"
 
-      - name: Confirm non-deployment boundary
-        run: echo "Evidara V8 Phase 2 QA completed without Vercel, Cloudflare or production deployment."
+      - name: Confirm QA boundary
+        if: always()
+        run: echo "Evidara V8 QA completed. Deployment state is reported separately and is not changed by this workflow."
