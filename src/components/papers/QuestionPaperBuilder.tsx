@@ -541,9 +541,10 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
   }, [loadQuestionBank]);
 
   useEffect(() => {
-    if (!supabase || !migrationReady || (kind === "school" && !organizationId)) return;
+    const client = supabase;
+    if (!client || !migrationReady || (kind === "school" && !organizationId)) return;
     const timer = window.setTimeout(async () => {
-      const { data } = await supabase.rpc("paper_question_availability_v8", {
+      const { data } = await client.rpc("paper_question_availability_v8", {
         p_organization_id: kind === "admin" ? null : organizationId,
         p_programme_code: programmeCode || null,
         p_subject_id: bankSubject === "all" ? null : bankSubject,
