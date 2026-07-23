@@ -61,6 +61,14 @@ jobs:
           cat v8-smoke.txt
           exit 0
 
+      - name: Run V8 Phase 1 integration smoke report
+        run: |
+          set +e
+          npm run qa:phase1 > v8-phase1.txt 2>&1
+          echo "$?" > v8-phase1.status
+          cat v8-phase1.txt
+          exit 0
+
       - name: Run Next.js build report
         run: |
           set +e
@@ -100,6 +108,8 @@ jobs:
             v8-typecheck.status
             v8-smoke.txt
             v8-smoke.status
+            v8-phase1.txt
+            v8-phase1.status
             v8-next-build.txt
             v8-next-build.status
             v8-cloudflare-build.txt
@@ -112,6 +122,7 @@ jobs:
           test "$(cat v8-lint.status)" = "0"
           test "$(cat v8-typecheck.status)" = "0"
           test "$(cat v8-smoke.status)" = "0"
+          test "$(cat v8-phase1.status)" = "0"
           test "$(cat v8-next-build.status)" = "0"
           test "$(cat v8-cloudflare-build.status)" = "0"
 
