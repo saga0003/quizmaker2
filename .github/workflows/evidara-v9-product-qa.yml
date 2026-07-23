@@ -52,8 +52,24 @@ jobs:
           retention-days: 1
       - name: Enforce lint
         run: test "$(cat v9-lint.status)" = "0"
-      - name: TypeScript
-        run: npm run typecheck
+      - name: Run TypeScript report
+        run: |
+          set +e
+          npm run typecheck > v9-typecheck.txt 2>&1
+          echo "$?" > v9-typecheck.status
+          cat v9-typecheck.txt
+          exit 0
+      - name: Upload TypeScript report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v9-typecheck-report
+          path: |
+            v9-typecheck.txt
+            v9-typecheck.status
+          retention-days: 1
+      - name: Enforce TypeScript
+        run: test "$(cat v9-typecheck.status)" = "0"
       - name: V8 paper smoke checks
         run: node scripts/v8-paper-smoke.mjs
       - name: V9 product smoke checks
