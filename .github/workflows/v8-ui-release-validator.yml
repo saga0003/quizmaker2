@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - evidara-v8-ui-refresh
+      - evidara-v8-papers
 
 permissions:
   contents: write
 
 concurrency:
-  group: v8-ui-release-validator
+  group: v8-ui-release-validator-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: evidara-v8-ui-refresh
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -32,7 +33,6 @@ jobs:
           cache: npm
 
       - name: Run independent gates
-        id: gates
         shell: bash
         run: |
           set +e
@@ -69,6 +69,7 @@ jobs:
             echo '# Evidara V8 Responsive UI — QA Report'
             echo
             echo "Validated commit: \`${GITHUB_SHA}\`"
+            echo "Validated branch: \`${GITHUB_REF_NAME}\`"
             echo "Recorded at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "Overall result: **${PASS}**"
             echo
@@ -101,4 +102,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add docs/V8_UI_QA_REPORT.md
           git commit -m 'Record V8 responsive UI QA report' || exit 0
-          git push origin HEAD:evidara-v8-ui-refresh
+          git push origin HEAD:${GITHUB_REF_NAME}
