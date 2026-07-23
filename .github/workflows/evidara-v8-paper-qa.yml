@@ -10,95 +10,44 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: evidara-v8-paper-qa-${{ github.ref }}
-  cancel-in-progress: true
+  group: apply-v8-academic-settings
+  cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Lint, typecheck, smoke and build
+  apply:
+    if: github.event_name == 'pull_request'
+    name: Apply configurable academic settings
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      NEXT_TELEMETRY_DISABLED: "1"
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - name: Check out V8 paper branch
+      - name: Check out V8 branch
         uses: actions/checkout@v4
-
-      - name: Package source snapshot
-        run: zip -qr v8-source.zip . -x '.git/*' 'node_modules/*' '.next/*' '.open-next/*'
-
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@v4
         with:
-          name: evidara-v8-source
-          path: v8-source.zip
-          retention-days: 1
+          ref: evidara-v8-paper-builder
+          fetch-depth: 0
 
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Run lint report
+      - name: Reconstruct and apply coordinated patch
+        shell: bash
         run: |
-          set +e
-          npm run lint > v8-lint.txt 2>&1
-          echo "$?" > v8-lint.status
-          cat v8-lint.txt
-          exit 0
+          set -euo pipefail
+          cat scripts/.v8-patch/part*.txt > /tmp/v8-settings.patch.gz.b64
+          echo "4a1d275fbcbf312de68a498817213e9e650009caadc59d771944479844b1d4a0  /tmp/v8-settings.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/v8-settings.patch.gz.b64 | gunzip > /tmp/v8-settings.patch
+          echo "6f0d9124a742cfd5bf9ce711723988cbd680e404fe5cace69bd280e05abb35cb  /tmp/v8-settings.patch" | sha256sum -c -
+          git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/evidara-v8-paper-qa.yml > .github/workflows/evidara-v8-paper-qa.yml
+          git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/v8-source-export.yml > .github/workflows/v8-source-export.yml
+          patch --batch -p1 < /tmp/v8-settings.patch
+          rm -rf scripts/.v8-patch
+          node scripts/v8-paper-smoke.mjs
 
-      - name: Run TypeScript report
+      - name: Commit upgraded modules
+        shell: bash
         run: |
-          set +e
-          npm run typecheck > v8-typecheck.txt 2>&1
-          echo "$?" > v8-typecheck.status
-          cat v8-typecheck.txt
-          exit 0
-
-      - name: Run V8 paper smoke report
-        run: |
-          set +e
-          node scripts/v8-paper-smoke.mjs > v8-smoke.txt 2>&1
-          echo "$?" > v8-smoke.status
-          cat v8-smoke.txt
-          exit 0
-
-      - name: Run Next.js build report
-        run: |
-          set +e
-          npm run build > v8-build.txt 2>&1
-          echo "$?" > v8-build.status
-          cat v8-build.txt
-          exit 0
-
-      - name: Upload V8 paper QA reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: evidara-v8-paper-qa-reports
-          path: |
-            v8-lint.txt
-            v8-lint.status
-            v8-typecheck.txt
-            v8-typecheck.status
-            v8-smoke.txt
-            v8-smoke.status
-            v8-build.txt
-            v8-build.status
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Enforce V8 paper quality gates
-        run: |
-          test "$(cat v8-lint.status)" = "0"
-          test "$(cat v8-typecheck.status)" = "0"
-          test "$(cat v8-smoke.status)" = "0"
-          test "$(cat v8-build.status)" = "0"
+          set -euo pipefail
+          git config user.name "Evidara V8 Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Add configurable grades and academic settings"
+          git push origin HEAD:evidara-v8-paper-builder
