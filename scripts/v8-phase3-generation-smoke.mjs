@@ -22,6 +22,7 @@ for (const marker of [
   "PaperGenerationPanel",
   "PaperGenerationHistory",
   "Generation Studio",
+  "toggleVisible",
 ]) assert.ok(studio.includes(marker), `Phase 3 studio marker missing: ${marker}`);
 
 for (const marker of [
@@ -46,9 +47,9 @@ for (const marker of [
 
 assert.ok(history.includes("paper_generation_runs"), "Generation history must read persisted generation runs.");
 assert.ok(history.includes("onReuseSeed"), "Generation history must expose reusable seeds.");
-assert.ok(list.includes("Open Phase 3 Studio"), "Papers must visibly link to the Phase 3 studio.");
+assert.ok(list.includes("Generation Studio"), "Papers must visibly link to the Generation Studio.");
 assert.ok(adminRoute.includes('QuestionGenerationStudio kind="admin"'), "Admin generation route missing.");
 assert.ok(schoolRoute.includes('QuestionGenerationStudio kind="school"'), "School generation route missing.");
 
-console.log("V8 Phase 3 question and generation smoke passed.");
-console.log("Server-side filtering, cross-page selection, exact availability, hybrid locks, blueprints, shortage blocking and generation history are wired.");
+console.log("V8 Phase 3 question and generation smoke passed under the responsive UI boundary.");
+console.log("Server-side filtering, cross-page selection, exact availability, hybrid locks, blueprints, shortage blocking and generation history remain wired.");
