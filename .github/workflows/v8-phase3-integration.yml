@@ -1,0 +1,160 @@
+name: One-time V8 Phase 3 Integration
+
+on:
+  push:
+    branches:
+      - evidara-v8-papers
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.event.head_commit.message == 'Trigger V8 Phase 3 integration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: evidara-v8-papers
+
+      - name: Integrate cross-page selection and generation history
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          builder_path = Path('src/components/papers/QuestionPaperBuilder.tsx')
+          builder = builder_path.read_text()
+
+          state_anchor = '  const [bankSelection, setBankSelection] = useState<Set<string>>(new Set());\n'
+          cache_state = '  const [bankQuestionCache, setBankQuestionCache] = useState<Map<string, BankQuestion>>(new Map());\n'
+          if cache_state not in builder:
+              if state_anchor not in builder:
+                  raise SystemExit('Question Bank selection state anchor missing.')
+              builder = builder.replace(state_anchor, state_anchor + cache_state, 1)
+
+          rows_old = '''      const rows = (data || []) as BankQuestion[];
+      setBankQuestions(rows);
+      setBankTotal(rows.length ? Number(rows[0].total_count || rows.length) : 0);'''
+          rows_new = '''      const rows = (data || []) as BankQuestion[];
+      setBankQuestions(rows);
+      setBankQuestionCache((current) => {
+        const next = new Map(current);
+        rows.forEach((question) => next.set(question.id, question));
+        return next;
+      });
+      setBankTotal(rows.length ? Number(rows[0].total_count || rows.length) : 0);'''
+          if rows_old in builder:
+              builder = builder.replace(rows_old, rows_new, 1)
+          elif 'setBankQuestionCache((current)' not in builder:
+              raise SystemExit('Question Bank rows anchor missing.')
+
+          # Exclude already-added paper questions from search and availability counts.
+          builder = builder.replace('      p_excluded_ids: [],\n      p_page: bankPage,', '      p_excluded_ids: Array.from(selectedIds),\n      p_page: bankPage,', 1)
+          builder = builder.replace('        p_excluded_ids: [],\n      });', '        p_excluded_ids: Array.from(selectedIds),\n      });', 1)
+
+          add_old = '''  function addBankSelection() {
+    if (!activeSection) {
+      setError("Select a destination section first.");
+      return;
+    }
+    const additions = bankQuestions
+      .filter((question) => bankSelection.has(question.id) && !selectedIds.has(question.id))
+      .map(bankToSelected);
+    if (additions.length === 0) return;
+    setSelectedQuestions((current) => [...current, ...additions]);
+    setBankSelection((current) => {
+      const next = new Set(current);
+      additions.forEach((question) => next.delete(question.question_id));
+      return next;
+    });
+    markDirty();
+  }'''
+          add_new = '''  function addBankSelection() {
+    if (!activeSection) {
+      setError("Select a destination section first.");
+      return;
+    }
+    const additions = Array.from(bankSelection)
+      .map((questionId) => bankQuestionCache.get(questionId))
+      .filter((question): question is BankQuestion => Boolean(question) && !selectedIds.has(question.id))
+      .map(bankToSelected);
+    if (additions.length === 0) {
+      setError("The selected questions are no longer available under the current Question Bank scope.");
+      return;
+    }
+    setSelectedQuestions((current) => [...current, ...additions]);
+    setBankSelection((current) => {
+      const next = new Set(current);
+      additions.forEach((question) => next.delete(question.question_id));
+      return next;
+    });
+    setNotice(`${additions.length} question${additions.length === 1 ? "" : "s"} added from the cross-page selection.`);
+    markDirty();
+  }'''
+          if add_old in builder:
+              builder = builder.replace(add_old, add_new, 1)
+          elif 'bankQuestionCache.get(questionId)' not in builder:
+              raise SystemExit('addBankSelection function anchor missing.')
+
+          # Ensure callbacks refresh when paper-selected IDs change.
+          callback_dependency = '''    programmeCode,
+    bankSubject,'''
+          if callback_dependency in builder:
+              builder = builder.replace(callback_dependency, '''    programmeCode,
+    selectedIds,
+    bankSubject,''', 1)
+          availability_dependency = '''    programmeCode,
+    bankSubject,
+    bankChapter,
+    bankTopic,
+    bankDifficulty,
+    bankType,
+  ]);'''
+          if availability_dependency in builder:
+              builder = builder.replace(availability_dependency, '''    programmeCode,
+    selectedIds,
+    bankSubject,
+    bankChapter,
+    bankTopic,
+    bankDifficulty,
+    bankType,
+  ]);''', 1)
+
+          builder_path.write_text(builder)
+
+          panel_path = Path('src/components/papers/PaperGenerationPanel.tsx')
+          panel = panel_path.read_text()
+          import_anchor = 'import { supabase } from "@/lib/supabase";\n'
+          history_import = 'import { PaperGenerationHistory } from "@/components/papers/PaperGenerationHistory";\n'
+          if history_import not in panel:
+              if import_anchor not in panel:
+                  raise SystemExit('Generation panel import anchor missing.')
+              panel = panel.replace(import_anchor, import_anchor + history_import, 1)
+
+          history_render = '''      <PaperGenerationHistory
+        paperId={paperId}
+        refreshKey={lastRun?.generation_run_id || ""}
+        onReuseSeed={(value) => {
+          setSeed(value);
+          setNotice(`Seed ${value} loaded. Generate again to reproduce the eligible ordering.`);
+        }}
+      />
+'''
+          if '<PaperGenerationHistory' not in panel:
+              position = panel.rfind('      <GenerationStyles />')
+              if position < 0:
+                  raise SystemExit('GenerationStyles render anchor missing.')
+              panel = panel[:position] + history_render + panel[position:]
+          panel_path.write_text(panel)
+
+          Path('.github/workflows/v8-phase3-integration.yml').unlink()
+          PY
+
+      - name: Commit Phase 3 integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/papers/QuestionPaperBuilder.tsx src/components/papers/PaperGenerationPanel.tsx .github/workflows/v8-phase3-integration.yml
+          git commit -m "Integrate V8 Phase 3 question selection and generation history"
+          git push origin HEAD:evidara-v8-papers
