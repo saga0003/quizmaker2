@@ -279,9 +279,10 @@ export function QuestionGenerationStudio({ kind }: { kind: "admin" | "school" })
   }, [loadBank]);
 
   useEffect(() => {
-    if (!supabase || !paperId || !selectedPaper) return;
+    const client = supabase;
+    if (!client || !paperId || !selectedPaper) return;
     const timer = window.setTimeout(async () => {
-      const result = await supabase.rpc("paper_question_availability_v8", {
+      const result = await client.rpc("paper_question_availability_v8", {
         p_organization_id: kind === "admin" ? null : organizationId,
         p_programme_code: selectedPaper.programme_code || null,
         p_subject_id: subjectId === "all" ? null : subjectId,
