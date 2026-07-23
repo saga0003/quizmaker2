@@ -40,26 +40,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Run TypeScript report
-        run: |
-          set +e
-          npm run typecheck > v8-typecheck.txt 2>&1
-          echo "$?" > v8-typecheck.status
-          cat v8-typecheck.txt
-          exit 0
-
-      - name: Upload TypeScript report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: evidara-v8-typecheck-report
-          path: |
-            v8-typecheck.txt
-            v8-typecheck.status
-          retention-days: 1
-
-      - name: Enforce TypeScript
-        run: test "$(cat v8-typecheck.status)" = "0"
+      - name: TypeScript
+        run: npm run typecheck
 
       - name: V8 paper smoke checks
         run: node scripts/v8-paper-smoke.mjs
