@@ -35,7 +35,19 @@ jobs:
             set -euxo pipefail
             python - <<'PY'
           from pathlib import Path
-          path = Path('scripts/.v9-bundle/chunk07.txt')
+
+          repairs = {
+              'chunk00.txt': (3936, 'O'),
+              'chunk04.txt': (879, 'w'),
+          }
+          root = Path('scripts/.v9-bundle')
+          for name, (index, expected) in repairs.items():
+              path = root / name
+              value = path.read_text()
+              value = value[:index] + expected + value[index + 1:]
+              path.write_text(value)
+
+          path = root / 'chunk07.txt'
           value = path.read_text()
           if len(value) == 5999:
               value = value[:3304] + 'n' + value[3304:]
