@@ -1,1 +1,1 @@
-apply-configurable-academic-settings-v2
+apply-configurable-academic-settings-v3
