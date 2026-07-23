@@ -33,7 +33,7 @@ export function GuidedLabel({
   required = false,
 }: {
   children: React.ReactNode;
-  help: string;
+  help?: string;
   required?: boolean;
 }) {
   return (
@@ -41,7 +41,7 @@ export function GuidedLabel({
       <Label className="min-w-0 break-words text-sm font-medium leading-5 text-[#14232B]">
         {children}{required ? ' *' : ''}
       </Label>
-      <HelpIcon text={help} />
+      {help ? <HelpIcon text={help} /> : null}
     </div>
   );
 }
