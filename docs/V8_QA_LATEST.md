@@ -1,7 +1,7 @@
 # Evidara V8 Papers — Latest QA Report
 
-Validated commit: `758a7b16ab7b8cd48161de3a414d04546e7ed2f5`
-Recorded at: 2026-07-23T08:04:04Z
+Validated commit: `238b806f2d92ae7355948a8eb21b4eeac36188c8`
+Recorded at: 2026-07-23T08:06:23Z
 
 | Gate | Status |
 |---|---:|
@@ -22,7 +22,7 @@ npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMExcep
 npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
 
-added 1054 packages in 19s
+added 1054 packages in 20s
 ```
 
 ## v8-lint.txt
@@ -161,7 +161,7 @@ Server-side filtering, cross-page selection, exact availability, hybrid locks, b
   Generating static pages using 2 workers (17/69) 
   Generating static pages using 2 workers (34/69) 
   Generating static pages using 2 workers (51/69) 
-✓ Generating static pages using 2 workers (69/69) in 885ms
+✓ Generating static pages using 2 workers (69/69) in 896ms
   Finalizing page optimization ...
 
 Route (app)
@@ -315,7 +315,7 @@ Bundling middleware function...
 Bundling static assets...
 Bundling cache assets...
 Building server function: default...
-Applying code patches: 2.663s
+Applying code patches: 2.774s
 # copyPackageTemplateFiles
 [35m⚙️ Bundling the OpenNext server...
 [0m
