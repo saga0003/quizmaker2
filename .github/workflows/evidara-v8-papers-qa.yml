@@ -1,4 +1,4 @@
-name: Evidara V8 Papers QA
+name: Evidara V8 Phase 3 QA
 
 on:
   push:
@@ -10,25 +10,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: evidara-v8-papers-qa-${{ github.ref }}
+  group: evidara-v8-phase3-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Install, lint, typecheck, smoke and builds
+    name: Validate V8 Phase 3
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - name: Check out V8 Papers
+      - name: Check out V8 Phase 3
         uses: actions/checkout@v4
-        with:
-          ref: evidara-v8-papers
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -36,161 +34,30 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install locked dependencies report
-        run: |
-          set +e
-          npm ci --no-audit --no-fund > v8-install.txt 2>&1
-          echo "$?" > v8-install.status
-          cat v8-install.txt
-          exit 0
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
 
-      - name: Run lint report
-        if: always()
-        run: |
-          set +e
-          npm run lint > v8-lint.txt 2>&1
-          echo "$?" > v8-lint.status
-          cat v8-lint.txt
-          exit 0
+      - name: Run complete V8 Phase 3 QA
+        run: npm run qa
 
-      - name: Run TypeScript report
-        if: always()
-        run: |
-          set +e
-          npm run typecheck > v8-typecheck.txt 2>&1
-          echo "$?" > v8-typecheck.status
-          cat v8-typecheck.txt
-          exit 0
+      - name: Verify Cloudflare/OpenNext compatibility
+        run: npm run cf:build
 
-      - name: Run V8 Papers smoke report
-        if: always()
+      - name: Verify Vercel deployment scope
         run: |
-          set +e
-          npm run qa:smoke > v8-smoke.txt 2>&1
-          echo "$?" > v8-smoke.status
-          cat v8-smoke.txt
-          exit 0
-
-      - name: Run V8 Phase 1 integration smoke report
-        if: always()
-        run: |
-          set +e
-          npm run qa:phase1 > v8-phase1.txt 2>&1
-          echo "$?" > v8-phase1.status
-          cat v8-phase1.txt
-          exit 0
-
-      - name: Run V8 Phase 2 management smoke report
-        if: always()
-        run: |
-          set +e
-          npm run qa:phase2 > v8-phase2.txt 2>&1
-          echo "$?" > v8-phase2.status
-          cat v8-phase2.txt
-          exit 0
-
-      - name: Run V8 Phase 3 smoke report when available
-        if: always()
-        run: |
-          set +e
-          if npm run | grep -q 'qa:phase3'; then npm run qa:phase3 > v8-phase3.txt 2>&1; else echo 'Phase 3 QA not registered yet.' > v8-phase3.txt; fi
-          echo "$?" > v8-phase3.status
-          cat v8-phase3.txt
-          exit 0
-
-      - name: Run Next.js build report
-        if: always()
-        run: |
-          set +e
-          npm run build > v8-next-build.txt 2>&1
-          echo "$?" > v8-next-build.status
-          cat v8-next-build.txt
-          exit 0
-
-      - name: Run Cloudflare build report
-        if: always()
-        run: |
-          set +e
-          npm run cf:build > v8-cloudflare-build.txt 2>&1
-          echo "$?" > v8-cloudflare-build.status
-          cat v8-cloudflare-build.txt
-          exit 0
-
-      - name: Check current deployment boundary
-        if: always()
-        run: |
-          set +e
-          node - <<'NODE' > v8-deployment.txt 2>&1
-          const fs = require('fs');
-          const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
-          console.log(`Vercel deploymentEnabled: ${JSON.stringify(config.git?.deploymentEnabled)}`);
+          node - <<'NODE'
+          const config = require('./vercel.json');
+          const deployment = config.git?.deploymentEnabled;
+          const validDisabled = deployment === false;
+          const validPhase3 = deployment && deployment['*'] === false && deployment['evidara-v8-papers'] === true;
+          if (!validDisabled && !validPhase3) {
+            throw new Error('Vercel must be disabled globally or enabled only for evidara-v8-papers.');
+          }
+          if (config.buildCommand !== 'npm run qa' && validPhase3) {
+            throw new Error('Vercel Phase 3 deployment must run the complete npm run qa gate.');
+          }
+          console.log('V8 Phase 3 deployment scope is valid.');
           NODE
-          echo "$?" > v8-deployment.status
-          cat v8-deployment.txt
-          exit 0
 
-      - name: Upload V8 QA reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: evidara-v8-papers-qa-reports
-          path: |
-            v8-*.txt
-            v8-*.status
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Record latest QA report in branch
-        if: always() && github.event_name == 'push' && github.event.head_commit.message != 'Record V8 QA report'
-        run: |
-          status() { test -f "$1" && cat "$1" || echo "missing"; }
-          {
-            echo "# Evidara V8 Papers — Latest QA Report"
-            echo
-            echo "Validated commit: \`${GITHUB_SHA}\`"
-            echo "Recorded at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo
-            echo "| Gate | Status |"
-            echo "|---|---:|"
-            echo "| Install | $(status v8-install.status) |"
-            echo "| ESLint | $(status v8-lint.status) |"
-            echo "| TypeScript | $(status v8-typecheck.status) |"
-            echo "| Base smoke | $(status v8-smoke.status) |"
-            echo "| Phase 1 smoke | $(status v8-phase1.status) |"
-            echo "| Phase 2 smoke | $(status v8-phase2.status) |"
-            echo "| Phase 3 smoke | $(status v8-phase3.status) |"
-            echo "| Next.js build | $(status v8-next-build.status) |"
-            echo "| Cloudflare build | $(status v8-cloudflare-build.status) |"
-            echo
-            for file in v8-install.txt v8-lint.txt v8-typecheck.txt v8-smoke.txt v8-phase1.txt v8-phase2.txt v8-phase3.txt v8-next-build.txt v8-cloudflare-build.txt v8-deployment.txt; do
-              echo "## ${file}"
-              echo '```text'
-              test -f "$file" && tail -n 80 "$file" || echo "Missing report"
-              echo '```'
-              echo
-            done
-          } > /tmp/V8_QA_LATEST.md
-          git pull --rebase origin evidara-v8-papers
-          cp /tmp/V8_QA_LATEST.md docs/V8_QA_LATEST.md
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/V8_QA_LATEST.md
-          git commit -m "Record V8 QA report" || exit 0
-          git push origin HEAD:evidara-v8-papers
-
-      - name: Enforce V8 quality gates
-        if: always()
-        run: |
-          test "$(cat v8-install.status)" = "0"
-          test "$(cat v8-lint.status)" = "0"
-          test "$(cat v8-typecheck.status)" = "0"
-          test "$(cat v8-smoke.status)" = "0"
-          test "$(cat v8-phase1.status)" = "0"
-          test "$(cat v8-phase2.status)" = "0"
-          test "$(cat v8-phase3.status)" = "0"
-          test "$(cat v8-next-build.status)" = "0"
-          test "$(cat v8-cloudflare-build.status)" = "0"
-
-      - name: Confirm QA boundary
-        if: always()
-        run: echo "Evidara V8 QA completed. Deployment state is reported separately and is not changed by this workflow."
+      - name: Confirm QA completion
+        run: echo "Evidara V8 Phase 3 passed lint, TypeScript, all smoke contracts, Next.js build and Cloudflare/OpenNext build."
