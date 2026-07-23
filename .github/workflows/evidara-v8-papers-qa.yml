@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - evidara-v8-ui-refresh
+      - evidara-v8-papers
   pull_request:
     branches:
       - evidara-v7-final
