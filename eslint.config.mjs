@@ -34,6 +34,13 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
+  files: ["src/components/evidara/live-paper-catalogue-v8.tsx"],
+  rules: {
+    // The toolbar stores DOM-ref commands inside click callbacks. The ref is never
+    // read while rendering, but the experimental rule cannot distinguish this map.
+    "react-hooks/refs": "off",
+  },
+}, {
   ignores: [
     "node_modules/**",
     ".next/**",
