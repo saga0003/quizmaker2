@@ -11,7 +11,7 @@ assert.ok(list.includes("PaperManagementDashboard"), "Papers must use the Phase 
 for (const marker of [
   "duplicate_question_paper_v8", "create_paper_version_v8", "manage_paper_status_v8",
   "soft_delete_paper_definition_v8", "restore_deleted_paper_definition_v8",
-  "Include recoverable deleted papers", "Products, pricing and test delivery remain outside this module",
+  "Include recoverable deleted papers", "Duplicates and new versions always begin as Draft",
 ]) assert.ok(dashboard.includes(marker), `Phase 2 dashboard marker missing: ${marker}`);
 
 for (const marker of [
@@ -26,7 +26,7 @@ for (const marker of [
 
 assert.match(migration, /workflow_status='draft'/, "Restored deleted papers must return as Draft.");
 assert.match(migration, /recoverable[^\n]*true/, "Soft deletion must remain recoverable.");
-assert.deepEqual(vercel.git?.deploymentEnabled, { "*": false, "evidara-v8-papers": true });
+assert.equal(vercel.git?.deploymentEnabled, false, "Vercel must remain disabled during the UI refresh.");
 assert.equal(vercel.buildCommand, "npm run qa");
 
-console.log("V8 Phase 2 management smoke passed under the Phase 3 preview release boundary.");
+console.log("V8 Phase 2 management smoke passed under the responsive UI refresh boundary.");
