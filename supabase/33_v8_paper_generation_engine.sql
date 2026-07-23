@@ -5,6 +5,26 @@
 
 begin;
 
+-- Forward declaration used by save_paper_blueprints_v8. The complete
+-- implementation later in this migration replaces this temporary body.
+create or replace function public.refresh_paper_blueprint_availability_v8(
+  p_paper_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public,auth
+as $$
+begin
+  return jsonb_build_object(
+    'paper_id',p_paper_id,
+    'rules','[]'::jsonb,
+    'ready',false,
+    'refreshed_at',now()
+  );
+end
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Complete, unpaged eligibility query for database-side generation.
 -- ---------------------------------------------------------------------------
@@ -42,10 +62,10 @@ begin
     raise exception 'Paper not found or permission denied.' using errcode='P0002';
   end if;
 
-  select coalesce(array_agg(token_value),array[]::text[])
+  select coalesce(array_agg(programme_token.value),array[]::text[])
   into programme_tokens
   from public.paper_programmes programme,
-       lateral jsonb_array_elements_text(coalesce(programme.metadata->'question_tokens','[]'::jsonb)) token_value
+       lateral jsonb_array_elements_text(coalesce(programme.metadata->'question_tokens','[]'::jsonb)) as programme_token(value)
   where programme.code=paper_record.programme_code;
 
   return query
@@ -149,10 +169,10 @@ begin
     raise exception 'You do not have permission to inspect this Question Bank.' using errcode='42501';
   end if;
 
-  select coalesce(array_agg(token_value),array[]::text[])
+  select coalesce(array_agg(programme_token.value),array[]::text[])
   into programme_tokens
   from public.paper_programmes programme,
-       lateral jsonb_array_elements_text(coalesce(programme.metadata->'question_tokens','[]'::jsonb)) token_value
+       lateral jsonb_array_elements_text(coalesce(programme.metadata->'question_tokens','[]'::jsonb)) as programme_token(value)
   where programme.code=p_programme_code;
 
   with eligible as (
@@ -487,8 +507,8 @@ as $$
   where question.id=p_question_id
 $$;
 
-grant execute on function public.paper_question_snapshot_v8(uuid)
-to authenticated,service_role;
+revoke all on function public.paper_question_snapshot_v8(uuid) from public,authenticated;
+grant execute on function public.paper_question_snapshot_v8(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Generate, regenerate a section, or regenerate one blueprint row.
@@ -509,7 +529,7 @@ declare
   paper_record public.question_papers%rowtype;
   rule_record public.paper_blueprints%rowtype;
   section_record public.paper_sections%rowtype;
-  seed_value text := coalesce(nullif(trim(p_seed),''),encode(gen_random_bytes(12),'hex'));
+  seed_value text := coalesce(nullif(trim(p_seed),''),replace(gen_random_uuid()::text,'-',''));
   shortage_rows jsonb := '[]'::jsonb;
   generation_rows jsonb := '[]'::jsonb;
   selected_ids uuid[] := '{}';
@@ -579,14 +599,7 @@ begin
     and section.selection_mode in ('automatic','hybrid')
     and paper_question.is_locked=false
     and (p_section_id is null or paper_question.section_id=p_section_id)
-    and (
-      p_rule_id is null
-      or paper_question.blueprint_rule_id=p_rule_id
-      or (
-        paper_question.blueprint_rule_id is null
-        and paper_question.section_id=(select section_id from public.paper_blueprints where id=p_rule_id)
-      )
-    );
+    and (p_rule_id is null or paper_question.blueprint_rule_id=p_rule_id);
 
   select coalesce(max(display_order),-1)+1
   into next_order
@@ -760,7 +773,7 @@ declare
   rule_record public.paper_blueprints%rowtype;
   candidate_record record;
   excluded_ids uuid[];
-  seed_value text := coalesce(nullif(trim(p_seed),''),encode(gen_random_bytes(12),'hex'));
+  seed_value text := coalesce(nullif(trim(p_seed),''),replace(gen_random_uuid()::text,'-',''));
   old_question_id uuid;
 begin
   select * into paper_question_record
