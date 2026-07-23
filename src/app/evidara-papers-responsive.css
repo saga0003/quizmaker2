@@ -1,0 +1,471 @@
+/* Evidara V8 Papers responsive bridge
+   Keeps the V7 visual language while making the V8 workspaces usable on every screen. */
+
+:root {
+  --paper-navy: #14232b;
+  --paper-teal: #0e5a5a;
+  --paper-teal-soft: #dce9e7;
+  --paper-amber: #f2b84b;
+  --paper-canvas: #f7f9f7;
+  --paper-surface: #ffffff;
+  --paper-line: #e7eceb;
+  --paper-muted: #6b7980;
+  --paper-shadow: 0 8px 24px rgba(20, 35, 43, 0.06);
+}
+
+html,
+body {
+  min-width: 320px;
+  overflow-x: clip;
+}
+
+.paper-workspace,
+.v8-paper-builder,
+.paper-generation-workspace {
+  min-width: 0;
+}
+
+.paper-workspace-card,
+.v8-workspace,
+.v8-summary,
+.paper-lifecycle,
+.paper-template-panel,
+.paper-export-panel,
+.paper-audit-panel {
+  border-color: var(--paper-line) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--paper-shadow) !important;
+}
+
+.paper-page-title {
+  color: var(--paper-navy);
+  letter-spacing: -0.025em;
+}
+
+.paper-page-copy {
+  color: var(--paper-muted);
+  line-height: 1.6;
+}
+
+.paper-touch,
+.paper-workspace button,
+.paper-workspace a,
+.v8-paper-builder button,
+.v8-paper-builder a,
+.paper-generation-workspace button,
+.paper-generation-workspace a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paper-scroll-region {
+  scrollbar-width: thin;
+  scrollbar-color: #b8c3c6 transparent;
+}
+
+/* Builder desktop and compact laptop behaviour */
+@media (max-width: 1240px) {
+  body .v8-builder-layout {
+    grid-template-columns: 164px minmax(0, 1fr) !important;
+  }
+
+  body .v8-summary {
+    grid-column: 1 / -1 !important;
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1.2fr) !important;
+    gap: 18px !important;
+  }
+
+  body .v8-summary > .rm-label,
+  body .v8-summary > h2 {
+    grid-column: 1 !important;
+  }
+
+  body .v8-summary dl {
+    grid-column: 1 !important;
+  }
+
+  body .v8-distribution,
+  body .v8-scope-note {
+    grid-column: 2 !important;
+  }
+
+  body .v8-bank-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body .v8-bank-filters .search-field {
+    grid-column: 1 / -1 !important;
+  }
+
+  body .v8-programme-grid,
+  body .v8-subject-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Tablet: navigation becomes a rail and the content receives the full screen. */
+@media (max-width: 960px) {
+  body .v8-paper-header {
+    top: 64px !important;
+    z-index: 20 !important;
+  }
+
+  body .v8-builder-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  body .v8-step-nav {
+    position: sticky !important;
+    top: 132px !important;
+    z-index: 18 !important;
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    padding: 7px !important;
+    scrollbar-width: none;
+  }
+
+  body .v8-step-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  body .v8-step-nav button {
+    min-width: max-content !important;
+    min-height: 42px !important;
+    grid-template-columns: 22px 18px auto !important;
+    padding: 8px 10px !important;
+    white-space: nowrap !important;
+  }
+
+  body .v8-workspace,
+  body .v8-summary {
+    grid-column: 1 !important;
+  }
+
+  body .v8-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  body .v8-form-grid.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body .wide-three,
+  body .wide-two {
+    grid-column: 1 / -1 !important;
+  }
+
+  body .v8-availability,
+  body .v8-preview-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body .v8-section-toolbar {
+    grid-template-columns: 34px minmax(0, 1fr) auto !important;
+  }
+
+  body .v8-section-toolbar > span {
+    display: none !important;
+  }
+
+  body .arrangement-section > article {
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+  }
+
+  body .arrangement-actions {
+    grid-column: 2 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+  }
+
+  body .lifecycle-grid,
+  body .template-grid,
+  body .export-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Phone: no fixed panels, no cramped button rows, and no horizontal form overflow. */
+@media (max-width: 640px) {
+  body .v8-paper-header {
+    position: static !important;
+    align-items: stretch !important;
+    flex-direction: column !important;
+    padding: 12px !important;
+  }
+
+  body .v8-paper-title {
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  body .v8-back-link {
+    min-height: 40px !important;
+  }
+
+  body .v8-title-row > strong {
+    font-size: 16px !important;
+  }
+
+  body .v8-save-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    width: 100% !important;
+  }
+
+  body .v8-save-state {
+    grid-column: 1 / -1 !important;
+    justify-content: center !important;
+    min-height: 40px !important;
+  }
+
+  body .v8-save-actions > button {
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+
+  body .v8-builder-layout {
+    margin-top: 10px !important;
+  }
+
+  body .v8-step-nav {
+    position: static !important;
+    margin-inline: -1px !important;
+  }
+
+  body .v8-step-nav button {
+    min-height: 44px !important;
+  }
+
+  body .v8-workspace {
+    padding: 14px !important;
+  }
+
+  body .v8-step-heading,
+  body .v8-step-heading.split,
+  body .preview-section-heading,
+  body .v8-paper-preview > header,
+  body .arrangement-heading {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  body .v8-step-heading h1 {
+    font-size: 21px !important;
+  }
+
+  body .v8-active-section {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  body .v8-form-grid.three,
+  body .v8-form-grid.two,
+  body .v8-programme-grid,
+  body .v8-subject-grid,
+  body .v8-bank-filters,
+  body .v8-summary,
+  body .comment-targets {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body .wide-two,
+  body .wide-three {
+    grid-column: 1 !important;
+  }
+
+  body .v8-programme-grid button,
+  body .v8-subject-grid button {
+    min-height: 54px !important;
+  }
+
+  body .v8-section-list > article {
+    padding: 11px !important;
+  }
+
+  body .v8-section-toolbar {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+  }
+
+  body .v8-section-toolbar > div {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  body .v8-section-toolbar > div button,
+  body .arrangement-actions button {
+    min-height: 42px !important;
+  }
+
+  body .v8-availability,
+  body .v8-preview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body .availability-status {
+    grid-column: 1 / -1 !important;
+  }
+
+  body .v8-bank-bulkbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  body .v8-bank-bulkbar > button {
+    width: 100% !important;
+    min-height: 46px !important;
+  }
+
+  body .v8-question-bank > article {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+  }
+
+  body .v8-question-bank > article > button {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+
+  body .question-body img,
+  body .v8-paper-preview > section > article img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  body .v8-pagination {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  body .v8-pagination > span {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    text-align: center !important;
+  }
+
+  body .v8-pagination button {
+    justify-content: center !important;
+    min-height: 44px !important;
+  }
+
+  body .arrangement-section > article {
+    grid-template-columns: 34px minmax(0, 1fr) !important;
+    padding: 10px !important;
+  }
+
+  body .arrangement-actions {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  body .marks-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body .marks-row .check-inline {
+    grid-column: 1 / -1 !important;
+  }
+
+  body .v8-paper-preview {
+    padding: 14px !important;
+  }
+
+  body .v8-paper-preview > header > div:last-child {
+    text-align: left !important;
+  }
+
+  body .v8-paper-preview > section > article {
+    grid-template-columns: 24px minmax(0, 1fr) !important;
+  }
+
+  body .preview-marks {
+    grid-column: 2 !important;
+  }
+
+  body .v8-summary {
+    display: block !important;
+    padding: 14px !important;
+  }
+
+  body .v8-distribution,
+  body .v8-scope-note {
+    grid-column: 1 !important;
+  }
+
+  body .v8-builder-footer {
+    position: static !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    padding: 12px 0 2px !important;
+  }
+
+  body .v8-builder-footer > span {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    text-align: center !important;
+  }
+
+  body .v8-builder-footer button {
+    min-height: 46px !important;
+  }
+
+  body .paper-modal {
+    place-items: end center !important;
+    padding: 0 !important;
+  }
+
+  body .paper-modal-card {
+    width: 100% !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+    border-radius: 18px 18px 0 0 !important;
+    padding: 18px !important;
+  }
+
+  body .paper-modal-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  body .paper-modal-actions button {
+    min-height: 46px !important;
+  }
+
+  body .paper-lifecycle > header {
+    flex-direction: column !important;
+  }
+
+  body .decision-actions,
+  body .export-actions,
+  body .preview-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  body .decision-actions button,
+  body .export-actions button,
+  body .preview-actions button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper-workspace *,
+  .v8-paper-builder *,
+  .paper-generation-workspace * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
