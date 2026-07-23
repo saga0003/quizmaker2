@@ -1,28 +1,42 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { FilePlus2, FileText, Sparkles } from "lucide-react";
 import { PaperManagementDashboard } from "@/components/papers/PaperManagementDashboard";
 
 export function QuestionPaperList({ kind }: { kind: "admin" | "school" }) {
-  const generationRoute = kind === "admin" ? "/admin/papers/generation/" : "/school/papers/generation/";
+  const base = kind === "admin" ? "/admin/papers" : "/school/papers";
+
   return (
-    <div className="space-y-4">
-      <section className="flex flex-col gap-4 rounded-xl border border-[#B7DCD5] bg-[#EDF7F5] p-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0E5A5A] text-white">
-            <Sparkles size={19} />
+    <div className="paper-workspace space-y-5">
+      <header className="flex flex-col gap-5 rounded-2xl border border-[#E7ECEB] bg-white p-5 shadow-[0_8px_24px_rgba(20,35,43,0.05)] sm:p-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#DCE9E7] text-[#0E5A5A]">
+            <FileText size={22} />
           </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0E5A5A]">V8 Phase 3</span>
-            <h2 className="mt-1 font-bold text-[#14232B]">Question Bank & Generation Studio</h2>
-            <p className="mt-1 text-xs leading-relaxed text-[#587077]">
-              Select approved questions across pages, lock hybrid questions, build exact blueprints, resolve shortages and reproduce generation runs by seed.
+          <div className="min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0E5A5A]">Assessment workspace</span>
+            <h1 className="paper-page-title mt-1 text-2xl font-bold sm:text-3xl">Papers</h1>
+            <p className="paper-page-copy mt-1 max-w-3xl text-sm">
+              Create reusable test-paper definitions, import approved Question Bank content, build manual or generated papers, and keep every copy safely in Draft.
             </p>
           </div>
         </div>
-        <Link href={generationRoute} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#0E5A5A] px-4 text-sm font-semibold text-white hover:bg-[#0A4747]">
-          <Sparkles size={16} /> Open Phase 3 Studio
-        </Link>
-      </section>
+
+        <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2">
+          <Link
+            href={`${base}/generation/`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#DCE9E7] bg-[#EDF6F4] px-4 text-sm font-semibold text-[#0E5A5A] transition hover:bg-[#DCE9E7]"
+          >
+            <Sparkles size={16} /> Generation Studio
+          </Link>
+          <Link
+            href={`${base}/new/`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#0E5A5A] px-4 text-sm font-semibold text-white transition hover:bg-[#0B4848]"
+          >
+            <FilePlus2 size={17} /> Create paper
+          </Link>
+        </div>
+      </header>
+
       <PaperManagementDashboard kind={kind} />
     </div>
   );
