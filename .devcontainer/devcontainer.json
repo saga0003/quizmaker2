@@ -1,5 +1,5 @@
 {
-  "name": "Evidara Development",
+  "name": "Evidara V8 Papers Development",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
@@ -9,7 +9,7 @@
   "forwardPorts": [20242],
   "portsAttributes": {
     "20242": {
-      "label": "Evidara V7 preview",
+      "label": "Evidara V8 Papers preview",
       "onAutoForward": "openPreview",
       "protocol": "http",
       "visibility": "public"

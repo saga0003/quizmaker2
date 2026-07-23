@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:codespaces": "next dev --hostname 0.0.0.0 --port 20242",
+    "dev:codespaces": "rm -rf .next && next dev --hostname 0.0.0.0 --port 20242",
     "dev:share": "bash scripts/codespaces-share-preview.sh",
     "preview:tunnel": "wrangler tunnel quick-start http://127.0.0.1:20242",
+    "verify:v8": "node scripts/verify-v8-launch.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
