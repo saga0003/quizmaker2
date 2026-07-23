@@ -1,6 +1,6 @@
 {
   "name": "evidara-school-platform",
-  "version": "8.0.0-phase3",
+  "version": "8.0.0-ui-refresh",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,7 +16,8 @@
     "qa:phase1": "node scripts/v8-phase1-integration-smoke.mjs",
     "qa:phase2": "node scripts/v8-phase2-management-smoke.mjs",
     "qa:phase3": "node scripts/v8-phase3-generation-smoke.mjs",
-    "qa": "npm run lint && npm run typecheck && npm run qa:smoke && npm run qa:phase1 && npm run qa:phase2 && npm run qa:phase3 && npm run build",
+    "qa:ui": "node scripts/v8-ui-responsive-smoke.mjs",
+    "qa": "npm run lint && npm run typecheck && npm run qa:smoke && npm run qa:phase1 && npm run qa:phase2 && npm run qa:phase3 && npm run qa:ui && npm run build",
     "check": "npm run qa",
     "demo:bootstrap": "node scripts/bootstrap-sales-demo.mjs",
     "cf:build": "opennextjs-cloudflare build",
