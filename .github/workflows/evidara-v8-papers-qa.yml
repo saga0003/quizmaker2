@@ -1,0 +1,119 @@
+name: Evidara V8 Papers QA
+
+on:
+  push:
+    branches:
+      - evidara-v8-papers
+  pull_request:
+    branches:
+      - evidara-v7-final
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v8-papers-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Install, lint, typecheck, smoke and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out V8 Papers
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run lint report
+        run: |
+          set +e
+          npm run lint > v8-lint.txt 2>&1
+          echo "$?" > v8-lint.status
+          cat v8-lint.txt
+          exit 0
+
+      - name: Run TypeScript report
+        run: |
+          set +e
+          npm run typecheck > v8-typecheck.txt 2>&1
+          echo "$?" > v8-typecheck.status
+          cat v8-typecheck.txt
+          exit 0
+
+      - name: Run V8 Papers smoke report
+        run: |
+          set +e
+          npm run qa:smoke > v8-smoke.txt 2>&1
+          echo "$?" > v8-smoke.status
+          cat v8-smoke.txt
+          exit 0
+
+      - name: Run Next.js build report
+        run: |
+          set +e
+          npm run build > v8-next-build.txt 2>&1
+          echo "$?" > v8-next-build.status
+          cat v8-next-build.txt
+          exit 0
+
+      - name: Run Cloudflare build report
+        run: |
+          set +e
+          npm run cf:build > v8-cloudflare-build.txt 2>&1
+          echo "$?" > v8-cloudflare-build.status
+          cat v8-cloudflare-build.txt
+          exit 0
+
+      - name: Confirm Vercel is disabled
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+          if (config.git?.deploymentEnabled !== false) {
+            throw new Error('Vercel deployment must remain disabled during V8 Papers development.');
+          }
+          console.log('Vercel deployment is disabled.');
+          NODE
+
+      - name: Upload V8 QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v8-papers-qa-reports
+          path: |
+            v8-lint.txt
+            v8-lint.status
+            v8-typecheck.txt
+            v8-typecheck.status
+            v8-smoke.txt
+            v8-smoke.status
+            v8-next-build.txt
+            v8-next-build.status
+            v8-cloudflare-build.txt
+            v8-cloudflare-build.status
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce V8 quality gates
+        run: |
+          test "$(cat v8-lint.status)" = "0"
+          test "$(cat v8-typecheck.status)" = "0"
+          test "$(cat v8-smoke.status)" = "0"
+          test "$(cat v8-next-build.status)" = "0"
+          test "$(cat v8-cloudflare-build.status)" = "0"
+
+      - name: Confirm non-deployment boundary
+        run: echo "Evidara V8 Papers QA completed without Vercel, Cloudflare or production deployment."
