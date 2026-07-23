@@ -104,6 +104,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
+import { ProductCommerceWorkspace } from '@/components/commerce/ProductCommerceWorkspace';
+
 // ─── Shared helpers ────────────────────────────────────────────────
 
 const subjectColorMap: Record<string, string> = {
