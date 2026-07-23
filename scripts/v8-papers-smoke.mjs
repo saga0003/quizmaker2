@@ -103,7 +103,7 @@ for (const expected of [
   "validate_paper_v8",
   "set_paper_workflow_status_v8",
   "Server-side filters retrieve one page",
-  "Products, prices, purchases, student access and examination delivery are outside this module",
+  "Products, pricing, payment, entitlement and test delivery remain separate",
   "Paper submitted for review",
 ]) {
   assert.ok(builder.includes(expected), `Paper builder is missing ${expected}`);
