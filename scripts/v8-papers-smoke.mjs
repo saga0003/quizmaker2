@@ -15,16 +15,12 @@ const generationPanel = read("src/components/papers/PaperGenerationPanel.tsx");
 const history = read("src/components/papers/PaperGenerationHistory.tsx");
 const paperList = read("src/components/papers/QuestionPaperList.tsx");
 
-assert.equal(pkg.version, "8.0.0-phase3", "Package must identify the V8 Phase 3 release.");
-for (const command of ["qa:smoke", "qa:phase1", "qa:phase2", "qa:phase3"]) {
+assert.equal(pkg.version, "8.0.0-ui-refresh", "Package must identify the V8 UI refresh build.");
+for (const command of ["qa:smoke", "qa:phase1", "qa:phase2", "qa:phase3", "qa:ui"]) {
   assert.ok(pkg.scripts[command], `Missing QA command: ${command}`);
 }
-assert.equal(vercel.buildCommand, "npm run qa", "Vercel must run the complete QA gate.");
-assert.deepEqual(
-  vercel.git?.deploymentEnabled,
-  { "*": false, "evidara-v8-papers": true },
-  "Vercel must deploy only evidara-v8-papers for the Phase 3 preview.",
-);
+assert.equal(vercel.buildCommand, "npm run qa", "Vercel must retain the complete QA command for the later approved deployment.");
+assert.equal(vercel.git?.deploymentEnabled, false, "Vercel must remain completely disabled during the UI/UX refresh.");
 
 for (const programme of [
   "Foundation Grade 7", "Foundation Grade 8", "Foundation Grade 9", "Foundation Grade 10",
@@ -79,7 +75,7 @@ for (const marker of [
   "Regenerate this blueprint row", "Reproducible random seed",
 ]) assert.ok(generationPanel.includes(marker), `Generation panel missing ${marker}`);
 assert.ok(history.includes("paper_generation_runs") && history.includes("onReuseSeed"), "Generation history must persist and reuse seeds.");
-assert.ok(paperList.includes("Open Phase 3 Studio"), "Papers page must expose the Phase 3 studio.");
+assert.ok(paperList.includes("Generation Studio"), "Papers page must expose the Generation Studio.");
 
 for (const source of [builder, managementDashboard, generationStudio]) {
   for (const forbidden of ["Payment gateway", "Access code required", "All logged-in students"]) {
@@ -87,4 +83,4 @@ for (const source of [builder, managementDashboard, generationStudio]) {
   }
 }
 
-console.log("V8 Phase 3 base smoke checks passed.");
+console.log("V8 UI refresh base smoke checks passed with Vercel locked.");
