@@ -30,17 +30,42 @@ jobs:
       - name: Reconstruct and apply V9 product module
         shell: bash
         run: |
-          set -euo pipefail
-          cat scripts/.v9-bundle/chunk*.txt > /tmp/v9-bundle.tar.xz.b64
-          echo "aef0905f559d3c4937ba231647096be21ade27fce108f87ea90e6317c54e913c  /tmp/v9-bundle.tar.xz.b64" | sha256sum -c -
-          base64 -d /tmp/v9-bundle.tar.xz.b64 > /tmp/v9-bundle.tar.xz
-          echo "a6a49c7a459260fd77fc72c91c109af5035f732d59fedb0a277f983e6e9e67c7  /tmp/v9-bundle.tar.xz" | sha256sum -c -
-          tar -xJf /tmp/v9-bundle.tar.xz
-          rm -rf scripts/.v9-bundle scripts/.v9-patch
-          rm -f .github/workflows/v9-source-export.yml
-          rm -f .github/workflows/apply-v9-product-bundle.yml
-          rm -f scripts/v9-source-export-trigger.txt
-          node scripts/v9-product-smoke.mjs
+          set +e
+          {
+            set -euxo pipefail
+            cat scripts/.v9-bundle/chunk*.txt > /tmp/v9-bundle.tar.xz.b64
+            wc -c /tmp/v9-bundle.tar.xz.b64
+            sha256sum /tmp/v9-bundle.tar.xz.b64
+            echo "aef0905f559d3c4937ba231647096be21ade27fce108f87ea90e6317c54e913c  /tmp/v9-bundle.tar.xz.b64" | sha256sum -c -
+            base64 -d /tmp/v9-bundle.tar.xz.b64 > /tmp/v9-bundle.tar.xz
+            wc -c /tmp/v9-bundle.tar.xz
+            sha256sum /tmp/v9-bundle.tar.xz
+            echo "a6a49c7a459260fd77fc72c91c109af5035f732d59fedb0a277f983e6e9e67c7  /tmp/v9-bundle.tar.xz" | sha256sum -c -
+            tar -tJf /tmp/v9-bundle.tar.xz | head -30
+            tar -xJf /tmp/v9-bundle.tar.xz
+            node scripts/v9-product-smoke.mjs
+            rm -rf scripts/.v9-bundle scripts/.v9-patch
+            rm -f .github/workflows/v9-source-export.yml
+            rm -f .github/workflows/apply-v9-product-bundle.yml
+            rm -f scripts/v9-source-export-trigger.txt
+          } > v9-apply.log 2>&1
+          status="$?"
+          echo "$status" > v9-apply.status
+          cat v9-apply.log
+          exit 0
+
+      - name: Upload V9 apply diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v9-apply-diagnostics
+          path: |
+            v9-apply.log
+            v9-apply.status
+          retention-days: 1
+
+      - name: Enforce V9 bundle application
+        run: test "$(cat v9-apply.status)" = "0"
 
       - name: Commit V9 product module
         shell: bash
