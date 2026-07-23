@@ -108,3 +108,8 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca8ac;
 }
+
+/* V8 student papers display only the section question and answer controls. */
+.secure-exam-content main.rm-card > div:first-child > div:first-child > div {
+  display: none;
+}
