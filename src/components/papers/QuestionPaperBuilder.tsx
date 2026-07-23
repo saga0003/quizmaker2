@@ -42,6 +42,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useQuestionScope } from "@/components/questions/useQuestionScope";
 import { PaperGenerationPanel } from "@/components/papers/PaperGenerationPanel";
+import { PaperLifecyclePanel } from "@/components/papers/PaperLifecyclePanel";
 import type { TaxonomyChapter, TaxonomySubject, TaxonomyTopic } from "@/types/questions";
 import type {
   PaperCreationMode,
@@ -928,10 +929,10 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
     const saved = await saveDraft(false);
     if (!saved) return;
     setSubmittingReview(true);
-    const { error: statusError } = await supabase.rpc("set_paper_workflow_status_v8", {
+    const { error: statusError } = await supabase.rpc("submit_paper_review_v8", {
       p_paper_id: paperId,
-      p_next_status: "submitted_for_review",
-      p_reason: null,
+      p_assigned_reviewer_id: null,
+      p_summary: null,
     });
     setSubmittingReview(false);
     if (statusError) {
@@ -1325,6 +1326,11 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
               <div className="v8-step-heading split"><div><span className="rm-label">Step 7</span><h1>Preview and validation</h1><p>Inspect the complete paper definition before submitting it for academic review.</p></div><div className="preview-actions"><button className="rm-btn-secondary" onClick={() => void runValidation()} disabled={validating}>{validating ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} Validate</button><button className="rm-btn-primary" onClick={() => void submitForReview()} disabled={submittingReview}>{submittingReview ? <LoaderCircle className="spin" size={16} /> : <Send size={16} />} Submit for review</button></div></div>
               <div className="v8-preview-summary"><div><strong>{selectedQuestions.length}</strong><span>Total questions</span></div><div><strong>{requiredAttempts}</strong><span>Required attempts</span></div><div><strong>{sections.length}</strong><span>Sections</span></div><div><strong>{totalMarks}</strong><span>Maximum marks</span></div><div><strong>{durationMinutes} min</strong><span>Duration</span></div><div><strong>{estimatedMinutes} min</strong><span>Estimated solving</span></div></div>
               {validation && <div className={`v8-validation ${validation.valid ? 'valid' : 'invalid'}`}><div className="validation-heading">{validation.valid ? <CheckCircle2 size={22} /> : <AlertCircle size={22} />}<div><strong>{validation.valid ? 'No critical errors' : `${validation.critical.length} critical issue${validation.critical.length === 1 ? '' : 's'}`}</strong><span>{validation.warnings.length} warning{validation.warnings.length === 1 ? '' : 's'}</span></div></div>{validation.critical.length > 0 && <div><h3>Must be fixed</h3>{validation.critical.map((issue) => <button type="button" key={issue.code} onClick={() => setActiveStep(issue.code.includes('programme') || issue.code.includes('subject') ? 'programme' : issue.code.includes('section') ? 'sections' : issue.code.includes('question') || issue.code.includes('answer') ? 'questions' : issue.code.includes('duration') ? 'rules' : 'details')}><AlertCircle size={15} /><span>{issue.message}</span><ChevronRight size={15} /></button>)}</div>}{validation.warnings.length > 0 && <div><h3>Review warnings</h3>{validation.warnings.map((issue) => <p key={issue.code}><AlertCircle size={14} /> {issue.message}</p>)}</div>}</div>}
+              <PaperLifecyclePanel
+                paperId={paperId}
+                workflowStatus={workflowStatus}
+                onWorkflowChange={setWorkflowStatus}
+              />
               <article className="v8-paper-preview"><header><div><span>{code || 'Draft code pending'}</span><h1>{title || 'Untitled paper'}</h1><p>{selectedProgramme?.name || 'Programme not selected'} · {selectedSubjectIds.map((id) => subjects.find((subject) => subject.id === id)?.name).filter(Boolean).join(', ') || 'No subjects selected'}</p></div><div><strong>{durationMinutes} minutes</strong><strong>{totalMarks} marks</strong></div></header>{instructions && <div className="preview-instructions"><strong>Instructions</strong><p>{instructions}</p></div>}{sections.map((section) => { const items = selectedQuestions.filter((question) => question.section_client_id === section.client_id); return <section key={section.client_id}><div className="preview-section-heading"><div><h2>{section.title}</h2><p>{section.instructions}</p></div><span>{items.length} questions</span></div>{items.map((question) => { const number = selectedQuestions.findIndex((item) => item.question_id === question.question_id) + 1; return <article key={question.question_id}><strong className="preview-number">{number}.</strong><div><p>{question.snapshot.stem_text}</p>{question.snapshot.question_image_url && <img src={question.snapshot.question_image_url} alt="Question illustration" />}{question.snapshot.options?.map((option) => <div className="preview-option" key={option.option_key}><strong>{option.option_key}</strong><span>{option.content_text || option.content_latex}</span></div>)}</div><span className="preview-marks">+{question.marks} / −{question.negative_marks}</span></article>; })}</section>; })}</article>
             </section>
           )}

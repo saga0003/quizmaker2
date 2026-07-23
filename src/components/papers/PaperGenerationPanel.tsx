@@ -311,6 +311,7 @@ export function PaperGenerationPanel({
     setError("");
     if (showNotice) setNotice("");
     const payload = rules.map((rule, index) => ({
+      id: rule.id || null,
       section_id: rule.section_id,
       rule_order: index,
       subject_id: rule.subject_id || null,
