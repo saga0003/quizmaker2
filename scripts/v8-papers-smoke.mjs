@@ -8,18 +8,22 @@ const [
   vercelText,
   foundationMigration,
   generationMigration,
+  lifecycleMigration,
   list,
   builder,
   generationPanel,
+  lifecyclePanel,
   types,
 ] = await Promise.all([
   read("package.json"),
   read("vercel.json"),
   read("supabase/32_v8_paper_builder_foundation.sql"),
   read("supabase/33_v8_paper_generation_engine.sql"),
+  read("supabase/34_v8_paper_review_publish_export.sql"),
   read("src/components/papers/QuestionPaperList.tsx"),
   read("src/components/papers/QuestionPaperBuilder.tsx"),
   read("src/components/papers/PaperGenerationPanel.tsx"),
+  read("src/components/papers/PaperLifecyclePanel.tsx"),
   read("src/types/papers.ts"),
 ]);
 
@@ -95,6 +99,23 @@ for (const contract of [
   );
 }
 
+for (const contract of [
+  "stable blueprint",
+  "export_paper_definition_v8",
+  "submit_paper_review_v8",
+  "add_paper_review_comment_v8",
+  "resolve_paper_review_comment_v8",
+  "decide_paper_review_v8",
+  "publish_paper_definition_v8",
+  "accepted_warning_reason",
+  "definition_snapshot",
+]) {
+  assert.ok(
+    lifecycleMigration.toLowerCase().includes(contract.toLowerCase()),
+    `Migration 34 is missing ${contract}`,
+  );
+}
+
 assert.match(
   foundationMigration,
   /'draft','draft'.*source_paper\.creation_mode/s,
@@ -113,6 +134,21 @@ assert.ok(
 assert.ok(
   generationMigration.includes("md5(eligible.question_id::text||seed_value"),
   "Generated selection must use a stored reproducible seed",
+);
+assert.ok(
+  generationMigration.includes("p_rule_id is null or paper_question.blueprint_rule_id=p_rule_id") &&
+    !generationMigration.includes("paper_question.blueprint_rule_id is null\n        and paper_question.section_id"),
+  "Rule-only regeneration must not remove unrelated questions",
+);
+assert.ok(
+  lifecycleMigration.includes("workflow_status<>'approved'") &&
+    lifecycleMigration.includes("Resolve all review comments before approving"),
+  "Publishing and approval must enforce the academic review workflow",
+);
+assert.ok(
+  lifecycleMigration.includes("'student_access_created',false") &&
+    lifecycleMigration.includes("'product_created',false"),
+  "Published V8 paper definitions must not create products or student access",
 );
 
 for (const expected of [
@@ -141,11 +177,12 @@ for (const step of [
 
 for (const expected of [
   "PaperGenerationPanel",
+  "PaperLifecyclePanel",
   "save_paper_definition_v8",
   "search_eligible_questions_v8",
   "paper_question_availability_v8",
   "validate_paper_v8",
-  "set_paper_workflow_status_v8",
+  "submit_paper_review_v8",
   "Server-side filters retrieve one page",
   "Products, pricing, payment, entitlement and test delivery remain separate",
   "Paper submitted for review",
@@ -162,10 +199,27 @@ for (const expected of [
   "Regenerate section",
   "Regenerate this blueprint row",
   "Locked manual questions stay fixed",
+  "id: rule.id || null",
 ]) {
   assert.ok(
     generationPanel.includes(expected),
     `Generation workspace is missing ${expected}`,
+  );
+}
+
+for (const expected of [
+  "submit_paper_review_v8",
+  "add_paper_review_comment_v8",
+  "resolve_paper_review_comment_v8",
+  "decide_paper_review_v8",
+  "publish_paper_definition_v8",
+  "create_paper_version_v8",
+  "export_paper_definition_v8",
+  "No product, price, bundle, entitlement, agent code or student attempt is created",
+]) {
+  assert.ok(
+    lifecyclePanel.includes(expected),
+    `Paper lifecycle workspace is missing ${expected}`,
   );
 }
 
