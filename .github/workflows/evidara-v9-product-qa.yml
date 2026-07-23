@@ -34,8 +34,24 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Lint
-        run: npm run lint
+      - name: Run lint report
+        run: |
+          set +e
+          npm run lint > v9-lint.txt 2>&1
+          echo "$?" > v9-lint.status
+          cat v9-lint.txt
+          exit 0
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v9-lint-report
+          path: |
+            v9-lint.txt
+            v9-lint.status
+          retention-days: 1
+      - name: Enforce lint
+        run: test "$(cat v9-lint.status)" = "0"
       - name: TypeScript
         run: npm run typecheck
       - name: V8 paper smoke checks
