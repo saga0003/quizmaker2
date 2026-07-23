@@ -43,6 +43,9 @@ import { supabase } from "@/lib/supabase";
 import { useQuestionScope } from "@/components/questions/useQuestionScope";
 import { PaperGenerationPanel } from "@/components/papers/PaperGenerationPanel";
 import { PaperLifecyclePanel } from "@/components/papers/PaperLifecyclePanel";
+import { PaperTemplatePanel } from "@/components/papers/PaperTemplatePanel";
+import { PaperExportPanel } from "@/components/papers/PaperExportPanel";
+import { PaperAuditPanel } from "@/components/papers/PaperAuditPanel";
 import type { TaxonomyChapter, TaxonomySubject, TaxonomyTopic } from "@/types/questions";
 import type {
   PaperCreationMode,
@@ -108,6 +111,8 @@ type QuestionSnapshot = {
 };
 
 type SelectedQuestion = PaperQuestionInput & {
+  paper_question_id?: string;
+  blueprint_rule_id?: string | null;
   snapshot: QuestionSnapshot;
   usage_count?: number;
 };
@@ -221,6 +226,7 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
   const [sections, setSections] = useState<PaperSectionInput[]>([emptySection()]);
   const [activeSectionId, setActiveSectionId] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<SelectedQuestion[]>([]);
+  const [replacingQuestionId, setReplacingQuestionId] = useState("");
 
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [readingTimeMinutes, setReadingTimeMinutes] = useState(0);
@@ -382,7 +388,7 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
       supabase.from("paper_sections").select("*").eq("paper_id", paperId).order("display_order"),
       supabase
         .from("paper_questions")
-        .select("id,question_id,section_id,display_order,marks,negative_marks,is_mandatory,is_locked,generation_source,shuffle_restricted,position_locked,is_bonus,is_cancelled,grace_marks,metadata,question_snapshot")
+        .select("id,question_id,section_id,display_order,marks,negative_marks,is_mandatory,is_locked,generation_source,blueprint_rule_id,shuffle_restricted,position_locked,is_bonus,is_cancelled,grace_marks,metadata,question_snapshot")
         .eq("paper_id", paperId)
         .order("display_order"),
     ]);
@@ -461,6 +467,8 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
 
     setSelectedQuestions(
       (questionsResult.data || []).map((question) => ({
+        paper_question_id: question.id,
+        blueprint_rule_id: question.blueprint_rule_id || null,
         question_id: question.question_id,
         section_client_id: question.section_id,
         display_order: numberValue(question.display_order),
@@ -900,6 +908,31 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
     markDirty();
   }
 
+  async function replaceGeneratedQuestion(question: SelectedQuestion) {
+    if (!supabase || !question.paper_question_id) {
+      setError("Save and regenerate the paper before replacing this question.");
+      return;
+    }
+    if (question.is_locked) {
+      setError("Unlock this question before replacing it.");
+      return;
+    }
+    setReplacingQuestionId(question.question_id);
+    setError("");
+    setNotice("");
+    const { error: replacementError } = await supabase.rpc("replace_paper_question_v8", {
+      p_paper_question_id: question.paper_question_id,
+      p_seed: null,
+    });
+    setReplacingQuestionId("");
+    if (replacementError) {
+      setError(replacementError.message);
+      return;
+    }
+    setNotice("Generated question replaced with another eligible approved question.");
+    await load();
+  }
+
   async function runValidation() {
     if (!supabase) return;
     const saved = await saveDraft(false);
@@ -1301,7 +1334,7 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
                     return <article key={question.question_id}>
                       <span className="question-number">{paperNumber}</span>
                       <div className="arrangement-question"><strong>{question.snapshot.stem_text}</strong><div><span>{question.snapshot.subject_name || subjects.find((subject) => subject.id === question.snapshot.subject_id)?.name || 'Subject'}</span><span>{question.snapshot.chapter_name || 'No chapter'}</span><span>{readable(question.snapshot.difficulty)}</span><span>{readable(question.generation_source || 'manual')}</span>{question.usage_count !== undefined && <span>Used {question.usage_count}×</span>}</div><select className="rm-input" value={question.section_client_id} onChange={(event) => updateSelected(question.question_id, { section_client_id: event.target.value })}>{sections.map((option) => <option key={option.client_id} value={option.client_id}>{option.title}</option>)}</select><div className="marks-row"><label>Marks<input type="number" step="0.25" className="rm-input" value={question.marks} onChange={(event) => updateSelected(question.question_id, { marks: Number(event.target.value) })} /></label><label>Negative<input type="number" step="0.25" className="rm-input" value={question.negative_marks} onChange={(event) => updateSelected(question.question_id, { negative_marks: Number(event.target.value) })} /></label><label className="check-inline"><input type="checkbox" checked={Boolean(question.is_mandatory)} onChange={(event) => updateSelected(question.question_id, { is_mandatory: event.target.checked })} /> Mandatory</label></div></div>
-                      <div className="arrangement-actions"><button title="Move to top" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'top')}><ChevronLeft size={15} className="rotate-90" /></button><button title="Move up" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'up')}><ArrowUp size={15} /></button><button title="Move down" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'down')}><ArrowDown size={15} /></button><button title="Move to bottom" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'bottom')}><ChevronRight size={15} className="rotate-90" /></button><button title={question.is_locked ? 'Unlock question' : 'Lock question'} onClick={() => updateSelected(question.question_id, { is_locked: !question.is_locked })}>{question.is_locked ? <Lock size={15} /> : <Unlock size={15} />}</button><button title="Lock position" onClick={() => updateSelected(question.question_id, { position_locked: !question.position_locked })} className={question.position_locked ? 'active' : ''}><GripVertical size={15} /></button><button title="Remove question" onClick={() => removeQuestion(question.question_id)} className="danger"><Trash2 size={15} /></button></div>
+                      <div className="arrangement-actions"><button title="Move to top" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'top')}><ChevronLeft size={15} className="rotate-90" /></button><button title="Move up" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'up')}><ArrowUp size={15} /></button><button title="Move down" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'down')}><ArrowDown size={15} /></button><button title="Move to bottom" disabled={question.position_locked} onClick={() => moveQuestion(question.question_id, 'bottom')}><ChevronRight size={15} className="rotate-90" /></button><button title={question.is_locked ? 'Unlock question' : 'Lock question'} onClick={() => updateSelected(question.question_id, { is_locked: !question.is_locked })}>{question.is_locked ? <Lock size={15} /> : <Unlock size={15} />}</button><button title="Lock position" onClick={() => updateSelected(question.question_id, { position_locked: !question.position_locked })} className={question.position_locked ? 'active' : ''}><GripVertical size={15} /></button>{question.blueprint_rule_id && <button title="Replace generated question" disabled={Boolean(question.is_locked) || replacingQuestionId === question.question_id} onClick={() => void replaceGeneratedQuestion(question)}>{replacingQuestionId === question.question_id ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}</button>}<button title="Remove question" onClick={() => removeQuestion(question.question_id)} className="danger"><Trash2 size={15} /></button></div>
                     </article>;
                   })}</div>;
                 })}
@@ -1331,6 +1364,14 @@ export function QuestionPaperBuilder({ kind }: { kind: "admin" | "school" }) {
                 workflowStatus={workflowStatus}
                 onWorkflowChange={setWorkflowStatus}
               />
+              <PaperTemplatePanel
+                paperId={paperId}
+                kind={kind}
+                organizationId={kind === "admin" ? null : organizationId}
+                base={base}
+              />
+              <PaperExportPanel paperId={paperId} />
+              <PaperAuditPanel paperId={paperId} />
               <article className="v8-paper-preview"><header><div><span>{code || 'Draft code pending'}</span><h1>{title || 'Untitled paper'}</h1><p>{selectedProgramme?.name || 'Programme not selected'} · {selectedSubjectIds.map((id) => subjects.find((subject) => subject.id === id)?.name).filter(Boolean).join(', ') || 'No subjects selected'}</p></div><div><strong>{durationMinutes} minutes</strong><strong>{totalMarks} marks</strong></div></header>{instructions && <div className="preview-instructions"><strong>Instructions</strong><p>{instructions}</p></div>}{sections.map((section) => { const items = selectedQuestions.filter((question) => question.section_client_id === section.client_id); return <section key={section.client_id}><div className="preview-section-heading"><div><h2>{section.title}</h2><p>{section.instructions}</p></div><span>{items.length} questions</span></div>{items.map((question) => { const number = selectedQuestions.findIndex((item) => item.question_id === question.question_id) + 1; return <article key={question.question_id}><strong className="preview-number">{number}.</strong><div><p>{question.snapshot.stem_text}</p>{question.snapshot.question_image_url && <img src={question.snapshot.question_image_url} alt="Question illustration" />}{question.snapshot.options?.map((option) => <div className="preview-option" key={option.option_key}><strong>{option.option_key}</strong><span>{option.content_text || option.content_latex}</span></div>)}</div><span className="preview-marks">+{question.marks} / −{question.negative_marks}</span></article>; })}</section>; })}</article>
             </section>
           )}

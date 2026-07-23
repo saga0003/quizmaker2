@@ -23,6 +23,7 @@ import type {
   PaperWorkflowStatus,
 } from "@/types/papers";
 import { useQuestionScope } from "@/components/questions/useQuestionScope";
+import { PaperTemplatePanel } from "@/components/papers/PaperTemplatePanel";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -422,6 +423,13 @@ export function QuestionPaperList({ kind }: { kind: "admin" | "school" }) {
           ))}
         </select>
       </section>
+
+      <PaperTemplatePanel
+        paperId={null}
+        kind={kind}
+        organizationId={kind === "admin" ? null : organizationId}
+        base={base}
+      />
 
       <section className="rm-card" style={{ marginTop: 16, overflow: "hidden" }}>
         {loading ? (
