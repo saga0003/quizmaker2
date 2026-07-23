@@ -4,9 +4,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "git": {
-    "deploymentEnabled": {
-      "*": false,
-      "evidara-v8-papers": true
-    }
+    "deploymentEnabled": false
   }
 }
