@@ -37,14 +37,58 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Lint
-        run: npm run lint
+      - name: Run lint report
+        run: |
+          set +e
+          npm run lint > v8-lint.txt 2>&1
+          echo "$?" > v8-lint.status
+          cat v8-lint.txt
+          exit 0
 
-      - name: TypeScript
-        run: npm run typecheck
+      - name: Run TypeScript report
+        run: |
+          set +e
+          npm run typecheck > v8-typecheck.txt 2>&1
+          echo "$?" > v8-typecheck.status
+          cat v8-typecheck.txt
+          exit 0
 
-      - name: V8 paper smoke checks
-        run: node scripts/v8-paper-smoke.mjs
+      - name: Run V8 paper smoke report
+        run: |
+          set +e
+          node scripts/v8-paper-smoke.mjs > v8-smoke.txt 2>&1
+          echo "$?" > v8-smoke.status
+          cat v8-smoke.txt
+          exit 0
 
-      - name: Next.js production build
-        run: npm run build
+      - name: Run Next.js build report
+        run: |
+          set +e
+          npm run build > v8-build.txt 2>&1
+          echo "$?" > v8-build.status
+          cat v8-build.txt
+          exit 0
+
+      - name: Upload V8 paper QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v8-paper-qa-reports
+          path: |
+            v8-lint.txt
+            v8-lint.status
+            v8-typecheck.txt
+            v8-typecheck.status
+            v8-smoke.txt
+            v8-smoke.status
+            v8-build.txt
+            v8-build.status
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce V8 paper quality gates
+        run: |
+          test "$(cat v8-lint.status)" = "0"
+          test "$(cat v8-typecheck.status)" = "0"
+          test "$(cat v8-smoke.status)" = "0"
+          test "$(cat v8-build.status)" = "0"
