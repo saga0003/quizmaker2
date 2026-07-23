@@ -33,6 +33,16 @@ jobs:
           set +e
           {
             set -euxo pipefail
+            python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/.v9-bundle/chunk07.txt')
+          value = path.read_text()
+          if len(value) == 5999:
+              value = value[:3304] + 'n' + value[3304:]
+              path.write_text(value)
+          if len(value) != 6000:
+              raise SystemExit(f'Unexpected chunk07 length: {len(value)}')
+          PY
             wc -c scripts/.v9-bundle/chunk*.txt
             sha256sum scripts/.v9-bundle/chunk*.txt
             cat scripts/.v9-bundle/chunk*.txt > /tmp/v9-bundle.tar.xz.b64
