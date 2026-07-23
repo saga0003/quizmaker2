@@ -62,12 +62,12 @@ jobs:
             tar -xJf /tmp/v9-bundle.tar.xz
             node scripts/v9-product-smoke.mjs
             rm -rf scripts/.v9-bundle scripts/.v9-patch
-            rm -f .github/workflows/v9-source-export.yml
-            rm -f .github/workflows/apply-v9-product-bundle.yml
             rm -f scripts/v9-source-export-trigger.txt
+            rm -f .github/workflows/evidara-v9-product-qa.yml
             git config user.name "Evidara V9 Automation"
             git config user.email "actions@users.noreply.github.com"
             git add -A
+            git reset -- v9-apply.log v9-apply.status || true
             git status --short
             git commit -m "Build V9 product catalogue and commerce module"
             git push origin HEAD:evidara-v9-product-catalogue
