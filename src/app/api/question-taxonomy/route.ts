@@ -139,6 +139,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ item: data, duplicate: false }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
+
+    if (['renameItem', 'moveItems', 'deleteItems', 'restoreItems'].includes(action)) {
+      if (!ctx.superAdmin) throw Object.assign(new Error('Only Super Admin can alter or delete academic settings.'), { status: 403 });
+      const entity = String(body.entity || '');
+      const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
+      const actionMap: Record<string, string> = {
+        renameItem: 'rename',
+        moveItems: 'move',
+        deleteItems: 'delete',
+        restoreItems: 'restore',
+      };
+      const { data, error } = await ctx.admin.rpc('bulk_manage_question_taxonomy_v8', {
+        p_entity: entity,
+        p_action: actionMap[action],
+        p_ids: ids,
+        p_parent_id: body.parentId ? String(body.parentId) : null,
+        p_name: body.name ? String(body.name) : null,
+        p_code: body.code ? String(body.code) : null,
+      });
+      if (error) throw new Error(error.message);
+      return NextResponse.json(data || {}, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     throw Object.assign(new Error('Unsupported taxonomy action.'), { status: 400 });
   } catch (error) {
     return failure(error);

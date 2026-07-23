@@ -41,6 +41,7 @@ import { useAuth } from '@/context/AuthProvider';
 import { normalizeEvidaraRole } from '@/lib/roles';
 import { useQuestionScope } from '@/components/questions/useQuestionScope';
 import { QuestionBulkImportDialog } from '@/components/evidara/question-bulk-import-dialog';
+import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 import type {
 QuestionDifficulty,
 QuestionRow,
@@ -98,9 +99,7 @@ AlertDialogFooter,
 AlertDialogHeader,
 AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-const EXAMS = ['NEET', 'JEE Main', 'JEE Advanced', 'KCET', 'School MCQ', 'Olympiad', 'Foundation', 'Scholarship Exam', 'Custom'];
-const GRADES = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12', 'NEET Long Term', 'JEE Long Term', 'Custom'];
-const SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Logical Reasoning'];
+const DEFAULT_SUBJECTS = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Logical Reasoning'];
 const MODES: PaperSelectionMode[] = ['manual', 'automatic', 'hybrid'];
 const DIFFICULTIES: QuestionDifficulty[] = ['very_easy', 'easy', 'moderate', 'difficult', 'very_difficult'];
 const DIFFICULTY_LABEL: Record<QuestionDifficulty, string> = {
@@ -111,20 +110,6 @@ difficult: 'Hard',
 very_difficult: 'Very hard',
 };
 const STATUSES: PaperStatus[] = ['draft', 'under_review', 'approved', 'published', 'paused', 'closed', 'archived', 'rejected'];
-const TEST_TYPES: Array<[PaperTestType, string]> = [
-['full_length_mock', 'Full-length mock test'],
-['subject_test', 'Subject test'],
-['chapter_test', 'Chapter test'],
-['topic_test', 'Topic test'],
-['unit_test', 'Unit test'],
-['diagnostic_test', 'Diagnostic test'],
-['scholarship_test', 'Scholarship test'],
-['previous_year_paper', 'Previous-year paper'],
-['practice_test', 'Practice test'],
-['foundation_test', 'Foundation test'],
-['school_test', 'School test'],
-['custom_test', 'Custom test'],
-];
 const emptyDistribution = (): DifficultyDistribution => ({
 very_easy: 0,
 easy: 0,
@@ -144,11 +129,11 @@ const sanitize = (value: string) => value
 .replace(/\son\w+="[^"]*"/gi, '')
 .replace(/\son\w+='[^']*'/gi, '')
 .replace(/javascript:/gi, '');
-function emptySection(order = 0, mode: PaperSelectionMode = 'manual'): PaperSectionInput {
+function emptySection(order = 0, mode: PaperSelectionMode = 'manual', subjectNames: string[] = DEFAULT_SUBJECTS): PaperSectionInput {
 return {
 client_id: id(),
 title: `Section ${String.fromCharCode(65 + order)}`,
-subject_key: SUBJECTS[Math.min(order, SUBJECTS.length - 1)],
+subject_key: subjectNames[Math.min(order, subjectNames.length - 1)] || 'Physics',
 biology_division: 'combined',
 selection_mode: mode,
 question_target: 0,
@@ -190,10 +175,11 @@ if (!subject) return true;
 const name = normal(question.subjects?.name);
 const code = normal(question.subjects?.code);
 const tags = (question.tags || []).map(normal);
+const biologyDivision = String(question.metadata?.biology_division || '').toLowerCase();
 if (subject === 'Biology') {
 if (!['biology', 'botany', 'zoology'].some((value) => name.includes(value) || code.includes(value))) return false;
-if (section.biology_division === 'botany') return name.includes('botany') || code.includes('botany') || tags.includes('botany');
-if (section.biology_division === 'zoology') return name.includes('zoology') || code.includes('zoology') || tags.includes('zoology');
+if (section.biology_division === 'botany') return biologyDivision === 'botany' || name.includes('botany') || code.includes('botany') || tags.includes('botany');
+if (section.biology_division === 'zoology') return biologyDivision === 'zoology' || name.includes('zoology') || code.includes('zoology') || tags.includes('zoology');
 return true;
 }
 return subjectAliases(subject).some((value) => name.includes(value) || code.includes(value) || tags.includes(value));
@@ -212,7 +198,6 @@ customTestType: string;
 duration: number;
 attempts: number;
 resultMode: ResultMode;
-instructions: string;
 from: string;
 until: string;
 openForever: boolean;
@@ -224,7 +209,7 @@ const emptyBuilder = (): Builder => ({
 id: null,
 title: '',
 code: '',
-description: '',
+description: '<p>Read every question carefully. Answers are autosaved. Submit before the timer reaches zero.</p>',
 exam: 'NEET',
 grade: 'Grade 11',
 customGrade: '',
@@ -233,7 +218,6 @@ customTestType: '',
 duration: 180,
 attempts: 1,
 resultMode: 'score_only',
-instructions: '<p>Read every question carefully. Answers are autosaved. Submit before the timer reaches zero.</p>',
 from: '',
 until: '',
 openForever: true,
@@ -269,7 +253,7 @@ return (
 </div>
 );
 }
-function RichInstructions({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function RichDescription({ value, onChange }: { value: string; onChange: (value: string) => void }) {
 const ref = useRef<HTMLDivElement>(null);
 useEffect(() => {
 if (ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value;
@@ -305,7 +289,7 @@ ref={ref}
 contentEditable
 suppressContentEditableWarning
 onInput={(event) => onChange(sanitize(event.currentTarget.innerHTML))}
-className="min-h-32 px-4 py-3 text-sm leading-6 text-[#14232B] outline-none empty:before:text-[#AEB8BC] empty:before:content-['Add_instructions_for_students'] [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+className="min-h-32 px-4 py-3 text-sm leading-6 text-[#14232B] outline-none empty:before:text-[#AEB8BC] empty:before:content-['Add_a_formatted_description_for_students'] [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
 />
 </div>
 );
@@ -314,6 +298,7 @@ export function LivePaperCatalogueV8({ kind, startInCreate = false }: { kind: 'a
 const { configured, profile, user } = useAuth();
 const role = normalizeEvidaraRole(profile?.role);
 const { organizationId, organizationName, loading: scopeLoading, error: scopeError } = useQuestionScope(kind);
+const { grades, exams, testTypes, error: settingsError } = useAssessmentOptions(organizationId);
 const [papers, setPapers] = useState<PaperListRow[]>([]);
 const [questions, setQuestions] = useState<QuestionRow[]>([]);
 const [subjects, setSubjects] = useState<TaxonomySubject[]>([]);
@@ -337,6 +322,7 @@ const [difficultyFilter, setDifficultyFilter] = useState('all');
 const [autosave, setAutosave] = useState('Autosave ready');
 const [importBefore, setImportBefore] = useState<Set<string> | null>(null);
 const [importSection, setImportSection] = useState('');
+const subjectNames = useMemo(() => { const names = subjects.map((item) => item.name); return names.length ? names : DEFAULT_SUBJECTS; }, [subjects]);
 const [deleteTarget, setDeleteTarget] = useState<PaperListRow | null>(null);
 const [rejectTarget, setRejectTarget] = useState<PaperListRow | null>(null);
 const [rejectionReason, setRejectionReason] = useState('');
@@ -436,11 +422,12 @@ examMatches(question, builder.exam)
 && (!section.chapter_ids?.length || (!!question.chapter_id && section.chapter_ids.includes(question.chapter_id)))
 && (!section.topic_ids?.length || (!!question.topic_id && section.topic_ids.includes(question.topic_id)))
 ), [builder.exam, resolvedGrade]);
-const filteredQuestions = useMemo(() => !active ? [] : questions.filter((question) => (
+const matchingQuestions = useMemo(() => !active ? [] : questions.filter((question) => (
 matches(question, active)
-&& (difficultyFilter === 'all' || question.difficulty === difficultyFilter)
 && (!questionSearch || `${question.stem_text} ${question.chapters?.name || ''} ${question.topics?.name || ''}`.toLowerCase().includes(questionSearch.toLowerCase()))
-)), [active, difficultyFilter, matches, questionSearch, questions]);
+)), [active, matches, questionSearch, questions]);
+const difficultyCounts = useMemo(() => Object.fromEntries(DIFFICULTIES.map((difficulty) => [difficulty, matchingQuestions.filter((question) => question.difficulty === difficulty).length])) as Record<QuestionDifficulty, number>, [matchingQuestions]);
+const filteredQuestions = useMemo(() => difficultyFilter === 'all' ? matchingQuestions : matchingQuestions.filter((question) => question.difficulty === difficultyFilter), [difficultyFilter, matchingQuestions]);
 const filteredPapers = useMemo(() => papers.filter((paper) => (
 (statusFilter === 'all' || paper.status === statusFilter)
 && (!search || `${paper.title} ${paper.code || ''} ${paper.exam_type} ${paper.grade_level || ''}`.toLowerCase().includes(search.toLowerCase()))
@@ -453,7 +440,7 @@ const distributionTotal = active
 ? DIFFICULTIES.reduce((sum, difficulty) => sum + Number(active.difficulty_distribution?.[difficulty] || 0), 0)
 : 0;
 function resetBuilder() {
-const section = emptySection();
+const section = emptySection(0, 'manual', subjectNames);
 setBuilder(emptyBuilder());
 setSections([section]);
 setActiveSection(section.client_id);
@@ -537,16 +524,15 @@ setBuilder({
 id: String(row.id),
 title: String(row.title || ''),
 code: String(row.code || ''),
-description: String(row.description || ''),
+description: String(row.description || row.instructions || ''),
 exam: String(row.exam_type || 'NEET'),
-grade: GRADES.includes(grade) ? grade : 'Custom',
-customGrade: GRADES.includes(grade) ? '' : grade,
+grade,
+customGrade: '',
 testType: row.test_type || 'full_length_mock',
 customTestType: String(row.custom_test_type || ''),
 duration: Number(row.duration_minutes || 60),
 attempts: Number(row.attempt_limit || 1),
 resultMode: row.result_mode || 'score_only',
-instructions: String(row.instructions || ''),
 from: toLocal(row.available_from),
 until: toLocal(row.available_until),
 openForever: Boolean(row.open_forever),
@@ -575,7 +561,7 @@ function updateSection(clientId: string, patch: Partial<PaperSectionInput>) {
 setSections((current) => current.map((section) => section.client_id === clientId ? { ...section, ...patch } : section));
 }
 function addSection() {
-const section = emptySection(sections.length, builder.defaultMode);
+const section = emptySection(sections.length, builder.defaultMode, subjectNames);
 setSections((current) => [...current, section]);
 setActiveSection(section.client_id);
 }
@@ -700,14 +686,14 @@ return;
 const payload: PaperPayload = {
 title: builder.title.trim() || 'Untitled Paper',
 code: builder.code.trim() || undefined,
-description: builder.description.trim() || undefined,
+description: sanitize(builder.description) || undefined,
 exam_type: builder.exam,
 grade_level: resolvedGrade,
 test_type: builder.testType,
 custom_test_type: builder.testType === 'custom_test' ? builder.customTestType.trim() : undefined,
 status,
 duration_minutes: builder.duration,
-instructions: sanitize(builder.instructions),
+instructions: sanitize(builder.description),
 access_mode: kind === 'admin' ? 'public' : 'organization',
 available_from: builder.openForever ? undefined : toIso(builder.from),
 available_until: builder.openForever ? undefined : toIso(builder.until),
@@ -821,8 +807,8 @@ Build grade-aware papers, configure each section and prepare approved assessment
 </Button>
 </div>
 </div>
-{(scopeError || error) && (
-<div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{scopeError || error}</div>
+{(scopeError || error || settingsError) && (
+<div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{scopeError || error || settingsError}</div>
 )}
 {message && (
 <div className="rounded-xl border border-[#0E5A5A]/20 bg-[#DCE9E7]/60 px-4 py-3 text-sm text-[#0E5A5A]">{message}</div>
@@ -897,7 +883,7 @@ className="h-11 border-[#E7ECEB] pl-9"
 {paper.rejection_reason && <p className="mt-1 line-clamp-2 text-xs text-[#B54747]">Reason: {paper.rejection_reason}</p>}
 </TableCell>
 <TableCell><p className="text-sm font-medium text-[#14232B]">{paper.exam_type}</p><p className="mt-1 text-xs text-[#6B7980]">{paper.grade_level || 'No grade'}</p></TableCell>
-<TableCell className="max-w-[190px] text-sm text-[#44545C]">{paper.test_type === 'custom_test' ? paper.custom_test_type : TEST_TYPES.find(([value]) => value === paper.test_type)?.[1]}</TableCell>
+<TableCell className="max-w-[190px] text-sm text-[#44545C]">{paper.test_type === 'custom_test' ? paper.custom_test_type : testTypes.find((item) => item.value === paper.test_type)?.label || statusLabel(String(paper.test_type || ''))}</TableCell>
 <TableCell className="text-sm tabular-nums text-[#14232B]">{paper.total_questions}</TableCell>
 <TableCell className="text-sm tabular-nums text-[#14232B]">{paper.total_marks}</TableCell>
 <TableCell className="text-sm text-[#44545C]">{paper.duration_minutes} min</TableCell>
@@ -963,18 +949,18 @@ className="h-11 border-[#E7ECEB] pl-9"
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 <div className="space-y-2 md:col-span-2"><Label>Paper title</Label><Input value={builder.title} onChange={(event) => setBuilder((current) => ({ ...current, title: event.target.value }))} placeholder="NEET Full Syllabus Mock 01" className="h-11 border-[#E7ECEB]" /></div>
 <div className="space-y-2"><Label>Paper code</Label><Input value={builder.code} onChange={(event) => setBuilder((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="NEET-M01" className="h-11 border-[#E7ECEB]" /></div>
-<div className="space-y-2"><Label>Exam type</Label><Select value={builder.exam} onValueChange={(exam) => setBuilder((current) => ({ ...current, exam }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{EXAMS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
-<div className="space-y-2"><span className="text-sm font-medium text-[#14232B]">Grade</span><Select value={builder.grade} onValueChange={(grade) => setBuilder((current) => ({ ...current, grade }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{GRADES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
-{builder.grade === 'Custom' && <div className="space-y-2"><Label>Custom grade</Label><Input value={builder.customGrade} onChange={(event) => setBuilder((current) => ({ ...current, customGrade: event.target.value }))} placeholder="Enter grade or cohort" className="h-11 border-[#E7ECEB]" /></div>}
-<div className="space-y-2"><Label>Test type</Label><Select value={builder.testType} onValueChange={(testType) => setBuilder((current) => ({ ...current, testType: testType as PaperTestType }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{TEST_TYPES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2"><Label>Exam type</Label><Select value={builder.exam} onValueChange={(exam) => setBuilder((current) => ({ ...current, exam }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2"><span className="text-sm font-medium text-[#14232B]">Grade</span><Select value={builder.grade} onValueChange={(grade) => setBuilder((current) => ({ ...current, grade }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+
+<div className="space-y-2"><Label>Test type</Label><Select value={builder.testType} onValueChange={(testType) => setBuilder((current) => ({ ...current, testType: testType as PaperTestType }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{testTypes.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
 {builder.testType === 'custom_test' && <div className="space-y-2"><Label>Custom test name</Label><Input value={builder.customTestType} onChange={(event) => setBuilder((current) => ({ ...current, customTestType: event.target.value }))} placeholder="School Pre-Board Test" className="h-11 border-[#E7ECEB]" /></div>}
-<div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Description</Label><Textarea rows={3} value={builder.description} onChange={(event) => setBuilder((current) => ({ ...current, description: event.target.value }))} placeholder="Explain what the paper covers and who it is designed for." className="border-[#E7ECEB]" /></div>
+<div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Formatted description</Label><p className="text-xs text-[#6B7980]">This is the only student-facing description. Use headings, emphasis, colours or highlights when needed.</p><RichDescription value={builder.description} onChange={(description) => setBuilder((current) => ({ ...current, description }))} /></div>
 </div>
 </CardContent>
 </Card>
 <Card className="gap-0 border-[#E7ECEB] bg-white shadow-none">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts, result visibility and instructions. Product purchase or school entitlement controls access outside this builder." />
+<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts and result visibility. Product purchase or school entitlement controls access outside this builder." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 <div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[#E7ECEB]" /></div>
 <div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[#E7ECEB]" /></div>
@@ -983,7 +969,7 @@ className="h-11 border-[#E7ECEB] pl-9"
 {!builder.openForever && <><div className="space-y-2"><Label>Opens at</Label><Input type="datetime-local" value={builder.from} onChange={(event) => setBuilder((current) => ({ ...current, from: event.target.value }))} className="h-11 border-[#E7ECEB]" /></div><div className="space-y-2"><Label>Closes at</Label><Input type="datetime-local" value={builder.until} onChange={(event) => setBuilder((current) => ({ ...current, until: event.target.value }))} className="h-11 border-[#E7ECEB]" /></div></>}
 <div className="flex min-h-20 items-center justify-between rounded-xl border border-[#E7ECEB] px-4 py-3"><div><Label>Shuffle questions</Label><p className="mt-1 text-xs text-[#6B7980]">Change order per attempt</p></div><Switch checked={builder.shuffleQuestions} onCheckedChange={(shuffleQuestions) => setBuilder((current) => ({ ...current, shuffleQuestions }))} /></div>
 <div className="flex min-h-20 items-center justify-between rounded-xl border border-[#E7ECEB] px-4 py-3"><div><Label>Shuffle options</Label><p className="mt-1 text-xs text-[#6B7980]">Randomise MCQ choices</p></div><Switch checked={builder.shuffleOptions} onCheckedChange={(shuffleOptions) => setBuilder((current) => ({ ...current, shuffleOptions }))} /></div>
-<div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Extra instructions</Label><RichInstructions value={builder.instructions} onChange={(instructions) => setBuilder((current) => ({ ...current, instructions }))} /></div>
+
 </div>
 </CardContent>
 </Card>
@@ -1017,7 +1003,7 @@ return (
 <div className="space-y-5 rounded-xl border border-[#DCE9E7] bg-[#FBFCFC] p-4">
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_auto]">
 <div className="space-y-2"><Label>Section title</Label><Input value={active.title} onChange={(event) => updateSection(active.client_id, { title: event.target.value })} className="h-11 border-[#E7ECEB] bg-white" /></div>
-<div className="space-y-2"><Label>Subject</Label><Select value={active.subject_key} onValueChange={(subject_key) => updateSection(active.client_id, { subject_key, chapter_ids: [], topic_ids: [] })}><SelectTrigger className="h-11 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{SUBJECTS.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2"><Label>Subject</Label><Select value={active.subject_key} onValueChange={(subject_key) => updateSection(active.client_id, { subject_key, chapter_ids: [], topic_ids: [] })}><SelectTrigger className="h-11 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{subjectNames.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select></div>
 <div className="space-y-2"><Label>Selection mode</Label><Select value={active.selection_mode} onValueChange={(selection_mode) => updateSection(active.client_id, { selection_mode: selection_mode as PaperSelectionMode })}><SelectTrigger className="h-11 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{MODES.map((mode) => <SelectItem key={mode} value={mode}>{statusLabel(mode)}</SelectItem>)}</SelectContent></Select></div>
 <Button type="button" variant="ghost" onClick={() => removeSection(active.client_id)} disabled={sections.length === 1} className="self-end text-[#B54747] hover:bg-[#B54747]/10 hover:text-[#B54747]"><Trash2 className="mr-2 h-4 w-4" />Remove</Button>
 </div>
@@ -1078,7 +1064,8 @@ action={<div className="flex flex-wrap gap-2"><Button type="button" variant="out
 <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" /><Input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search matching questions" className="h-10 border-[#E7ECEB] pl-9" /></div>
 <Select value={difficultyFilter} onValueChange={setDifficultyFilter}><SelectTrigger className="h-10 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All difficulties</SelectItem>{DIFFICULTIES.map((difficulty) => <SelectItem key={difficulty} value={difficulty}>{DIFFICULTY_LABEL[difficulty]}</SelectItem>)}</SelectContent></Select>
 </div>
-<div className="mt-3 flex items-center justify-between text-xs text-[#6B7980]"><span>{active?.title || 'Active section'}</span><span>{filteredQuestions.length} matching · {selectedInActive} selected</span></div>
+<div className="mt-3 grid gap-2 sm:grid-cols-5">{DIFFICULTIES.map((difficulty) => <button key={difficulty} type="button" onClick={() => setDifficultyFilter(difficultyFilter === difficulty ? 'all' : difficulty)} className={`rounded-xl border px-3 py-2 text-left transition ${difficultyFilter === difficulty ? 'border-[#0E5A5A] bg-[#DCE9E7]' : 'border-[#E7ECEB] bg-white hover:border-[#0E5A5A]/40'}`}><span className="block text-[10px] font-semibold uppercase tracking-wide text-[#6B7980]">{DIFFICULTY_LABEL[difficulty]}</span><strong className="mt-1 block text-lg tabular-nums text-[#14232B]">{difficultyCounts[difficulty]}</strong></button>)}</div>
+<div className="mt-3 flex items-center justify-between text-xs text-[#6B7980]"><span>{active?.title || 'Active section'}</span><span>{filteredQuestions.length} shown · {matchingQuestions.length} total matching · {selectedInActive} selected</span></div>
 <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
 {filteredQuestions.map((question) => (
 <div key={question.id} className="rounded-xl border border-[#E7ECEB] p-3 transition hover:border-[#0E5A5A]/30">
@@ -1141,7 +1128,7 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 <div className="pr-8"><DialogTitle className="text-xl text-[#14232B]">{builder.title || 'Question Paper Preview'}</DialogTitle><DialogDescription className="mt-1">Learner-facing preview · {builder.exam} · {resolvedGrade} · {builder.duration} minutes</DialogDescription></div>
 </DialogHeader>
 <div className="bg-[#FBFCFC] px-4 py-5 sm:px-7">
-{builder.instructions && <div className="rounded-xl border border-[#DCE9E7] bg-white p-4 text-sm leading-relaxed text-[#44545C]" dangerouslySetInnerHTML={{ __html: sanitize(builder.instructions) }} />}
+{builder.description && <div className="rounded-xl border border-[#DCE9E7] bg-white p-4 text-sm leading-relaxed text-[#44545C]" dangerouslySetInnerHTML={{ __html: sanitize(builder.description) }} />}
 {sections.map((section) => (
 <section key={section.client_id} className="mt-6 rounded-xl border border-[#E7ECEB] bg-white p-4 sm:p-5">
 <div className="border-b border-[#E7ECEB] pb-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0E5A5A]">Section</span><h3 className="mt-1 text-xl font-bold text-[#14232B]">{section.title}</h3></div>

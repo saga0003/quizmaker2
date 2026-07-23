@@ -75,6 +75,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { GuidedLabel } from '@/components/evidara/question-help';
 import { QuestionDevicePreview } from '@/components/evidara/question-device-preview';
 import { SearchableTaxonomySelect } from '@/components/evidara/searchable-taxonomy-select';
+import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 
 const simpleQuestionTypes: QuestionType[] = [
   'single_correct',
@@ -144,8 +145,9 @@ function isPlaceholderImageUrl(value: string) {
 function templateCsv() {
   const example: Record<string, string> = {
     exam_types: 'NEET',
-    class_level: 'Class 11',
+    grade: 'Grade 11',
     subject: 'Physics',
+    biology_division: '',
     chapter: 'Units and Measurements',
     topic: 'Dimensions',
     question_type: 'single_correct',
@@ -216,6 +218,7 @@ export function QuestionBulkImportDialog({
   const role = normalizeEvidaraRole(profile?.role);
   const canPublish = role === 'super_admin' || role === 'evidara_admin' || role === 'school_admin';
   const platformImport = kind === 'admin' && (role === 'super_admin' || role === 'evidara_admin');
+  const { grades, exams, error: settingsError } = useAssessmentOptions(organizationId);
   const [questionFile, setQuestionFile] = useState<File | null>(null);
   const [imageZip, setImageZip] = useState<File | null>(null);
   const [zipNames, setZipNames] = useState<Set<string> | null>(null);
@@ -255,15 +258,22 @@ export function QuestionBulkImportDialog({
     const subjectByCode = new Map(orderedSubjects.map((subject) => [nameKey(subject.code), subject]));
     const parsed = parseQuestionRows(rawRows).map((row) => {
       const payload = structuredClone(row.payload!);
-      const errors = row.errors.map((item) => item
-        .replace(/question_type/g, 'question type')
-        .replace(/custom_test_type/g, 'custom test type')
-        .replace(/test_type/g, 'test type'));
+      const errors = row.errors.map((item) => item.replace(/question_type/g, 'question type'));
       const warnings: string[] = [];
       const subjectName = normalizeName(row.raw.subject || payload.metadata?.import_subject);
       const selectedSubject = subjectByName.get(nameKey(subjectName)) || subjectByCode.get(nameKey(subjectName));
       if (!selectedSubject) errors.push(`Subject '${subjectName || 'blank'}' is not available. Only Super Admin can add a new subject from Question Settings.`);
       else payload.subject_id = selectedSubject.id;
+
+      const grade = normalizeName(row.raw.grade || row.raw.class_level || payload.class_level);
+      const allowedGrades = new Set(grades.map((item) => nameKey(item.value)));
+      if (!grade) errors.push('Grade is required.');
+      else if (!allowedGrades.has(nameKey(grade))) errors.push(`Grade '${grade}' is not active for this school/institute.`);
+      payload.class_level = grade;
+
+      const allowedExams = new Set(exams.map((item) => nameKey(item.value)));
+      const unknownExams = (payload.exam_types || []).filter((exam) => !allowedExams.has(nameKey(exam)));
+      if (unknownExams.length) errors.push(`Examination '${unknownExams.join(', ')}' is not active for this school/institute.`);
 
       const chapterName = normalizeName(row.raw.chapter || payload.metadata?.import_chapter);
       const selectedChapter = chapterName && selectedSubject
@@ -303,7 +313,7 @@ export function QuestionBulkImportDialog({
       seen.set(key, row.rowNumber - 1);
       return row;
     });
-  }, [canPublish, imageZip, orderedChapters, orderedSubjects, orderedTopics, rawRows]);
+  }, [canPublish, exams, grades, imageZip, orderedChapters, orderedSubjects, orderedTopics, rawRows]);
 
   const localImageReferences = useMemo(() => rows.flatMap((row) => {
     const payload = row.payload;
@@ -727,7 +737,7 @@ export function QuestionBulkImportDialog({
                 <DialogDescription className="mt-1 max-w-3xl">Upload Excel, attach its image ZIP when filenames are used, navigate only the errors, undo changes when needed, and publish only after review.</DialogDescription>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics, grades: grades.map((item) => item.value), exams: exams.map((item) => item.value) })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel</Button>
                 <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV</Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP Template</Button>
                 <Button type="button" variant="outline" size="sm" onClick={downloadQuestionImportGuide} className="border-[#E7ECEB]"><FileText className="mr-1.5 h-4 w-4" />Guide</Button>
@@ -741,7 +751,7 @@ export function QuestionBulkImportDialog({
               <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2">{preflight?.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}<span>{preflight?.message || 'Checking database role, import function and image storage…'}</span></div><Button type="button" variant="ghost" size="sm" onClick={() => void runPreflight()} className="h-7 shrink-0 px-2"><RefreshCw className="mr-1 h-3.5 w-3.5" />Check again</Button></div>
             </div>
 
-            {error && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error}</div>}
+            {(error || settingsError) && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error || settingsError}</div>}
             {notice && !error && <div className="mb-4 rounded-xl border border-[#DCE9E7] bg-white px-4 py-3 text-sm text-[#0E5A5A]">{notice}</div>}
 
             <div className="grid gap-4 lg:grid-cols-2">
@@ -786,14 +796,14 @@ export function QuestionBulkImportDialog({
                   {!!current.warnings?.length && <div className="rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-3 text-xs text-[#8A5F00]">{current.warnings.join(' ')}</div>}
 
                   <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Classification</strong><p className="text-xs text-[#6B7980]">Search existing taxonomy or add a missing chapter/topic from this question.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <div className="space-y-2"><GuidedLabel required help="Subjects are universal. Only Super Admin can create a missing subject from Question Settings.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>
+                    <div className="space-y-2"><GuidedLabel required help="Subjects are universal. Only Super Admin can create a missing subject from Question Settings.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>{ /biology|botany|zoology/i.test(`${orderedSubjects.find((item) => item.id === currentSubjectId)?.name || ''} ${orderedSubjects.find((item) => item.id === currentSubjectId)?.code || ''}`) && <div className="space-y-2"><GuidedLabel help="Classify Biology questions for combined, Botany or Zoology sections.">Biology division</GuidedLabel><Select value={rawText(current.raw, 'biology_division') || 'combined'} onValueChange={(biology_division) => updateRaw('biology_division', biology_division)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="combined">Combined Biology</SelectItem><SelectItem value="botany">Botany</SelectItem><SelectItem value="zoology">Zoology</SelectItem></SelectContent></Select></div>}
                     <div className="space-y-2"><GuidedLabel help="Choose an existing chapter or use the Excel chapter name.">Chapter</GuidedLabel><SearchableTaxonomySelect value={currentChapterId} onValueChange={(chapterId) => { const chapter = orderedChapters.find((item) => item.id === chapterId); updateRaw('chapter', chapter?.name || ''); updateRaw('topic', ''); }} options={currentChapters.map((chapter) => ({ value: chapter.id, label: chapter.name }))} placeholder="Search chapter" disabled={!currentSubjectId} allowClear clearLabel="No chapter" /><Input value={rawText(current.raw, 'chapter')} onChange={(event) => { updateRaw('chapter', event.target.value); updateRaw('topic', ''); }} placeholder="Chapter name from Excel" className="border-[#E7ECEB]" />{current.missingChapter && <Button type="button" size="sm" onClick={() => void createCurrentChapter()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add chapter “{current.missingChapter.name}”</Button>}</div>
                     <div className="space-y-2"><GuidedLabel help="Topic is optional but recommended.">Topic</GuidedLabel><SearchableTaxonomySelect value={currentPayload.topic_id || ''} onValueChange={(topicId) => { const topic = orderedTopics.find((item) => item.id === topicId); updateRaw('topic', topic?.name || ''); }} options={currentTopics.map((topic) => ({ value: topic.id, label: topic.name }))} placeholder="Search topic" disabled={!currentChapterId} allowClear clearLabel="No topic" /><Input value={rawText(current.raw, 'topic')} onChange={(event) => updateRaw('topic', event.target.value)} placeholder="Optional topic name" className="border-[#E7ECEB]" />{current.missingTopic && <Button type="button" size="sm" onClick={() => void createCurrentTopic()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add topic “{current.missingTopic.name}”</Button>}</div>
                     <div className="space-y-2"><GuidedLabel required help="Choose the way a learner answers this question.">Question type</GuidedLabel><Select value={currentPayload.question_type} onValueChange={(value) => updateRaw('question_type', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{simpleQuestionTypes.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><GuidedLabel required help="Difficulty is used for paper balancing and analytics.">Difficulty</GuidedLabel><Select value={currentPayload.difficulty} onValueChange={(value) => updateRaw('difficulty', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{difficulties.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><GuidedLabel help="Teachers may use Draft or In Review only.">Status</GuidedLabel><Select value={currentPayload.status} onValueChange={(value) => updateRaw('status', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{(canPublish ? ['draft', 'in_review', 'approved'] : ['draft', 'in_review']).map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><GuidedLabel required help="Use | between multiple examinations.">Exam types</GuidedLabel><Input value={rawText(current.raw, 'exam_types')} onChange={(event) => updateRaw('exam_types', event.target.value)} placeholder="NEET|KCET" className="border-[#E7ECEB]" /></div>
-                    <div className="space-y-2"><GuidedLabel help="Grade or class used for filters.">Class level</GuidedLabel><Input value={rawText(current.raw, 'class_level')} onChange={(event) => updateRaw('class_level', event.target.value)} className="border-[#E7ECEB]" /></div>
+                    <div className="space-y-2"><GuidedLabel required help="Choose active examinations. The Excel dropdown uses the same database list.">Examinations</GuidedLabel><div className="flex flex-wrap gap-2">{exams.map((item) => { const selectedValues = rawText(current.raw, 'exam_types').split(/[|,]/).map((value) => value.trim()).filter(Boolean); const selectedExam = selectedValues.includes(item.value); return <Button key={item.id} type="button" variant="outline" size="sm" onClick={() => updateRaw('exam_types', (selectedExam ? selectedValues.filter((value) => value !== item.value) : [...selectedValues, item.value]).join('|'))} className={selectedExam ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB]'}>{item.label}</Button>; })}</div></div>
+                    <div className="space-y-2"><GuidedLabel required help="Grade is used for eligibility and paper filtering.">Grade</GuidedLabel><Select value={rawText(current.raw, 'grade') || rawText(current.raw, 'class_level')} onValueChange={(grade) => { updateRaw('grade', grade); updateRaw('class_level', ''); }}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Select grade" /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
                   </div></div>
 
                   <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Question, LaTeX and image</strong><p className="text-xs text-[#6B7980]">Edit here and verify the rendered result on the right.</p></div><div className="space-y-4"><div className="space-y-2"><GuidedLabel required help="Complete learner-facing question text.">Question text</GuidedLabel><Textarea rows={6} value={rawText(current.raw, 'question') || rawText(current.raw, 'stem_text')} onChange={(event) => updateRaw('question', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Paste and correct question LaTeX directly.">Question LaTeX</GuidedLabel><Textarea rows={3} value={rawText(current.raw, 'question_latex') || rawText(current.raw, 'stem_latex')} onChange={(event) => updateRaw('question_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div><div className="space-y-2"><GuidedLabel help="Use a real public HTTPS URL or the exact filename inside the selected ZIP.">Question image</GuidedLabel><Input value={rawText(current.raw, 'question_image')} onChange={(event) => updateRaw('question_image', event.target.value)} placeholder="physics-q1.png or https://…" className="border-[#E7ECEB]" /></div></div></div>

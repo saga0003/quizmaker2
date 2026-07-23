@@ -10,7 +10,6 @@ export type QuestionType =
 
 export type QuestionStatus = "draft" | "in_review" | "approved" | "rejected" | "archived";
 export type QuestionDifficulty = "very_easy" | "easy" | "moderate" | "difficult" | "very_difficult";
-export type QuestionTestType = "full_length" | "part_test" | "chapter_test" | "topic_test" | "custom";
 
 export type QuestionOptionInput = {
   option_key: string;
@@ -35,9 +34,8 @@ export type MatchFollowingPair = {
 
 export type QuestionMetadata = {
   editor?: string;
-  test_type?: QuestionTestType;
-  custom_test_type?: string;
   match_pairs?: MatchFollowingPair[];
+  biology_division?: "combined" | "botany" | "zoology";
   import_subject?: string;
   import_chapter?: string;
   import_topic?: string;
@@ -115,9 +113,9 @@ export type QuestionRow = {
   profiles?: { full_name: string | null } | null;
 };
 
-export type TaxonomySubject = { id: string; name: string; code: string; organization_id: string | null };
-export type TaxonomyChapter = { id: string; name: string; subject_id: string; organization_id: string | null };
-export type TaxonomyTopic = { id: string; name: string; chapter_id: string; organization_id: string | null };
+export type TaxonomySubject = { id: string; name: string; code: string; organization_id: string | null; is_active?: boolean };
+export type TaxonomyChapter = { id: string; name: string; subject_id: string; organization_id: string | null; is_active?: boolean };
+export type TaxonomyTopic = { id: string; name: string; chapter_id: string; organization_id: string | null; is_active?: boolean };
 
 export type ParsedQuestionRow = {
   rowNumber: number;

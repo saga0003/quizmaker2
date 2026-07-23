@@ -86,7 +86,7 @@ function parseLabelledBlock(block: string): Record<string, unknown> {
         correct: "correct_answer",
         correct_option: "correct_answer",
         explanation: "solution",
-        grade: "class_level",
+        grade: "grade",
         exam: "exam_types",
         exam_type: "exam_types",
       } as Record<string, string>)[normalized] || normalized;
