@@ -33,6 +33,8 @@ jobs:
           set +e
           {
             set -euxo pipefail
+            wc -c scripts/.v9-bundle/chunk*.txt
+            sha256sum scripts/.v9-bundle/chunk*.txt
             cat scripts/.v9-bundle/chunk*.txt > /tmp/v9-bundle.tar.xz.b64
             wc -c /tmp/v9-bundle.tar.xz.b64
             sha256sum /tmp/v9-bundle.tar.xz.b64
