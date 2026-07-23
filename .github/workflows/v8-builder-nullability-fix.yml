@@ -1,0 +1,48 @@
+name: One-time V8 Builder Nullability Fix
+
+on:
+  push:
+    branches:
+      - evidara-v8-papers
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Trigger V8 builder nullability fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: evidara-v8-papers
+
+      - name: Patch guarded Supabase client capture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/components/papers/QuestionPaperBuilder.tsx')
+          text = path.read_text()
+          old = '''  useEffect(() => {
+              if (!supabase || !migrationReady || (kind === "school" && !organizationId)) return;
+              const timer = window.setTimeout(async () => {
+                const { data } = await supabase.rpc("paper_question_availability_v8", {'''
+          new = '''  useEffect(() => {
+              const client = supabase;
+              if (!client || !migrationReady || (kind === "school" && !organizationId)) return;
+              const timer = window.setTimeout(async () => {
+                const { data } = await client.rpc("paper_question_availability_v8", {'''
+          if old not in text:
+              raise SystemExit('Expected V8 availability effect was not found.')
+          path.write_text(text.replace(old, new, 1))
+          Path('.github/workflows/v8-builder-nullability-fix.yml').unlink()
+          PY
+
+      - name: Commit the one-time correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/papers/QuestionPaperBuilder.tsx .github/workflows/v8-builder-nullability-fix.yml
+          git commit -m "Fix V8 builder Supabase client narrowing"
+          git push origin HEAD:evidara-v8-papers
