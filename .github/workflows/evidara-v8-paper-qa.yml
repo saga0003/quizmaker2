@@ -28,6 +28,16 @@ jobs:
       - name: Check out V8 paper branch
         uses: actions/checkout@v4
 
+      - name: Package source snapshot
+        run: zip -qr v8-source.zip . -x '.git/*' 'node_modules/*' '.next/*' '.open-next/*'
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v8-source
+          path: v8-source.zip
+          retention-days: 1
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
