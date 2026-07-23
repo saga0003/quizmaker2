@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const productId = String(body.product_id ?? "");
     const voucherCode = String(body.voucher_code ?? body.coupon_code ?? "").trim().toUpperCase();
+    const requestedScope = String(body.purchase_scope ?? "student").toLowerCase();
 
     if (!productId) return json(req, { error: "Product is required." }, 400);
 
@@ -93,19 +94,25 @@ Deno.serve(async (req) => {
       return json(req, { error: "This offer is outside its sale period." }, 409);
     }
 
+    const purchaseScope = product.audience === "school"
+      ? "school"
+      : product.audience === "student"
+        ? "student"
+        : requestedScope === "school" ? "school" : "student";
+
     let organizationId: string | null = null;
-    if (product.audience === "school") {
+    if (purchaseScope === "school") {
       const { data: membership } = await admin
         .from("organization_members")
         .select("organization_id")
         .eq("user_id", user.id)
         .eq("is_active", true)
-        .in("member_role", ["institute_owner", "institute_admin"])
+        .in("member_role", ["institute_owner", "institute_admin", "school_owner", "school_admin", "super_admin", "evidara_admin", "admin", "platform_admin"])
         .limit(1)
         .maybeSingle();
 
       if (!membership) {
-        return json(req, { error: "Create your school workspace before buying this plan." }, 409);
+        return json(req, { error: "Sign in as a School Admin before buying this product for a school." }, 409);
       }
       organizationId = membership.organization_id;
     }
@@ -120,7 +127,7 @@ Deno.serve(async (req) => {
     if (voucherCode) {
       const { data: voucher, error: voucherError } = await admin
         .from("voucher_codes")
-        .select("id,code,discount_percent,purpose,product_id,allowed_email,organization_id,usage_limit,per_user_limit,used_count,starts_at,ends_at,active,offline_payment_reference")
+        .select("id,code,discount_percent,purpose,product_id,allowed_email,organization_id,seat_count,usage_limit,per_user_limit,used_count,starts_at,ends_at,active,offline_payment_reference")
         .eq("code", voucherCode)
         .maybeSingle();
 
@@ -160,6 +167,9 @@ Deno.serve(async (req) => {
           return json(req, { error: "This account has already used or reserved the voucher." }, 400);
         }
 
+        if (Number(voucher.discount_percent) === 100 && purchaseScope !== "school") {
+          return json(req, { error: "A 100% offline-payment voucher can activate only a school purchase." }, 400);
+        }
         discountPercent = Number(voucher.discount_percent);
         discountPaise = Math.min(
           version.selling_price_paise,
@@ -239,6 +249,7 @@ Deno.serve(async (req) => {
         commerce_metadata: {
           requested_code: voucherCode || null,
           voucher_purpose: voucherPurpose,
+          purchase_scope: purchaseScope,
         },
       })
       .select("id,payment_source")

@@ -72,6 +72,7 @@ const ROLE_PERMISSIONS: Record<EvidaraRole, ReadonlySet<EvidaraPermission>> = {
   ]),
   evidara_admin: new Set<EvidaraPermission>([
     "platform.operations",
+    "platform.manage_commerce",
     "schools.read_all",
     "schools.manage_all",
     "school.manage_profile",

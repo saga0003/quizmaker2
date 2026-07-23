@@ -1,6 +1,5 @@
 'use client';
 
-import { ShoppingBag } from 'lucide-react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { AppSidebar } from '@/components/evidara/app-sidebar';
@@ -36,6 +35,8 @@ import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
 import { AccessControlView } from '@/components/evidara/access-control-view';
+import { ProductStore } from '@/components/commerce/ProductStore';
+import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -56,12 +57,14 @@ function ViewRouter() {
   if (view === 'student-achievements') return <StudentAchievementsView />;
   if (view === 'student-benchmarks') return <StudentBenchmarksView />;
   if (view === 'student-resources') return <StudentResourcesView />;
-  if (view === 'student-purchases') return <StudentPurchasesView />;
+  if (view === 'student-store') return <ProductStore />;
+  if (view === 'student-purchases') return <PurchaseHistory />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
+  if (view === 'school-store') return <ProductStore />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
   if (view === 'school-resources') return <SchoolResourcesView />;
   if (view === 'school-achievements') return <SchoolAchievementsView />;
@@ -80,28 +83,6 @@ function ViewRouter() {
   if (view === 'admin-access') return <AccessControlView kind="admin" />;
 
   return null;
-}
-
-function StudentPurchasesView() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#14232B]">Purchase History</h1>
-        <p className="mt-1 text-sm text-[#6B7980]">Your transaction history and entitlements</p>
-      </div>
-      <div className="rounded-xl border border-[#E7ECEB] bg-white p-8 text-center">
-        <ShoppingBag className="mx-auto h-12 w-12 text-[#DCE9E7]" />
-        <h3 className="mt-4 text-lg font-semibold text-[#14232B]">No purchases yet</h3>
-        <p className="mt-1 text-sm text-[#6B7980]">Your purchase history will appear here after you subscribe to a product.</p>
-        <button
-          onClick={() => useAppStore.getState().setView('student-dashboard')}
-          className="mt-4 rounded-lg bg-[#0E5A5A] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#0a4747]"
-        >
-          Browse Products
-        </button>
-      </div>
-    </div>
-  );
 }
 
 export default function Home() {
