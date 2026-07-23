@@ -13,41 +13,62 @@ permissions:
   contents: write
 
 concurrency:
-  group: apply-v8-academic-settings
-  cancel-in-progress: false
+  group: evidara-v8-settings-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply:
-    if: github.event_name == 'pull_request'
-    name: Apply configurable academic settings
+  validate:
+    name: Apply, lint, typecheck, smoke and build
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - name: Check out V8 branch
+      - name: Check out V8 paper branch
         uses: actions/checkout@v4
         with:
           ref: evidara-v8-paper-builder
           fetch-depth: 0
 
-      - name: Reconstruct and apply coordinated patch
+      - name: Apply configurable academic settings
         shell: bash
         run: |
           set -euo pipefail
-          cat scripts/.v8-patch/part*.txt > /tmp/v8-settings.patch.gz.b64
-          echo "4a1d275fbcbf312de68a498817213e9e650009caadc59d771944479844b1d4a0  /tmp/v8-settings.patch.gz.b64" | sha256sum -c -
-          base64 -d /tmp/v8-settings.patch.gz.b64 | gunzip > /tmp/v8-settings.patch
-          echo "6f0d9124a742cfd5bf9ce711723988cbd680e404fe5cace69bd280e05abb35cb  /tmp/v8-settings.patch" | sha256sum -c -
-          git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/evidara-v8-paper-qa.yml > .github/workflows/evidara-v8-paper-qa.yml
-          git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/v8-source-export.yml > .github/workflows/v8-source-export.yml
-          patch --batch -p1 < /tmp/v8-settings.patch
-          rm -rf scripts/.v8-patch
-          node scripts/v8-paper-smoke.mjs
+          if compgen -G 'scripts/.v8-patch/part*.txt' > /dev/null; then
+            cat scripts/.v8-patch/part*.txt > /tmp/v8-settings.patch.gz.b64
+            echo "4a1d275fbcbf312de68a498817213e9e650009caadc59d771944479844b1d4a0  /tmp/v8-settings.patch.gz.b64" | sha256sum -c -
+            base64 -d /tmp/v8-settings.patch.gz.b64 | gunzip > /tmp/v8-settings.patch
+            echo "6f0d9124a742cfd5bf9ce711723988cbd680e404fe5cace69bd280e05abb35cb  /tmp/v8-settings.patch" | sha256sum -c -
+            git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/evidara-v8-paper-qa.yml > .github/workflows/evidara-v8-paper-qa.yml
+            git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/v8-source-export.yml > .github/workflows/v8-source-export.yml
+            patch --batch -p1 < /tmp/v8-settings.patch
+            rm -rf scripts/.v8-patch
+            node scripts/v8-paper-smoke.mjs
+            git config user.name "Evidara V8 Automation"
+            git config user.email "actions@users.noreply.github.com"
+            git add -A
+            git commit -m "Add configurable grades and academic settings"
+            git push origin HEAD:evidara-v8-paper-builder
+          fi
 
-      - name: Commit upgraded modules
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "Evidara V8 Automation"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A
-          git commit -m "Add configurable grades and academic settings"
-          git push origin HEAD:evidara-v8-paper-builder
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: V8 paper smoke checks
+        run: node scripts/v8-paper-smoke.mjs
+
+      - name: Next.js production build
+        run: npm run build
