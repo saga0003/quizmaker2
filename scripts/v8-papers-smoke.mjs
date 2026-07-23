@@ -9,10 +9,14 @@ const [
   foundationMigration,
   generationMigration,
   lifecycleMigration,
+  workflowMigration,
   list,
   builder,
   generationPanel,
   lifecyclePanel,
+  templatePanel,
+  exportPanel,
+  auditPanel,
   types,
 ] = await Promise.all([
   read("package.json"),
@@ -20,10 +24,14 @@ const [
   read("supabase/32_v8_paper_builder_foundation.sql"),
   read("supabase/33_v8_paper_generation_engine.sql"),
   read("supabase/34_v8_paper_review_publish_export.sql"),
+  read("supabase/35_v8_safe_autosave_templates_workflow.sql"),
   read("src/components/papers/QuestionPaperList.tsx"),
   read("src/components/papers/QuestionPaperBuilder.tsx"),
   read("src/components/papers/PaperGenerationPanel.tsx"),
   read("src/components/papers/PaperLifecyclePanel.tsx"),
+  read("src/components/papers/PaperTemplatePanel.tsx"),
+  read("src/components/papers/PaperExportPanel.tsx"),
+  read("src/components/papers/PaperAuditPanel.tsx"),
   read("src/types/papers.ts"),
 ]);
 
@@ -116,6 +124,24 @@ for (const contract of [
   );
 }
 
+for (const contract of [
+  "retained_section_ids",
+  "retained_question_ids",
+  "on conflict (id) do update",
+  "on conflict (paper_id,question_id) do update",
+  "sections_preserved",
+  "blueprints_preserved",
+  "save_paper_as_template_v8",
+  "create_paper_from_template_v8",
+  "Use the tracked review decision and publication functions",
+  "definition_only",
+]) {
+  assert.ok(
+    workflowMigration.includes(contract),
+    `Migration 35 is missing ${contract}`,
+  );
+}
+
 assert.match(
   foundationMigration,
   /'draft','draft'.*source_paper\.creation_mode/s,
@@ -150,6 +176,22 @@ assert.ok(
     lifecycleMigration.includes("'product_created',false"),
   "Published V8 paper definitions must not create products or student access",
 );
+assert.ok(
+  workflowMigration.includes("id<>all(retained_section_ids)") &&
+    workflowMigration.includes("question_id<>all(retained_question_ids)"),
+  "Draft autosave must update retained sections and questions without rebuilding everything",
+);
+assert.ok(
+  workflowMigration.includes("'workflow_status','draft'") &&
+    workflowMigration.includes("'student_access_created',false") &&
+    workflowMigration.includes("'product_created',false"),
+  "Template-created papers must always begin as isolated draft definitions",
+);
+assert.ok(
+  workflowMigration.includes("workflow_status<>'approved'") &&
+    workflowMigration.includes("definition_snapshot=excluded.definition_snapshot"),
+  "Final publication must require approval and preserve an immutable version snapshot",
+);
 
 for (const expected of [
   "duplicate_question_paper_v8",
@@ -178,11 +220,18 @@ for (const step of [
 for (const expected of [
   "PaperGenerationPanel",
   "PaperLifecyclePanel",
+  "PaperTemplatePanel",
+  "PaperExportPanel",
+  "PaperAuditPanel",
   "save_paper_definition_v8",
   "search_eligible_questions_v8",
   "paper_question_availability_v8",
   "validate_paper_v8",
   "submit_paper_review_v8",
+  "replace_paper_question_v8",
+  "paper_question_id",
+  "blueprint_rule_id",
+  "Replace generated question",
   "Server-side filters retrieve one page",
   "Products, pricing, payment, entitlement and test delivery remain separate",
   "Paper submitted for review",
@@ -221,6 +270,46 @@ for (const expected of [
     lifecyclePanel.includes(expected),
     `Paper lifecycle workspace is missing ${expected}`,
   );
+}
+
+for (const expected of [
+  "save_paper_as_template_v8",
+  "create_paper_from_template_v8",
+  "Save as template",
+  "Build draft",
+  "Create draft paper",
+  "Templates never publish a paper and never create student access",
+]) {
+  assert.ok(
+    templatePanel.includes(expected),
+    `Template workspace is missing ${expected}`,
+  );
+}
+
+for (const expected of [
+  "export_paper_definition_v8",
+  "Question paper HTML",
+  "Answer key HTML",
+  "Solutions HTML",
+  "Excel question list",
+  "Question list CSV",
+  "Answers & solutions CSV",
+  "Blueprint CSV",
+  "Validation report",
+  "Complete JSON backup",
+  "Print current preview",
+]) {
+  assert.ok(exportPanel.includes(expected), `Export workspace is missing ${expected}`);
+}
+
+for (const expected of [
+  "paper_audit_history",
+  "Every important paper action",
+  "Draft saves, duplication, generation, replacement, review, publication, versions and templates are recorded",
+  "Search action, role, reason or changed value",
+  "All actions",
+]) {
+  assert.ok(auditPanel.includes(expected), `Audit workspace is missing ${expected}`);
 }
 
 for (const forbidden of [
