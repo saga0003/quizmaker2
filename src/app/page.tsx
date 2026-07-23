@@ -32,10 +32,10 @@ import {
   AdminSegmentsView,
 } from '@/components/evidara/admin-views';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
-import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
 import { AccessControlView } from '@/components/evidara/access-control-view';
+import { QuestionPaperList } from '@/components/papers/QuestionPaperList';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -60,7 +60,7 @@ function ViewRouter() {
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
-  if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
+  if (view === 'school-papers') return <QuestionPaperList kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
   if (view === 'school-resources') return <SchoolResourcesView />;
@@ -71,7 +71,7 @@ function ViewRouter() {
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
-  if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
+  if (view === 'admin-papers') return <QuestionPaperList kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
   if (view === 'admin-achievements') return <AdminAchievementsView />;
