@@ -4,9 +4,6 @@
   "installCommand": "npm ci --no-audit --no-fund",
   "buildCommand": "npm run qa",
   "git": {
-    "deploymentEnabled": {
-      "*": false,
-      "evidara-v8-papers": true
-    }
+    "deploymentEnabled": false
   }
 }
