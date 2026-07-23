@@ -1,7 +1,7 @@
 # Evidara V8 Papers — Latest QA Report
 
-Validated commit: `a60b6e453cfb0513e1b224a09d67b8a5c3ac7a11`
-Recorded at: 2026-07-23T07:58:58Z
+Validated commit: `e11d371dd6bfee81a66e6943211b37c77723886c`
+Recorded at: 2026-07-23T08:00:48Z
 
 | Gate | Status |
 |---|---:|
@@ -12,8 +12,8 @@ Recorded at: 2026-07-23T07:58:58Z
 | Phase 1 smoke | 0 |
 | Phase 2 smoke | 0 |
 | Phase 3 smoke | 0 |
-| Next.js build | 127 |
-| Cloudflare build | 127 |
+| Next.js build | 0 |
+| Cloudflare build | 0 |
 
 ## v8-install.txt
 ```text
@@ -21,6 +21,8 @@ npm warn deprecated intersection-observer@0.10.0: The Intersection Observer poly
 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
 npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
+
+added 1054 packages in 24s
 ```
 
 ## v8-lint.txt
@@ -34,86 +36,36 @@ sh: 1: eslint: not found
 
 ## v8-typecheck.txt
 ```text
-src/app/verify/certificate/page.tsx(1,31): error TS2307: Cannot find module 'next' or its corresponding type declarations.
-src/components/AuthForm.tsx(4,27): error TS2307: Cannot find module 'next/navigation' or its corresponding type declarations.
-src/components/AuthForm.tsx(75,48): error TS2339: Property 'signUp' does not exist on type 'SupabaseAuthClient'.
-src/components/AuthForm.tsx(81,48): error TS2339: Property 'signInWithPassword' does not exist on type 'SupabaseAuthClient'.
-src/components/AuthForm.tsx(92,39): error TS2339: Property 'signInWithOAuth' does not exist on type 'SupabaseAuthClient'.
-src/components/DashboardShell.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/DashboardShell.tsx(4,29): error TS2307: Cannot find module 'next/navigation' or its corresponding type declarations.
-src/components/InstituteRegistrationForm.tsx(8,220): error TS2339: Property 'getUser' does not exist on type 'SupabaseAuthClient'.
+
+> evidara-school-platform@8.0.0-phase2 typecheck
+> tsc --noEmit
+
+src/app/layout.tsx(2,8): error TS2882: Cannot find module or type declarations for side-effect import of 'katex/dist/katex.min.css'.
+src/app/layout.tsx(3,8): error TS2882: Cannot find module or type declarations for side-effect import of './globals.css'.
+src/app/layout.tsx(4,8): error TS2882: Cannot find module or type declarations for side-effect import of './evidara-brand.css'.
+src/app/layout.tsx(5,8): error TS2882: Cannot find module or type declarations for side-effect import of './evidara-metrics.css'.
+src/app/layout.tsx(6,8): error TS2882: Cannot find module or type declarations for side-effect import of './evidara-tables.css'.
+src/app/layout.tsx(7,8): error TS2882: Cannot find module or type declarations for side-effect import of './evidara-segments.css'.
+src/app/layout.tsx(8,8): error TS2882: Cannot find module or type declarations for side-effect import of './evidara-benchmarks.css'.
 src/components/InstituteRegistrationForm.tsx(11,1492): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
-src/components/Navbar.tsx(2,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/PerformanceChart.tsx(2,100): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/ProtectedPage.tsx(4,27): error TS2307: Cannot find module 'next/navigation' or its corresponding type declarations.
-src/components/SetupBanner.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/TrialTest.tsx(16,3243): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
-src/components/achievements/AchievementBadge.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/achievements/AchievementBadge.tsx(6,20): error TS2307: Cannot find module './Achievements.module.css' or its corresponding type declarations.
 src/components/achievements/AdminAchievementGovernance.tsx(6,20): error TS2307: Cannot find module './Achievements.module.css' or its corresponding type declarations.
-src/components/achievements/CertificateViewer.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/achievements/CertificateViewer.tsx(8,20): error TS2307: Cannot find module './Achievements.module.css' or its corresponding type declarations.
-src/components/achievements/SchoolAchievementWorkspace.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/achievements/SchoolAchievementWorkspace.tsx(7,20): error TS2307: Cannot find module './Achievements.module.css' or its corresponding type declarations.
-src/components/achievements/StudentAchievementWorkspace.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/achievements/StudentAchievementWorkspace.tsx(8,20): error TS2307: Cannot find module './Achievements.module.css' or its corresponding type declarations.
-src/components/analytics/StudentIntelligence.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/analytics/StudentIntelligence.tsx(5,92): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/benchmarks/StudentBenchmarkWorkspace.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/commerce/AdminProductManager.tsx(44,406): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
 src/components/commerce/AdminVoucherManager.tsx(384,14): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
-src/components/commerce/ProductStore.tsx(4,27): error TS2307: Cannot find module 'next/navigation' or its corresponding type declarations.
-src/components/commerce/ProductStore.tsx(5,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/commerce/ProductStore.tsx(183,12): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
 src/components/commerce/PurchaseHistory.tsx(9,3037): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
-src/components/evidara/access-control-view.tsx(105,47): error TS2339: Property 'getSession' does not exist on type 'SupabaseAuthClient'.
-src/components/evidara/admin-views.tsx(15,8): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/evidara/landing-page.tsx(5,19): error TS2307: Cannot find module 'next/image' or its corresponding type declarations.
-src/components/evidara/login-page.tsx(4,19): error TS2307: Cannot find module 'next/image' or its corresponding type declarations.
-src/components/evidara/login-page.tsx(67,45): error TS2339: Property 'signInWithPassword' does not exist on type 'SupabaseAuthClient'.
-src/components/evidara/login-page.tsx(92,45): error TS2339: Property 'signInWithOAuth' does not exist on type 'SupabaseAuthClient'.
-src/components/evidara/login-page.tsx(123,45): error TS2339: Property 'resetPasswordForEmail' does not exist on type 'SupabaseAuthClient'.
-src/components/evidara/school-views.tsx(13,8): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/evidara/student-dashboard.tsx(37,8): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/evidara/student-views.tsx(62,8): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/legal/LegalLayout.tsx(1,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/papers/PaperManagementDashboard.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/papers/PaperPreview.tsx(3,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/papers/QuestionGenerationStudio.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/papers/QuestionPaperBuilder.tsx(10,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/questions/QuestionBank.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/questions/QuestionEditor.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/questions/QuestionImporter.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/questions/QuestionReviewQueue.tsx(4,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
 src/components/readiness/SystemReadinessDashboard.tsx(220,14): error TS2322: Type '{ jsx: true; children: string; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
   Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
-src/components/segments/StudentSegmentEvidence.tsx(1,18): error TS2307: Cannot find module 'next/link' or its corresponding type declarations.
-src/components/ui/calendar.tsx(9,60): error TS2307: Cannot find module 'react-day-picker' or its corresponding type declarations.
-src/components/ui/chart.tsx(4,36): error TS2307: Cannot find module 'recharts' or its corresponding type declarations.
-src/components/ui/form.tsx(14,8): error TS2307: Cannot find module 'react-hook-form' or its corresponding type declarations.
-src/context/AuthProvider.tsx(3,10): error TS2305: Module '"@supabase/supabase-js"' has no exported member 'Session'.
-src/context/AuthProvider.tsx(3,19): error TS2305: Module '"@supabase/supabase-js"' has no exported member 'User'.
-src/context/AuthProvider.tsx(33,19): error TS2339: Property 'getSession' does not exist on type 'SupabaseAuthClient'.
-src/context/AuthProvider.tsx(37,46): error TS2339: Property 'onAuthStateChange' does not exist on type 'SupabaseAuthClient'.
-src/context/AuthProvider.tsx(50,62): error TS2339: Property 'signOut' does not exist on type 'SupabaseAuthClient'.
-src/lib/achievementClient.ts(76,40): error TS2339: Property 'getSession' does not exist on type 'SupabaseAuthClient'.
-src/lib/benchmarkClient.ts(76,40): error TS2339: Property 'getSession' does not exist on type 'SupabaseAuthClient'.
-src/lib/server/supabaseServer.ts(1,50): error TS2305: Module '"@supabase/supabase-js"' has no exported member 'User'.
-src/lib/server/supabaseServer.ts(3,21): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(5,3): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(6,3): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(8,20): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/server/supabaseServer.ts(58,45): error TS2339: Property 'getUser' does not exist on type 'SupabaseAuthClient'.
-src/lib/supabase.ts(3,13): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/supabase.ts(4,14): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/lib/supabase.ts(4,66): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.
-src/store/use-app-store.ts(130,39): error TS2339: Property 'signOut' does not exist on type 'SupabaseAuthClient'.
 ```
 
 ## v8-smoke.txt
@@ -175,20 +127,170 @@ Phase 3 QA not registered yet.
 
 ## v8-next-build.txt
 ```text
+  Generating static pages using 2 workers (17/69) 
+  Generating static pages using 2 workers (34/69) 
+  Generating static pages using 2 workers (51/69) 
+✓ Generating static pages using 2 workers (69/69) in 927ms
+  Finalizing page optimization ...
 
-> evidara-school-platform@8.0.0-phase2 build
-> next build
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /admin/achievements
+├ ○ /admin/benchmarks
+├ ○ /admin/papers
+├ ○ /admin/papers/generation
+├ ○ /admin/papers/new
+├ ○ /admin/papers/preview
+├ ○ /admin/products
+├ ○ /admin/questions
+├ ○ /admin/questions/import
+├ ○ /admin/questions/new
+├ ○ /admin/questions/review
+├ ○ /admin/readiness
+├ ○ /admin/segments
+├ ○ /admin/subscriptions
+├ ƒ /api/access-control
+├ ƒ /api/achievements
+├ ƒ /api/admin/readiness
+├ ƒ /api/benchmarks
+├ ƒ /api/certificates
+├ ƒ /api/config
+├ ƒ /api/health
+├ ƒ /api/question-taxonomy
+├ ƒ /api/questions/review
+├ ƒ /api/school-platform
+├ ○ /auth/callback
+├ ○ /contact
+├ ○ /data-guide
+├ ○ /deployment-check
+├ ○ /login
+├ ○ /metric-guide
+├ ○ /privacy
+├ ○ /products
+├ ○ /refund-policy
+├ ○ /reset-password
+├ ○ /school
+├ ○ /school/achievements
+├ ○ /school/benchmarks
+├ ○ /school/benchmarks/publish
+├ ○ /school/papers
+├ ○ /school/papers/generation
+├ ○ /school/papers/new
+├ ○ /school/papers/preview
+├ ○ /school/questions
+├ ○ /school/questions/import
+├ ○ /school/questions/new
+├ ○ /school/register
+├ ○ /school/resources
+├ ○ /school/segments
+├ ○ /school/students
+├ ○ /school/subscription
+├ ○ /setup-check
+├ ○ /student
+├ ○ /student/achievements
+├ ○ /student/analytics
+├ ○ /student/benchmarks
+├ ○ /student/purchases
+├ ○ /student/resources
+├ ○ /student/results
+├ ○ /student/segment
+├ ○ /student/tests
+├ ○ /student/tests/take
+├ ○ /terms
+├ ○ /trial
+├ ○ /verify/certificate
+└ ƒ /verify/certificate/[code]
 
-sh: 1: next: not found
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
 ```
 
 ## v8-cloudflare-build.txt
 ```text
+├ ○ /admin/products
+├ ○ /admin/questions
+├ ○ /admin/questions/import
+├ ○ /admin/questions/new
+├ ○ /admin/questions/review
+├ ○ /admin/readiness
+├ ○ /admin/segments
+├ ○ /admin/subscriptions
+├ ƒ /api/access-control
+├ ƒ /api/achievements
+├ ƒ /api/admin/readiness
+├ ƒ /api/benchmarks
+├ ƒ /api/certificates
+├ ƒ /api/config
+├ ƒ /api/health
+├ ƒ /api/question-taxonomy
+├ ƒ /api/questions/review
+├ ƒ /api/school-platform
+├ ○ /auth/callback
+├ ○ /contact
+├ ○ /data-guide
+├ ○ /deployment-check
+├ ○ /login
+├ ○ /metric-guide
+├ ○ /privacy
+├ ○ /products
+├ ○ /refund-policy
+├ ○ /reset-password
+├ ○ /school
+├ ○ /school/achievements
+├ ○ /school/benchmarks
+├ ○ /school/benchmarks/publish
+├ ○ /school/papers
+├ ○ /school/papers/generation
+├ ○ /school/papers/new
+├ ○ /school/papers/preview
+├ ○ /school/questions
+├ ○ /school/questions/import
+├ ○ /school/questions/new
+├ ○ /school/register
+├ ○ /school/resources
+├ ○ /school/segments
+├ ○ /school/students
+├ ○ /school/subscription
+├ ○ /setup-check
+├ ○ /student
+├ ○ /student/achievements
+├ ○ /student/analytics
+├ ○ /student/benchmarks
+├ ○ /student/purchases
+├ ○ /student/resources
+├ ○ /student/results
+├ ○ /student/segment
+├ ○ /student/tests
+├ ○ /student/tests/take
+├ ○ /terms
+├ ○ /trial
+├ ○ /verify/certificate
+└ ƒ /verify/certificate/[code]
 
-> evidara-school-platform@8.0.0-phase2 cf:build
-> opennextjs-cloudflare build
 
-sh: 1: opennextjs-cloudflare: not found
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+┌──────────────────────────────┐
+│ OpenNext — Generating bundle │
+└──────────────────────────────┘
+
+Bundling middleware function...
+Bundling static assets...
+Bundling cache assets...
+Building server function: default...
+Applying code patches: 2.680s
+# copyPackageTemplateFiles
+[35m⚙️ Bundling the OpenNext server...
+[0m
+[35mWorker saved in `.open-next/worker.js` 🚀
+[0m
+OpenNext build complete.
 ```
 
 ## v8-deployment.txt
