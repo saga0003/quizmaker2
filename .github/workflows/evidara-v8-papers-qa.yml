@@ -1,9 +1,9 @@
-name: Evidara V8 Phase 3 QA
+name: Evidara V8 Responsive UI QA
 
 on:
   push:
     branches:
-      - evidara-v8-papers
+      - evidara-v8-ui-refresh
   pull_request:
     branches:
       - evidara-v7-final
@@ -13,19 +13,19 @@ permissions:
   contents: read
 
 concurrency:
-  group: evidara-v8-phase3-qa-${{ github.ref }}
+  group: evidara-v8-ui-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
-    name: Validate V8 Phase 3
+    name: Validate V8 responsive UI
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
-      - name: Check out V8 Phase 3
+      - name: Check out V8 UI refresh
         uses: actions/checkout@v4
 
       - name: Use Node.js 22
@@ -37,27 +37,24 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Run complete V8 Phase 3 QA
+      - name: Run complete V8 UI QA
         run: npm run qa
 
       - name: Verify Cloudflare/OpenNext compatibility
         run: npm run cf:build
 
-      - name: Verify Vercel deployment scope
+      - name: Verify Vercel remains locked
         run: |
           node - <<'NODE'
           const config = require('./vercel.json');
-          const deployment = config.git?.deploymentEnabled;
-          const validDisabled = deployment === false;
-          const validPhase3 = deployment && deployment['*'] === false && deployment['evidara-v8-papers'] === true;
-          if (!validDisabled && !validPhase3) {
-            throw new Error('Vercel must be disabled globally or enabled only for evidara-v8-papers.');
+          if (config.git?.deploymentEnabled !== false) {
+            throw new Error('Vercel must remain completely disabled until the UI/UX refresh is reviewed.');
           }
-          if (config.buildCommand !== 'npm run qa' && validPhase3) {
-            throw new Error('Vercel Phase 3 deployment must run the complete npm run qa gate.');
+          if (config.buildCommand !== 'npm run qa') {
+            throw new Error('The future approved deployment must run the complete npm run qa gate.');
           }
-          console.log('V8 Phase 3 deployment scope is valid.');
+          console.log('Vercel is locked and the future deployment gate is preserved.');
           NODE
 
       - name: Confirm QA completion
-        run: echo "Evidara V8 Phase 3 passed lint, TypeScript, all smoke contracts, Next.js build and Cloudflare/OpenNext build."
+        run: echo "Evidara V8 UI refresh passed lint, TypeScript, Phase 1-3 contracts, responsive UI contracts, Next.js build and Cloudflare/OpenNext build."
