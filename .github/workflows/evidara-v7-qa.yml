@@ -1,0 +1,119 @@
+name: Evidara V7 Supabase QA
+
+on:
+  push:
+    branches:
+      - evidara-v7-super-ui
+  pull_request:
+    branches:
+      - evidara-v6-8-production-qa
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v7-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Install, lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out V7
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked V7 dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Upload V7 release manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v7-release-manifests
+          path: |
+            package.json
+            package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Run lint report
+        run: |
+          set +e
+          npm run lint > v7-lint.txt 2>&1
+          echo "$?" > v7-lint.status
+          cat v7-lint.txt
+          exit 0
+
+      - name: Run TypeScript report
+        run: |
+          set +e
+          npm run typecheck > v7-typecheck.txt 2>&1
+          echo "$?" > v7-typecheck.status
+          cat v7-typecheck.txt
+          exit 0
+
+      - name: Run V7 smoke report
+        run: |
+          set +e
+          npm run qa:smoke > v7-smoke.txt 2>&1
+          echo "$?" > v7-smoke.status
+          cat v7-smoke.txt
+          exit 0
+
+      - name: Run Next.js build report
+        run: |
+          set +e
+          npm run build > v7-next-build.txt 2>&1
+          echo "$?" > v7-next-build.status
+          cat v7-next-build.txt
+          exit 0
+
+      - name: Run Cloudflare build report
+        run: |
+          set +e
+          npm run cf:build > v7-cloudflare-build.txt 2>&1
+          echo "$?" > v7-cloudflare-build.status
+          cat v7-cloudflare-build.txt
+          exit 0
+
+      - name: Upload V7 QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v7-qa-reports
+          path: |
+            v7-lint.txt
+            v7-lint.status
+            v7-typecheck.txt
+            v7-typecheck.status
+            v7-smoke.txt
+            v7-smoke.status
+            v7-next-build.txt
+            v7-next-build.status
+            v7-cloudflare-build.txt
+            v7-cloudflare-build.status
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce V7 quality gates
+        run: |
+          test "$(cat v7-lint.status)" = "0"
+          test "$(cat v7-typecheck.status)" = "0"
+          test "$(cat v7-smoke.status)" = "0"
+          test "$(cat v7-next-build.status)" = "0"
+          test "$(cat v7-cloudflare-build.status)" = "0"
+
+      - name: Confirm non-deployment boundary
+        run: echo "Evidara V7 QA completed without deployment or merge."

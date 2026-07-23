@@ -1,12 +1,18 @@
 {
   "name": "Evidara Development",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
   "postCreateCommand": "npm ci",
-  "forwardPorts": [3000],
+  "postStartCommand": "bash .devcontainer/configure-preview-port.sh",
+  "forwardPorts": [20242],
   "portsAttributes": {
-    "3000": {
-      "label": "Evidara local preview",
-      "onAutoForward": "openBrowser"
+    "20242": {
+      "label": "Evidara V7 preview",
+      "onAutoForward": "openPreview",
+      "protocol": "http",
+      "visibility": "public"
     }
   },
   "customizations": {

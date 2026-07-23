@@ -10,19 +10,29 @@ export async function GET() {
 
   return NextResponse.json(
     {
-      release: "6.8.0",
+      release: "7.1.1",
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
       subscriptionModel: "annual-school",
       deploymentTarget: "cloudflare-workers",
       qaRelease: true,
+      interface: "v7-1-1-questions-final",
       publicKeyType: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         ? "publishable"
         : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
           ? "anon"
           : null,
       modules: [
+        "v7-interactive-interface",
+        "supabase-auth",
+        "question-bank",
+        "question-import-preflight",
+        "question-image-zip-import",
+        "question-import-undo-redo",
+        "question-error-navigation",
+        "question-bulk-delete-audit",
+        "protected-assessment-content",
         "shared-benchmarks",
         "achievements",
         "verifiable-certificates",

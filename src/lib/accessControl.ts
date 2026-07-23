@@ -1,31 +1,33 @@
-export type EvidaraWorkspace = "student" | "school" | "admin";
+import {
+  canAccessEvidaraWorkspace,
+  evidaraWorkspaceHome,
+  isSchoolStaff,
+  type EvidaraWorkspace,
+} from "@/lib/roles";
+
+export type { EvidaraWorkspace } from "@/lib/roles";
 
 export const SCHOOL_ROLES = [
+  "school_admin",
+  "school_teacher",
   "institute_owner",
   "institute_admin",
   "school_owner",
-  "school_admin",
   "teacher",
   "reviewer",
   "invigilator",
 ] as const;
 
 export function isSchoolRole(role?: string | null) {
-  if (!role) return false;
-  return role.startsWith("institute_") || role.startsWith("school_") || SCHOOL_ROLES.includes(role as (typeof SCHOOL_ROLES)[number]);
+  return isSchoolStaff(role);
 }
 
 export function canAccessWorkspace(role: string | null | undefined, workspace: EvidaraWorkspace) {
-  if (!role) return false;
-  if (workspace === "admin") return role === "super_admin";
-  if (workspace === "school") return isSchoolRole(role);
-  return true;
+  return canAccessEvidaraWorkspace(role, workspace);
 }
 
 export function workspaceHome(role?: string | null) {
-  if (role === "super_admin") return "/admin/";
-  if (isSchoolRole(role)) return "/school/";
-  return "/student/";
+  return evidaraWorkspaceHome(role);
 }
 
 export const protectedRouteSmokeCases: Array<{
@@ -36,11 +38,17 @@ export const protectedRouteSmokeCases: Array<{
   route: string;
 }> = [
   { id: "admin-super-admin", role: "super_admin", workspace: "admin", expected: true, route: "/admin/" },
-  { id: "admin-school-role", role: "institute_admin", workspace: "admin", expected: false, route: "/admin/" },
+  { id: "admin-evidara-admin", role: "evidara_admin", workspace: "admin", expected: true, route: "/admin/" },
+  { id: "admin-school-admin", role: "school_admin", workspace: "admin", expected: false, route: "/admin/" },
   { id: "admin-student", role: "student", workspace: "admin", expected: false, route: "/admin/" },
-  { id: "school-school-role", role: "institute_admin", workspace: "school", expected: true, route: "/school/" },
+  { id: "school-super-admin", role: "super_admin", workspace: "school", expected: true, route: "/school/" },
+  { id: "school-evidara-admin", role: "evidara_admin", workspace: "school", expected: true, route: "/school/" },
+  { id: "school-school-admin", role: "school_admin", workspace: "school", expected: true, route: "/school/" },
+  { id: "school-school-teacher", role: "school_teacher", workspace: "school", expected: true, route: "/school/" },
   { id: "school-student", role: "student", workspace: "school", expected: false, route: "/school/" },
   { id: "student-student", role: "student", workspace: "student", expected: true, route: "/student/" },
-  { id: "student-school-role", role: "teacher", workspace: "student", expected: true, route: "/student/" },
+  { id: "student-school-teacher", role: "school_teacher", workspace: "student", expected: true, route: "/student/" },
+  { id: "student-school-admin", role: "school_admin", workspace: "student", expected: true, route: "/student/" },
+  { id: "student-evidara-admin", role: "evidara_admin", workspace: "student", expected: true, route: "/student/" },
   { id: "student-super-admin", role: "super_admin", workspace: "student", expected: true, route: "/student/" },
 ];

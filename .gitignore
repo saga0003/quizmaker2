@@ -21,6 +21,18 @@
 # production
 /build
 
+# local databases and generated template artifacts
+*.db
+*.db-journal
+/tool-results/
+/worklog.md
+/dev.log
+/server.log
+
+# generated sales demo credentials
+/.evidara-demo-access.txt
+/.evidara-demo-access.json
+
 # misc
 .DS_Store
 *.pem
@@ -31,7 +43,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 
 # vercel and cloudflare
