@@ -1,0 +1,138 @@
+/* Touch and small-screen polish for embedded V8 paper panels. */
+
+.paper-template-panel button,
+.paper-export-panel button,
+.paper-lifecycle button,
+.generation-actions button,
+.section-generation-controls button,
+.add-rule,
+.rule-actions button {
+  min-height: 40px;
+}
+
+.template-archive,
+.expand-rule,
+.rule-actions button {
+  min-width: 40px;
+}
+
+@media (max-width: 900px) {
+  .generation-heading {
+    align-items: stretch !important;
+  }
+
+  .generation-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .generation-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .generation-sections > article > header {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  .section-generation-controls {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .section-generation-controls select {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .rule-summary {
+    grid-template-columns: 40px minmax(0, 1fr) !important;
+  }
+
+  .rule-metrics,
+  .rule-actions {
+    grid-column: 2 !important;
+  }
+
+  .rule-actions {
+    flex-wrap: wrap !important;
+  }
+
+  .save-template-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .generation-actions,
+  .section-generation-controls,
+  .save-template-form,
+  .template-build-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .generation-actions button,
+  .section-generation-controls button,
+  .save-template-form button,
+  .template-build-form button,
+  .export-grid button,
+  .lifecycle-grid button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .generation-guide {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .seed-panel {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .rule-summary {
+    grid-template-columns: 40px minmax(0, 1fr) !important;
+  }
+
+  .rule-metrics,
+  .rule-actions {
+    grid-column: 1 / -1 !important;
+  }
+
+  .rule-actions {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .rule-actions button,
+  .expand-rule,
+  .template-archive {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .rule-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .rule-fields label.wide {
+    grid-column: 1 !important;
+  }
+
+  .template-summary {
+    display: grid !important;
+  }
+
+  .template-summary > div:last-child {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 44px !important;
+  }
+
+  .paper-template-panel,
+  .paper-export-panel,
+  .paper-lifecycle,
+  .paper-audit-panel {
+    padding: 13px !important;
+  }
+}
