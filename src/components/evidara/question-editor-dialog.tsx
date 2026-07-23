@@ -20,7 +20,6 @@ import type {
   QuestionPayload,
   QuestionRow,
   QuestionStatus,
-  QuestionTestType,
   QuestionType,
   TaxonomyChapter,
   TaxonomySubject,
@@ -50,6 +49,7 @@ import { GuidedLabel, HelpIcon } from '@/components/evidara/question-help';
 import { QuestionImageField } from '@/components/evidara/question-image-field';
 import { QuestionDevicePreview } from '@/components/evidara/question-device-preview';
 import { SearchableTaxonomySelect } from '@/components/evidara/searchable-taxonomy-select';
+import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 
 const questionTypeLabels: Record<QuestionType, string> = {
   single_correct: 'Single-correct MCQ',
@@ -79,14 +79,6 @@ const difficultyLabels: Record<QuestionDifficulty, string> = {
   moderate: 'Moderate',
   difficult: 'Difficult',
   very_difficult: 'Very difficult',
-};
-
-const testTypeLabels: Record<QuestionTestType, string> = {
-  full_length: 'Full Length Test',
-  part_test: 'Part Test',
-  chapter_test: 'Chapter Test',
-  topic_test: 'Topic Test',
-  custom: 'Custom',
 };
 
 const choiceTypes: QuestionType[] = ['single_correct', 'multiple_correct', 'assertion_reason', 'passage', 'image_based'];
@@ -124,8 +116,6 @@ type EditorState = {
   type: QuestionType;
   status: QuestionStatus;
   difficulty: QuestionDifficulty;
-  testType: QuestionTestType;
-  customTestType: string;
   stem: string;
   stemLatex: string;
   passage: string;
@@ -136,8 +126,8 @@ type EditorState = {
   negativeMarks: number;
   estimatedSeconds: number;
   examTypes: string[];
-  customExamType: string;
   classLevel: string;
+  biologyDivision: 'combined' | 'botany' | 'zoology';
   language: string;
   source: string;
   sourceYear: string;
@@ -156,8 +146,6 @@ function emptyEditor(kind: 'admin' | 'school', canPublish: boolean): EditorState
     type: 'single_correct',
     status: kind === 'admin' && canPublish ? 'approved' : 'draft',
     difficulty: 'moderate',
-    testType: 'chapter_test',
-    customTestType: '',
     stem: '',
     stemLatex: '',
     passage: '',
@@ -168,8 +156,8 @@ function emptyEditor(kind: 'admin' | 'school', canPublish: boolean): EditorState
     negativeMarks: 1,
     estimatedSeconds: 90,
     examTypes: ['NEET'],
-    customExamType: '',
-    classLevel: 'Class 11-12',
+    classLevel: 'Grade 11',
+    biologyDivision: 'combined',
     language: 'English',
     source: '',
     sourceYear: '',
@@ -211,8 +199,6 @@ function editorFromQuestion(kind: 'admin' | 'school', canPublish: boolean, quest
     type: question.question_type,
     status: question.status,
     difficulty: question.difficulty,
-    testType: metadata.test_type || 'custom',
-    customTestType: metadata.custom_test_type || '',
     stem: question.stem_text,
     stemLatex: question.stem_latex || '',
     passage: question.passage_text || '',
@@ -223,8 +209,8 @@ function editorFromQuestion(kind: 'admin' | 'school', canPublish: boolean, quest
     negativeMarks: Number(question.negative_marks),
     estimatedSeconds: question.estimated_seconds || 90,
     examTypes: question.exam_types || [],
-    customExamType: '',
-    classLevel: question.class_level || '',
+    classLevel: question.class_level || 'Grade 11',
+    biologyDivision: (metadata.biology_division === 'botany' || metadata.biology_division === 'zoology') ? metadata.biology_division : 'combined',
     language: question.language || 'English',
     source: question.source || '',
     sourceYear: question.source_year ? String(question.source_year) : '',
@@ -233,10 +219,6 @@ function editorFromQuestion(kind: 'admin' | 'school', canPublish: boolean, quest
     options: options.length ? options : seedOptions(),
     matchPairs: metadataMatchPairs(question),
   };
-}
-
-function testTypeBadge(value: QuestionTestType, custom: string) {
-  return value === 'custom' ? custom || 'Custom' : testTypeLabels[value];
 }
 
 function SectionHeading({ number, title, description }: { number: string; title: string; description: string }) {
@@ -275,6 +257,7 @@ export function QuestionEditorDialog({
   const role = normalizeEvidaraRole(profile?.role);
   const canPublish = role === 'super_admin' || role === 'evidara_admin' || role === 'school_admin';
   const teacher = role === 'school_teacher';
+  const { grades, exams, error: settingsError } = useAssessmentOptions(organizationId);
   const lockedDecision = teacher && Boolean(question && ['approved', 'rejected', 'archived'].includes(question.status));
   const [editor, setEditor] = useState<EditorState>(() => editorFromQuestion(kind, canPublish, question));
   const [saving, setSaving] = useState(false);
@@ -307,6 +290,11 @@ export function QuestionEditorDialog({
   const selectedSubject = orderedSubjects.find((subject) => subject.id === editor.subjectId);
   const selectedChapter = chapters.find((chapter) => chapter.id === editor.chapterId);
   const selectedTopic = topics.find((topic) => topic.id === editor.topicId);
+  const biologySubject = Boolean(selectedSubject && /biology|botany|zoology/i.test(`${selectedSubject.name} ${selectedSubject.code}`));
+  const availableGrades = useMemo(() => {
+    const values = grades.map((item) => item.value);
+    return editor.classLevel && !values.includes(editor.classLevel) ? [...values, editor.classLevel] : values;
+  }, [editor.classLevel, grades]);
   const isChoice = choiceTypes.includes(editor.type);
   const isMatch = editor.type === 'match_following';
   const isNumeric = editor.type === 'numerical' || editor.type === 'integer';
@@ -322,8 +310,8 @@ export function QuestionEditorDialog({
     const problems: string[] = [];
     if (editor.stem.trim().length < 5) problems.push('Enter a complete question.');
     if (!editor.subjectId) problems.push('Select a subject.');
-    if (editor.testType === 'custom' && !editor.customTestType.trim()) problems.push('Enter the custom test type.');
-    if (!editor.examTypes.length && !editor.customExamType.trim()) problems.push('Select or enter at least one examination.');
+    if (!editor.examTypes.length) problems.push('Select at least one examination.');
+    if (!editor.classLevel.trim()) problems.push('Select a grade.');
     if (kind === 'school' && !organizationId) problems.push('This account is not linked to a school organization.');
     if (teacher && !['draft', 'in_review'].includes(editor.status)) problems.push('Teachers can save drafts or submit questions for review only.');
     if (isChoice && usableOptions.length < 2) problems.push('Enter at least two answer options.');
@@ -438,7 +426,6 @@ export function QuestionEditorDialog({
     }
 
     const examTypes = [...editor.examTypes];
-    if (editor.customExamType.trim()) examTypes.push(editor.customExamType.trim());
     const matchOptions: QuestionOptionInput[] = usablePairs.map((pair, display_order) => ({ option_key: pair.right_key, content_text: pair.right_text, content_latex: pair.right_latex, image_url: pair.right_image_url, is_correct: false, display_order }));
     const correctAnswer = isMatch ? usablePairs.map((pair) => `${pair.left_key}-${pair.right_key}`) : isChoice ? correctOptions.map((option) => option.option_key) : editor.numericAnswer.trim();
     const existingPublishedAt = question?.metadata?.published_at;
@@ -469,8 +456,7 @@ export function QuestionEditorDialog({
       metadata: {
         ...(question?.metadata || {}),
         editor: 'evidara_v7_one_page_question_editor',
-        test_type: editor.testType,
-        custom_test_type: editor.testType === 'custom' ? editor.customTestType.trim() : undefined,
+        biology_division: biologySubject ? editor.biologyDivision : undefined,
         match_pairs: isMatch ? usablePairs : undefined,
         published_at: editor.status === 'approved' ? existingPublishedAt || new Date().toISOString() : existingPublishedAt,
       },
@@ -508,14 +494,14 @@ export function QuestionEditorDialog({
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-[#DCE9E7] text-[#0E5A5A]">{questionTypeLabels[editor.type]}</Badge>
-              <Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{testTypeBadge(editor.testType, editor.customTestType)}</Badge>
+              <Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{editor.classLevel || 'Grade pending'}</Badge>
               <Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{kind === 'admin' ? 'Evidara Master Bank' : 'School Question Bank'}</Badge>
             </div>
           </div>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
-          {error && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error}</div>}
+          {(error || settingsError) && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error || settingsError}</div>}
           {lockedDecision && <div className="mb-4 rounded-xl border border-[#8A5F00]/20 bg-[#F2B84B]/10 px-4 py-3 text-sm text-[#8A5F00]">This question has already received an administrator decision. Teachers can review the result but cannot modify or archive it.</div>}
 
           <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(390px,.62fr)]">
@@ -536,14 +522,23 @@ export function QuestionEditorDialog({
                       {showTopicCreate && <div className="flex gap-2 rounded-xl border border-[#DCE9E7] bg-[#F7F9F7] p-2"><Input autoFocus value={topicDraft} onChange={(event) => setTopicDraft(event.target.value)} placeholder="New topic name" className="border-[#E7ECEB] bg-white" /><Button type="button" size="icon" disabled={!topicDraft.trim() || taxonomyBusy === 'createTopic'} onClick={() => void createTaxonomy('createTopic')} className="shrink-0 bg-[#0E5A5A]">{taxonomyBusy === 'createTopic' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}</Button><Button type="button" variant="ghost" size="icon" onClick={() => setShowTopicCreate(false)}><X className="h-4 w-4" /></Button></div>}
                     </div>
                   </div>
+                  {biologySubject && (
+                    <div className="rounded-xl border border-[#DCE9E7] bg-[#F7F9F7] p-3">
+                      <GuidedLabel help="Keep Biology as the parent subject while classifying the question for combined Biology, Botany or Zoology sections.">Biology division</GuidedLabel>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {([['combined', 'Combined Biology'], ['botany', 'Botany'], ['zoology', 'Zoology']] as const).map(([value, label]) => (
+                          <Button key={value} type="button" variant="outline" size="sm" onClick={() => setEditor((current) => ({ ...current, biologyDivision: value }))} className={editor.biologyDivision === value ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] bg-white text-[#44545C]'}>{label}</Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-2"><GuidedLabel required help="The question type controls how answers are entered and evaluated.">Question type</GuidedLabel><Select value={editor.type} onValueChange={(value) => setEditor((current) => ({ ...current, type: value as QuestionType, options: seedOptions(), matchPairs: seedMatchPairs(), numericAnswer: '' }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(questionTypeLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="space-y-2"><GuidedLabel required help="Choose full syllabus, part syllabus, chapter, topic or a named custom test.">Test type</GuidedLabel><Select value={editor.testType} onValueChange={(value) => setEditor((current) => ({ ...current, testType: value as QuestionTestType }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(testTypeLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><GuidedLabel required help="Grade controls eligibility, filtering and paper selection.">Grade</GuidedLabel><Select value={editor.classLevel} onValueChange={(classLevel) => setEditor((current) => ({ ...current, classLevel }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Select grade" /></SelectTrigger><SelectContent>{availableGrades.map((value) => <SelectItem key={value} value={value}>{grades.find((item) => item.value === value)?.label || value}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><GuidedLabel help="Difficulty supports paper balancing and analytics.">Difficulty</GuidedLabel><Select value={editor.difficulty} onValueChange={(value) => setEditor((current) => ({ ...current, difficulty: value as QuestionDifficulty }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(difficultyLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><GuidedLabel help={canPublish ? 'Administrators may publish, reject or archive. Teachers are limited to Draft and In Review.' : 'Teachers can save a draft or send the question for administrator review.'}>Status</GuidedLabel><Select value={editor.status} onValueChange={(value) => setEditor((current) => ({ ...current, status: value as QuestionStatus }))} disabled={lockedDecision}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{statusOptions.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
                   </div>
-                  {editor.testType === 'custom' && <div className="max-w-md space-y-2"><GuidedLabel required help="Enter the exact custom test classification.">Custom test type</GuidedLabel><Input value={editor.customTestType} onChange={(event) => setEditor((current) => ({ ...current, customTestType: event.target.value }))} placeholder="Weekly Diagnostic Test" className="border-[#E7ECEB]" /></div>}
                   <div className="flex items-start gap-2 rounded-xl bg-[#F7F9F7] p-3 text-xs leading-relaxed text-[#6B7980]"><HelpIcon text={questionTypeHelp[editor.type]} /><span>{questionTypeHelp[editor.type]}</span></div>
                 </CardContent>
               </Card>
@@ -579,8 +574,8 @@ export function QuestionEditorDialog({
                 <CardContent className="space-y-5 p-4 sm:p-5">
                   <SectionHeading number="4" title="Solution and assessment settings" description="Add the explanation, marking rules, examination eligibility and searchable metadata." />
                   <div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2"><GuidedLabel help="Write the human-readable reasoning shown after the test when solutions are enabled.">Solution explanation</GuidedLabel><Textarea rows={6} value={editor.solution} onChange={(event) => setEditor((current) => ({ ...current, solution: event.target.value }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Add equations or scientific notation used in the solution.">Solution LaTeX</GuidedLabel><Textarea rows={6} value={editor.solutionLatex} onChange={(event) => setEditor((current) => ({ ...current, solutionLatex: event.target.value }))} className="border-[#E7ECEB] font-mono" /></div></div>
-                  <div className="space-y-2"><GuidedLabel required help="Select every examination where this question is academically appropriate.">Applicable examinations</GuidedLabel><div className="flex flex-wrap gap-2">{['NEET', 'JEE Main', 'JEE Advanced', 'KCET', 'Olympiad', 'Foundation', 'Board'].map((exam) => <button type="button" key={exam} onClick={() => toggleExam(exam)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${editor.examTypes.includes(exam) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#6B7980] hover:border-[#0E5A5A]/40'}`}>{editor.examTypes.includes(exam) && <CheckCircle2 className="mr-1 inline h-3 w-3" />}{exam}</button>)}</div><Input value={editor.customExamType} onChange={(event) => setEditor((current) => ({ ...current, customExamType: event.target.value }))} placeholder="Optional custom examination name" className="mt-2 max-w-md border-[#E7ECEB]" /></div>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks awarded for a correct answer.">Marks</GuidedLabel><Input type="number" step="0.25" value={editor.marks} onChange={(event) => setEditor((current) => ({ ...current, marks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Marks deducted for an incorrect answer.">Negative marks</GuidedLabel><Input type="number" step="0.25" min="0" value={editor.negativeMarks} onChange={(event) => setEditor((current) => ({ ...current, negativeMarks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected expert-solving time used for speed analytics.">Expected seconds</GuidedLabel><Input type="number" min="1" value={editor.estimatedSeconds} onChange={(event) => setEditor((current) => ({ ...current, estimatedSeconds: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Grade used for filters and eligibility.">Class level</GuidedLabel><Input value={editor.classLevel} onChange={(event) => setEditor((current) => ({ ...current, classLevel: event.target.value }))} className="border-[#E7ECEB]" /></div></div>
+                  <div className="space-y-2"><GuidedLabel required help="Select every examination where this question is academically appropriate. Super Admin manages this list in Question Settings.">Applicable examinations</GuidedLabel><div className="flex flex-wrap gap-2">{exams.map((item) => <button type="button" key={item.id} onClick={() => toggleExam(item.value)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${editor.examTypes.includes(item.value) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#6B7980] hover:border-[#0E5A5A]/40'}`}>{editor.examTypes.includes(item.value) && <CheckCircle2 className="mr-1 inline h-3 w-3" />}{item.label}</button>)}</div></div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks awarded for a correct answer.">Marks</GuidedLabel><Input type="number" step="0.25" value={editor.marks} onChange={(event) => setEditor((current) => ({ ...current, marks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Marks deducted for an incorrect answer.">Negative marks</GuidedLabel><Input type="number" step="0.25" min="0" value={editor.negativeMarks} onChange={(event) => setEditor((current) => ({ ...current, negativeMarks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected expert-solving time used for speed analytics.">Expected seconds</GuidedLabel><Input type="number" min="1" value={editor.estimatedSeconds} onChange={(event) => setEditor((current) => ({ ...current, estimatedSeconds: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div></div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Learner-facing language.">Language</GuidedLabel><Select value={editor.language} onValueChange={(value) => setEditor((current) => ({ ...current, language: value }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="English">English</SelectItem><SelectItem value="Kannada">Kannada</SelectItem><SelectItem value="Hindi">Hindi</SelectItem><SelectItem value="Bilingual">Bilingual</SelectItem></SelectContent></Select></div><div className="space-y-2"><GuidedLabel help="Record NCERT, worksheet or previous-year paper source.">Source</GuidedLabel><Input value={editor.source} onChange={(event) => setEditor((current) => ({ ...current, source: event.target.value }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Optional source or examination year.">Source year</GuidedLabel><Input type="number" value={editor.sourceYear} onChange={(event) => setEditor((current) => ({ ...current, sourceYear: event.target.value }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Comma-separated keywords improve search.">Tags</GuidedLabel><Input value={editor.tags} onChange={(event) => setEditor((current) => ({ ...current, tags: event.target.value }))} placeholder="mechanics, vectors, PYQ" className="border-[#E7ECEB]" /></div></div>
                 </CardContent>
               </Card>

@@ -185,7 +185,7 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
       estimated_seconds: expectedSeconds || undefined,
       correct_answer: parsedAnswer,
       exam_types: exams,
-      class_level: normalize(raw.class_level || raw.grade),
+      class_level: normalize(raw.grade || raw.class_level),
       source: normalize(raw.source),
       source_year: numberValue(raw.source_year, 0) || undefined,
       language: acceptedLanguages.has(language.toLowerCase()) ? language : "English",
@@ -196,6 +196,7 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
         import_topic: normalize(raw.topic),
         question_image_filename: normalize(raw.question_image_filename || raw.question_image),
         match_pairs: matchPairs.length ? matchPairs : undefined,
+        biology_division: ['combined','botany','zoology'].includes(slugValue(raw.biology_division)) ? slugValue(raw.biology_division) as 'combined' | 'botany' | 'zoology' : undefined,
       },
       options,
     };
@@ -207,7 +208,7 @@ export function parseQuestionRows(rows: Record<string, unknown>[]): ParsedQuesti
 // Questions remain reusable. Test/series classification is selected later while
 // creating a paper or test series, so it is deliberately excluded here.
 export const bulkQuestionTemplateHeaders = [
-  "exam_types", "class_level", "subject", "chapter", "topic", "question_type", "difficulty",
+  "exam_types", "grade", "subject", "biology_division", "chapter", "topic", "question_type", "difficulty",
   "question", "question_latex", "question_image",
   "option_a", "option_a_latex", "option_a_image",
   "option_b", "option_b_latex", "option_b_image",

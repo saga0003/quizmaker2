@@ -1,0 +1,50 @@
+name: Evidara V8 Paper Builder QA
+
+on:
+  push:
+    branches:
+      - evidara-v8-paper-builder
+  pull_request:
+    branches:
+      - evidara-v7-final-locked
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v8-paper-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out V8 paper branch
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: V8 paper smoke checks
+        run: node scripts/v8-paper-smoke.mjs
+
+      - name: Next.js production build
+        run: npm run build

@@ -2,63 +2,14 @@
 
 import { useEffect } from 'react';
 
-const TEST_TYPE_LABELS = new Set([
-  'full length test',
-  'part test',
-  'chapter test',
-  'topic test',
-  'custom',
-]);
-
 function textOf(element: Element) {
   return (element.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 function hide(element: Element | null) {
-  if (!(element instanceof HTMLElement) || element.dataset.questionTestTypeHidden === 'true') return;
-  element.dataset.questionTestTypeHidden = 'true';
+  if (!(element instanceof HTMLElement)) return;
   element.hidden = true;
   element.setAttribute('aria-hidden', 'true');
-}
-
-function isQuestionDialog(dialog: Element) {
-  const title = textOf(dialog.querySelector('[data-slot="dialog-title"]') || dialog);
-  return title.includes('question') || title.includes('bulk import');
-}
-
-function removeQuestionTestTypeUi() {
-  document.querySelectorAll('[data-slot="dialog-content"]').forEach((dialog) => {
-    if (!isQuestionDialog(dialog)) return;
-
-    dialog.querySelectorAll('label').forEach((label) => {
-      const labelText = textOf(label).replace(/\s*\*$/, '');
-      if (labelText === 'test type' || labelText === 'custom test type') {
-        hide(label.closest('.space-y-2') || label.parentElement?.parentElement || label.parentElement);
-      }
-    });
-
-    const header = dialog.querySelector('[data-slot="dialog-header"]');
-    header?.querySelectorAll('[data-slot="badge"]').forEach((badge) => {
-      if (TEST_TYPE_LABELS.has(textOf(badge))) hide(badge);
-    });
-
-    dialog.querySelectorAll('strong').forEach((strong) => {
-      if (textOf(strong) === 'test type') {
-        hide(strong.closest('.flex.items-start.gap-2') || strong.parentElement?.parentElement || strong.parentElement);
-      }
-    });
-  });
-
-  document.querySelectorAll('button, [role="combobox"]').forEach((control) => {
-    const value = textOf(control);
-    if (value === 'all test types' || value === 'select test type') {
-      hide(control.closest('.space-y-2') || control);
-    }
-  });
-
-  document.querySelectorAll('[role="option"]').forEach((option) => {
-    if (textOf(option) === 'topic serial') hide(option);
-  });
 }
 
 function normalizeQuestionTable() {
@@ -93,7 +44,6 @@ function normalizeQuestionTable() {
 }
 
 function applyQuestionPolicies() {
-  removeQuestionTestTypeUi();
   normalizeQuestionTable();
 }
 

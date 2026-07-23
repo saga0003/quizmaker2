@@ -45,8 +45,9 @@ const fixedLists = {
 
 const sample: Record<string, string | number> = {
   exam_types: 'NEET',
-  class_level: 'Class 11',
+  grade: 'Grade 11',
   subject: 'Physics',
+  biology_division: '',
   chapter: 'Units and Measurements',
   topic: 'Dimensions',
   question_type: 'single_correct',
@@ -80,7 +81,10 @@ const sample: Record<string, string | number> = {
 };
 
 const guideRows: Array<[string, string, string, string]> = [
-  ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin can add universal subjects.'],
+  ['grade', 'Required', 'Choose an active grade from the dropdown.', 'This list is generated from the school/institute database when the template is downloaded.'],
+  ['exam_types', 'Required', 'Choose one active examination. Multiple values may be separated by |.', 'The dropdown is generated from the current Evidara settings.'],
+  ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin can add or alter universal subjects.'],
+  ['biology_division', 'Biology only', 'Choose combined, botany or zoology.', 'Keeps Biology analytics unified while allowing Botany/Zoology paper sections.'],
   ['chapter', 'Recommended', 'Choose a chapter or type a new chapter name.', 'V7.1 can create a missing chapter from the review screen.'],
   ['topic', 'Optional', 'Choose a topic or type a new topic name.', 'V7.1 can create a missing topic from the review screen.'],
   ['question_type', 'Required', 'Choose one exact dropdown value.', 'Match the Following remains in the manual editor, not this simple template.'],
@@ -91,7 +95,6 @@ const guideRows: Array<[string, string, string, string]> = [
   ['option_a to option_d', 'Required for MCQ', 'Enter option text and optional LaTeX/image filename.', 'At least two answer options are required.'],
   ['correct_answer', 'Required', 'A, B, C or D; multiple-correct uses A|B.', 'Numerical/integer questions use the exact numeric answer.'],
   ['status', 'Required', 'Use draft, in_review or approved.', 'Teachers are always limited to Draft or In Review.'],
-  ['exam_types', 'Required', 'Use one exam or multiple values separated by |.', 'Example: JEE Main|KCET'],
   ['tags', 'Optional', 'Use comma- or pipe-separated keywords.', 'Tags improve question search and automatic paper selection.'],
 ];
 
@@ -108,18 +111,28 @@ export async function buildQuestionTemplateWorkbook({
   subjects,
   chapters,
   topics,
+  grades,
+  exams,
 }: {
   subjects: TaxonomySubject[];
   chapters: TaxonomyChapter[];
   topics: TaxonomyTopic[];
+  grades: string[];
+  exams: string[];
 }) {
   const orderedSubjects = [...subjects].sort((a, b) => a.name.localeCompare(b.name)).map((item) => item.name);
   const orderedChapters = [...chapters].sort((a, b) => a.name.localeCompare(b.name)).map((item) => item.name);
   const orderedTopics = [...topics].sort((a, b) => a.name.localeCompare(b.name)).map((item) => item.name);
+  const orderedGrades = [...new Set(grades)].sort((a, b) => a.localeCompare(b));
+  const orderedExams = [...new Set(exams)].sort((a, b) => a.localeCompare(b));
+  const biologyDivisions = ['combined', 'botany', 'zoology'];
   const listColumns: string[][] = [
     orderedSubjects,
     orderedChapters,
     orderedTopics,
+    orderedGrades,
+    orderedExams,
+    biologyDivisions,
     fixedLists.difficulty,
     fixedLists.question_type,
     fixedLists.language,
@@ -127,7 +140,7 @@ export async function buildQuestionTemplateWorkbook({
     fixedLists.correct_answer,
   ];
   const maxListRows = Math.max(1, ...listColumns.map((column) => column.length));
-  const listHeaders = ['Subjects', 'Chapters', 'Topics', 'Difficulty', 'Question Types', 'Languages', 'Statuses', 'Common Answers'];
+  const listHeaders = ['Subjects', 'Chapters', 'Topics', 'Grades', 'Examinations', 'Biology Divisions', 'Difficulty', 'Question Types', 'Languages', 'Statuses', 'Common Answers'];
   const listRows = Array.from({ length: maxListRows }, (_unused, index) => listColumns.map((column) => column[index] || ''));
 
   const headerRow = rowXml(1, bulkQuestionTemplateHeaders, 1);
@@ -143,11 +156,14 @@ export async function buildQuestionTemplateWorkbook({
     validation('list', byHeader.get('subject')!, listRange(0, orderedSubjects.length), 'Search or choose an existing subject.'),
     validation('list', byHeader.get('chapter')!, listRange(1, orderedChapters.length), 'Choose an existing chapter or type a new chapter name.'),
     validation('list', byHeader.get('topic')!, listRange(2, orderedTopics.length), 'Choose an optional topic or type a new topic name.'),
-    validation('list', byHeader.get('difficulty')!, listRange(3, fixedLists.difficulty.length), 'Choose the exact supported difficulty.'),
-    validation('list', byHeader.get('question_type')!, listRange(4, fixedLists.question_type.length), 'Choose a supported simple question type.'),
-    validation('list', byHeader.get('language')!, listRange(5, fixedLists.language.length), 'Choose the learner-facing language.'),
-    validation('list', byHeader.get('status')!, listRange(6, fixedLists.status.length), 'Choose draft, in_review or approved.'),
-    validation('list', byHeader.get('correct_answer')!, listRange(7, fixedLists.correct_answer.length), 'Choose a common MCQ answer or enter the exact numerical answer.'),
+    validation('list', byHeader.get('grade')!, listRange(3, orderedGrades.length), 'Choose an active grade from the database.'),
+    validation('list', byHeader.get('exam_types')!, listRange(4, orderedExams.length), 'Choose an active examination. Use | for multiple examinations.'),
+    validation('list', byHeader.get('biology_division')!, listRange(5, biologyDivisions.length), 'Choose combined, botany or zoology for Biology questions.'),
+    validation('list', byHeader.get('difficulty')!, listRange(6, fixedLists.difficulty.length), 'Choose the exact supported difficulty.'),
+    validation('list', byHeader.get('question_type')!, listRange(7, fixedLists.question_type.length), 'Choose a supported simple question type.'),
+    validation('list', byHeader.get('language')!, listRange(8, fixedLists.language.length), 'Choose the learner-facing language.'),
+    validation('list', byHeader.get('status')!, listRange(9, fixedLists.status.length), 'Choose draft, in_review or approved.'),
+    validation('list', byHeader.get('correct_answer')!, listRange(10, fixedLists.correct_answer.length), 'Choose a common MCQ answer or enter the exact numerical answer.'),
     validation('decimal', byHeader.get('marks')!, '0', 'Enter zero or a positive mark.'),
     validation('decimal', byHeader.get('negative_marks')!, '0', 'Enter zero or a positive deduction.'),
     validation('whole', byHeader.get('estimated_seconds')!, '1', 'Enter expected solving time in seconds.'),
@@ -159,7 +175,7 @@ export async function buildQuestionTemplateWorkbook({
   <cols>${widths}</cols>
   <sheetData>${headerRow}${sampleRow}</sheetData>
   <autoFilter ref="A1:${lastColumn}500"/>
-  <dataValidations count="11">${validations}</dataValidations>
+  <dataValidations count="14">${validations}</dataValidations>
 </worksheet>`;
 
   const guideSheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -203,8 +219,10 @@ export async function downloadQuestionTemplateWorkbook(input: {
   subjects: TaxonomySubject[];
   chapters: TaxonomyChapter[];
   topics: TaxonomyTopic[];
+  grades: string[];
+  exams: string[];
 }) {
-  downloadBlob(await buildQuestionTemplateWorkbook(input), 'evidara-v7-1-question-import-template.xlsx');
+  downloadBlob(await buildQuestionTemplateWorkbook(input), 'evidara-v8-dynamic-question-import-template.xlsx');
 }
 
 export async function downloadQuestionImageZipTemplate() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { CalendarDays, CheckCircle2, Clock3, FileQuestion, School, Tag } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock3, GraduationCap, School, Tag } from 'lucide-react';
 import type { QuestionRow } from '@/types/questions';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -64,7 +64,7 @@ export function QuestionReviewDialog({
               <div className="rounded-2xl border border-[#E7ECEB] bg-[#F7F9F7] p-4">
                 <strong className="text-sm text-[#14232B]">Question details</strong>
                 <div className="mt-3 space-y-3 text-xs text-[#6B7980]">
-                  <div className="flex items-start gap-2"><FileQuestion className="mt-0.5 h-4 w-4 shrink-0 text-[#0E5A5A]" /><span><strong className="block text-[#14232B]">Test type</strong>{question.metadata?.test_type === 'custom' ? question.metadata?.custom_test_type || 'Custom' : String(question.metadata?.test_type || 'Not set').replaceAll('_', ' ')}</span></div>
+                  <div className="flex items-start gap-2"><GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-[#0E5A5A]" /><span><strong className="block text-[#14232B]">Grade and examination</strong>{question.class_level || 'Grade not set'} · {(question.exam_types || []).join(', ') || 'Exam not set'}{question.metadata?.biology_division ? ` · ${String(question.metadata.biology_division).replace(/^./, (value) => value.toUpperCase())}` : ''}</span></div>
                   <div className="flex items-start gap-2"><School className="mt-0.5 h-4 w-4 shrink-0 text-[#2E6D8B]" /><span><strong className="block text-[#14232B]">Ownership</strong>{question.organization_id ? question.organizations?.name || 'School question bank' : 'Evidara Master Bank'}</span></div>
                   <div className="flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-[#8A5F00]" /><span><strong className="block text-[#14232B]">Expected time</strong>{question.estimated_seconds ? `${question.estimated_seconds} seconds` : 'Not set'}</span></div>
                   <div className="flex items-start gap-2"><CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-[#0E5A5A]" /><span><strong className="block text-[#14232B]">Published</strong>{publishedAt ? dateText(publishedAt) : question.status === 'approved' ? dateText(question.updated_at) : 'Not published'}</span></div>
