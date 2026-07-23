@@ -7,6 +7,7 @@ const files = {
   listRoute: readFileSync('src/components/papers/QuestionPaperList.tsx', 'utf8'),
   builderRoute: readFileSync('src/components/papers/QuestionPaperBuilder.tsx', 'utf8'),
   preview: readFileSync('src/components/papers/PaperPreview.tsx', 'utf8'),
+  styles: readFileSync('src/app/globals.css', 'utf8'),
 };
 
 const checks = [
@@ -25,6 +26,7 @@ const checks = [
   ['biology split', ['combined', 'botany', 'zoology'].every((value) => files.builder.includes(value))],
   ['real paper routes use V8', files.listRoute.includes('LivePaperCatalogueV8') && files.builderRoute.includes('LivePaperCatalogueV8')],
   ['student-facing preview hides answers', !files.preview.includes('is_correct') && !files.preview.includes('solution_text')],
+  ['live student exam hides taxonomy metadata', files.styles.includes('.secure-exam-content main.rm-card > div:first-child > div:first-child > div')],
 ];
 
 const failed = checks.filter(([, ok]) => !ok);
