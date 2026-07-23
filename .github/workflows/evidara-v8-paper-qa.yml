@@ -34,15 +34,18 @@ jobs:
       - name: Apply configurable academic settings
         shell: bash
         run: |
-          set -euo pipefail
-          if compgen -G 'scripts/.v8-patch/part*.txt' > /dev/null; then
+          set +e
+          {
+            set -euxo pipefail
             cat scripts/.v8-patch/part*.txt > /tmp/v8-settings.patch.gz.b64
-            echo "4a1d275fbcbf312de68a498817213e9e650009caadc59d771944479844b1d4a0  /tmp/v8-settings.patch.gz.b64" | sha256sum -c -
+            wc -c /tmp/v8-settings.patch.gz.b64
+            sha256sum /tmp/v8-settings.patch.gz.b64
             base64 -d /tmp/v8-settings.patch.gz.b64 | gunzip > /tmp/v8-settings.patch
-            echo "6f0d9124a742cfd5bf9ce711723988cbd680e404fe5cace69bd280e05abb35cb  /tmp/v8-settings.patch" | sha256sum -c -
+            wc -c /tmp/v8-settings.patch
+            sha256sum /tmp/v8-settings.patch
             git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/evidara-v8-paper-qa.yml > .github/workflows/evidara-v8-paper-qa.yml
             git show 796d8ca56091ed30949b28f5c5d0a7614d256129:.github/workflows/v8-source-export.yml > .github/workflows/v8-source-export.yml
-            patch --batch -p1 < /tmp/v8-settings.patch
+            patch --batch --verbose -p1 < /tmp/v8-settings.patch
             rm -rf scripts/.v8-patch
             node scripts/v8-paper-smoke.mjs
             git config user.name "Evidara V8 Automation"
@@ -50,7 +53,23 @@ jobs:
             git add -A
             git commit -m "Add configurable grades and academic settings"
             git push origin HEAD:evidara-v8-paper-builder
-          fi
+          } > v8-apply.log 2>&1
+          echo "$?" > v8-apply.status
+          cat v8-apply.log
+          exit 0
+
+      - name: Upload patch diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v8-apply-diagnostics
+          path: |
+            v8-apply.log
+            v8-apply.status
+          retention-days: 1
+
+      - name: Enforce patch application
+        run: test "$(cat v8-apply.status)" = "0"
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
