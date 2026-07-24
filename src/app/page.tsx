@@ -37,7 +37,7 @@ import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
-import { AnalyticsWorkspacePhase3 } from '@/components/analytics/AnalyticsWorkspacePhase3';
+import { AnalyticsWorkspacePhase4 } from '@/components/analytics/AnalyticsWorkspacePhase4';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -53,7 +53,7 @@ function ViewRouter() {
 
   if (view === 'student-dashboard') return <StudentDashboard />;
   if (view === 'student-tests') return <LiveStudentTests />;
-  if (view === 'student-analytics') return <AnalyticsWorkspacePhase3 audience="student" />;
+  if (view === 'student-analytics') return <AnalyticsWorkspacePhase4 audience="student" />;
   if (view === 'student-results') return <StudentResultsView />;
   if (view === 'student-achievements') return <StudentAchievementsView />;
   if (view === 'student-benchmarks') return <StudentBenchmarksView />;
@@ -62,7 +62,7 @@ function ViewRouter() {
   if (view === 'student-purchases') return <PurchaseHistory />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view === 'school-analytics') return <AnalyticsWorkspacePhase3 audience="school" />;
+  if (view === 'school-analytics') return <AnalyticsWorkspacePhase4 audience="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -77,7 +77,7 @@ function ViewRouter() {
   if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
-  if (view === 'admin-analytics') return <AnalyticsWorkspacePhase3 audience="admin" />;
+  if (view === 'admin-analytics') return <AnalyticsWorkspacePhase4 audience="admin" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
