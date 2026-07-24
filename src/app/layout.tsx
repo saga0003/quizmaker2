@@ -6,6 +6,7 @@ import "./evidara-metrics.css";
 import "./evidara-tables.css";
 import "./evidara-segments.css";
 import "./evidara-benchmarks.css";
+import "./evidara-analytics-phase3.css";
 import { AuthProvider } from "@/context/AuthProvider";
 import { V7AuthBridge } from "@/components/evidara/v7-auth-bridge";
 import { QuestionBankPolicy } from "@/components/evidara/question-bank-policy";

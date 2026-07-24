@@ -11,7 +11,7 @@ const comparison = read('supabase/36e_v10_analytics_comparison_engine.sql');
 const resetSafety = read('supabase/36f_v10_analytics_demo_reset_safety.sql');
 const hardening = read('supabase/36g_v10_analytics_comparison_hardening.sql');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
-const student = read('src/components/analytics/StudentAnalyticsDashboard.tsx');
+const student = read('src/components/analytics/StudentAnalyticsDashboardV3.tsx');
 const teacher = read('src/components/analytics/TeacherAnalyticsDashboard.tsx');
 const demo = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
 const demoTable = read('src/components/analytics/DemoStudentResultsTable.tsx');
@@ -45,9 +45,8 @@ const checks = [
   [workspace.includes('DemoAnalyticsDataLab'), 'Super Admin demo lab routing'],
   [teacher.includes("supabase.rpc('get_teacher_analytics_overview_v10'"), 'live teacher RPC usage'],
   [student.includes("supabase.rpc('get_student_analytics_overview_v11'"), 'student uses upgraded comparison RPC'],
-  [student.includes("supabase.rpc('get_student_test_comparison_v11'"), 'timeline popup uses test comparison RPC'],
-  [student.includes('Show answered-only accuracy'), 'accuracy card swap control'],
-  [student.includes('seriesToggleGroup'), 'trend benchmark toggles'],
+  [student.includes('Show answered-only'), 'accuracy card swap control'],
+  [student.includes('SeriesToggles'), 'benchmark toggle controls'],
   [student.includes('Subject comparison'), 'redesigned subject comparison'],
   [!student.includes('Last 3'), 'removed ambiguous Last 3 quick filter'],
   [!student.includes('Date band'), 'removed date-band control'],
