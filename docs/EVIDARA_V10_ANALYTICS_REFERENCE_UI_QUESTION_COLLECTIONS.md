@@ -14,6 +14,7 @@ Apply after migration 38b:
 6. `supabase/39e_v10_collection_paper_hardening.sql`
 7. `supabase/39f_v10_collection_scope_hardening.sql`
 8. `supabase/40_v10_demo_cohort_studio.sql`
+9. `supabase/40a_v10_demo_cohort_studio_hardening.sql`
 
 No migration, cohort generation, collection creation, paper generation, merge or deployment runs automatically.
 
