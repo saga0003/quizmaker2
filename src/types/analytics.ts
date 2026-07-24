@@ -151,3 +151,91 @@ export type StudentAnalyticsPayload = {
   timeline: AnalyticsTimelineRow[];
   generated_at: string;
 };
+
+export type TeacherAnalyticsSummary = {
+  total_students: number;
+  active_students: number;
+  completed_tests: number;
+  average_percentage?: number | null;
+  accuracy?: number | null;
+  participation?: number | null;
+  needs_attention: number;
+  improving: number;
+  strong: number;
+};
+
+export type TeacherAnalyticsSectionRow = {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  academic_year: string;
+  grade: number;
+  name: string;
+  students: number;
+  completed_tests: number;
+  average_percentage?: number | null;
+  accuracy?: number | null;
+};
+
+export type TeacherAnalyticsStudentRow = {
+  student_id: string;
+  membership_id: string;
+  section_id: string;
+  full_name: string;
+  grade: number;
+  section_name: string;
+  completed_tests: number;
+  average_percentage?: number | null;
+  accuracy?: number | null;
+  first_test_at?: string | null;
+  latest_test_at?: string | null;
+  first_percentage?: number | null;
+  latest_percentage?: number | null;
+  improvement: number;
+  performance_status: 'not_started' | 'needs_attention' | 'improving' | 'strong' | 'steady';
+};
+
+export type TeacherAnalyticsSubjectRow = {
+  subject_name: string;
+  responses: number;
+  correct: number;
+  incorrect: number;
+  accuracy?: number | null;
+  average_percentage?: number | null;
+};
+
+export type TeacherAnalyticsTrendRow = {
+  date: string;
+  completed_tests: number;
+  active_students: number;
+  average_percentage?: number | null;
+  accuracy?: number | null;
+};
+
+export type TeacherAnalyticsPayload = {
+  summary: TeacherAnalyticsSummary;
+  sections: TeacherAnalyticsSectionRow[];
+  students: TeacherAnalyticsStudentRow[];
+  subjects: TeacherAnalyticsSubjectRow[];
+  trends: TeacherAnalyticsTrendRow[];
+  generated_at: string;
+};
+
+export type AnalyticsDemoBatchStatus = {
+  id: string;
+  status: 'generating' | 'ready' | 'resetting' | 'reset' | 'failed';
+  requested_evidence_rows: number;
+  attempts: number;
+  responses: number;
+  papers: number;
+  products: number;
+  created_at: string;
+  completed_at?: string | null;
+};
+
+export type AnalyticsDemoStatus = {
+  email: string;
+  student_id?: string | null;
+  account_found: boolean;
+  active_batch?: AnalyticsDemoBatchStatus | null;
+};
