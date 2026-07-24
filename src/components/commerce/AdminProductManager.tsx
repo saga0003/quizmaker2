@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Archive,
   Check,
+  CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Edit3,
-  ExternalLink,
   FileText,
   Image as ImageIcon,
   LoaderCircle,
+  Package,
   PackagePlus,
   Plus,
   RefreshCw,
@@ -26,10 +30,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import styles from '@/components/commerce/commerce-prototype.module.css';
 
 const PRODUCT_TYPES = [
   ['test_series', 'Test series'],
@@ -42,6 +55,9 @@ const PRODUCT_TYPES = [
   ['question_bank_addon', 'Question bank add-on'],
   ['bundle', 'Bundle'],
 ] as const;
+
+const FORM_TABS = ['Basic info', 'Descriptions', 'Images', 'Pricing', 'Benefits', 'Papers'] as const;
+const STATUS_FILTERS = ['all', 'published', 'draft', 'archived'] as const;
 
 const slugify = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const httpsUrl = (value: string) => !value.trim() || /^https:\/\//i.test(value.trim());
@@ -72,20 +88,15 @@ const emptyForm = {
 
 type FormState = typeof emptyForm;
 
-function PortraitPreview({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="aspect-[3/4] overflow-hidden rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7]">
-      {src && httpsUrl(src) ? (
-        <img src={src} alt={alt || 'Product cover preview'} className="h-full w-full object-cover" />
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center px-5 text-center text-[#6B7980]">
-          <ImageIcon className="h-9 w-9 text-[#AEB8BC]" />
-          <p className="mt-3 text-sm font-medium">3:4 portrait cover</p>
-          <p className="mt-1 text-xs">Paste an HTTPS image link. Evidara stores only the URL.</p>
-        </div>
-      )}
-    </div>
-  );
+function statusClass(status: ProductStatus) {
+  if (status === 'published') return 'border-[#237A57]/20 bg-[#237A57]/10 text-[#237A57]';
+  if (status === 'archived') return 'border-[#F2B84B]/35 bg-[#FCF1DB] text-[#9A6508]';
+  return 'border-[#E7ECEB] bg-[#F7F9F7] text-[#6B7980]';
+}
+
+function audienceLabel(audience: ProductAudience) {
+  if (audience === 'both') return 'Students and schools';
+  return audience === 'school' ? 'Schools' : 'Students';
 }
 
 export function AdminProductManager() {
@@ -94,8 +105,12 @@ export function AdminProductManager() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [availablePapers, setAvailablePapers] = useState<BuilderPaper[]>([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all');
   const [paperSearch, setPaperSearch] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [formTab, setFormTab] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [workingId, setWorkingId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -123,22 +138,42 @@ export function AdminProductManager() {
 
   const mrpPaise = Math.round(Number(form.mrpRupees || 0) * 100);
   const sellingPaise = Math.round(Number(form.sellingRupees || 0) * 100);
-  const filteredProducts = useMemo(() => products.filter((product) => !search || `${product.name} ${product.slug} ${product.exam_type || ''}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
   const selectedPaperIds = useMemo(() => new Set(form.papers.map((paper) => paper.paper_id)), [form.papers]);
-  const filteredPapers = useMemo(() => availablePapers.filter((paper) => !paperSearch || `${paper.title} ${paper.code || ''} ${paper.exam_type || ''} ${paper.grade_level || ''}`.toLowerCase().includes(paperSearch.toLowerCase())), [availablePapers, paperSearch]);
+  const filteredPapers = useMemo(() => availablePapers.filter((paper) => {
+    if (!paperSearch) return true;
+    return `${paper.title} ${paper.code || ''} ${paper.exam_type || ''} ${paper.grade_level || ''}`.toLowerCase().includes(paperSearch.toLowerCase());
+  }), [availablePapers, paperSearch]);
+  const filteredProducts = useMemo(() => products.filter((product) => {
+    const matchesStatus = statusFilter === 'all' || product.status === statusFilter;
+    const matchesSearch = !search || `${product.name} ${product.slug} ${product.exam_type || ''}`.toLowerCase().includes(search.toLowerCase());
+    return matchesStatus && matchesSearch;
+  }), [products, search, statusFilter]);
+
+  const stats = {
+    total: products.length,
+    published: products.filter((product) => product.status === 'published').length,
+    draft: products.filter((product) => product.status === 'draft').length,
+    archived: products.filter((product) => product.status === 'archived').length,
+  };
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function reset() {
+  function resetForm() {
     setForm(emptyForm);
     setPaperSearch('');
-    setError('');
-    setMessage('');
+    setFormTab(0);
   }
 
-  function edit(product: AdminProduct) {
+  function openCreate() {
+    resetForm();
+    setError('');
+    setMessage('');
+    setFormOpen(true);
+  }
+
+  function openEdit(product: AdminProduct) {
     const version = product.current_version;
     setForm({
       id: product.id,
@@ -163,11 +198,17 @@ export function AdminProductManager() {
       isFeatured: product.is_featured,
       papers: (product.papers || []).map((paper, index) => ({ ...paper, display_order: index })),
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setPaperSearch('');
+    setFormTab(0);
+    setError('');
+    setMessage('');
+    setFormOpen(true);
   }
 
   function toggleGrade(value: string) {
-    update('gradeLevels', form.gradeLevels.includes(value) ? form.gradeLevels.filter((grade) => grade !== value) : [...form.gradeLevels, value]);
+    update('gradeLevels', form.gradeLevels.includes(value)
+      ? form.gradeLevels.filter((grade) => grade !== value)
+      : [...form.gradeLevels, value]);
   }
 
   function addPaper(paper: BuilderPaper) {
@@ -189,7 +230,9 @@ export function AdminProductManager() {
   }
 
   function removePaper(paperId: string) {
-    update('papers', form.papers.filter((paper) => paper.paper_id !== paperId).map((paper, index) => ({ ...paper, display_order: index })));
+    update('papers', form.papers
+      .filter((paper) => paper.paper_id !== paperId)
+      .map((paper, index) => ({ ...paper, display_order: index })));
   }
 
   function movePaper(index: number, direction: -1 | 1) {
@@ -208,130 +251,215 @@ export function AdminProductManager() {
     update('galleryImageUrls', form.galleryImageUrls.map((item, itemIndex) => itemIndex === index ? value : item));
   }
 
+  async function persistProduct(payload: FormState, targetStatus = payload.status) {
+    if (!supabase) throw new Error('Supabase is not configured.');
+    const gallery = payload.galleryImageUrls.map((item) => item.trim()).filter(Boolean);
+    const listPaise = Math.round(Number(payload.mrpRupees || 0) * 100);
+    const salePaise = Math.round(Number(payload.sellingRupees || 0) * 100);
+    if (!httpsUrl(payload.coverImageUrl) || gallery.some((item) => !httpsUrl(item))) throw new Error('Every product image must be an HTTPS image link.');
+    if (!payload.papers.length && targetStatus === 'published') throw new Error('Add at least one paper before publishing the product.');
+    if (salePaise > listPaise) throw new Error('Selling price cannot exceed the list price.');
+    const { error: saveError } = await supabase.rpc('admin_upsert_product_v9', {
+      p_product_id: payload.id || null,
+      p_name: payload.name,
+      p_slug: payload.slug || slugify(payload.name),
+      p_short_description: payload.shortDescription || null,
+      p_description: payload.description || null,
+      p_product_type: payload.productType,
+      p_audience: payload.audience,
+      p_exam_type: payload.examType || null,
+      p_grade_levels: payload.gradeLevels,
+      p_cover_image_url: payload.coverImageUrl || null,
+      p_gallery_image_urls: gallery,
+      p_image_alt_text: payload.imageAltText || null,
+      p_mrp_paise: listPaise,
+      p_selling_price_paise: salePaise,
+      p_access_days: payload.accessDays ? Number(payload.accessDays) : null,
+      p_max_attempts: payload.maxAttempts ? Number(payload.maxAttempts) : null,
+      p_student_limit: payload.studentLimit ? Number(payload.studentLimit) : null,
+      p_features: payload.features.split('\n').map((item) => item.trim()).filter(Boolean),
+      p_status: targetStatus,
+      p_is_featured: payload.isFeatured,
+      p_papers: payload.papers.map((paper, display_order) => ({ paper_id: paper.paper_id, display_name: paper.display_name, display_order })),
+    });
+    if (saveError) throw saveError;
+  }
+
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setError('');
     setMessage('');
-    if (!supabase) return setError('Supabase is not configured.');
-    const gallery = form.galleryImageUrls.map((item) => item.trim()).filter(Boolean);
-    if (!httpsUrl(form.coverImageUrl) || gallery.some((item) => !httpsUrl(item))) return setError('Every product image must be an HTTPS link.');
-    if (!form.papers.length && form.status === 'published') return setError('Add at least one paper before publishing the product.');
-    if (sellingPaise > mrpPaise) return setError('Selling price cannot exceed the list price.');
     setBusy(true);
-    const { error: saveError } = await supabase.rpc('admin_upsert_product_v9', {
-      p_product_id: form.id || null,
-      p_name: form.name,
-      p_slug: form.slug || slugify(form.name),
-      p_short_description: form.shortDescription || null,
-      p_description: form.description || null,
-      p_product_type: form.productType,
-      p_audience: form.audience,
-      p_exam_type: form.examType || null,
-      p_grade_levels: form.gradeLevels,
-      p_cover_image_url: form.coverImageUrl || null,
-      p_gallery_image_urls: gallery,
-      p_image_alt_text: form.imageAltText || null,
-      p_mrp_paise: mrpPaise,
-      p_selling_price_paise: sellingPaise,
-      p_access_days: form.accessDays ? Number(form.accessDays) : null,
-      p_max_attempts: form.maxAttempts ? Number(form.maxAttempts) : null,
-      p_student_limit: form.studentLimit ? Number(form.studentLimit) : null,
-      p_features: form.features.split('\n').map((item) => item.trim()).filter(Boolean),
-      p_status: form.status,
-      p_is_featured: form.isFeatured,
-      p_papers: form.papers.map((paper, display_order) => ({ paper_id: paper.paper_id, display_name: paper.display_name, display_order })),
-    });
-    setBusy(false);
-    if (saveError) return setError(saveError.message);
-    setMessage(form.id ? 'Product updated. A new immutable price version was created.' : 'Product created successfully.');
-    reset();
-    await load();
+    try {
+      await persistProduct(form);
+      setMessage(form.id ? 'Product updated. A new immutable price version was created.' : 'Product created successfully.');
+      setFormOpen(false);
+      resetForm();
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save product.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function changeStatus(product: AdminProduct, status: ProductStatus) {
+    const version = product.current_version;
+    if (!version) return setError('The product does not have a current pricing version.');
+    setWorkingId(product.id);
+    setError('');
+    setMessage('');
+    try {
+      await persistProduct({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        shortDescription: product.short_description || '',
+        description: product.description || '',
+        productType: product.product_type,
+        audience: product.audience,
+        examType: product.exam_type || '',
+        gradeLevels: product.grade_levels || [],
+        coverImageUrl: product.cover_image_url || '',
+        imageAltText: product.image_alt_text || '',
+        galleryImageUrls: product.gallery_image_urls?.length ? product.gallery_image_urls : [''],
+        mrpRupees: String(version.mrp_paise / 100),
+        sellingRupees: String(version.selling_price_paise / 100),
+        accessDays: version.access_days ? String(version.access_days) : '',
+        maxAttempts: version.max_attempts ? String(version.max_attempts) : '',
+        studentLimit: version.student_limit ? String(version.student_limit) : '',
+        features: (version.features || []).join('\n'),
+        status,
+        isFeatured: product.is_featured,
+        papers: product.papers || [],
+      }, status);
+      setMessage(status === 'published' ? `“${product.name}” is now published.` : `“${product.name}” has been archived.`);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to change product status.');
+    } finally {
+      setWorkingId('');
+    }
+  }
+
+  function renderFormContent() {
+    if (formTab === 0) {
+      return (
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2"><Label>Product name</Label><Input required value={form.name} onChange={(event) => { update('name', event.target.value); if (!form.id) update('slug', slugify(event.target.value)); }} placeholder="NEET Complete Mock Test Series" /></div>
+          <div className="space-y-2"><Label>URL slug</Label><Input required value={form.slug} onChange={(event) => update('slug', slugify(event.target.value))} /></div>
+          <div className="space-y-2"><Label>Product type</Label><Select value={form.productType} onValueChange={(value) => update('productType', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRODUCT_TYPES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+          <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value) => update('audience', value as ProductAudience)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Students</SelectItem><SelectItem value="school">Schools</SelectItem><SelectItem value="both">Students and schools</SelectItem></SelectContent></Select></div>
+          <div className="space-y-2"><Label>Exam</Label><Select value={form.examType} onValueChange={(value) => update('examType', value)}><SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+          <div className="space-y-2 md:col-span-2"><div className="flex items-center justify-between"><Label>Grades</Label><span className="text-xs text-[#6B7980]">{form.gradeLevels.length} selected</span></div><div className="flex flex-wrap gap-2">{grades.map((item) => <Button key={item.id} type="button" size="sm" variant="outline" onClick={() => toggleGrade(item.value)} className={form.gradeLevels.includes(item.value) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB]'}>{item.label}</Button>)}</div></div>
+          <div className="space-y-2"><Label>Status</Label><Select value={form.status} onValueChange={(value) => update('status', value as ProductStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="published">Published</SelectItem><SelectItem value="archived">Archived</SelectItem></SelectContent></Select></div>
+          <label className="flex items-center gap-3 rounded-xl border border-[#E7ECEB] px-4 py-3"><Checkbox checked={form.isFeatured} onCheckedChange={(checked) => update('isFeatured', checked === true)} /><span className="text-sm font-medium text-[#14232B]">Featured product</span></label>
+        </div>
+      );
+    }
+
+    if (formTab === 1) {
+      return (
+        <div className="space-y-5">
+          <div className="space-y-2"><Label>Short description</Label><Input value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} placeholder="Shown in catalogue and store cards" /></div>
+          <div className="space-y-2"><Label>Full description</Label><Textarea rows={12} value={form.description} onChange={(event) => update('description', event.target.value)} placeholder="Explain coverage, outcomes and who the product is for." /></div>
+        </div>
+      );
+    }
+
+    if (formTab === 2) {
+      return (
+        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="aspect-[3/4] overflow-hidden rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7]">
+            {form.coverImageUrl && httpsUrl(form.coverImageUrl) ? <img src={form.coverImageUrl} alt={form.imageAltText || 'Product cover preview'} className="h-full w-full object-cover" /> : <div className="flex h-full flex-col items-center justify-center px-5 text-center text-[#6B7980]"><ImageIcon className="h-9 w-9 text-[#AEB8BC]" /><p className="mt-3 text-sm font-medium">Product cover preview</p></div>}
+          </div>
+          <div className="space-y-5">
+            <div className="space-y-2"><Label>Primary cover image URL</Label><Input value={form.coverImageUrl} onChange={(event) => update('coverImageUrl', event.target.value)} placeholder="HTTPS image link" /></div>
+            <div className="space-y-2"><Label>Image alt text</Label><Input value={form.imageAltText} onChange={(event) => update('imageAltText', event.target.value)} /></div>
+            <div className="space-y-3"><div className="flex items-center justify-between"><div><Label>Gallery image links</Label><p className="mt-1 text-xs text-[#6B7980]">Up to eight HTTPS links.</p></div><Button type="button" size="sm" variant="outline" disabled={form.galleryImageUrls.length >= 8} onClick={() => update('galleryImageUrls', [...form.galleryImageUrls, ''])}><Plus className="mr-1 h-4 w-4" />Add</Button></div>{form.galleryImageUrls.map((url, index) => <div key={index} className="flex gap-2"><Input value={url} onChange={(event) => setGallery(index, event.target.value)} placeholder={`Gallery image ${index + 1}`} /><Button type="button" variant="ghost" size="icon" onClick={() => update('galleryImageUrls', form.galleryImageUrls.filter((_item, itemIndex) => itemIndex !== index))} disabled={form.galleryImageUrls.length === 1 && !url}><X className="h-4 w-4" /></Button></div>)}</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (formTab === 3) {
+      const discount = discountPercent(mrpPaise, sellingPaise);
+      return (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-2"><Label>List price ₹</Label><Input required type="number" min="0" value={form.mrpRupees} onChange={(event) => update('mrpRupees', event.target.value)} /></div>
+            <div className="space-y-2"><Label>Selling price ₹</Label><Input required type="number" min="0" value={form.sellingRupees} onChange={(event) => update('sellingRupees', event.target.value)} /></div>
+            <div className="space-y-2"><Label>Access days</Label><Input type="number" min="1" value={form.accessDays} onChange={(event) => update('accessDays', event.target.value)} /></div>
+            <div className="space-y-2"><Label>Maximum attempts per paper</Label><Input type="number" min="1" value={form.maxAttempts} onChange={(event) => update('maxAttempts', event.target.value)} placeholder="Use paper limit" /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Default school seats</Label><Input type="number" min="1" value={form.studentLimit} onChange={(event) => update('studentLimit', event.target.value)} placeholder="Used for online school purchase" /></div>
+          </div>
+          <div className="rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7] p-5"><div className="flex flex-wrap items-baseline gap-3"><strong className="text-3xl text-[#14232B]">{rupees(sellingPaise)}</strong>{sellingPaise < mrpPaise && <><s className="text-sm text-[#6B7980]">{rupees(mrpPaise)}</s><Badge className="bg-[#DCE9E7] text-[#0E5A5A]">{discount}% off</Badge></>}</div><p className="mt-2 text-xs text-[#6B7980]">{form.papers.length} papers · {form.accessDays || 'No fixed'} days access</p></div>
+        </div>
+      );
+    }
+
+    if (formTab === 4) {
+      return <div className="space-y-2"><Label>Benefits — one per line</Label><Textarea rows={14} value={form.features} onChange={(event) => update('features', event.target.value)} placeholder="Detailed analytics\nChapter-level insights" /></div>;
+    }
+
+    return (
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="rounded-2xl border border-[#E7ECEB] p-4">
+          <div className="flex items-center justify-between"><div><h3 className="font-semibold text-[#14232B]">Available papers</h3><p className="mt-1 text-xs text-[#6B7980]">Approved and published Evidara master papers.</p></div><Badge variant="outline">{availablePapers.length}</Badge></div>
+          <div className="relative mt-4"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={paperSearch} onChange={(event) => setPaperSearch(event.target.value)} placeholder="Search papers" className="pl-9" /></div>
+          <div className={`${styles.scrollArea} mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1`}>{filteredPapers.map((paper) => <div key={paper.id} className="flex items-start gap-3 rounded-xl border border-[#E7ECEB] p-3"><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-medium text-[#14232B]">{paper.title}</p><p className="mt-1 text-xs text-[#6B7980]">{paper.code || 'No code'} · {paper.exam_type || 'No exam'} · {paper.grade_level || 'No grade'} · {paper.total_questions} questions</p></div><Button type="button" size="sm" variant={selectedPaperIds.has(paper.id) ? 'secondary' : 'outline'} disabled={selectedPaperIds.has(paper.id)} onClick={() => addPaper(paper)}>{selectedPaperIds.has(paper.id) ? <Check className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}{selectedPaperIds.has(paper.id) ? 'Added' : 'Add'}</Button></div>)}{!filteredPapers.length && <div className={styles.emptyState}><FileText className="mx-auto mb-3 h-8 w-8 text-[#AEB8BC]" />No matching papers.</div>}</div>
+        </div>
+        <div className="rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7] p-4">
+          <div className="flex items-center justify-between"><div><h3 className="font-semibold text-[#14232B]">Included papers and storefront names</h3><p className="mt-1 text-xs text-[#6B7980]">The source-paper title remains unchanged.</p></div><Badge className="bg-[#DCE9E7] text-[#0E5A5A]">{form.papers.length} paper{form.papers.length === 1 ? '' : 's'}</Badge></div>
+          <div className={`${styles.scrollArea} mt-4 max-h-[470px] space-y-3 overflow-y-auto pr-1`}>{form.papers.map((paper, index) => <div key={paper.paper_id} className="rounded-xl border border-[#DCE9E7] bg-white p-3"><div className="flex items-start gap-2"><div className="flex flex-col"><Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === 0} onClick={() => movePaper(index, -1)}><ChevronUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === form.papers.length - 1} onClick={() => movePaper(index, 1)}><ChevronDown className="h-4 w-4" /></Button></div><div className="min-w-0 flex-1"><Input value={paper.display_name} onChange={(event) => updatePaperName(paper.paper_id, event.target.value)} className="h-9 text-sm font-medium" /><p className="mt-2 line-clamp-1 text-xs text-[#6B7980]">Source: {paper.title || availablePapers.find((item) => item.id === paper.paper_id)?.title}</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#B54747]" onClick={() => removePaper(paper.paper_id)}><Trash2 className="h-4 w-4" /></Button></div></div>)}{!form.papers.length && <div className={styles.emptyState}><Package className="mx-auto mb-3 h-8 w-8 text-[#AEB8BC]" />Select papers to build the product.</div>}</div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-5">
-      <form onSubmit={save}>
-        <Card className="gap-0 overflow-hidden border-[#DCE9E7] shadow-none">
-          <div className="border-b border-[#DCE9E7] bg-[#F7F9F7] px-5 py-4 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">Product builder</div>
-                <h2 className="mt-1 text-xl font-bold text-[#14232B]">{form.id ? 'Edit paper-series product' : 'Create a paper-series product'}</h2>
-                <p className="mt-1 text-sm text-[#6B7980]">Images stay on your CDN or website. Evidara stores only HTTPS links.</p>
-              </div>
-              {form.id && <Button type="button" variant="outline" onClick={reset} className="border-[#DCE9E7] bg-white"><Plus className="mr-2 h-4 w-4" />Create another</Button>}
-            </div>
-          </div>
-          <CardContent className="space-y-6 p-5 sm:p-6">
-            {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#0E5A5A]/20 bg-[#DCE9E7]/50 text-[#0E5A5A]'}`}>{error || message}</div>}
+    <div className={`${styles.workspace} space-y-6`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div><h2 className="text-2xl font-extrabold tracking-tight text-[#14232B]">Products</h2><p className="mt-1 text-sm text-[#6B7980]">Manage paper bundles, pricing versions and publication.</p></div>
+        <Button onClick={openCreate} className="h-11 bg-[#0E5A5A] hover:bg-[#0A4A4A]"><Plus className="mr-2 h-4 w-4" />Create Product</Button>
+      </div>
 
-            <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-              <div className="space-y-3">
-                <PortraitPreview src={form.coverImageUrl} alt={form.imageAltText} />
-                <div className="space-y-2"><Label>Primary cover image URL</Label><Input value={form.coverImageUrl} onChange={(event) => update('coverImageUrl', event.target.value)} placeholder="https://cdn.example.com/neet-series.jpg" className="border-[#E7ECEB]" /></div>
-                <div className="space-y-2"><Label>Image alt text</Label><Input value={form.imageAltText} onChange={(event) => update('imageAltText', event.target.value)} placeholder="NEET full syllabus test series cover" className="border-[#E7ECEB]" /></div>
-              </div>
+      {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#237A57]/20 bg-[#237A57]/5 text-[#237A57]'}`}>{error || message}</div>}
 
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2"><Label>Product name</Label><Input required value={form.name} onChange={(event) => { update('name', event.target.value); if (!form.id) update('slug', slugify(event.target.value)); }} placeholder="NEET Complete Mock Test Series" className="h-11 border-[#E7ECEB]" /></div>
-                  <div className="space-y-2"><Label>URL slug</Label><Input required value={form.slug} onChange={(event) => update('slug', slugify(event.target.value))} className="h-11 border-[#E7ECEB]" /></div>
-                  <div className="space-y-2"><Label>Audience</Label><Select value={form.audience} onValueChange={(value) => update('audience', value as ProductAudience)}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="student">Students</SelectItem><SelectItem value="school">Schools</SelectItem><SelectItem value="both">Students and schools</SelectItem></SelectContent></Select></div>
-                  <div className="space-y-2"><Label>Product type</Label><Select value={form.productType} onValueChange={(value) => update('productType', value)}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{PRODUCT_TYPES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2"><Label>Exam</Label><Select value={form.examType} onValueChange={(value) => update('examType', value)}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue placeholder="Select exam" /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
-                  <div className="space-y-2 md:col-span-2"><Label>Short description</Label><Input value={form.shortDescription} onChange={(event) => update('shortDescription', event.target.value)} placeholder="A concise value statement shown on the product card." className="h-11 border-[#E7ECEB]" /></div>
-                  <div className="space-y-2 md:col-span-2"><Label>Product description</Label><Textarea rows={5} value={form.description} onChange={(event) => update('description', event.target.value)} placeholder="Explain who this series is for, what it covers and what students or schools receive." className="border-[#E7ECEB]" /></div>
-                </div>
-
-                <div>
-                  <div className="mb-2 flex items-center justify-between"><Label>Grades</Label><span className="text-xs text-[#6B7980]">{form.gradeLevels.length} selected</span></div>
-                  <div className="flex flex-wrap gap-2">{grades.map((item) => <Button key={item.id} type="button" size="sm" variant="outline" onClick={() => toggleGrade(item.value)} className={form.gradeLevels.includes(item.value) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] bg-white text-[#44545C]'}>{item.label}</Button>)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[#E7ECEB] bg-[#FBFCFC] p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-[#14232B]">Optional gallery image links</h3><p className="mt-1 text-xs text-[#6B7980]">Show up to eight additional previews of analytics, paper coverage or included benefits.</p></div><Button type="button" variant="outline" size="sm" disabled={form.galleryImageUrls.length >= 8} onClick={() => update('galleryImageUrls', [...form.galleryImageUrls, ''])} className="border-[#DCE9E7] bg-white"><Plus className="mr-1 h-4 w-4" />Add image</Button></div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">{form.galleryImageUrls.map((url, index) => <div key={index} className="flex items-center gap-2"><Input value={url} onChange={(event) => setGallery(index, event.target.value)} placeholder={`Gallery image ${index + 1} HTTPS URL`} className="border-[#E7ECEB] bg-white" /><Button type="button" variant="ghost" size="icon" onClick={() => update('galleryImageUrls', form.galleryImageUrls.filter((_item, itemIndex) => itemIndex !== index))} disabled={form.galleryImageUrls.length === 1 && !url}><X className="h-4 w-4" /></Button></div>)}</div>
-            </div>
-
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
-              <div className="rounded-2xl border border-[#E7ECEB] p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-[#14232B]">Select question papers</h3><p className="mt-1 text-xs text-[#6B7980]">The product count is compiled automatically from this list.</p></div><Badge variant="outline" className="w-fit border-[#0E5A5A]/20 bg-[#DCE9E7] text-[#0E5A5A]">{form.papers.length} paper{form.papers.length === 1 ? '' : 's'} included</Badge></div>
-                <div className="relative mt-4"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" /><Input value={paperSearch} onChange={(event) => setPaperSearch(event.target.value)} placeholder="Search published or approved papers" className="border-[#E7ECEB] pl-9" /></div>
-                <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">{filteredPapers.map((paper) => <div key={paper.id} className="flex items-start gap-3 rounded-xl border border-[#E7ECEB] bg-white p-3"><div className="min-w-0 flex-1"><p className="line-clamp-2 text-sm font-medium text-[#14232B]">{paper.title}</p><p className="mt-1 text-xs text-[#6B7980]">{paper.code || 'No code'} · {paper.exam_type || 'No exam'} · {paper.grade_level || 'No grade'} · {paper.total_questions} questions</p></div><Button type="button" size="sm" variant={selectedPaperIds.has(paper.id) ? 'secondary' : 'outline'} disabled={selectedPaperIds.has(paper.id)} onClick={() => addPaper(paper)} className={selectedPaperIds.has(paper.id) ? 'bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#0E5A5A]/30 text-[#0E5A5A]'}>{selectedPaperIds.has(paper.id) ? <Check className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}{selectedPaperIds.has(paper.id) ? 'Added' : 'Add'}</Button></div>)}{!filteredPapers.length && <div className="py-10 text-center text-sm text-[#6B7980]">No matching master papers are available.</div>}</div>
-              </div>
-
-              <div className="rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7] p-4 sm:p-5">
-                <h3 className="font-semibold text-[#14232B]">Included papers and storefront names</h3>
-                <p className="mt-1 text-xs text-[#6B7980]">Rename papers only for this product. The source paper title remains unchanged.</p>
-                <div className="mt-4 max-h-[470px] space-y-3 overflow-y-auto pr-1">{form.papers.map((paper, index) => <div key={paper.paper_id} className="rounded-xl border border-[#DCE9E7] bg-white p-3"><div className="flex items-start gap-2"><div className="flex flex-col"><Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === 0} onClick={() => movePaper(index, -1)}><ChevronUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={index === form.papers.length - 1} onClick={() => movePaper(index, 1)}><ChevronDown className="h-4 w-4" /></Button></div><div className="min-w-0 flex-1"><Input value={paper.display_name} onChange={(event) => updatePaperName(paper.paper_id, event.target.value)} className="h-9 border-[#E7ECEB] text-sm font-medium" /><p className="mt-2 line-clamp-1 text-xs text-[#6B7980]">Source: {paper.title || availablePapers.find((item) => item.id === paper.paper_id)?.title}</p></div><Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-[#B54747]" onClick={() => removePaper(paper.paper_id)}><Trash2 className="h-4 w-4" /></Button></div></div>)}{!form.papers.length && <div className="py-12 text-center text-sm text-[#6B7980]"><FileText className="mx-auto mb-3 h-8 w-8 text-[#AEB8BC]" />Select papers to build the product.</div>}</div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-2"><Label>List price ₹</Label><Input required type="number" min="0" value={form.mrpRupees} onChange={(event) => update('mrpRupees', event.target.value)} className="h-11 border-[#E7ECEB]" /></div>
-              <div className="space-y-2"><Label>Selling price ₹</Label><Input required type="number" min="0" value={form.sellingRupees} onChange={(event) => update('sellingRupees', event.target.value)} className="h-11 border-[#E7ECEB]" /></div>
-              <div className="space-y-2"><Label>Access days</Label><Input type="number" min="1" value={form.accessDays} onChange={(event) => update('accessDays', event.target.value)} className="h-11 border-[#E7ECEB]" /></div>
-              <div className="space-y-2"><Label>Maximum attempts per paper</Label><Input type="number" min="1" value={form.maxAttempts} onChange={(event) => update('maxAttempts', event.target.value)} placeholder="Use paper limit" className="h-11 border-[#E7ECEB]" /></div>
-              <div className="space-y-2"><Label>Default school seats</Label><Input type="number" min="1" value={form.studentLimit} onChange={(event) => update('studentLimit', event.target.value)} placeholder="Used for online school purchase" className="h-11 border-[#E7ECEB]" /></div>
-              <div className="space-y-2"><Label>Status</Label><Select value={form.status} onValueChange={(value) => update('status', value as ProductStatus)}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="draft">Draft</SelectItem><SelectItem value="published">Published</SelectItem><SelectItem value="archived">Archived</SelectItem></SelectContent></Select></div>
-              <div className="md:col-span-2 rounded-xl border border-[#DCE9E7] bg-[#F7F9F7] px-4 py-3"><div className="flex flex-wrap items-baseline gap-2"><strong className="text-2xl text-[#14232B]">{rupees(sellingPaise)}</strong>{sellingPaise < mrpPaise && <><s className="text-sm text-[#6B7980]">{rupees(mrpPaise)}</s><Badge className="bg-[#DCE9E7] text-[#0E5A5A]">{discountPercent(mrpPaise, sellingPaise)}% off</Badge></>}</div><p className="mt-1 text-xs text-[#6B7980]">{form.papers.length} papers · {form.accessDays || 'No fixed'} days access</p></div>
-              <div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Benefits — one per line</Label><Textarea rows={4} value={form.features} onChange={(event) => update('features', event.target.value)} className="border-[#E7ECEB]" /></div>
-              <label className="flex items-center gap-3 rounded-xl border border-[#E7ECEB] px-4 py-3 md:col-span-2"><Checkbox checked={form.isFeatured} onCheckedChange={(checked) => update('isFeatured', checked === true)} /><div><div className="flex items-center gap-2 text-sm font-medium text-[#14232B]"><Star className="h-4 w-4 text-[#F2B84B]" />Featured product</div><p className="text-xs text-[#6B7980]">Prioritise this series in the student and school store.</p></div></label>
-            </div>
-
-            <Button disabled={busy} className="h-12 w-full bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <PackagePlus className="mr-2 h-4 w-4" />}{form.id ? 'Save product changes' : 'Create product'}</Button>
-          </CardContent>
-        </Card>
-      </form>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'All products', value: stats.total, icon: Package },
+          { label: 'Published', value: stats.published, icon: CheckCircle2 },
+          { label: 'Drafts', value: stats.draft, icon: Edit3 },
+          { label: 'Archived', value: stats.archived, icon: Archive },
+        ].map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{value}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></div></div>)}
+      </div>
 
       <Card className="gap-0 border-[#E7ECEB] shadow-none">
-        <CardContent className="p-5 sm:p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">Product catalogue</div><h2 className="mt-1 text-xl font-bold text-[#14232B]">Products and current versions</h2></div><div className="flex gap-2"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products" className="w-[240px] border-[#E7ECEB] pl-9" /></div><Button variant="outline" size="icon" onClick={() => void load()} disabled={busy} className="border-[#E7ECEB]"><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button></div></div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">{filteredProducts.map((product) => <article key={product.id} className="grid grid-cols-[110px_minmax(0,1fr)] gap-4 rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="aspect-[3/4] overflow-hidden rounded-xl bg-[#F7F9F7]">{product.cover_image_url ? <img src={product.cover_image_url} alt={product.image_alt_text || product.name} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center"><ImageIcon className="h-7 w-7 text-[#AEB8BC]" /></div>}</div><div className="min-w-0"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold text-[#14232B]">{product.name}</h3><p className="mt-1 text-xs text-[#6B7980]">{product.exam_type || 'Multi-exam'} · {product.paper_count} papers · {product.audience}</p></div><Badge variant="outline" className={product.status === 'published' ? 'border-[#0E5A5A]/20 bg-[#DCE9E7] text-[#0E5A5A]' : product.status === 'archived' ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#E7ECEB] text-[#6B7980]'}>{product.status}</Badge></div><p className="mt-3 line-clamp-2 text-sm text-[#44545C]">{product.short_description || product.description}</p><div className="mt-3 flex flex-wrap items-center gap-2"><strong className="text-lg text-[#14232B]">{rupees(product.current_version?.selling_price_paise || 0)}</strong>{product.current_version && product.current_version.mrp_paise > product.current_version.selling_price_paise && <s className="text-xs text-[#6B7980]">{rupees(product.current_version.mrp_paise)}</s>}{product.is_featured && <Badge className="bg-[#FCF1DB] text-[#8A5F00]">Featured</Badge>}</div><div className="mt-4 flex gap-2"><Button type="button" size="sm" variant="outline" onClick={() => edit(product)} className="border-[#0E5A5A]/30 text-[#0E5A5A]"><Edit3 className="mr-1 h-4 w-4" />Edit</Button>{product.cover_image_url && <Button type="button" size="sm" variant="ghost" asChild><a href={product.cover_image_url} target="_blank" rel="noreferrer"><ExternalLink className="mr-1 h-4 w-4" />Image</a></Button>}</div></div></article>)}{!filteredProducts.length && <div className="col-span-full py-12 text-center text-sm text-[#6B7980]">No products match the search.</div>}</div>
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-3 border-b border-[#E7ECEB] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name, slug or exam" className="pl-9" /></div>
+            <div className="flex flex-wrap gap-2">{STATUS_FILTERS.map((status) => <Button key={status} type="button" size="sm" variant="outline" onClick={() => setStatusFilter(status)} className={statusFilter === status ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB]'}>{status === 'all' ? 'All' : status[0].toUpperCase() + status.slice(1)}</Button>)}<Button type="button" variant="outline" size="icon" onClick={() => void load()} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button></div>
+          </div>
+          <div className={`${styles.scrollArea} overflow-x-auto`}>
+            <table className="min-w-[980px] w-full border-collapse">
+              <thead><tr className="border-b border-[#E7ECEB] bg-[#F7F9F7] text-left text-xs font-semibold text-[#6B7980]"><th className="px-5 py-3">Product</th><th>Audience</th><th>Papers</th><th>Current price</th><th>Status</th><th>Updated</th><th className="pr-5 text-right">Actions</th></tr></thead>
+              <tbody>{filteredProducts.map((product) => { const version = product.current_version; return <tr key={product.id} className={`${styles.tableRow} border-b border-[#E7ECEB] text-sm`}><td className="px-5 py-4"><div className="flex items-center gap-3"><div className="h-14 w-20 overflow-hidden rounded-xl border border-[#E7ECEB] bg-[#F7F9F7]">{product.cover_image_url ? <img src={product.cover_image_url} alt={product.image_alt_text || product.name} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center"><ImageIcon className="h-5 w-5 text-[#AEB8BC]" /></div>}</div><div className="min-w-0"><div className="flex items-center gap-2"><strong className="max-w-[300px] truncate text-[#14232B]">{product.name}</strong>{product.is_featured && <Star className="h-4 w-4 fill-[#F2B84B] text-[#F2B84B]" />}</div><p className="mt-1 text-xs text-[#6B7980]">{product.slug} · {product.exam_type || 'Multi-exam'}</p></div></div></td><td className="capitalize text-[#44545C]">{audienceLabel(product.audience)}</td><td><strong className="text-[#14232B]">{product.paper_count}</strong></td><td>{version ? <div><strong className="text-[#14232B]">{rupees(version.selling_price_paise)}</strong>{version.mrp_paise > version.selling_price_paise && <p className="text-xs text-[#6B7980]"><s>{rupees(version.mrp_paise)}</s> · v{version.version_number}</p>}</div> : <span className="text-[#AEB8BC]">No price</span>}</td><td><Badge variant="outline" className={statusClass(product.status)}>{product.status}</Badge></td><td className="text-xs text-[#6B7980]">{new Date(product.updated_at || product.created_at).toLocaleDateString('en-IN')}</td><td className="pr-5"><div className="flex justify-end gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => openEdit(product)}><Edit3 className="mr-1 h-4 w-4" />Edit</Button>{product.status !== 'published' && <Button type="button" variant="ghost" size="sm" disabled={workingId === product.id} onClick={() => void changeStatus(product, 'published')} className="text-[#237A57]">{workingId === product.id ? <LoaderCircle className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}Publish</Button>}{product.status !== 'archived' && <Button type="button" variant="ghost" size="sm" disabled={workingId === product.id} onClick={() => void changeStatus(product, 'archived')} className="text-[#9A6508]"><Archive className="mr-1 h-4 w-4" />Archive</Button>}</div></td></tr>; })}{!filteredProducts.length && <tr><td colSpan={7} className={styles.emptyState}><Package className="mx-auto mb-3 h-10 w-10 text-[#AEB8BC]" />No products match the current search and status filter.</td></tr>}</tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!busy) setFormOpen(open); }}>
+        <DialogContent className="max-h-[94vh] w-[96vw] max-w-6xl overflow-hidden border-[#DCE9E7] p-0">
+          <form onSubmit={save} className="flex max-h-[94vh] flex-col">
+            <DialogHeader className="border-b border-[#E7ECEB] px-5 py-4 text-left sm:px-6"><DialogTitle className="text-xl text-[#14232B]">{form.id ? 'Edit product' : 'Create product'}</DialogTitle><DialogDescription>{form.id ? 'Changes create a new immutable pricing version.' : 'Bundle approved or published master papers into a commercial product.'}</DialogDescription></DialogHeader>
+            <div className={`${styles.scrollArea} flex gap-0 overflow-x-auto border-b border-[#E7ECEB] px-4 sm:px-6`}>{FORM_TABS.map((tab, index) => <button key={tab} type="button" onClick={() => setFormTab(index)} className={`${styles.focusRing} shrink-0 border-b-2 px-3.5 py-3 text-xs font-semibold transition-colors ${formTab === index ? 'border-[#0E5A5A] text-[#0E5A5A]' : 'border-transparent text-[#6B7980] hover:text-[#14232B]'}`}>{tab}</button>)}</div>
+            <div className={`${styles.scrollArea} ${styles.fadeIn} flex-1 overflow-y-auto bg-white p-5 sm:p-6`}>{renderFormContent()}</div>
+            <DialogFooter className="border-t border-[#E7ECEB] bg-white px-5 py-4 sm:px-6"><div className="mr-auto text-xs text-[#6B7980]">Step {formTab + 1} of {FORM_TABS.length}</div>{formTab > 0 && <Button type="button" variant="outline" onClick={() => setFormTab((current) => current - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Back</Button>}{formTab < FORM_TABS.length - 1 && <Button type="button" variant="outline" onClick={() => setFormTab((current) => current + 1)}>Next<ChevronRight className="ml-1 h-4 w-4" /></Button>}<Button disabled={busy} className="bg-[#0E5A5A] hover:bg-[#0A4A4A]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <PackagePlus className="mr-2 h-4 w-4" />}{form.id ? 'Save changes' : 'Create product'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
