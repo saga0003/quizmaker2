@@ -6,8 +6,10 @@ const safety = read('supabase/36a_v10_analytics_phase_2_safety.sql');
 const attemptLimitHotfix = read('supabase/36b_v10_analytics_phase_2_attempt_limit_hotfix.sql');
 const studentFix = read('supabase/36c_v10_analytics_student_calculation_ui_fix.sql');
 const cohort = read('supabase/36d_v10_analytics_100_student_demo_cohort.sql');
+const roundCompat = read('supabase/36d1_v10_analytics_numeric_round_compat.sql');
 const comparison = read('supabase/36e_v10_analytics_comparison_engine.sql');
 const resetSafety = read('supabase/36f_v10_analytics_demo_reset_safety.sql');
+const hardening = read('supabase/36g_v10_analytics_comparison_hardening.sql');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
 const student = read('src/components/analytics/StudentAnalyticsDashboard.tsx');
 const teacher = read('src/components/analytics/TeacherAnalyticsDashboard.tsx');
@@ -30,12 +32,15 @@ const checks = [
   [cohort.includes('for v_test in 1..10 loop'), 'ten tests per series'],
   [cohort.includes('total_marks,total_questions'), '100-question generated papers'],
   [cohort.includes('list_analytics_demo_students_v11'), 'Super Admin results table RPC'],
+  [roundCompat.includes('round(p_value::numeric,p_scale)'), 'PostgreSQL percentile rounding compatibility'],
   [comparison.includes('analytics_test_snapshot_v11'), 'multi-metric test comparison snapshot'],
   [comparison.includes('get_student_analytics_overview_v11'), 'upgraded student overview RPC'],
   [comparison.includes('get_student_test_comparison_v11'), 'timeline test detail RPC'],
   [comparison.includes("'accuracy_top10'"), 'accuracy benchmark lines'],
   [comparison.includes("'time_top5'"), 'time-score benchmark lines'],
   [resetSafety.includes('previous_tracks'), 'original student tracks reset safety'],
+  [hardening.includes('real_school_subject_fallback'), 'genuine school comparison fallback'],
+  [hardening.includes("'comparison_engine','v11-hardened'"), 'hardened overview payload'],
   [workspace.includes('TeacherAnalyticsDashboard'), 'teacher workspace routing'],
   [workspace.includes('DemoAnalyticsDataLab'), 'Super Admin demo lab routing'],
   [teacher.includes("supabase.rpc('get_teacher_analytics_overview_v10'"), 'live teacher RPC usage'],
