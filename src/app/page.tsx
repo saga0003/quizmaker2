@@ -37,6 +37,7 @@ import { SchoolQuestionReview } from '@/components/evidara/school-question-revie
 import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
+import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -65,6 +66,8 @@ function ViewRouter() {
   if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-store') return <ProductStore />;
+  if (view === 'school-entitlements') return <SchoolProductAccess mode="entitlements" />;
+  if (view === 'school-product-seats') return <SchoolProductAccess mode="seats" />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
   if (view === 'school-resources') return <SchoolResourcesView />;
   if (view === 'school-achievements') return <SchoolAchievementsView />;
