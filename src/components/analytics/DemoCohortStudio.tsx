@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   BarChart3,
   BookOpenCheck,
@@ -13,7 +13,6 @@ import {
   Search,
   Target,
   Users,
-  XCircle,
 } from 'lucide-react';
 import {
   Bar,
@@ -263,7 +262,7 @@ function StudentRow({ student, selected, onOpen }: { student: DemoCohortStudent;
   return <tr className={`border-t border-[#EEF2F1] ${selected ? 'bg-[#EDF6F5]' : 'hover:bg-[#FAFCFB]'}`}><td className="px-4 py-3"><strong className="block text-[#14232B]">{student.full_name}</strong><span className="text-xs text-[#6B7980]">{student.roll_number} · {student.section_label}</span></td><td className="px-3 py-3"><Badge variant="outline">{student.track}</Badge></td><td className="px-3 py-3">{student.completed_tests}</td><td className="px-3 py-3 font-bold text-[#0E5A5A]">{metric(student.average_percentage, '%')}</td><td className="px-3 py-3">{metric(student.average_accuracy, '%')}</td><td className="px-3 py-3">{metric(student.average_time_score, '/10')}</td><td className="px-3 py-3 text-[#237A57]">{student.strongest_subject || '—'}</td><td className="px-3 py-3 text-[#B54747]">{student.weakest_subject || '—'}</td><td className="px-3 py-3"><Button size="sm" variant={selected ? 'default' : 'outline'} onClick={onOpen} className={selected ? 'bg-[#0E5A5A] hover:bg-[#0A4747]' : ''}>Open charts</Button></td></tr>;
 }
 
-function ChartCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function ChartCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return <Card className="border-[#E7ECEB] shadow-none"><CardContent className="p-5"><h3 className="font-semibold text-[#14232B]">{title}</h3><p className="mt-1 text-sm text-[#6B7980]">{description}</p><div className="mt-4 h-[340px]">{children}</div></CardContent></Card>;
 }
 
