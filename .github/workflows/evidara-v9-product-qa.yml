@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - evidara-v9-product-catalogue
+      - agent/evidara-v9-products-prototype-ui
   pull_request:
     branches:
       - evidara-v8-paper-builder
