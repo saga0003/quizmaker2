@@ -65,7 +65,7 @@ begin
     where member.user_id=auth.uid()
       and member.is_active=true
       and public.is_evidara_school_staff(member.organization_id)
-    order by member.created_at nulls last,member.organization_id
+    order by member.organization_id
     limit 1;
 
     if v_target_organization is null then
