@@ -66,6 +66,16 @@ A product containing 10 papers now reports a maximum of 10 completed tests in it
 - Trend controls wrap inside their own card instead of overflowing the screen.
 - Charts use a compact two-column layout with the trend chart spanning the full width.
 
+### Acceptance checks
+
+- Selecting a 10-test product displays 10 completed tests, not the total number of attempts.
+- Accuracy equals correct answers divided by correct plus incorrect answers; unanswered questions remain separate.
+- The time-management value, including `/ 10`, remains on one line.
+- No native horizontal scrollbar is visible in the timeline.
+- Product selection does not consume a permanent left column.
+- Trend selectors remain inside the trend card on desktop, tablet and mobile widths.
+- Group average, Top 10%, Top 5% and highest score appear in the comparison summary and percentage charts when enough comparison students exist.
+
 ## Teacher dashboard
 
 Teachers see only sections assigned through `teacher_section_assignments`.
