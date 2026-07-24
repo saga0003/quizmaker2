@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { AppSidebar } from '@/components/evidara/app-sidebar';
@@ -29,10 +30,10 @@ import {
   AdminBenchmarksView,
   AdminSegmentsView,
 } from '@/components/evidara/admin-views';
-import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
+import { QuestionManagementWorkspace } from '@/components/questions/QuestionManagementWorkspace';
 import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
@@ -43,9 +44,19 @@ function SchoolQuestionWorkspace() {
   return (
     <div className="space-y-6">
       <SchoolQuestionReview />
-      <LiveQuestionBank kind="school" />
+      <QuestionManagementWorkspace kind="school" />
     </div>
   );
+}
+
+function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
+  const [openRequestedPaper, setOpenRequestedPaper] = useState(false);
+
+  useEffect(() => {
+    setOpenRequestedPaper(new URLSearchParams(window.location.search).has('id'));
+  }, []);
+
+  return <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />;
 }
 
 function ViewRouter() {
@@ -64,7 +75,7 @@ function ViewRouter() {
   if (view === 'school-dashboard') return <SchoolDashboardView />;
   if (view === 'school-analytics') return <AnalyticsWorkspacePhase4 audience="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
-  if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
+  if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-store') return <ProductStore />;
   if (view === 'school-entitlements') return <SchoolProductAccess mode="entitlements" />;
@@ -78,8 +89,8 @@ function ViewRouter() {
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-analytics') return <AnalyticsWorkspacePhase4 audience="admin" />;
-  if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
-  if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
+  if (view === 'admin-questions') return <QuestionManagementWorkspace kind="admin" />;
+  if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
   if (view === 'admin-achievements') return <AdminAchievementsView />;
