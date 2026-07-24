@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - evidara-v9-product-catalogue
-      - agent/evidara-v9-products-prototype-ui
   pull_request:
     branches:
       - evidara-v8-paper-builder
@@ -38,24 +37,7 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: TypeScript
-        id: typecheck
-        shell: bash
-        run: |
-          set +e
-          npm run typecheck > typecheck.log 2>&1
-          code=$?
-          cat typecheck.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-      - name: Upload TypeScript report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: v9-typecheck-report
-          path: typecheck.log
-      - name: Stop on TypeScript errors
-        if: steps.typecheck.outputs.exit_code != '0'
-        run: exit 1
+        run: npm run typecheck
       - name: V8 paper smoke checks
         run: node scripts/v8-paper-smoke.mjs
       - name: V9 product smoke checks
