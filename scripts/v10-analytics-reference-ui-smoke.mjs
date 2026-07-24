@@ -5,6 +5,8 @@ const migration = read('supabase/39_v10_question_collections_reference_analytics
 const hardening = read('supabase/39a_v10_question_collections_hardening.sql');
 const taxonomy = read('supabase/39b_v10_reference_taxonomy_detail.sql');
 const scoped = read('supabase/39c_v10_reference_breakdown_scope.sql');
+const unanswered = read('supabase/39d_v10_reference_unanswered_hardening.sql');
+const paperHardening = read('supabase/39e_v10_collection_paper_hardening.sql');
 const dashboard = read('src/components/analytics/StudentAnalyticsReferenceDashboard.tsx');
 const collections = read('src/components/questions/QuestionCollectionsManager.tsx');
 const questionsWorkspace = read('src/components/questions/QuestionManagementWorkspace.tsx');
@@ -24,7 +26,11 @@ const checks = [
   [hardening.includes('public.is_evidara_school_staff') && hardening.includes('public.is_evidara_platform_admin'), 'existing permission helpers'],
   [taxonomy.includes('get_student_reference_taxonomy_detail_v13'), 'chapter topic detail RPC'],
   [taxonomy.includes('average_time_seconds') && taxonomy.includes('attempt_rate'), 'live response-time and attempt-rate evidence'],
+  [taxonomy.includes('left join public.exam_responses') && taxonomy.includes('deterministic_unassigned_ids'), 'taxonomy unanswered and stable identifiers'],
   [scoped.includes('get_student_reference_scoped_breakdowns_v13'), 'scoped difficulty and format RPC'],
+  [scoped.includes('left join public.exam_responses') && scoped.includes('unanswered_from_all_paper_questions'), 'scoped unanswered handling'],
+  [unanswered.includes('missing_response_is_unanswered') && unanswered.includes('join public.paper_questions'), 'complete unanswered hardening'],
+  [paperHardening.includes('ordered_grouped') && paperHardening.includes('public.save_question_paper'), 'ordered Paper Builder payload hardening'],
   [['Overview','Subjects','Chapters','Topics','Practice','Test History','Goals'].every((value) => dashboard.includes(value)), 'complete analytics navigation'],
   [dashboard.includes('Performance profile') && dashboard.includes('Subject comparison') && dashboard.includes('Performance trend'), 'overview charts'],
   [dashboard.includes('Chapter mastery') && dashboard.includes('Question format performance'), 'subject analysis'],
@@ -39,6 +45,7 @@ const checks = [
   [page.includes('QuestionManagementWorkspace') && page.includes('PaperWorkspace'), 'application question and paper routing'],
   [layout.includes('evidara-analytics-reference.css'), 'reference visual system loaded'],
   [docs.includes('Questions are not copied') && docs.includes('No unsupported confidence or semantic-error value is shown'), 'evidence and reuse documentation'],
+  [docs.includes('39d_v10_reference_unanswered_hardening.sql') && docs.includes('39e_v10_collection_paper_hardening.sql'), 'complete migration sequence documentation'],
 ];
 
 const failed = checks.filter(([passed]) => !passed);
