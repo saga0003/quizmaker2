@@ -427,7 +427,12 @@ export function AdminProductManager() {
       {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#237A57]/20 bg-[#237A57]/5 text-[#237A57]'}`}>{error || message}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[['All products', stats.total, Package], ['Published', stats.published, CheckCircle2], ['Drafts', stats.draft, Edit3], ['Archived', stats.archived, Archive]].map(([label, value, Icon]) => <div key={String(label)} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[#6B7980]">{String(label)}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{String(value)}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></div></div>)}
+        {[
+          { label: 'All products', value: stats.total, icon: Package },
+          { label: 'Published', value: stats.published, icon: CheckCircle2 },
+          { label: 'Drafts', value: stats.draft, icon: Edit3 },
+          { label: 'Archived', value: stats.archived, icon: Archive },
+        ].map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{value}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></div></div>)}
       </div>
 
       <Card className="gap-0 border-[#E7ECEB] shadow-none">
