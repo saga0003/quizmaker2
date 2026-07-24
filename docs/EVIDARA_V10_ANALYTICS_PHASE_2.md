@@ -8,14 +8,17 @@ Apply after migration 35:
 
 1. `supabase/36_v10_analytics_phase_2.sql`
 2. `supabase/36a_v10_analytics_phase_2_safety.sql`
+3. `supabase/36b_v10_analytics_phase_2_attempt_limit_hotfix.sql`
 
 The safety migration must be applied immediately after migration 36. It gives generated sections a batch-unique identity and ensures teacher status counts represent distinct students rather than repeated attempts.
+
+Migration 36b corrects only analytics-demo paper inserts to the valid maximum attempt limit of 100. It preserves the normal `question_papers_attempt_limit_check` boundary for genuine papers.
 
 ## Demo account
 
 Default target:
 
-` sales.student@demo.evidara.app `
+`sales.student@demo.evidara.app`
 
 The account must already exist in Supabase Auth and must have opened Evidara at least once so a profile exists.
 
