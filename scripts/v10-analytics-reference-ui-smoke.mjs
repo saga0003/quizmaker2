@@ -8,6 +8,7 @@ const scoped = read('supabase/39c_v10_reference_breakdown_scope.sql');
 const unanswered = read('supabase/39d_v10_reference_unanswered_hardening.sql');
 const paperHardening = read('supabase/39e_v10_collection_paper_hardening.sql');
 const cohortMigration = read('supabase/40_v10_demo_cohort_studio.sql');
+const cohortHardening = read('supabase/40a_v10_demo_cohort_studio_hardening.sql');
 const dashboard = read('src/components/analytics/StudentAnalyticsReferenceDashboard.tsx');
 const cohortStudio = read('src/components/analytics/DemoCohortStudio.tsx');
 const demoLab = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
@@ -37,6 +38,7 @@ const checks = [
   [cohortMigration.includes('get_analytics_demo_cohort_studio_v14'), 'demo cohort directory RPC'],
   [cohortMigration.includes('get_analytics_demo_student_drilldown_v14'), 'demo student topic drill-down RPC'],
   [cohortMigration.includes('analytics_demo_topic_results_v12') && cohortMigration.includes('questions'), 'cohort question and topic evidence'],
+  [cohortHardening.includes('correct_count+subject.incorrect_count+subject.unanswered_count'), 'subject question total schema compatibility'],
   [['Overview','Subjects','Chapters','Topics','Practice','Test History','Goals'].every((value) => dashboard.includes(value)), 'complete student analytics navigation'],
   [dashboard.includes('Performance profile') && dashboard.includes('Subject comparison') && dashboard.includes('Performance trend'), 'overview charts'],
   [dashboard.includes('Chapter mastery') && dashboard.includes('Question format performance'), 'subject analysis'],
@@ -55,7 +57,7 @@ const checks = [
   [!page.includes('QuestionManagementWorkspace'), 'Question Collections removed from Questions route'],
   [layout.includes('evidara-analytics-reference.css'), 'reference visual system loaded'],
   [docs.includes('Questions are not copied') && docs.includes('No unsupported confidence or semantic-error value is shown'), 'evidence and reuse documentation'],
-  [docs.includes('40_v10_demo_cohort_studio.sql'), 'demo cohort migration documented'],
+  [docs.includes('40_v10_demo_cohort_studio.sql') && docs.includes('40a_v10_demo_cohort_studio_hardening.sql'), 'demo cohort migrations documented'],
 ];
 
 const failed = checks.filter(([passed]) => !passed);
