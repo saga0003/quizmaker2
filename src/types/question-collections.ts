@@ -151,3 +151,28 @@ export type StudentReferenceBreakdowns = {
   };
   generated_at: string;
 };
+
+export type ReferenceTaxonomyDetailRow = {
+  id: string;
+  subject_name: string;
+  chapter_id?: string | null;
+  chapter_name: string;
+  topic_id?: string | null;
+  topic_name?: string | null;
+  questions: number;
+  correct: number;
+  incorrect: number;
+  unanswered: number;
+  marks_awarded: number;
+  maximum_marks: number;
+  percentage: number;
+  accuracy: number;
+  attempt_rate: number;
+  average_time_seconds: number;
+};
+
+export type ReferenceTaxonomyDetailPayload = {
+  chapters: ReferenceTaxonomyDetailRow[];
+  topics: ReferenceTaxonomyDetailRow[];
+  generated_at: string;
+};
