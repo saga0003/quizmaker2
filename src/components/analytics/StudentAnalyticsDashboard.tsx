@@ -391,8 +391,8 @@ export function StudentAnalyticsDashboard({ studentId, onBack }: Props) {
             <section className={styles.chartGrid}>
               <Card className={`${styles.chartCard} gap-0`}>
                 <CardContent className="p-4 sm:p-5">
-                  <h2 className="font-semibold text-[#14232B]">Subject performance profile</h2>
-                  <p className="mt-1 text-xs text-[#6B7980]">Your score compared with the group average, Top 10%, Top 5% and highest score.</p>
+                  <h2 className="font-semibold text-[#14232B]">Performance profile</h2>
+                  <p className="mt-1 text-xs text-[#6B7980]">Your subject score compared with the group average, Top 10%, Top 5% and highest score.</p>
                   <div className={styles.radarChartHeight}>
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={data?.subjects || []} margin={{ top: 16, right: 28, bottom: 12, left: 28 }}>
