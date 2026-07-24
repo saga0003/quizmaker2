@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(path, 'utf8');
 const migration = read('supabase/36_v10_analytics_phase_2.sql');
 const safety = read('supabase/36a_v10_analytics_phase_2_safety.sql');
+const attemptLimitHotfix = read('supabase/36b_v10_analytics_phase_2_attempt_limit_hotfix.sql');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
 const teacher = read('src/components/analytics/TeacherAnalyticsDashboard.tsx');
 const demo = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
@@ -20,6 +21,9 @@ const checks = [
   [migration.includes("commerce_settings->>'demo_batch_id'"), 'generated product cleanup'],
   [safety.includes('analytics_demo_section_identity_v10'), 'batch-unique section trigger'],
   [safety.includes('get_teacher_analytics_overview_base_v10'), 'distinct teacher count wrapper'],
+  [attemptLimitHotfix.includes('normalize_analytics_demo_paper_attempt_limit_v10'), 'demo paper attempt-limit hotfix'],
+  [attemptLimitHotfix.includes('new.attempt_limit := 100'), 'valid maximum demo attempt limit'],
+  [attemptLimitHotfix.includes("new.settings,'{}'::jsonb) ? 'demo_batch_id'"), 'hotfix isolated to generated papers'],
   [workspace.includes('TeacherAnalyticsDashboard'), 'teacher workspace routing'],
   [workspace.includes('DemoAnalyticsDataLab'), 'Super Admin demo lab routing'],
   [teacher.includes("supabase.rpc('get_teacher_analytics_overview_v10'"), 'live teacher RPC usage'],
