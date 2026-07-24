@@ -7,7 +7,6 @@ import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
 import {
-  StudentAnalyticsView,
   StudentResultsView,
   StudentAchievementsView,
   StudentBenchmarksView,
@@ -38,6 +37,7 @@ import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
+import { AnalyticsWorkspace } from '@/components/analytics/AnalyticsWorkspace';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -53,7 +53,7 @@ function ViewRouter() {
 
   if (view === 'student-dashboard') return <StudentDashboard />;
   if (view === 'student-tests') return <LiveStudentTests />;
-  if (view === 'student-analytics') return <StudentAnalyticsView />;
+  if (view === 'student-analytics') return <AnalyticsWorkspace audience="student" />;
   if (view === 'student-results') return <StudentResultsView />;
   if (view === 'student-achievements') return <StudentAchievementsView />;
   if (view === 'student-benchmarks') return <StudentBenchmarksView />;
@@ -62,6 +62,7 @@ function ViewRouter() {
   if (view === 'student-purchases') return <PurchaseHistory />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
+  if (view === 'school-analytics') return <AnalyticsWorkspace audience="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -76,6 +77,7 @@ function ViewRouter() {
   if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
+  if (view === 'admin-analytics') return <AnalyticsWorkspace audience="admin" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
@@ -111,7 +113,7 @@ export default function Home() {
       <div className="min-h-screen bg-[#F7F9F7]">
         <AppSidebar />
         <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-[68px]'}`}>
-          <div className="mx-auto max-w-7xl p-6 lg:p-8">
+          <div className="mx-auto max-w-[1540px] p-6 lg:p-8">
             <ViewRouter />
           </div>
         </main>
