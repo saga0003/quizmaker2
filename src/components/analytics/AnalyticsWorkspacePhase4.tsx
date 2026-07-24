@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowLeft, BarChart3, FlaskConical, Layers3, LoaderCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthProvider';
@@ -61,7 +61,7 @@ export function AnalyticsWorkspacePhase4({ audience }: { audience: 'student' | '
   const collectionKind: 'admin' | 'school' = platformAdmin ? 'admin' : 'school';
   const drilldownOpen = Boolean(selectedStudent || selectedOrganization || showManagement);
 
-  let overview: React.ReactNode;
+  let overview: ReactNode;
   if (role === 'school_teacher') {
     overview = <AnalyticsWorkspace audience={audience} />;
   } else if (selectedStudent) {
@@ -103,6 +103,6 @@ export function AnalyticsWorkspacePhase4({ audience }: { audience: 'student' | '
   );
 }
 
-function ModuleButton({ active, icon: Icon, onClick, children }: { active: boolean; icon: typeof BarChart3; onClick: () => void; children: React.ReactNode }) {
+function ModuleButton({ active, icon: Icon, onClick, children }: { active: boolean; icon: typeof BarChart3; onClick: () => void; children: ReactNode }) {
   return <Button variant={active ? 'default' : 'ghost'} onClick={onClick} className={active ? 'bg-[#0E5A5A] text-white hover:bg-[#0A4747]' : 'text-[#44545C] hover:bg-[#EDF6F5] hover:text-[#0E5A5A]'}><Icon className="mr-2 h-4 w-4" />{children}</Button>;
 }
