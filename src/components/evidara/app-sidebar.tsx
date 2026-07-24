@@ -46,6 +46,7 @@ const studentNav: NavItem[] = [
   { label: 'Achievements', icon: Trophy, view: 'student-achievements', moduleKey: 'achievements' },
   { label: 'Benchmarks', icon: Target, view: 'student-benchmarks', moduleKey: 'benchmarks' },
   { label: 'Resources', icon: FolderOpen, view: 'student-resources', moduleKey: 'resources' },
+  { label: 'Store', icon: Package, view: 'student-store', moduleKey: 'subscriptions' },
   { label: 'Purchases', icon: ShoppingBag, view: 'student-purchases', moduleKey: 'subscriptions' },
 ];
 
@@ -54,6 +55,9 @@ const schoolNav: NavItem[] = [
   { label: 'Questions', icon: BookOpen, view: 'school-questions', moduleKey: 'questions' },
   { label: 'Papers', icon: FileText, view: 'school-papers', moduleKey: 'papers' },
   { label: 'Students', icon: Users, view: 'school-students', moduleKey: 'students' },
+  { label: 'Product Store', icon: Package, view: 'school-store', moduleKey: 'subscriptions' },
+  { label: 'Entitlements', icon: ShoppingBag, view: 'school-entitlements', moduleKey: 'subscriptions' },
+  { label: 'Seat Management', icon: Users, view: 'school-product-seats', moduleKey: 'subscriptions' },
   { label: 'Subscription', icon: CreditCard, view: 'school-subscription', moduleKey: 'subscriptions' },
   { label: 'Resources', icon: FolderOpen, view: 'school-resources', moduleKey: 'resources' },
   { label: 'Achievements', icon: Trophy, view: 'school-achievements', moduleKey: 'achievements' },
@@ -78,12 +82,9 @@ function navigationForUser(role: 'student' | 'school' | 'admin', accessRole: str
   if (role === 'student') return studentNav;
   if (role === 'school') {
     if (accessRole === 'school_teacher') {
-      return schoolNav.filter((item) => item.view !== 'school-subscription' && item.view !== 'school-access');
+      return schoolNav.filter((item) => !['school-subscription', 'school-entitlements', 'school-product-seats', 'school-access'].includes(item.view));
     }
     return schoolNav;
-  }
-  if (accessRole === 'evidara_admin') {
-    return adminNav.filter((item) => item.view !== 'admin-products');
   }
   return adminNav;
 }
