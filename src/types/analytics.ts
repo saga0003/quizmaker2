@@ -90,6 +90,10 @@ export type AnalyticsSummary = {
   unanswered: number;
   time_score?: number | null;
   cohort_size?: number | null;
+  comparison_average_percentage?: number | null;
+  top10_threshold?: number | null;
+  top5_threshold?: number | null;
+  highest_percentage?: number | null;
   from_date?: string | null;
   to_date?: string | null;
 };
