@@ -26,6 +26,8 @@ export type AppView =
   | 'school-papers'
   | 'school-students'
   | 'school-store'
+  | 'school-entitlements'
+  | 'school-product-seats'
   | 'school-subscription'
   | 'school-resources'
   | 'school-achievements'
