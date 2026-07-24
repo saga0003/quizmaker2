@@ -18,7 +18,7 @@ const checks = [
   ['student section assignment rpc', migration.includes('assign_student_section_v10')],
   ['teacher section assignment rpc', migration.includes('assign_teacher_section_v10')],
   ['product percentile completion gate', migration.includes('product.total_tests > 0 and product.completed_tests >= product.total_tests')],
-  ['live dashboard uses analytics rpc', dashboard.includes("supabase.rpc('get_student_analytics_overview_v10'")],
+  ['live dashboard uses analytics rpc', dashboard.includes("supabase.rpc('get_student_analytics_overview_v11'") || dashboard.includes("supabase.rpc('get_student_analytics_overview_v10'")],
   ['dashboard contains required KPIs', ['Average percentage', 'Average percentile', 'Accuracy', 'Time management'].every((value) => dashboard.includes(value))],
   ['dashboard contains template charts', ['Performance profile', 'Subject comparison', 'Performance trends'].every((value) => dashboard.includes(value))],
   ['workspace uses role scoped directory', workspace.includes("supabase.rpc('list_analytics_scope_v10'")],
