@@ -5,8 +5,13 @@ const migration = read('supabase/35_v10_analytics_phase_1.sql');
 const dashboard = read('src/components/analytics/StudentAnalyticsDashboardV3.tsx');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
 const phase3Workspace = read('src/components/analytics/AnalyticsWorkspacePhase3.tsx');
+const phase4Workspace = read('src/components/analytics/AnalyticsWorkspacePhase4.tsx');
 const page = read('src/app/page.tsx');
 const sidebar = read('src/components/evidara/app-sidebar.tsx');
+
+const routeUsesPhase3OrLater = (audience) =>
+  page.includes(`<AnalyticsWorkspacePhase3 audience="${audience}" />`) ||
+  page.includes(`<AnalyticsWorkspacePhase4 audience="${audience}" />`);
 
 const checks = [
   ['academic sections table', migration.includes('create table if not exists public.academic_sections')],
@@ -25,9 +30,10 @@ const checks = [
   ['workspace uses role scoped directory', workspace.includes("supabase.rpc('list_analytics_scope_v10'")],
   ['workspace supports section and teacher setup', workspace.includes('Sections & teachers') && workspace.includes('assign_teacher_section_v10')],
   ['Phase 3 preserves legacy workspace', phase3Workspace.includes('<AnalyticsWorkspace audience={audience} />')],
-  ['student analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="student" />')],
-  ['school analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="school" />')],
-  ['admin analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="admin" />')],
+  ['Phase 4 preserves teacher and management workspaces', phase4Workspace.includes('<AnalyticsWorkspace audience={audience} />') && phase4Workspace.includes('SchoolAdminAnalyticsDashboard')],
+  ['student analytics route', routeUsesPhase3OrLater('student')],
+  ['school analytics route', routeUsesPhase3OrLater('school')],
+  ['admin analytics route', routeUsesPhase3OrLater('admin')],
   ['school analytics navigation', sidebar.includes("view: 'school-analytics'")],
   ['admin analytics navigation', sidebar.includes("view: 'admin-analytics'")],
 ];
