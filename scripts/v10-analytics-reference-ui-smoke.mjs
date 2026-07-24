@@ -7,10 +7,12 @@ const taxonomy = read('supabase/39b_v10_reference_taxonomy_detail.sql');
 const scoped = read('supabase/39c_v10_reference_breakdown_scope.sql');
 const unanswered = read('supabase/39d_v10_reference_unanswered_hardening.sql');
 const paperHardening = read('supabase/39e_v10_collection_paper_hardening.sql');
-const scopeHardening = read('supabase/39f_v10_collection_scope_hardening.sql');
+const cohortMigration = read('supabase/40_v10_demo_cohort_studio.sql');
 const dashboard = read('src/components/analytics/StudentAnalyticsReferenceDashboard.tsx');
+const cohortStudio = read('src/components/analytics/DemoCohortStudio.tsx');
+const demoLab = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
+const analyticsWorkspace = read('src/components/analytics/AnalyticsWorkspacePhase4.tsx');
 const collections = read('src/components/questions/QuestionCollectionsManager.tsx');
-const questionsWorkspace = read('src/components/questions/QuestionManagementWorkspace.tsx');
 const page = read('src/app/page.tsx');
 const layout = read('src/app/layout.tsx');
 const docs = read('docs/EVIDARA_V10_ANALYTICS_REFERENCE_UI_QUESTION_COLLECTIONS.md');
@@ -32,8 +34,10 @@ const checks = [
   [scoped.includes('left join public.exam_responses') && scoped.includes('unanswered_from_all_paper_questions'), 'scoped unanswered handling'],
   [unanswered.includes('missing_response_is_unanswered') && unanswered.includes('join public.paper_questions'), 'complete unanswered hardening'],
   [paperHardening.includes('ordered_grouped') && paperHardening.includes('public.save_question_paper'), 'ordered Paper Builder payload hardening'],
-  [scopeHardening.includes('school_managers_read_drafts') && scopeHardening.includes('platform_clone_to_school_scope'), 'draft visibility and platform clone scope'],
-  [['Overview','Subjects','Chapters','Topics','Practice','Test History','Goals'].every((value) => dashboard.includes(value)), 'complete analytics navigation'],
+  [cohortMigration.includes('get_analytics_demo_cohort_studio_v14'), 'demo cohort directory RPC'],
+  [cohortMigration.includes('get_analytics_demo_student_drilldown_v14'), 'demo student topic drill-down RPC'],
+  [cohortMigration.includes('analytics_demo_topic_results_v12') && cohortMigration.includes('questions'), 'cohort question and topic evidence'],
+  [['Overview','Subjects','Chapters','Topics','Practice','Test History','Goals'].every((value) => dashboard.includes(value)), 'complete student analytics navigation'],
   [dashboard.includes('Performance profile') && dashboard.includes('Subject comparison') && dashboard.includes('Performance trend'), 'overview charts'],
   [dashboard.includes('Chapter mastery') && dashboard.includes('Question format performance'), 'subject analysis'],
   [dashboard.includes('Topic mastery within') && dashboard.includes('Accuracy vs response time'), 'chapter analysis'],
@@ -41,19 +45,23 @@ const checks = [
   [dashboard.includes('No per-question target time') || dashboard.includes('no target time is assigned'), 'no question target-time fabrication'],
   [dashboard.includes('get_student_test_review_v12'), 'test history answer review'],
   [dashboard.includes('upsert_student_analytics_goal_v13'), 'goal management'],
+  [cohortStudio.includes('Cohort explorer') && cohortStudio.includes('Open any generated student'), 'visible cohort explorer UI'],
+  [cohortStudio.includes('Weakest topics') && cohortStudio.includes('Chapter and topic evidence'), 'per-student topic diagnosis'],
+  [demoLab.includes('Create cohort + questions'), 'one-click cohort and question action'],
+  [analyticsWorkspace.includes('Demo Cohorts') && analyticsWorkspace.includes('Question Collections'), 'analytics module tabs'],
   [collections.includes('Question Collections') && collections.includes('Create draft paper'), 'collection manager UI'],
   [collections.includes('save_question_collection_v13') && collections.includes('create_paper_from_question_collection_v13'), 'collection manager live RPCs'],
-  [questionsWorkspace.includes('Question Bank') && questionsWorkspace.includes('Question Collections'), 'question workspace tabs'],
-  [page.includes('QuestionManagementWorkspace') && page.includes('PaperWorkspace'), 'application question and paper routing'],
+  [page.includes('admin-questions') && page.includes('<LiveQuestionBank kind="admin" />'), 'Questions restored to live bank only'],
+  [!page.includes('QuestionManagementWorkspace'), 'Question Collections removed from Questions route'],
   [layout.includes('evidara-analytics-reference.css'), 'reference visual system loaded'],
   [docs.includes('Questions are not copied') && docs.includes('No unsupported confidence or semantic-error value is shown'), 'evidence and reuse documentation'],
-  [docs.includes('39d_v10_reference_unanswered_hardening.sql') && docs.includes('39e_v10_collection_paper_hardening.sql') && docs.includes('39f_v10_collection_scope_hardening.sql'), 'complete migration sequence documentation'],
+  [docs.includes('40_v10_demo_cohort_studio.sql'), 'demo cohort migration documented'],
 ];
 
 const failed = checks.filter(([passed]) => !passed);
 for (const [passed, label] of checks) console.log(`${passed ? 'PASS' : 'FAIL'} ${label}`);
 if (failed.length) {
-  console.error(`\n${failed.length} reference analytics / Question Collections smoke checks failed.`);
+  console.error(`\n${failed.length} reference analytics / demo cohort / Question Collections smoke checks failed.`);
   process.exit(1);
 }
-console.log(`\nAll ${checks.length} reference analytics / Question Collections smoke checks passed.`);
+console.log(`\nAll ${checks.length} reference analytics / demo cohort / Question Collections smoke checks passed.`);
