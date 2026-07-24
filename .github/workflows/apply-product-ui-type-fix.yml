@@ -1,0 +1,42 @@
+name: Apply product UI type fix
+
+on:
+  push:
+    branches:
+      - agent/evidara-v9-products-prototype-ui
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/evidara-v9-products-prototype-ui
+      - name: Replace mixed metric tuple with typed objects
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/components/commerce/AdminProductManager.tsx')
+          source = path.read_text()
+          old = """        {[['All products', stats.total, Package], ['Published', stats.published, CheckCircle2], ['Drafts', stats.draft, Edit3], ['Archived', stats.archived, Archive]].map(([label, value, Icon]) => <div key={String(label)} className={styles.metricCard}><div className=\"flex items-center justify-between\"><div><p className=\"text-xs font-medium text-[#6B7980]\">{String(label)}</p><p className=\"mt-1 text-2xl font-extrabold text-[#14232B]\">{String(value)}</p></div><div className=\"rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]\"><Icon className=\"h-5 w-5\" /></div></div></div>)}"""
+          new = """        {[
+                    { label: 'All products', value: stats.total, icon: Package },
+                    { label: 'Published', value: stats.published, icon: CheckCircle2 },
+                    { label: 'Drafts', value: stats.draft, icon: Edit3 },
+                    { label: 'Archived', value: stats.archived, icon: Archive },
+                  ].map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className=\"flex items-center justify-between\"><div><p className=\"text-xs font-medium text-[#6B7980]\">{label}</p><p className=\"mt-1 text-2xl font-extrabold text-[#14232B]\">{value}</p></div><div className=\"rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]\"><Icon className=\"h-5 w-5\" /></div></div></div>)}"""
+          if old not in source:
+              raise SystemExit('Expected metric-card block was not found')
+          path.write_text(source.replace(old, new))
+          Path('.github/workflows/apply-product-ui-type-fix.yml').unlink()
+      - name: Commit the focused type fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/commerce/AdminProductManager.tsx .github/workflows/apply-product-ui-type-fix.yml
+          git commit -m "Fix typed product metric cards"
+          git push origin HEAD:agent/evidara-v9-products-prototype-ui
