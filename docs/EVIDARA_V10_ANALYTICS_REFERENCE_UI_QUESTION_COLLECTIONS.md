@@ -10,6 +10,8 @@ Apply after migration 38b:
 2. `supabase/39a_v10_question_collections_hardening.sql`
 3. `supabase/39b_v10_reference_taxonomy_detail.sql`
 4. `supabase/39c_v10_reference_breakdown_scope.sql`
+5. `supabase/39d_v10_reference_unanswered_hardening.sql`
+6. `supabase/39e_v10_collection_paper_hardening.sql`
 
 No migration, collection creation, paper generation, merge or deployment runs automatically.
 
@@ -78,10 +80,12 @@ The uploaded HTML contained demonstration values for semantic error categories, 
 The live workspace uses:
 
 - latest submitted result per paper
-- exam responses
+- every paper question in that submitted test
+- exam responses where a response exists
+- a missing response treated as unanswered
 - question marks
 - correct, wrong and unanswered status
-- response time
+- observed response time
 - question subject, chapter and topic
 - difficulty
 - question type
@@ -110,7 +114,7 @@ An Admin or authorised school user can:
 - delete only the collection links
 - create an editable draft paper from the collection
 
-Creating a paper groups the questions by subject, preserves their order and snapshots the question evidence into the existing Paper Builder tables. The new paper remains a draft and opens in the existing Paper Builder for final editing and publishing.
+Creating a paper groups the questions by subject and preserves their order. The collection is converted into a normal V8 Paper Builder payload and saved through the existing `save_question_paper` RPC. The new paper remains a draft and opens in the existing Paper Builder for final editing and publishing.
 
 ## Practice
 
@@ -147,12 +151,13 @@ The current live value is stored as the starting point. Evidara does not generat
 4. Selecting a chapter opens its topic evidence.
 5. Selecting a topic displays difficulty, format, tag and incorrect-question evidence.
 6. No unsupported confidence or semantic-error value is shown.
-7. Question Bank contains a Question Collections tab.
-8. A collection can be created from approved live questions.
-9. Selected questions can be reordered and saved.
-10. A collection can generate a draft paper.
-11. The generated paper opens in the existing Paper Builder.
-12. A published linked paper appears as an available student practice item.
-13. Test History opens detailed answer review.
-14. Goals can be created, edited and deleted.
-15. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
+7. Unanswered paper questions remain in chapter, topic, difficulty and format totals even when no response row exists.
+8. Question Bank contains a Question Collections tab.
+9. A collection can be created from approved live questions.
+10. Selected questions can be reordered and saved.
+11. A collection can generate a draft paper using the existing Paper Builder save RPC.
+12. The generated paper opens in the existing Paper Builder.
+13. A published linked paper appears as an available student practice item.
+14. Test History opens detailed answer review.
+15. Goals can be created, edited and deleted.
+16. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
