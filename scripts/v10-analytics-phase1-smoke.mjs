@@ -2,8 +2,9 @@ import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 const migration = read('supabase/35_v10_analytics_phase_1.sql');
-const dashboard = read('src/components/analytics/StudentAnalyticsDashboard.tsx');
+const dashboard = read('src/components/analytics/StudentAnalyticsDashboardV3.tsx');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
+const phase3Workspace = read('src/components/analytics/AnalyticsWorkspacePhase3.tsx');
 const page = read('src/app/page.tsx');
 const sidebar = read('src/components/evidara/app-sidebar.tsx');
 
@@ -18,14 +19,15 @@ const checks = [
   ['student section assignment rpc', migration.includes('assign_student_section_v10')],
   ['teacher section assignment rpc', migration.includes('assign_teacher_section_v10')],
   ['product percentile completion gate', migration.includes('product.total_tests > 0 and product.completed_tests >= product.total_tests')],
-  ['live dashboard uses analytics rpc', dashboard.includes("supabase.rpc('get_student_analytics_overview_v11'") || dashboard.includes("supabase.rpc('get_student_analytics_overview_v10'")],
+  ['live dashboard uses analytics rpc', dashboard.includes("supabase.rpc('get_student_analytics_overview_v11'")],
   ['dashboard contains required KPIs', ['Average percentage', 'Average percentile', 'Accuracy', 'Time management'].every((value) => dashboard.includes(value))],
-  ['dashboard contains template charts', ['Performance profile', 'Subject comparison', 'Performance trends'].every((value) => dashboard.includes(value))],
+  ['dashboard contains required charts', ['Performance profile', 'Subject comparison', 'Performance trends'].every((value) => dashboard.includes(value))],
   ['workspace uses role scoped directory', workspace.includes("supabase.rpc('list_analytics_scope_v10'")],
   ['workspace supports section and teacher setup', workspace.includes('Sections & teachers') && workspace.includes('assign_teacher_section_v10')],
-  ['student analytics route', page.includes('<AnalyticsWorkspace audience="student" />')],
-  ['school analytics route', page.includes('<AnalyticsWorkspace audience="school" />')],
-  ['admin analytics route', page.includes('<AnalyticsWorkspace audience="admin" />')],
+  ['Phase 3 preserves legacy workspace', phase3Workspace.includes('<AnalyticsWorkspace audience={audience} />')],
+  ['student analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="student" />')],
+  ['school analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="school" />')],
+  ['admin analytics route', page.includes('<AnalyticsWorkspacePhase3 audience="admin" />')],
   ['school analytics navigation', sidebar.includes("view: 'school-analytics'")],
   ['admin analytics navigation', sidebar.includes("view: 'admin-analytics'")],
 ];
