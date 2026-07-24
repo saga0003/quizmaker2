@@ -1,0 +1,221 @@
+.workspace {
+  --analytics-teal: #0e5a5a;
+  --analytics-amber: #f2b84b;
+  --analytics-ink: #14232b;
+  --analytics-muted: #6b7980;
+  --analytics-border: #e7eceb;
+  --analytics-cloud: #f7f9f7;
+  --analytics-mist: #dce9e7;
+}
+
+.dashboardShell {
+  display: grid;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.productRail {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--analytics-border);
+  border-radius: 16px;
+  background: white;
+  padding: 14px;
+}
+
+.productButton {
+  width: 100%;
+  border: 1px solid var(--analytics-border);
+  border-radius: 12px;
+  background: white;
+  padding: 12px;
+  text-align: left;
+  transition: 160ms ease;
+}
+
+.productButton:hover {
+  border-color: #9fbdbd;
+  transform: translateY(-1px);
+}
+
+.productButtonActive {
+  border-color: var(--analytics-teal);
+  background: rgba(220, 233, 231, 0.5);
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--analytics-border);
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--analytics-teal);
+}
+
+.filterPanel,
+.metricCard,
+.chartCard,
+.insightPanel,
+.directoryPanel {
+  border: 1px solid var(--analytics-border);
+  background: white;
+  box-shadow: none;
+}
+
+.filterPanel {
+  border-radius: 16px;
+}
+
+.metricCard {
+  min-height: 154px;
+  border-radius: 12px;
+}
+
+.chartCard {
+  min-height: 470px;
+  border-radius: 12px;
+}
+
+.metricIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--analytics-mist);
+  color: var(--analytics-teal);
+}
+
+.metricIconAmber {
+  background: #fcf1db;
+  color: #9a6508;
+}
+
+.timeline {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(110px, 1fr);
+  gap: 0;
+  min-width: max-content;
+}
+
+.timelineItem {
+  position: relative;
+  min-width: 110px;
+  padding: 0 8px;
+  text-align: center;
+}
+
+.timelineItem::before {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--analytics-border);
+  content: "";
+}
+
+.timelineDot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 2px auto 8px;
+  border: 3px solid white;
+  border-radius: 999px;
+  background: #aeb8bc;
+  box-shadow: 0 0 0 1px #aeb8bc;
+}
+
+.timelineDotComplete {
+  background: var(--analytics-teal);
+  box-shadow: 0 0 0 1px var(--analytics-teal);
+}
+
+.timelineDotPending {
+  background: white;
+}
+
+.insightPanel {
+  border-color: #cfdddd;
+  border-radius: 16px;
+  background: linear-gradient(105deg, rgba(220, 233, 231, 0.65), rgba(247, 249, 247, 0.95));
+}
+
+.directoryGrid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.studentList {
+  max-height: 620px;
+  overflow: auto;
+}
+
+.studentButton {
+  width: 100%;
+  border: 1px solid var(--analytics-border);
+  border-radius: 12px;
+  background: white;
+  padding: 12px;
+  text-align: left;
+}
+
+.studentButton:hover {
+  border-color: #9fbdbd;
+  background: #fbfcfb;
+}
+
+.emptyState {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  padding: 32px;
+  color: var(--analytics-muted);
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .dashboardShell,
+  .directoryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .productRail {
+    position: static;
+    display: flex;
+    max-height: none;
+    gap: 10px;
+    overflow-x: auto;
+  }
+
+  .productButton {
+    min-width: 230px;
+  }
+}
+
+@media print {
+  .noPrint,
+  .productRail {
+    display: none !important;
+  }
+
+  .dashboardShell {
+    display: block;
+  }
+
+  .chartCard,
+  .metricCard {
+    break-inside: avoid;
+  }
+}
