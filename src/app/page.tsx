@@ -30,10 +30,10 @@ import {
   AdminBenchmarksView,
   AdminSegmentsView,
 } from '@/components/evidara/admin-views';
+import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
-import { QuestionManagementWorkspace } from '@/components/questions/QuestionManagementWorkspace';
 import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
@@ -44,7 +44,7 @@ function SchoolQuestionWorkspace() {
   return (
     <div className="space-y-6">
       <SchoolQuestionReview />
-      <QuestionManagementWorkspace kind="school" />
+      <LiveQuestionBank kind="school" />
     </div>
   );
 }
@@ -89,7 +89,7 @@ function ViewRouter() {
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-analytics') return <AnalyticsWorkspacePhase4 audience="admin" />;
-  if (view === 'admin-questions') return <QuestionManagementWorkspace kind="admin" />;
+  if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
