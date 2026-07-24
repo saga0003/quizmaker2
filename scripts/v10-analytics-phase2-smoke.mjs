@@ -4,7 +4,9 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const migration = read('supabase/36_v10_analytics_phase_2.sql');
 const safety = read('supabase/36a_v10_analytics_phase_2_safety.sql');
 const attemptLimitHotfix = read('supabase/36b_v10_analytics_phase_2_attempt_limit_hotfix.sql');
+const studentFix = read('supabase/36c_v10_analytics_student_calculation_ui_fix.sql');
 const workspace = read('src/components/analytics/AnalyticsWorkspace.tsx');
+const student = read('src/components/analytics/StudentAnalyticsDashboard.tsx');
 const teacher = read('src/components/analytics/TeacherAnalyticsDashboard.tsx');
 const demo = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
 const types = read('src/types/analytics.ts');
@@ -24,14 +26,28 @@ const checks = [
   [attemptLimitHotfix.includes('normalize_analytics_demo_paper_attempt_limit_v10'), 'demo paper attempt-limit hotfix'],
   [attemptLimitHotfix.includes('new.attempt_limit := 100'), 'valid maximum demo attempt limit'],
   [attemptLimitHotfix.includes("new.settings,'{}'::jsonb) ? 'demo_batch_id'"), 'hotfix isolated to generated papers'],
+  [studentFix.includes('partition by attempt.paper_id'), 'latest attempt per selected test'],
+  [studentFix.includes('partition by attempt.paper_id,attempt.student_id'), 'latest comparison attempt per student and test'],
+  [studentFix.includes("'comparison_average_percentage'"), 'simple group average benchmark'],
+  [studentFix.includes("'top10_threshold'"), 'Top 10 percent benchmark'],
+  [studentFix.includes("'top5_threshold'"), 'Top 5 percent benchmark'],
+  [studentFix.includes("'highest_percentage'"), 'highest score benchmark'],
   [workspace.includes('TeacherAnalyticsDashboard'), 'teacher workspace routing'],
   [workspace.includes('DemoAnalyticsDataLab'), 'Super Admin demo lab routing'],
   [teacher.includes("supabase.rpc('get_teacher_analytics_overview_v10'"), 'live teacher RPC usage'],
+  [student.includes('Analytics product'), 'top product dropdown'],
+  [student.includes('Test timeline'), 'clean test timeline'],
+  [student.includes('How this is calculated'), 'interactive KPI calculation help'],
+  [student.includes('Top 5% score'), 'plain-language Top 5 benchmark'],
+  [!student.includes('Last 3'), 'removed ambiguous Last 3 quick filter'],
+  [!student.includes('Date band'), 'removed date-band control'],
+  [!student.includes('Cohort average'), 'removed cohort wording'],
   [demo.includes('First confirmation'), 'first reset confirmation'],
   [demo.includes('Second and final confirmation'), 'second reset confirmation'],
   [demo.includes('sales.student@demo.evidara.app'), 'requested demo student email'],
   [types.includes('TeacherAnalyticsPayload'), 'teacher payload types'],
   [types.includes('AnalyticsDemoStatus'), 'demo status types'],
+  [types.includes('comparison_average_percentage'), 'student comparison summary types'],
 ];
 
 const failed = checks.filter(([ok]) => !ok);
