@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   BookOpenCheck,
   Building2,
+  Database,
   GraduationCap,
   LoaderCircle,
   Plus,
@@ -17,7 +18,9 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthProvider';
 import { normalizeEvidaraRole } from '@/lib/roles';
 import type { AnalyticsScope } from '@/types/analytics';
+import { DemoAnalyticsDataLab } from './DemoAnalyticsDataLab';
 import { StudentAnalyticsDashboard } from './StudentAnalyticsDashboard';
+import { TeacherAnalyticsDashboard } from './TeacherAnalyticsDashboard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,7 +38,7 @@ function titleForRole(role?: string) {
 }
 
 function descriptionForRole(role?: string) {
-  if (role === 'school_teacher') return 'Students from the sections assigned to you appear here.';
+  if (role === 'school_teacher') return 'Live class evidence from only the sections assigned to you.';
   if (role === 'school_admin') return 'Filter the school by grade and section, then open any student profile.';
   if (role === 'evidara_admin' || role === 'super_admin') return 'Navigate school → grade → section → student while preserving school data boundaries.';
   return 'Your submitted assessment evidence.';
@@ -51,6 +54,7 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
   const [sectionId, setSectionId] = useState('all');
   const [search, setSearch] = useState('');
   const [showSetup, setShowSetup] = useState(false);
+  const [showDemoData, setShowDemoData] = useState(false);
   const [loading, setLoading] = useState(audience !== 'student');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -68,7 +72,7 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
 
   const loadScope = useCallback(async () => {
     if (!supabase) {
-      setError('Connect Supabase and apply migration 35 to load the analytics directory.');
+      setError('Connect Supabase and apply migrations 35 and 36 to load analytics.');
       setLoading(false);
       return;
     }
@@ -77,7 +81,7 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
     const { data, error: loadError } = await supabase.rpc('list_analytics_scope_v10');
     if (loadError) {
       setError(/list_analytics_scope_v10/i.test(loadError.message)
-        ? 'Apply Supabase migration 35 to enable sections, teacher assignments and analytics access.'
+        ? 'Apply Supabase migrations 35 and 36 to enable sections, teacher assignments and analytics access.'
         : loadError.message);
     } else {
       const next = data as AnalyticsScope;
@@ -106,7 +110,6 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
 
   const viewerRole = scope?.viewer_role || normalizedRole;
   const canManageSections = ['school_admin', 'evidara_admin', 'super_admin'].includes(viewerRole);
-
   const organizations = scope?.organizations || [];
   const visibleSections = (scope?.sections || []).filter((section) =>
     (organizationId === 'all' || section.organization_id === organizationId)
@@ -209,31 +212,38 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
       : (organizationId === 'all' || section.organization_id === organizationId),
   );
 
+  if (loading) {
+    return <div className={styles.emptyState}><div><LoaderCircle className="mx-auto mb-3 h-7 w-7 animate-spin" />Loading role-scoped analytics access…</div></div>;
+  }
+
+  if (viewerRole === 'school_teacher' && scope) {
+    return <TeacherAnalyticsDashboard scope={scope} onOpenStudent={setSelectedStudent} onRefreshScope={() => void loadScope()} />;
+  }
+
   const directoryStats = [
     { label: 'Visible students', value: visibleStudents.length, icon: Users },
     { label: 'Visible sections', value: visibleSections.length, icon: BookOpenCheck },
     { label: 'Schools', value: organizationId === 'all' ? organizations.length : 1, icon: Building2 },
   ];
 
-  if (loading) {
-    return <div className={styles.emptyState}><div><LoaderCircle className="mx-auto mb-3 h-7 w-7 animate-spin" />Loading role-scoped analytics access…</div></div>;
-  }
-
   return (
     <div className={`${styles.workspace} space-y-5`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">Analytics Phase 1</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">Analytics Phase 2</div>
           <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#14232B]">{titleForRole(viewerRole)}</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-[#44545C]">{descriptionForRole(viewerRole)}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {viewerRole === 'super_admin' && <Button variant="outline" onClick={() => setShowDemoData((value) => !value)}><Database className="mr-2 h-4 w-4" />Demo data</Button>}
           {canManageSections && <Button variant="outline" onClick={() => setShowSetup((value) => !value)}><Settings2 className="mr-2 h-4 w-4" />Sections & teachers</Button>}
           <Button variant="outline" onClick={() => void loadScope()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
         </div>
       </div>
 
       {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#FAEEEE] text-[#B54747]' : 'border-[#237A57]/20 bg-[#EAF4EF] text-[#237A57]'}`}>{error || message}</div>}
+
+      {showDemoData && viewerRole === 'super_admin' && <DemoAnalyticsDataLab onChanged={() => void loadScope()} />}
 
       {showSetup && canManageSections && (
         <Card className={`${styles.directoryPanel} gap-0`}>
@@ -279,42 +289,16 @@ export function AnalyticsWorkspace({ audience }: { audience: 'student' | 'school
         {directoryStats.map(({ label, value, icon: Icon }) => <Card key={label} className="gap-0 border-[#E7ECEB] shadow-none"><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{value}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></CardContent></Card>)}
       </div>
 
-      <Card className={`${styles.directoryPanel} gap-0`}>
-        <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_200px_minmax(240px,1.3fr)]">
-            <Select value={organizationId} onValueChange={(value) => { setOrganizationId(value); setGrade('all'); setSectionId('all'); }}>
-              <SelectTrigger><SelectValue placeholder="School" /></SelectTrigger>
-              <SelectContent>{['evidara_admin', 'super_admin'].includes(viewerRole) && <SelectItem value="all">All schools</SelectItem>}{organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={grade} onValueChange={(value) => { setGrade(value); setSectionId('all'); }}>
-              <SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">All grades</SelectItem>{grades.map((item) => <SelectItem key={item} value={String(item)}>Grade {item}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={sectionId} onValueChange={setSectionId}>
-              <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">All sections</SelectItem><SelectItem value="unassigned">Unassigned</SelectItem>{visibleSections.map((section) => <SelectItem key={section.id} value={section.id}>{section.name} · {section.academic_year}</SelectItem>)}</SelectContent>
-            </Select>
-            <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name" className="pl-9" /></div>
-          </div>
-        </CardContent>
-      </Card>
+      <Card className={`${styles.directoryPanel} gap-0`}><CardContent className="p-4"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_160px_200px_minmax(240px,1.3fr)]">
+        <Select value={organizationId} onValueChange={(value) => { setOrganizationId(value); setGrade('all'); setSectionId('all'); }}><SelectTrigger><SelectValue placeholder="School" /></SelectTrigger><SelectContent>{['evidara_admin', 'super_admin'].includes(viewerRole) && <SelectItem value="all">All schools</SelectItem>}{organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent></Select>
+        <Select value={grade} onValueChange={(value) => { setGrade(value); setSectionId('all'); }}><SelectTrigger><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All grades</SelectItem>{grades.map((item) => <SelectItem key={item} value={String(item)}>Grade {item}</SelectItem>)}</SelectContent></Select>
+        <Select value={sectionId} onValueChange={setSectionId}><SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger><SelectContent><SelectItem value="all">All sections</SelectItem><SelectItem value="unassigned">Unassigned</SelectItem>{visibleSections.map((section) => <SelectItem key={section.id} value={section.id}>{section.name} · {section.academic_year}</SelectItem>)}</SelectContent></Select>
+        <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name" className="pl-9" /></div>
+      </div></CardContent></Card>
 
       <div className={styles.directoryGrid}>
-        <Card className={`${styles.directoryPanel} gap-0`}>
-          <CardContent className="p-4">
-            <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-[#14232B]">Students</h2><p className="text-xs text-[#6B7980]">{visibleStudents.length} matching profiles</p></div><Users className="h-5 w-5 text-[#0E5A5A]" /></div>
-            <div className={`${styles.studentList} space-y-2`}>
-              {visibleStudents.map((student) => <button key={student.membership_id} type="button" className={styles.studentButton} onClick={() => setSelectedStudent(student.student_id)}><div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-[#14232B]">{student.full_name}</strong><p className="mt-1 text-xs text-[#6B7980]">Grade {student.grade} · {student.section_name} · {student.academic_year}</p></div><Badge variant="outline">{student.board}</Badge></div></button>)}
-              {!visibleStudents.length && <div className="py-12 text-center text-sm text-[#6B7980]">No students are visible in this school, grade and section combination.</div>}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className={`${styles.directoryPanel} gap-0`}>
-          <CardContent className={styles.emptyState}>
-            <div><GraduationCap className="mx-auto mb-3 h-12 w-12 text-[#9FBDBD]" /><h2 className="text-lg font-semibold text-[#14232B]">Choose a student profile</h2><p className="mt-2 max-w-lg text-sm leading-6">Open a student to view the product timeline, percentage, locked product percentile, accuracy, time-management score, subject comparison and evidence-based next step.</p></div>
-          </CardContent>
-        </Card>
+        <Card className={`${styles.directoryPanel} gap-0`}><CardContent className="p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold text-[#14232B]">Students</h2><p className="text-xs text-[#6B7980]">{visibleStudents.length} matching profiles</p></div><Users className="h-5 w-5 text-[#0E5A5A]" /></div><div className={`${styles.studentList} space-y-2`}>{visibleStudents.map((student) => <button key={student.membership_id} type="button" className={styles.studentButton} onClick={() => setSelectedStudent(student.student_id)}><div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-[#14232B]">{student.full_name}</strong><p className="mt-1 text-xs text-[#6B7980]">Grade {student.grade} · {student.section_name} · {student.academic_year}</p></div><Badge variant="outline">{student.board}</Badge></div></button>)}{!visibleStudents.length && <div className="py-12 text-center text-sm text-[#6B7980]">No students are visible in this school, grade and section combination.</div>}</div></CardContent></Card>
+        <Card className={`${styles.directoryPanel} gap-0`}><CardContent className={styles.emptyState}><div><GraduationCap className="mx-auto mb-3 h-12 w-12 text-[#9FBDBD]" /><h2 className="text-lg font-semibold text-[#14232B]">Choose a student profile</h2><p className="mt-2 max-w-lg text-sm leading-6">Open a student to view the product timeline, percentage, locked product percentile, accuracy, time-management score, subject comparison and evidence-based next step.</p></div></CardContent></Card>
       </div>
     </div>
   );
