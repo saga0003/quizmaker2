@@ -12,6 +12,7 @@ Apply after migration 38b:
 4. `supabase/39c_v10_reference_breakdown_scope.sql`
 5. `supabase/39d_v10_reference_unanswered_hardening.sql`
 6. `supabase/39e_v10_collection_paper_hardening.sql`
+7. `supabase/39f_v10_collection_scope_hardening.sql`
 
 No migration, collection creation, paper generation, merge or deployment runs automatically.
 
@@ -114,6 +115,8 @@ An Admin or authorised school user can:
 - delete only the collection links
 - create an editable draft paper from the collection
 
+School managers can inspect school draft collections. When school staff clone an active platform collection, Evidara creates a private school-owned copy so it can be edited and converted into a school paper.
+
 Creating a paper groups the questions by subject and preserves their order. The collection is converted into a normal V8 Paper Builder payload and saved through the existing `save_question_paper` RPC. The new paper remains a draft and opens in the existing Paper Builder for final editing and publishing.
 
 ## Practice
@@ -155,9 +158,10 @@ The current live value is stored as the starting point. Evidara does not generat
 8. Question Bank contains a Question Collections tab.
 9. A collection can be created from approved live questions.
 10. Selected questions can be reordered and saved.
-11. A collection can generate a draft paper using the existing Paper Builder save RPC.
-12. The generated paper opens in the existing Paper Builder.
-13. A published linked paper appears as an available student practice item.
-14. Test History opens detailed answer review.
-15. Goals can be created, edited and deleted.
-16. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
+11. School managers can see school drafts and school staff can clone a platform collection into school scope.
+12. A collection can generate a draft paper using the existing Paper Builder save RPC.
+13. The generated paper opens in the existing Paper Builder.
+14. A published linked paper appears as an available student practice item.
+15. Test History opens detailed answer review.
+16. Goals can be created, edited and deleted.
+17. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
