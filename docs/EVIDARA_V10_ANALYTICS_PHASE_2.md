@@ -1,6 +1,6 @@
 # Evidara V10 Analytics Phase 2
 
-Phase 2 extends the live Phase 1 student analytics foundation with teacher-level aggregate analytics, a controlled Super Admin demo-data laboratory and the corrected student analytics presentation.
+Phase 2 extends the live student analytics foundation with teacher analytics, a controlled Super Admin demo cohort, multi-student benchmarks and the corrected student dashboard.
 
 ## Migration order
 
@@ -10,125 +10,157 @@ Apply after migration 35:
 2. `supabase/36a_v10_analytics_phase_2_safety.sql`
 3. `supabase/36b_v10_analytics_phase_2_attempt_limit_hotfix.sql`
 4. `supabase/36c_v10_analytics_student_calculation_ui_fix.sql`
+5. `supabase/36d_v10_analytics_100_student_demo_cohort.sql`
+6. `supabase/36d1_v10_analytics_numeric_round_compat.sql`
+7. `supabase/36e_v10_analytics_comparison_engine.sql`
+8. `supabase/36f_v10_analytics_demo_reset_safety.sql`
+9. `supabase/36g_v10_analytics_comparison_hardening.sql`
 
-Migration 36a gives generated sections a batch-unique identity and ensures teacher status counts represent distinct students rather than repeated attempts.
+For an installation already migrated through 36c, run only steps 5–9.
 
-Migration 36b corrects only analytics-demo paper inserts to the valid maximum attempt limit of 100. It preserves the normal `question_papers_attempt_limit_check` boundary for genuine papers.
-
-Migration 36c corrects student analytics so each paper contributes only its latest submitted attempt. It also uses one latest attempt per comparison student per paper, adds group average, Top 10%, Top 5% and highest-score references, and prevents repeated attempts from inflating test counts, question counts or subject evidence.
+- 36a gives generated sections a batch-unique identity and fixes teacher status counts.
+- 36b keeps generated paper attempt limits inside the valid 1–100 range.
+- 36c uses one latest submitted result per student per test.
+- 36d replaces the original single-student generator with the fixed 100-student PCM/PCB cohort.
+- 36d1 supports decimal rounding for PostgreSQL ordered-set percentile aggregates.
+- 36e adds percentage, percentile, accuracy and time-score comparisons plus test-detail analytics.
+- 36f restores the real demo student’s original academic tracks after reset.
+- 36g preserves genuine school subject benchmarks when no generated cohort is involved.
 
 ## Demo account
 
-Default target:
+Default real login:
 
 `sales.student@demo.evidara.app`
 
-The account must already exist in Supabase Auth and must have opened Evidara at least once so a profile exists.
+The account must exist in Supabase Auth and must have opened Evidara once so that its profile exists.
 
-## Generated evidence
+The other 99 generated students are isolated analytics records and do not require Supabase Auth accounts.
 
-Super Admin can generate one isolated batch with:
-
-- 10,000 response rows
-- 25,000 response rows
-- 50,000 response rows
+## Fixed 100-student cohort
 
 The generator creates:
 
-- five subjects
-- one hundred reusable questions
-- thirty published question papers
-- three published products
-- a current version and entitlement for every product
-- varied submitted attempts
-- one response for every paper question in every generated attempt
-- varied percentage, correctness, unanswered, response-time and integrity values
+- 100 students
+- 50 PCM students
+- 50 PCB students
+- three JEE test series
+- three NEET test series
+- ten papers per series
+- sixty published papers in total
+- one hundred questions per paper
+- Physics and Chemistry for both tracks
+- Mathematics for PCM
+- Biology for PCB
+- varied correct, incorrect and unanswered counts
+- varied percentage, both accuracy values and time-management scores
+- complete and deliberately incomplete series
 
-### Product calculation cases
+The real demo login is part of PCM and receives detailed attempts and question responses. It completes two JEE series and only 7 of 10 tests in the third JEE series.
 
-1. **Demo Foundation Complete Series** — all 10 papers completed; product percentile should unlock.
-2. **Demo NEET Incomplete Series** — 7 of 10 papers completed; percentage, accuracy and time management remain visible while product percentile stays locked.
-3. **Demo Mixed Mastery Series** — all 10 papers completed with multi-subject evidence.
+The additional 99 students store efficient per-test and per-subject evidence so comparisons remain fast without creating hundreds of thousands of unnecessary response rows.
 
-A product containing 10 papers now reports a maximum of 10 completed tests in its summary. Multiple attempts on one paper do not increase the completed-test count. The latest submitted attempt is used for percentage, accuracy, time management, subject evidence and comparison calculations.
+## Percentile completion rule
 
-## Corrected student analytics UI
+A series percentile unlocks only when the student completes all ten papers in that selected series.
 
-- Analytics products moved from the left rail into a top dropdown.
-- Date-band, Last 3 and Last 5 controls removed.
-- Test history is displayed as a clean horizontally navigable timeline without a native scrollbar.
-- Every KPI information icon explains the exact calculation in simple language.
-- “Cohort” wording is replaced with “comparison students” and “group average”.
-- Accuracy shows correct, answered and unanswered counts separately.
-- Time-management values remain on one line.
-- Radar, subject bars and percentage trends show group average, Top 10%, Top 5% and highest-score references.
-- Percentile trends show average percentile, Top 10%, Top 5% and highest-percentile guide lines.
-- Trend controls wrap inside their own card instead of overflowing the screen.
-- Charts use a compact two-column layout with the trend chart spanning the full width.
+At 7/10, 8/10 or 9/10:
 
-### Acceptance checks
+- percentage remains visible
+- overall accuracy remains visible
+- answered-only accuracy remains visible
+- time score remains visible
+- series percentile remains locked
 
-- Selecting a 10-test product displays 10 completed tests, not the total number of attempts.
-- Accuracy equals correct answers divided by correct plus incorrect answers; unanswered questions remain separate.
-- The time-management value, including `/ 10`, remains on one line.
-- No native horizontal scrollbar is visible in the timeline.
-- Product selection does not consume a permanent left column.
-- Trend selectors remain inside the trend card on desktop, tablet and mobile widths.
-- Group average, Top 10%, Top 5% and highest score appear in the comparison summary and percentage charts when enough comparison students exist.
+At 10/10, the average series percentile becomes available.
 
-## Teacher dashboard
+## Accuracy definitions
 
-Teachers see only sections assigned through `teacher_section_assignments`.
+### Primary accuracy
 
-The dashboard includes:
+`Correct answers ÷ total questions × 100`
 
-- assigned students
-- active students
+Example:
+
+- 50 correct
+- 30 wrong
+- 20 unanswered
+- 100 total questions
+- overall accuracy = 50%
+
+### Alternate accuracy
+
+`Correct answers ÷ (correct + incorrect) × 100`
+
+The Accuracy card contains a swap control so the user can move between all-question accuracy and answered-only accuracy.
+
+## Student dashboard corrections
+
+- Product selection is a top dropdown rather than a permanent left rail.
+- Every test appears once in a horizontally navigable timeline.
+- Selecting a timeline card opens that test’s detailed comparison popup.
+- Each KPI information icon explains its formula.
+- Subject comparison uses one compact row per subject rather than five crowded bar groups.
+- The subject panel can switch between percentage, overall accuracy and time score.
+- Each subject row shows the student result, comparison average marker and gap above or below average.
+- Performance trends support percentage, percentile, overall accuracy and time score.
+- Trend buttons independently toggle the student, average, Top 10%, Top 5% and highest lines.
+- Trend selectors and buttons remain inside their card at all screen widths.
+
+## Timeline test popup
+
+Selecting any test displays:
+
+- student score and percentage
+- correct, wrong and unanswered counts
+- overall accuracy
+- answered-only accuracy
+- time-management score
+- number of students who wrote the test
+- student rank position
+- student percentile
+- average
+- lowest
+- highest
+- Top 10% threshold
+- Top 5% threshold
+
+Comparison groups are restricted to students who wrote the same test.
+
+## Super Admin student table
+
+The Demo Data area contains a table of all 100 generated students with:
+
+- roll number and student name
+- PCM or PCB track
 - completed tests
-- average performance
-- accuracy
-- participation
-- improving students
-- students needing attention
-- strong students
-- subject performance
-- performance and accuracy trends
-- section comparison
-- review queues
-- student profile drill-down
+- total marks and maximum marks
+- overall percentage
+- Physics percentage
+- Chemistry percentage
+- Mathematics or Biology percentage
+- series completion status
+- percentile locked or unlocked status when one series is selected
 
-The status queue is designed for teaching follow-up and is not a permanent student label.
+Super Admin can filter by:
+
+- all six series or one specific series
+- PCM or PCB
+- roll number or student name
 
 ## Reset safeguards
 
-Reset is restricted to Super Admin.
+Reset is restricted to Super Admin and requires two confirmations.
 
-The interface asks twice:
+The final confirmation requires:
 
-1. A first warning lists the complete generated scope.
-2. A second warning requires the exact target email and the exact phrase `RESET DEMO ANALYTICS`.
+- the exact target email
+- the exact phrase `RESET DEMO ANALYTICS`
 
-The RPC independently validates both values.
-
-Reset removes only rows carrying the generated batch identity:
-
-- exam responses
-- exam attempts
-- generated products and product versions
-- generated entitlements
-- product-paper relationships
-- generated papers, sections and paper questions
-- generated questions and options
-- generated subjects
-- the generated academic section
-- a generated organization or membership only when the batch originally created it
-
-For an existing student membership, its previous section is restored.
-
-Genuine products, papers, tests, attempts, responses, schools, students and memberships are outside the deletion query.
+Reset removes only records tagged with that generated batch, including generated students, results, products, papers, questions, attempts and responses. It restores the real demo account’s previous section and academic tracks. Genuine Evidara data is outside the deletion scope.
 
 ## Performance boundary
 
-The default 25,000-row dataset creates 250 attempts and 25,000 responses. The latest-attempt query reduces the student-facing calculation to one result per distinct paper while retaining the larger evidence volume for database and comparison testing.
+Only the real demo login receives full question-response evidence. The other 99 students use compact result tables for test and subject comparisons. This provides meaningful 100-student percentiles and thresholds while keeping generation and dashboard queries practical.
 
-Phase 3 remains the school-wide management dashboard with grade, section, teacher and subject comparisons across the full institution.
+Phase 3 remains the whole-school management dashboard with grade, section, teacher and subject comparisons across the institution.
