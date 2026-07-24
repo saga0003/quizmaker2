@@ -52,6 +52,7 @@ const studentNav: NavItem[] = [
 
 const schoolNav: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, view: 'school-dashboard' },
+  { label: 'Analytics', icon: BarChart3, view: 'school-analytics', moduleKey: 'analytics' },
   { label: 'Questions', icon: BookOpen, view: 'school-questions', moduleKey: 'questions' },
   { label: 'Papers', icon: FileText, view: 'school-papers', moduleKey: 'papers' },
   { label: 'Students', icon: Users, view: 'school-students', moduleKey: 'students' },
@@ -68,6 +69,7 @@ const schoolNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },
+  { label: 'Analytics', icon: BarChart3, view: 'admin-analytics', moduleKey: 'analytics' },
   { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },
   { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },
   { label: 'Products', icon: Package, view: 'admin-products', moduleKey: 'subscriptions' },
