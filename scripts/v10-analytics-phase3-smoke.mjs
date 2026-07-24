@@ -6,6 +6,7 @@ const hardening = read('supabase/37a_v10_analytics_phase_3_review_hardening.sql'
 const student = read('src/components/analytics/StudentAnalyticsDashboardV3.tsx');
 const school = read('src/components/analytics/SchoolAdminAnalyticsDashboard.tsx');
 const workspace = read('src/components/analytics/AnalyticsWorkspacePhase3.tsx');
+const finalWorkspace = read('src/components/analytics/AnalyticsWorkspacePhase4.tsx');
 const pdf = read('src/lib/analytics-pdf.ts');
 const phase3Types = read('src/types/analytics-phase3.ts');
 const page = read('src/app/page.tsx');
@@ -42,8 +43,9 @@ const checks = [
   [school.includes('Academic follow-up tracker'), 'intervention UI'],
   [school.includes('Export CSV'), 'school CSV export'],
   [school.includes('Download school PDF'), 'school PDF export'],
-  [workspace.includes('SchoolAdminAnalyticsDashboard'), 'role-aware school dashboard routing'],
-  [page.includes('AnalyticsWorkspacePhase3'), 'application Phase 3 routes'],
+  [workspace.includes('SchoolAdminAnalyticsDashboard'), 'Phase 3 role-aware school routing'],
+  [finalWorkspace.includes('SchoolAdminAnalyticsDashboard') && finalWorkspace.includes('StudentAnalyticsDashboard'), 'Phase 4 preserves Phase 3 school and student drill-down'],
+  [page.includes('AnalyticsWorkspacePhase3') || page.includes('AnalyticsWorkspacePhase4'), 'application Phase 3-or-later routes'],
   [pdf.includes('%PDF-1.4'), 'native PDF document builder'],
   [pdf.includes('Selected test answer review'), 'PDF question review section'],
   [pdf.includes('Student surface report'), 'school PDF student table'],
