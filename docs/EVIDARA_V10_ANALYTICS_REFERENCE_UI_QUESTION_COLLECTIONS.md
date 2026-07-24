@@ -1,0 +1,235 @@
+# Evidara V10 — Reference Analytics, Demo Cohorts and Question Collections
+
+This release is built on Analytics Phase 4. It replaces the stacked student analytics composition with one connected workspace modelled on the supplied `preview.html`, while preserving Supabase as the source of truth.
+
+## Migration order
+
+Apply after migration 38b:
+
+1. `supabase/39_v10_question_collections_reference_analytics.sql`
+2. `supabase/39a_v10_question_collections_hardening.sql`
+3. `supabase/39b_v10_reference_taxonomy_detail.sql`
+4. `supabase/39c_v10_reference_breakdown_scope.sql`
+5. `supabase/39d_v10_reference_unanswered_hardening.sql`
+6. `supabase/39e_v10_collection_paper_hardening.sql`
+7. `supabase/39f_v10_collection_scope_hardening.sql`
+8. `supabase/40_v10_demo_cohort_studio.sql`
+9. `supabase/40a_v10_demo_cohort_studio_hardening.sql`
+
+No migration, cohort generation, collection creation, paper generation, merge or deployment runs automatically.
+
+## Analytics module layout
+
+The non-student Analytics module now contains three top-level workspaces:
+
+- Analytics Overview
+- Demo Cohorts — Super Admin only
+- Question Collections
+
+Question Collections no longer appears inside the Questions route. The Questions route contains the live Question Bank and its normal question-management functions only.
+
+## Demo Cohort Studio
+
+The Super Admin can create a complete chart-testing dataset with one action: **Create cohort + questions**.
+
+The existing safe demo generator creates:
+
+- 100 generated students
+- 50 PCM students
+- 50 PCB students
+- six test series
+- sixty papers
+- mapped demo questions
+- sixteen chapters
+- forty-eight topics
+- test-result evidence
+- subject-result evidence
+- topic-result evidence
+- varied completion, accuracy and time-management patterns
+
+The generated cohort is isolated through its demo batch identifier. Resetting it deletes only the generated batch and does not remove genuine Evidara records.
+
+### Cohort Explorer
+
+Every generated student can now be opened directly, including students without a real authentication account.
+
+The explorer supports:
+
+- PCM / PCB filtering
+- series filtering
+- student search
+- strongest-subject indicator
+- weakest-subject indicator
+- completed tests
+- average percentage
+- average accuracy
+- average time score
+- correct, wrong and unanswered totals
+- subject performance chart
+- answer-distribution chart
+- weakest-topic chart
+- test-performance trend
+- full chapter and topic evidence table
+- generated question difficulty blueprint
+- generated question-format blueprint
+
+This makes it possible to trial the charts using different generated students and inspect exactly which subjects, chapters and topics are causing weaker performance.
+
+One designated demo login continues to receive normal `exam_attempts` and `exam_responses`, allowing answer-level review through the standard student analytics screens. The remaining generated students are explored through the Super Admin cohort RPCs without creating unnecessary authentication accounts.
+
+## Complete student analytics navigation
+
+The student analytics workspace contains:
+
+- Overview
+- Subjects
+- Chapters
+- Topics
+- Practice
+- Test History
+- Goals
+
+The same selected product is retained while moving through the analysis hierarchy.
+
+### Overview
+
+- overall percentage, marks or completed-series percentile
+- accuracy across all questions
+- Phase 4 time-management score
+- radar performance profile
+- subject comparison
+- test performance trend
+- independent Your result, Average, Top 10%, Top 5% and Highest controls
+
+### Subject analysis
+
+- subject score, accuracy, time score and comparison size
+- chapter mastery
+- average benchmark markers
+- question-format table
+- question-difficulty chart
+- factual evidence summary
+
+### Chapter analysis
+
+- subject and chapter selectors
+- horizontal chapter tabs
+- raw marks or percentage
+- accuracy
+- attempt rate
+- observed average response time
+- topic mastery
+- accuracy versus response-time chart
+- correct, wrong and unanswered distribution
+
+### Topic analysis
+
+- subject → chapter → topic selectors
+- raw marks or percentage
+- accuracy
+- observed average response time
+- question count
+- question tags used as sub-concept labels
+- difficulty analysis
+- question-format performance
+- mapped incorrect questions
+- available Question Collection practice papers
+
+## Evidence boundaries
+
+The uploaded HTML contained demonstration values for semantic error categories, confidence, recommended actions and individual-question speed targets. These are not currently captured by the Evidara schema and are not fabricated.
+
+The live workspace uses:
+
+- latest submitted result per paper
+- every paper question in that submitted test
+- exam responses where a response exists
+- a missing response treated as unanswered
+- question marks
+- correct, wrong and unanswered status
+- observed response time
+- question subject, chapter and topic
+- difficulty
+- question type
+- question tags
+- comparison records generated by the existing analytics engine
+
+The system displays correct/wrong/unanswered instead of claiming concept, calculation or careless-error causes.
+
+## Question Collections
+
+Question Collections are reusable references to approved Question Bank records. Questions are not copied.
+
+They are managed from **Analytics → Question Collections**.
+
+An Admin or authorised school user can:
+
+- create a named collection
+- add description, exam and grade
+- select a primary subject
+- record chapter and topic coverage
+- record included difficulty levels and question formats
+- select questions from the live bank
+- search and filter the bank
+- order and remove selected questions
+- save as private, school or platform visibility
+- activate or archive the collection
+- clone a collection
+- delete only the collection links
+- create an editable draft paper from the collection
+
+School managers can inspect school draft collections. When school staff clone an active platform collection, Evidara creates a private school-owned copy so it can be edited and converted into a school paper.
+
+Creating a paper groups the questions by subject and preserves their order. The collection is converted into a normal V8 Paper Builder payload and saved through the existing `save_question_paper` RPC. The new paper remains a draft and opens in the existing Paper Builder for final editing and publishing.
+
+## Practice
+
+Active collections appear in the student Practice view. A collection becomes directly attemptable only when its linked paper has been published. Until then, the student sees that the paper is not published.
+
+## Test history
+
+The history table uses the latest submitted result from each test. Opening a test displays:
+
+- percentage benchmarks
+- selected answer
+- correct answer
+- correct/wrong/unanswered status
+- marks
+- response time
+- solution where available
+
+## Goals
+
+Students and authorised staff can create measurable goals for:
+
+- percentage
+- accuracy
+- time score
+- tests completed
+
+The current live value is stored as the starting point. Evidara does not generate a target automatically.
+
+## Acceptance checks
+
+1. Student Analytics opens the reference-style internal navigation.
+2. Product and Marks/Percentage/Percentile controls work across the hierarchy.
+3. Selecting a subject opens its chapter evidence.
+4. Selecting a chapter opens its topic evidence.
+5. Selecting a topic displays difficulty, format, tag and incorrect-question evidence.
+6. No unsupported confidence or semantic-error value is shown.
+7. Unanswered paper questions remain in chapter, topic, difficulty and format totals even when no response row exists.
+8. Questions opens only the live Question Bank and no longer contains Question Collections.
+9. Analytics contains Analytics Overview, Demo Cohorts and Question Collections.
+10. Super Admin can create the complete demo cohort and questions with one action.
+11. The Cohort Explorer lists all generated students.
+12. Opening any generated student loads subject, chapter, topic and test-trend evidence.
+13. Series, track and student filters work.
+14. A collection can be created from approved live questions.
+15. Selected questions can be reordered and saved.
+16. School managers can see school drafts and school staff can clone a platform collection into school scope.
+17. A collection can generate a draft paper using the existing Paper Builder save RPC.
+18. The generated paper opens in the existing Paper Builder.
+19. A published linked paper appears as an available student practice item.
+20. Test History opens detailed answer review.
+21. Goals can be created, edited and deleted.
+22. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.

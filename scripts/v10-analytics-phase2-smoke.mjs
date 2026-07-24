@@ -50,7 +50,7 @@ const checks = [
   [student.includes('Subject comparison'), 'redesigned subject comparison'],
   [!student.includes('Last 3'), 'removed ambiguous Last 3 quick filter'],
   [!student.includes('Date band'), 'removed date-band control'],
-  [demo.includes('Generate 100-student cohort'), 'fixed cohort generator UI'],
+  [demo.includes('Create cohort + questions'), 'one-click cohort and question generator UI'],
   [demo.includes('First confirmation'), 'first reset confirmation'],
   [demo.includes('Second and final confirmation'), 'second reset confirmation'],
   [demoTable.includes('100-student comparison table'), 'Super Admin cohort table UI'],
