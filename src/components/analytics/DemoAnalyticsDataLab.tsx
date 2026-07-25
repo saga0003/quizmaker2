@@ -40,6 +40,7 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
   const [status, setStatus] = useState<AnalyticsDemoStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  const [generationStage, setGenerationStage] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [firstConfirmOpen, setFirstConfirmOpen] = useState(false);
@@ -49,7 +50,7 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
 
   const load = useCallback(async () => {
     if (!supabase) {
-      setError('Connect Supabase and apply analytics migrations through 40 to use the cohort studio.');
+      setError('Connect Supabase and apply analytics migrations through 40b to use the cohort studio.');
       setLoading(false);
       return;
     }
@@ -70,15 +71,26 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
     setBusy('generate');
     setError('');
     setMessage('');
+    setGenerationStage('Creating students, questions, papers and topic evidence… Keep this screen open.');
+
     const { data, error: generateError } = await supabase.rpc('generate_analytics_demo_data_v10', {
       p_email: email.trim().toLowerCase(),
       p_evidence_rows: 10000,
     });
+
     setBusy('');
+    setGenerationStage('');
     if (generateError) {
-      setError(generateError.message);
+      if (/statement timeout|57014|canceling statement/i.test(generateError.message)) {
+        setError('Cohort generation exceeded Supabase’s default REST timeout. Apply migration 40b_v10_demo_cohort_statement_timeout_hotfix.sql, refresh Evidara and retry once.');
+      } else if (/lock timeout|55P03/i.test(generateError.message)) {
+        setError('Another operation is using the demo cohort records. Wait a few seconds and retry.');
+      } else {
+        setError(generateError.message);
+      }
       return;
     }
+
     const result = data as {
       students?: number;
       test_results?: number;
@@ -90,7 +102,7 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
       chapters?: number;
       topics?: number;
     };
-    setMessage(`Created the cohort and question evidence: ${result.students || 0} students, ${result.products || 0} series, ${result.papers || 0} papers, ${result.chapters || 0} chapters, ${result.topics || 0} topics and ${result.test_results?.toLocaleString('en-IN') || 0} student-test results.`);
+    setMessage(`Created the cohort and question evidence: ${result.students || 0} students, ${result.products || 0} series, ${result.papers || 0} papers, ${result.chapters || 16} chapters, ${result.topics || 48} topics and ${result.test_results?.toLocaleString('en-IN') || 0} student-test results.`);
     await load();
     onChanged?.();
   }
@@ -143,19 +155,19 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
             <div className="max-w-3xl">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#8A5F00]"><Database className="h-4 w-4" />Demo cohort generator</div>
               <h2 className="mt-2 text-xl font-bold text-[#14232B]">Create students, questions and analytics evidence in one click</h2>
-              <p className="mt-2 text-sm leading-6 text-[#44545C]">Creates 100 varied students: 50 PCM and 50 PCB, six test series, sixty papers, mapped questions, sixteen chapters, forty-eight topics, test results, subject results and topic-level evidence. The generated students intentionally have different strengths, weaknesses, completion levels and time-management patterns.</p>
+              <p className="mt-2 text-sm leading-6 text-[#44545C]">Creates 100 varied students: 50 PCM and 50 PCB, six test series, sixty papers, mapped questions, sixteen chapters, forty-eight topics, test results, subject results and topic-level evidence. Generation may take 10–60 seconds after the timeout hotfix is applied.</p>
             </div>
             <Badge variant="outline" className={ready ? 'border-[#237A57]/25 bg-[#EAF4EF] text-[#237A57]' : 'border-[#AEB8BC]/40 bg-white text-[#6B7980]'}>
-              {loading ? 'Checking…' : ready ? 'Cohort ready' : status?.account_found ? 'Ready to create' : 'Demo account not found'}
+              {loading ? 'Checking…' : busy === 'generate' ? 'Creating cohort…' : ready ? 'Cohort ready' : status?.account_found ? 'Ready to create' : 'Demo account not found'}
             </Badge>
           </div>
 
-          {(error || message) && <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#FAEEEE] text-[#B54747]' : 'border-[#237A57]/20 bg-[#EAF4EF] text-[#237A57]'}`}>{error || message}</div>}
+          {(error || message || generationStage) && <div className={`mt-4 rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#FAEEEE] text-[#B54747]' : 'border-[#237A57]/20 bg-[#EAF4EF] text-[#237A57]'}`}>{error || generationStage || message}</div>}
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(300px,1fr)_auto_auto] lg:items-end">
-            <div className="space-y-2"><Label>Demo student login used for detailed answer-level evidence</Label><Input value={email} onChange={(event) => setEmail(event.target.value)} /></div>
-            <Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Check account</Button>
-            <Button onClick={() => void generate()} disabled={busy === 'generate' || ready || !status?.account_found} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy === 'generate' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Create cohort + questions</Button>
+            <div className="space-y-2"><Label>Demo student login used for detailed answer-level evidence</Label><Input value={email} onChange={(event) => setEmail(event.target.value)} disabled={busy === 'generate'} /></div>
+            <Button variant="outline" onClick={() => void load()} disabled={loading || busy === 'generate'}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Check account</Button>
+            <Button onClick={() => void generate()} disabled={busy === 'generate' || ready || !status?.account_found} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy === 'generate' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}{busy === 'generate' ? 'Creating cohort…' : 'Create cohort + questions'}</Button>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
@@ -171,7 +183,7 @@ export function DemoAnalyticsDataLab({ onChanged, email: controlledEmail, onEmai
             ].map(([label, value]) => <div key={label} className="rounded-xl border border-[#E7D8A8] bg-white p-3"><p className="text-[11px] font-medium uppercase tracking-wide text-[#8A7450]">{label}</p><strong className="mt-1 block text-sm text-[#14232B]">{value}</strong></div>)}
           </div>
 
-          <div className="mt-4 rounded-xl border border-[#E7D8A8] bg-white p-4 text-xs leading-5 text-[#6B7980]">Use the Cohort Explorer below to open any generated student, switch series and inspect subject, chapter, topic, wrong-answer, unanswered and time-score patterns. The one real demo login also receives normal attempts and question responses for answer-level review.</div>
+          <div className="mt-4 rounded-xl border border-[#E7D8A8] bg-white p-4 text-xs leading-5 text-[#6B7980]">Use the Cohort Explorer below to open any generated student, switch series and inspect subject, chapter, topic, wrong-answer, unanswered and time-score patterns. While generation is running, do not refresh, close the tab or click the action again.</div>
 
           {ready && <div className="mt-5 flex flex-col gap-3 rounded-xl border border-[#B54747]/20 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#B54747]" /><div><strong className="text-sm text-[#14232B]">Reset the generated cohort</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">The reset removes only records created for this demo batch. Genuine Evidara data remains outside the deletion scope.</p></div></div><Button variant="destructive" onClick={() => setFirstConfirmOpen(true)}><Eraser className="mr-2 h-4 w-4" />Reset generated data</Button></div>}
         </CardContent>
