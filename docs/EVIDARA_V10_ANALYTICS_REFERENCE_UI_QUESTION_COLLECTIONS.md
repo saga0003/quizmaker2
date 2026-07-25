@@ -15,6 +15,7 @@ Apply after migration 38b:
 7. `supabase/39f_v10_collection_scope_hardening.sql`
 8. `supabase/40_v10_demo_cohort_studio.sql`
 9. `supabase/40a_v10_demo_cohort_studio_hardening.sql`
+10. `supabase/40b_v10_demo_cohort_statement_timeout_hotfix.sql`
 
 No migration, cohort generation, collection creation, paper generation, merge or deployment runs automatically.
 
@@ -76,6 +77,12 @@ The explorer supports:
 This makes it possible to trial the charts using different generated students and inspect exactly which subjects, chapters and topics are causing weaker performance.
 
 One designated demo login continues to receive normal `exam_attempts` and `exam_responses`, allowing answer-level review through the standard student analytics screens. The remaining generated students are explored through the Super Admin cohort RPCs without creating unnecessary authentication accounts.
+
+### Cohort generation timeout protection
+
+Supabase REST calls made by the authenticated role normally have a short statement timeout. Migration 40b gives only the cohort generator and its internal generator functions a function-level 60-second allowance. It also creates indexes for repeated generated-batch metadata lookups.
+
+The ordinary timeout for other authenticated application queries is not changed. After selecting **Create cohort + questions**, keep the page open and do not select the action again while it is running.
 
 ## Complete student analytics navigation
 
@@ -220,16 +227,17 @@ The current live value is stored as the starting point. Evidara does not generat
 7. Unanswered paper questions remain in chapter, topic, difficulty and format totals even when no response row exists.
 8. Questions opens only the live Question Bank and no longer contains Question Collections.
 9. Analytics contains Analytics Overview, Demo Cohorts and Question Collections.
-10. Super Admin can create the complete demo cohort and questions with one action.
-11. The Cohort Explorer lists all generated students.
-12. Opening any generated student loads subject, chapter, topic and test-trend evidence.
-13. Series, track and student filters work.
-14. A collection can be created from approved live questions.
-15. Selected questions can be reordered and saved.
-16. School managers can see school drafts and school staff can clone a platform collection into school scope.
-17. A collection can generate a draft paper using the existing Paper Builder save RPC.
-18. The generated paper opens in the existing Paper Builder.
-19. A published linked paper appears as an available student practice item.
-20. Test History opens detailed answer review.
-21. Goals can be created, edited and deleted.
-22. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
+10. Super Admin can create the complete demo cohort and questions with one action after migration 40b.
+11. Cohort generation can run for up to 60 seconds without changing normal application-query timeouts.
+12. The Cohort Explorer lists all generated students.
+13. Opening any generated student loads subject, chapter, topic and test-trend evidence.
+14. Series, track and student filters work.
+15. A collection can be created from approved live questions.
+16. Selected questions can be reordered and saved.
+17. School managers can see school drafts and school staff can clone a platform collection into school scope.
+18. A collection can generate a draft paper using the existing Paper Builder save RPC.
+19. The generated paper opens in the existing Paper Builder.
+20. A published linked paper appears as an available student practice item.
+21. Test History opens detailed answer review.
+22. Goals can be created, edited and deleted.
+23. Existing Phase 1–4 analytics, Paper and Product checks continue to pass.
