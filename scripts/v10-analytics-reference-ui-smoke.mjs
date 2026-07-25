@@ -9,6 +9,7 @@ const unanswered = read('supabase/39d_v10_reference_unanswered_hardening.sql');
 const paperHardening = read('supabase/39e_v10_collection_paper_hardening.sql');
 const cohortMigration = read('supabase/40_v10_demo_cohort_studio.sql');
 const cohortHardening = read('supabase/40a_v10_demo_cohort_studio_hardening.sql');
+const cohortTimeout = read('supabase/40b_v10_demo_cohort_statement_timeout_hotfix.sql');
 const dashboard = read('src/components/analytics/StudentAnalyticsReferenceDashboard.tsx');
 const cohortStudio = read('src/components/analytics/DemoCohortStudio.tsx');
 const demoLab = read('src/components/analytics/DemoAnalyticsDataLab.tsx');
@@ -39,6 +40,8 @@ const checks = [
   [cohortMigration.includes('get_analytics_demo_student_drilldown_v14'), 'demo student topic drill-down RPC'],
   [cohortMigration.includes('analytics_demo_topic_results_v12') && cohortMigration.includes('questions'), 'cohort question and topic evidence'],
   [cohortHardening.includes('correct_count+subject.incorrect_count+subject.unanswered_count'), 'subject question total schema compatibility'],
+  [cohortTimeout.includes("statement_timeout = ''60s''") && cohortTimeout.includes('normal_application_timeout_unchanged'), 'function-scoped 60-second cohort timeout'],
+  [cohortTimeout.includes('questions_demo_batch_subject_idx') && cohortTimeout.includes('products_demo_batch_track_idx'), 'cohort metadata lookup indexes'],
   [['Overview','Subjects','Chapters','Topics','Practice','Test History','Goals'].every((value) => dashboard.includes(value)), 'complete student analytics navigation'],
   [dashboard.includes('Performance profile') && dashboard.includes('Subject comparison') && dashboard.includes('Performance trend'), 'overview charts'],
   [dashboard.includes('Chapter mastery') && dashboard.includes('Question format performance'), 'subject analysis'],
@@ -50,6 +53,7 @@ const checks = [
   [cohortStudio.includes('Cohort explorer') && cohortStudio.includes('Open any generated student'), 'visible cohort explorer UI'],
   [cohortStudio.includes('Weakest topics') && cohortStudio.includes('Chapter and topic evidence'), 'per-student topic diagnosis'],
   [demoLab.includes('Create cohort + questions'), 'one-click cohort and question action'],
+  [demoLab.includes('40b_v10_demo_cohort_statement_timeout_hotfix.sql') && demoLab.includes('10–60 seconds'), 'timeout guidance in cohort UI'],
   [analyticsWorkspace.includes('Demo Cohorts') && analyticsWorkspace.includes('Question Collections'), 'analytics module tabs'],
   [collections.includes('Question Collections') && collections.includes('Create draft paper'), 'collection manager UI'],
   [collections.includes('save_question_collection_v13') && collections.includes('create_paper_from_question_collection_v13'), 'collection manager live RPCs'],
