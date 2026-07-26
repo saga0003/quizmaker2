@@ -1,1 +1,1 @@
-export { StudentAnalyticsReferenceDashboard as StudentAnalyticsDashboard } from './StudentAnalyticsReferenceDashboard';
+export { StudentAnalyticsDashboardV10_10 as StudentAnalyticsDashboard } from './StudentAnalyticsDashboardV10_10';
