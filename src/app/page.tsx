@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { AppSidebar } from '@/components/evidara/app-sidebar';
@@ -48,6 +49,16 @@ function SchoolQuestionWorkspace() {
   );
 }
 
+function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
+  const [openRequestedPaper, setOpenRequestedPaper] = useState(false);
+
+  useEffect(() => {
+    setOpenRequestedPaper(new URLSearchParams(window.location.search).has('id'));
+  }, []);
+
+  return <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />;
+}
+
 function ViewRouter() {
   const { view } = useAppStore();
 
@@ -64,7 +75,7 @@ function ViewRouter() {
   if (view === 'school-dashboard') return <SchoolDashboardView />;
   if (view === 'school-analytics') return <AnalyticsWorkspacePhase4 audience="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
-  if (view === 'school-papers') return <LivePaperCatalogue kind="school" />;
+  if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
   if (view === 'school-store') return <ProductStore />;
   if (view === 'school-entitlements') return <SchoolProductAccess mode="entitlements" />;
@@ -79,7 +90,7 @@ function ViewRouter() {
   if (view === 'admin-dashboard') return <AdminDashboardView />;
   if (view === 'admin-analytics') return <AnalyticsWorkspacePhase4 audience="admin" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
-  if (view === 'admin-papers') return <LivePaperCatalogue kind="admin" />;
+  if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
   if (view === 'admin-achievements') return <AdminAchievementsView />;
