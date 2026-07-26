@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthProvider';
 type Kind = 'student' | 'school' | 'admin';
 type DemoIdentity = { id:string; fullName:string; email:string; username:string; role:string };
 type NavItem = { h:string; l:string; i:typeof Home; tag?:string };
+type AnalyticsItem = { label:string; icon:typeof Home; href?:string };
 
 const links: Record<Kind, NavItem[]> = {
   student: [
@@ -32,9 +33,16 @@ const links: Record<Kind, NavItem[]> = {
   ],
 };
 
-const analyticsTree = [
-  ['Overview', Home], ['Subjects', BookOpen], ['Chapters', Layers3], ['Topics', Tag], ['Practice', Target], ['Test History', History], ['Goals', Flag],
-] as const;
+const analyticsTree:AnalyticsItem[] = [
+  {label:'Overview',icon:Home},
+  {label:'Subjects',icon:BookOpen},
+  {label:'Chapters',icon:Layers3},
+  {label:'Topics',icon:Tag},
+  {label:'Learning Behaviour',icon:Brain,href:'/student/analytics/learning-behaviour/'},
+  {label:'Practice',icon:Target},
+  {label:'Test History',icon:History},
+  {label:'Goals',icon:Flag},
+];
 
 export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNode}){
   const {user,profile,signOut,configured}=useAuth();
@@ -42,7 +50,7 @@ export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNo
   const [demoIdentity,setDemoIdentity]=useState<DemoIdentity|null>(null);
   const [navPinned,setNavPinned]=useState(false);
   const [analyticsOpen,setAnalyticsOpen]=useState(pathname.startsWith('/student/analytics'));
-  const [analyticsView,setAnalyticsView]=useState('Overview');
+  const [analyticsView,setAnalyticsView]=useState(pathname.startsWith('/student/analytics/learning-behaviour')?'Learning Behaviour':'Overview');
 
   useEffect(()=>{
     if(configured)return;
@@ -58,15 +66,20 @@ export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNo
   const avatarText=displayName.slice(0,2).toUpperCase();
   const workspaceName=kind==='school'?'School workspace':kind==='admin'?'Evidara platform':displayName;
 
-  function openAnalytics(label:string,index:number){
-    setAnalyticsView(label);
+  function openAnalytics(item:AnalyticsItem,index:number){
+    setAnalyticsView(item.label);
     setAnalyticsOpen(true);
-    if(!pathname.startsWith('/student/analytics')){
-      window.location.href=`/student/analytics/?view=${encodeURIComponent(label.toLowerCase().replace(' ','-'))}`;
+    if(item.href){
+      window.location.href=item.href;
       return;
     }
+    if(!pathname.startsWith('/student/analytics')||pathname.startsWith('/student/analytics/learning-behaviour')){
+      window.location.href=`/student/analytics/?view=${encodeURIComponent(item.label.toLowerCase().replace(' ','-'))}`;
+      return;
+    }
+    const referenceIndex=analyticsTree.slice(0,index).filter(entry=>!entry.href).length;
     const buttons=document.querySelectorAll<HTMLButtonElement>('.reference-nav-button');
-    buttons[index]?.click();
+    buttons[referenceIndex]?.click();
     if(window.innerWidth<1100)setNavPinned(false);
   }
 
@@ -86,13 +99,13 @@ export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNo
       <nav className="so-nav">
         {kind==='student'&&<div className={`so-tree ${analyticsOpen?'open':''}`}>
           <button className={`so-tree-root ${pathname.startsWith('/student/analytics')?'active':''}`} onClick={()=>setAnalyticsOpen(value=>!value)}><span><BarChart3 size={19}/>Analytics</span><ChevronDown className="so-tree-chevron" size={17}/></button>
-          <div className="so-tree-children">{analyticsTree.map(([label,Icon],index)=><button key={label} className={analyticsView===label&&pathname.startsWith('/student/analytics')?'active':''} onClick={()=>openAnalytics(label,index)}><Icon size={16}/>{label}</button>)}</div>
+          <div className="so-tree-children">{analyticsTree.map((item,index)=>{const Icon=item.icon;const active=item.href?pathname.startsWith(item.href):analyticsView===item.label&&pathname==='/student/analytics/';return <button key={item.label} className={active?'active':''} onClick={()=>openAnalytics(item,index)}><Icon size={16}/>{item.label}</button>})}</div>
         </div>}
         {links[kind].map(({h,l,i:Icon,tag})=>{const active=pathname===h||pathname.startsWith(h.replace(/\/$/,'')+(h==='/student/'||h==='/school/'||h==='/admin/'?'__never':'/'));return <Link key={h} href={h} className={active?'active':''} onClick={()=>window.innerWidth<1100&&setNavPinned(false)}><span><Icon size={18}/>{l}</span>{tag&&<em>{tag}</em>}</Link>})}
       </nav>
       <div className="so-sidebar-card"><Sparkles size={18}/><div><strong>Evidara</strong><span>{kind==='student'?'Evidence with a clear next step':'Evidence-driven student development'}</span></div></div>
       <div className="so-account"><div className="so-avatar">{avatarText}</div><div><strong>{displayName}</strong><span>{displayRole.replaceAll('_',' ')}</span></div>{(user||demoIdentity)&&<button onClick={()=>void logout()} title="Sign out"><LogOut size={17}/></button>}</div>
     </aside>
-    <main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?'Cloud data connected':'Interactive demo mode'}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><ChevronRight size={15}/> Evidara V10.12</span></div></header><div className="so-content">{children}</div></main>
+    <main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?'Cloud data connected':'Interactive demo mode'}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><ChevronRight size={15}/> Evidara V10.13</span></div></header><div className="so-content">{children}</div></main>
   </div>;
 }

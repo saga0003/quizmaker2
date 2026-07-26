@@ -1,6 +1,6 @@
 {
   "name": "evidara-school-platform",
-  "version": "10.12.0",
+  "version": "10.13.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
