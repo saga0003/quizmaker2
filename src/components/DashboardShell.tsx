@@ -1,51 +1,98 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Award, BarChart3, BookOpenCheck, Brain, Building2, CalendarRange, ChevronRight, CircleHelp, ClipboardList, CreditCard, FileQuestion, GitCompareArrows, GraduationCap, Home, Layers3, LogOut, Package, Settings, ShieldCheck, Sparkles, TableProperties, Upload, Users } from "lucide-react";
-import { Logo } from "./Logo";
-import { useAuth } from "@/context/AuthProvider";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Award, BarChart3, BookOpen, BookOpenCheck, Brain, Building2, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, CreditCard, FileQuestion, Flag, GitCompareArrows, GraduationCap, History, Home, Layers3, LogOut, Menu, Package, Settings, ShieldCheck, Sparkles, TableProperties, Tag, Target, Upload, Users, X } from 'lucide-react';
+import { Logo } from './Logo';
+import { useAuth } from '@/context/AuthProvider';
 
-type Kind = "student" | "school" | "admin";
+type Kind = 'student' | 'school' | 'admin';
 type DemoIdentity = { id:string; fullName:string; email:string; username:string; role:string };
+type NavItem = { h:string; l:string; i:typeof Home; tag?:string };
 
-const links:{[K in Kind]:{h:string;l:string;i:typeof Home;tag?:string}[]}={
-  student:[
-    {h:"/student/",l:"My Overview",i:Home},{h:"/student/tests/",l:"Available Tests",i:ClipboardList},{h:"/student/analytics/",l:"My Analytics",i:BarChart3},{h:"/student/segment/",l:"My Development Pattern",i:Brain,tag:"Explained"},{h:"/student/benchmarks/",l:"Shared Benchmarks",i:GitCompareArrows,tag:"Private"},{h:"/student/achievements/",l:"Achievements",i:Award,tag:"V6.7"},{h:"/student/results/",l:"Result History",i:GraduationCap},{h:"/student/resources/",l:"My Resources",i:BookOpenCheck,tag:"Included"},{h:"/student/purchases/",l:"My Access",i:CreditCard},{h:"/metric-guide/",l:"Metric Guide",i:CircleHelp},{h:"/data-guide/",l:"Data Controls",i:TableProperties},{h:"/student/#profile",l:"Profile",i:Settings},
+const links: Record<Kind, NavItem[]> = {
+  student: [
+    {h:'/student/',l:'My Overview',i:Home},
+    {h:'/student/tests/',l:'Available Tests',i:ClipboardList},
+    {h:'/student/segment/',l:'My Development Pattern',i:Brain,tag:'Explained'},
+    {h:'/student/benchmarks/',l:'Shared Benchmarks',i:GitCompareArrows,tag:'Private'},
+    {h:'/student/achievements/',l:'Achievements',i:Award},
+    {h:'/student/resources/',l:'My Resources',i:BookOpenCheck,tag:'Included'},
+    {h:'/student/purchases/',l:'My Access',i:CreditCard},
+    {h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},
+    {h:'/data-guide/',l:'Data Controls',i:TableProperties},
+    {h:'/student/#profile',l:'Profile',i:Settings},
   ],
-  school:[
-    {h:"/school/",l:"School Overview",i:Home},{h:"/school/subscription/",l:"Annual Subscription",i:CreditCard,tag:"Active"},{h:"/school/students/",l:"Students & Promotion",i:Users},{h:"/school/segments/",l:"Development Patterns",i:Brain,tag:"V6.4"},{h:"/school/benchmarks/",l:"Shared Benchmarks",i:GitCompareArrows,tag:"Live"},{h:"/school/achievements/",l:"Achievements",i:Award,tag:"V6.7"},{h:"/school/resources/",l:"Resource Library",i:BookOpenCheck,tag:"Complimentary"},{h:"/school/questions/",l:"Question Bank",i:FileQuestion},{h:"/school/questions/import/",l:"Bulk Question Import",i:Upload},{h:"/school/papers/",l:"Tests & Papers",i:ClipboardList,tag:"Free"},{h:"/metric-guide/",l:"Metric Guide",i:CircleHelp},{h:"/data-guide/",l:"Data Controls",i:TableProperties},{h:"/school/register/",l:"School Profile",i:Building2},
+  school: [
+    {h:'/school/',l:'School Overview',i:Home},{h:'/school/analytics/',l:'Analytics',i:BarChart3},{h:'/school/subscription/',l:'Annual Subscription',i:CreditCard,tag:'Active'},{h:'/school/students/',l:'Students & Promotion',i:Users},{h:'/school/segments/',l:'Development Patterns',i:Brain},{h:'/school/benchmarks/',l:'Shared Benchmarks',i:GitCompareArrows},{h:'/school/achievements/',l:'Achievements',i:Award},{h:'/school/resources/',l:'Resource Library',i:BookOpenCheck},{h:'/school/questions/',l:'Question Bank',i:FileQuestion},{h:'/school/questions/import/',l:'Bulk Question Import',i:Upload},{h:'/school/papers/',l:'Tests & Papers',i:ClipboardList},{h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},{h:'/data-guide/',l:'Data Controls',i:TableProperties},{h:'/school/register/',l:'School Profile',i:Building2},
   ],
-  admin:[
-    {h:"/admin/",l:"Command Centre",i:Home},{h:"/admin/subscriptions/",l:"School Subscriptions",i:CreditCard},{h:"/admin/questions/",l:"Master Question Bank",i:FileQuestion},{h:"/admin/questions/import/",l:"Bulk Import",i:Upload},{h:"/admin/papers/",l:"Assessment Catalogue",i:ClipboardList},{h:"/admin/segments/",l:"Segment Governance",i:Brain,tag:"Versioned"},{h:"/admin/benchmarks/",l:"Benchmark Governance",i:GitCompareArrows,tag:"Live"},{h:"/admin/achievements/",l:"Achievement Governance",i:Award,tag:"V6.7"},{h:"/admin/products/",l:"Plans & Pricing",i:Package},{h:"/admin/readiness/",l:"Launch Readiness",i:ShieldCheck,tag:"V6.8"},{h:"/metric-guide/",l:"Metric Guide",i:CircleHelp},{h:"/data-guide/",l:"Data Controls",i:TableProperties},
+  admin: [
+    {h:'/admin/',l:'Command Centre',i:Home},{h:'/admin/analytics/',l:'Analytics',i:BarChart3},{h:'/admin/subscriptions/',l:'School Subscriptions',i:CreditCard},{h:'/admin/questions/',l:'Master Question Bank',i:FileQuestion},{h:'/admin/questions/import/',l:'Bulk Import',i:Upload},{h:'/admin/papers/',l:'Assessment Catalogue',i:ClipboardList},{h:'/admin/segments/',l:'Segment Governance',i:Brain},{h:'/admin/benchmarks/',l:'Benchmark Governance',i:GitCompareArrows},{h:'/admin/achievements/',l:'Achievement Governance',i:Award},{h:'/admin/products/',l:'Plans & Pricing',i:Package},{h:'/admin/readiness/',l:'Launch Readiness',i:ShieldCheck},{h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},{h:'/data-guide/',l:'Data Controls',i:TableProperties},
   ],
 };
+
+const analyticsTree = [
+  ['Overview', Home], ['Subjects', BookOpen], ['Chapters', Layers3], ['Topics', Tag], ['Practice', Target], ['Test History', History], ['Goals', Flag],
+] as const;
 
 export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNode}){
   const {user,profile,signOut,configured}=useAuth();
   const pathname=usePathname();
   const [demoIdentity,setDemoIdentity]=useState<DemoIdentity|null>(null);
+  const [navPinned,setNavPinned]=useState(false);
+  const [analyticsOpen,setAnalyticsOpen]=useState(pathname.startsWith('/student/analytics'));
+  const [analyticsView,setAnalyticsView]=useState('Overview');
 
   useEffect(()=>{
     if(configured)return;
     try{
-      const raw=localStorage.getItem("evidara_demo_user")||localStorage.getItem("scholaros_demo_user");
-      if(raw&&!localStorage.getItem("evidara_demo_user"))localStorage.setItem("evidara_demo_user",raw);
+      const raw=localStorage.getItem('evidara_demo_user')||localStorage.getItem('scholaros_demo_user');
+      if(raw&&!localStorage.getItem('evidara_demo_user'))localStorage.setItem('evidara_demo_user',raw);
       setDemoIdentity(raw?JSON.parse(raw) as DemoIdentity:null);
     }catch{setDemoIdentity(null)}
   },[configured,pathname]);
 
-  const displayName=profile?.full_name||profile?.username||user?.email||demoIdentity?.fullName||demoIdentity?.username||"Demo User";
+  const displayName=profile?.full_name||profile?.username||user?.email||demoIdentity?.fullName||demoIdentity?.username||'Demo User';
   const displayRole=profile?.role||demoIdentity?.role||`${kind} role`;
   const avatarText=displayName.slice(0,2).toUpperCase();
-  const workspaceName=kind==="school"?"Green Valley School":displayName;
+  const workspaceName=kind==='school'?'School workspace':kind==='admin'?'Evidara platform':displayName;
+
+  function openAnalytics(label:string,index:number){
+    setAnalyticsView(label);
+    setAnalyticsOpen(true);
+    if(!pathname.startsWith('/student/analytics')){
+      window.location.href=`/student/analytics/?view=${encodeURIComponent(label.toLowerCase().replace(' ','-'))}`;
+      return;
+    }
+    const buttons=document.querySelectorAll<HTMLButtonElement>('.reference-nav-button');
+    buttons[index]?.click();
+    if(window.innerWidth<1100)setNavPinned(false);
+  }
 
   async function logout(){
     if(user)await signOut();
-    ["evidara_demo_user","evidara_demo_role","scholaros_demo_user","scholaros_demo_role"].forEach(key=>localStorage.removeItem(key));
-    window.location.href="/login/";
+    ['evidara_demo_user','evidara_demo_role','scholaros_demo_user','scholaros_demo_role'].forEach(key=>localStorage.removeItem(key));
+    window.location.href='/login/';
   }
 
-  return <div className="so-shell"><aside className="so-sidebar"><div className="so-sidebar-brand"><Link href="/"><Logo variant="dark"/></Link><button className="so-collapse" aria-label="Collapse navigation"><ChevronRight size={15}/></button></div><div className="so-workspace"><span>{kind==="admin"?"Platform workspace":kind==="school"?"School workspace":"Student workspace"}</span><strong>{workspaceName}</strong></div><nav className="so-nav">{links[kind].map(({h,l,i:Icon,tag})=>{const active=pathname===h||pathname.startsWith(h.replace(/\/$/,"")+(h==="/student/"||h==="/school/"||h==="/admin/"?"__never":"/"));return <Link key={h} href={h} className={active?"active":""}><span><Icon size={18}/>{l}</span>{tag&&<em>{tag}</em>}</Link>})}</nav><div className="so-sidebar-card"><Sparkles size={18}/><div><strong>Evidara Annual</strong><span>{kind==="student"?"Resources assigned by your school":"Free tests · complimentary resources"}</span></div></div><div className="so-account"><div className="so-avatar">{avatarText}</div><div><strong>{displayName}</strong><span>{displayRole.replaceAll("_"," ")}{demoIdentity?.id?` · ${demoIdentity.id}`:""}</span></div>{(user||demoIdentity)&&<button onClick={()=>void logout()} title="Sign out"><LogOut size={17}/></button>}</div></aside><main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?"Cloud data connected":"Interactive demo mode"}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><Layers3 size={15}/> Evidara V6.8</span></div></header><div className="so-content">{children}</div></main></div>;
+  return <div className={`so-shell ${navPinned?'nav-pinned':''}`}>
+    <div className="so-sidebar-zone" aria-hidden="true" />
+    <button className="so-nav-trigger" onClick={()=>setNavPinned(value=>!value)} aria-label={navPinned?'Close navigation':'Open navigation'}>{navPinned?<X size={21}/>:<Menu size={21}/>}</button>
+    <div className="so-nav-overlay" onClick={()=>setNavPinned(false)} />
+    <aside className="so-sidebar">
+      <div className="so-sidebar-brand"><Link href="/"><Logo variant="dark"/></Link><button className="so-collapse" onClick={()=>setNavPinned(false)} aria-label="Close navigation"><ChevronLeft size={17}/></button></div>
+      <div className="so-workspace"><span>{kind==='admin'?'Platform workspace':kind==='school'?'School workspace':'Student workspace'}</span><strong>{workspaceName}</strong></div>
+      <nav className="so-nav">
+        {kind==='student'&&<div className={`so-tree ${analyticsOpen?'open':''}`}>
+          <button className={`so-tree-root ${pathname.startsWith('/student/analytics')?'active':''}`} onClick={()=>setAnalyticsOpen(value=>!value)}><span><BarChart3 size={19}/>Analytics</span><ChevronDown className="so-tree-chevron" size={17}/></button>
+          <div className="so-tree-children">{analyticsTree.map(([label,Icon],index)=><button key={label} className={analyticsView===label&&pathname.startsWith('/student/analytics')?'active':''} onClick={()=>openAnalytics(label,index)}><Icon size={16}/>{label}</button>)}</div>
+        </div>}
+        {links[kind].map(({h,l,i:Icon,tag})=>{const active=pathname===h||pathname.startsWith(h.replace(/\/$/,'')+(h==='/student/'||h==='/school/'||h==='/admin/'?'__never':'/'));return <Link key={h} href={h} className={active?'active':''} onClick={()=>window.innerWidth<1100&&setNavPinned(false)}><span><Icon size={18}/>{l}</span>{tag&&<em>{tag}</em>}</Link>})}
+      </nav>
+      <div className="so-sidebar-card"><Sparkles size={18}/><div><strong>Evidara</strong><span>{kind==='student'?'Evidence with a clear next step':'Evidence-driven student development'}</span></div></div>
+      <div className="so-account"><div className="so-avatar">{avatarText}</div><div><strong>{displayName}</strong><span>{displayRole.replaceAll('_',' ')}</span></div>{(user||demoIdentity)&&<button onClick={()=>void logout()} title="Sign out"><LogOut size={17}/></button>}</div>
+    </aside>
+    <main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?'Cloud data connected':'Interactive demo mode'}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><ChevronRight size={15}/> Evidara V10.12</span></div></header><div className="so-content">{children}</div></main>
+  </div>;
 }
