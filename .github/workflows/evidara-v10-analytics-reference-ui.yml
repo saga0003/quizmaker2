@@ -37,7 +37,19 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: TypeScript
-        run: npm run typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck 2>&1 | tee typecheck-output.txt
+      - name: Upload TypeScript diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v10-11-typecheck
+          path: typecheck-output.txt
+          if-no-files-found: error
+      - name: Fail when TypeScript failed
+        if: steps.typecheck.outcome == 'failure'
+        run: exit 1
       - name: V8 paper smoke checks
         run: node scripts/v8-paper-smoke.mjs
       - name: V9 product smoke checks
