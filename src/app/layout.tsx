@@ -16,15 +16,15 @@ import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Evidara V10.10 — Complete Student Analytics",
-  description: "Evidence-driven assessment analytics with overview, subject, chapter, topic, practice, test-history, goals and clean PDF reporting.",
+  title: "Evidara V10.11 — Complete Student Analytics",
+  description: "Evidence-driven assessment analytics with tree navigation, mapped student evidence, subject, chapter and topic analysis, practice, test history, goals and clean PDF reporting.",
   icons: {
     icon: "/brand/evidara-emblem.png",
     apple: "/brand/evidara-emblem.png",
   },
   openGraph: {
-    title: "Evidara V10.10 — Complete Student Analytics",
-    description: "Evidence-driven assessment analytics with detailed taxonomy analysis and clean PDF reports.",
+    title: "Evidara V10.11 — Complete Student Analytics",
+    description: "Mapped student analytics with detailed taxonomy analysis and clean PDF reports.",
     type: "website",
   },
 };
