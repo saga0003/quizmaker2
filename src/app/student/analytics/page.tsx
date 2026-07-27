@@ -1,6 +1,7 @@
 import { ProtectedPage } from "@/components/ProtectedPage";
-import { AnalyticsV12Frame } from "@/components/analytics/AnalyticsV12Frame";
+import { DashboardShell } from "@/components/DashboardShell";
+import { V12LiveAnalytics } from "@/components/analytics/V12LiveAnalytics";
 
 export default function Page(){
-  return <ProtectedPage allowed="student"><AnalyticsV12Frame/></ProtectedPage>;
+  return <ProtectedPage allowed="student"><DashboardShell kind="student"><V12LiveAnalytics mode="student"/></DashboardShell></ProtectedPage>;
 }
