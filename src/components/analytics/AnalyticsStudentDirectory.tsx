@@ -21,8 +21,14 @@ type StudentRow = {
 };
 
 type SortKey='sl'|'student_name'|'school_name'|'grade'|'section'|'average_percentage'|'average_percentile'|'completed_tests';
+type SortDirection='asc'|'desc';
 
 function metric(value?:number|null,suffix=''){return value==null?'—':`${Number(value).toFixed(1)}${suffix}`;}
+
+function SortIcon({column,sortKey,direction}:{column:SortKey;sortKey:SortKey;direction:SortDirection}){
+  if(sortKey!==column)return <ArrowUpDown size={14}/>;
+  return direction==='asc'?<ArrowUp size={14}/>:<ArrowDown size={14}/>;
+}
 
 export function AnalyticsStudentDirectory({onOpenStudent}:{onOpenStudent:(studentId:string)=>void}){
   const [rows,setRows]=useState<StudentRow[]>([]);
@@ -31,7 +37,7 @@ export function AnalyticsStudentDirectory({onOpenStudent}:{onOpenStudent:(studen
   const [error,setError]=useState('');
   const [search,setSearch]=useState('');
   const [sortKey,setSortKey]=useState<SortKey>('student_name');
-  const [direction,setDirection]=useState<'asc'|'desc'>('asc');
+  const [direction,setDirection]=useState<SortDirection>('asc');
 
   const load=useCallback(async()=>{
     if(!supabase){setError('Connect Supabase and apply migration 42.');setLoading(false);return;}
@@ -45,7 +51,6 @@ export function AnalyticsStudentDirectory({onOpenStudent}:{onOpenStudent:(studen
   useEffect(()=>{void load();},[load]);
 
   function changeSort(key:SortKey){if(sortKey===key)setDirection(value=>value==='asc'?'desc':'asc');else{setSortKey(key);setDirection('asc');}}
-  function SortIcon({column}:{column:SortKey}){return sortKey!==column?<ArrowUpDown size={14}/>:direction==='asc'?<ArrowUp size={14}/>:<ArrowDown size={14}/>;}
 
   const schoolColumn=role==='super_admin'||role==='evidara_admin';
   const visible=useMemo(()=>{
@@ -57,6 +62,8 @@ export function AnalyticsStudentDirectory({onOpenStudent}:{onOpenStudent:(studen
       return direction==='asc'?result:-result;
     });
   },[direction,rows,search,sortKey]);
+
+  const sortIcon=(column:SortKey)=><SortIcon column={column} sortKey={sortKey} direction={direction}/>;
 
   if(loading&&!rows.length)return <Card className="border-[#E7ECEB] shadow-none"><CardContent className="grid min-h-[320px] place-items-center text-sm text-[#6B7980]"><div><LoaderCircle className="mx-auto mb-3 h-7 w-7 animate-spin"/>Loading student analytics directory…</div></CardContent></Card>;
 
@@ -70,12 +77,12 @@ export function AnalyticsStudentDirectory({onOpenStudent}:{onOpenStudent:(studen
     <div className="overflow-x-auto rounded-[15px] border border-[#E7ECEB] bg-white shadow-[0_10px_30px_rgba(5,31,50,.055)]">
       <table className="ev-sortable w-full min-w-[1040px] text-left">
         <thead><tr>
-          <th className="px-4 py-2"><button onClick={()=>changeSort('sl')}>Sl.<SortIcon column="sl"/></button></th>
-          <th className="px-4 py-2"><button onClick={()=>changeSort('student_name')}>Student name<SortIcon column="student_name"/></button></th>
-          {schoolColumn?<th className="px-4 py-2"><button onClick={()=>changeSort('school_name')}>School name<SortIcon column="school_name"/></button></th>:<><th className="px-4 py-2"><button onClick={()=>changeSort('grade')}>Grade<SortIcon column="grade"/></button></th><th className="px-4 py-2"><button onClick={()=>changeSort('section')}>Section<SortIcon column="section"/></button></th></>}
-          <th className="px-4 py-2"><button onClick={()=>changeSort('average_percentage')}>Average percentage<SortIcon column="average_percentage"/></button></th>
-          <th className="px-4 py-2"><button onClick={()=>changeSort('average_percentile')}>Average percentile<SortIcon column="average_percentile"/></button></th>
-          <th className="px-4 py-2"><button onClick={()=>changeSort('completed_tests')}>Tests<SortIcon column="completed_tests"/></button></th>
+          <th className="px-4 py-2"><button onClick={()=>changeSort('sl')}>Sl.{sortIcon('sl')}</button></th>
+          <th className="px-4 py-2"><button onClick={()=>changeSort('student_name')}>Student name{sortIcon('student_name')}</button></th>
+          {schoolColumn?<th className="px-4 py-2"><button onClick={()=>changeSort('school_name')}>School name{sortIcon('school_name')}</button></th>:<><th className="px-4 py-2"><button onClick={()=>changeSort('grade')}>Grade{sortIcon('grade')}</button></th><th className="px-4 py-2"><button onClick={()=>changeSort('section')}>Section{sortIcon('section')}</button></th></>}
+          <th className="px-4 py-2"><button onClick={()=>changeSort('average_percentage')}>Average percentage{sortIcon('average_percentage')}</button></th>
+          <th className="px-4 py-2"><button onClick={()=>changeSort('average_percentile')}>Average percentile{sortIcon('average_percentile')}</button></th>
+          <th className="px-4 py-2"><button onClick={()=>changeSort('completed_tests')}>Tests{sortIcon('completed_tests')}</button></th>
         </tr></thead>
         <tbody>{visible.map((row,index)=><tr key={row.student_id} role="button" tabIndex={0} onClick={()=>onOpenStudent(row.student_id)} onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onOpenStudent(row.student_id);}}} className="border-t border-[#E7ECEB] focus-visible:outline focus-visible:outline-3 focus-visible:outline-[#2164D6]">
           <td className="px-4 py-4 text-[#6B7980]">{index+1}</td><td className="px-4 py-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[#DCE9E7] font-semibold text-[#0E5A5A]"><Users size={17}/></span><div><strong className="block text-[#14232B]">{row.student_name}</strong><span className="text-xs text-[#6B7980]">{row.completed_tests} completed test{row.completed_tests===1?'':'s'}</span></div></div></td>
