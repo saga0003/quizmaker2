@@ -1,2 +1,5 @@
-import { DashboardShell } from "@/components/DashboardShell";import { ProtectedPage } from "@/components/ProtectedPage";import { StudentIntelligence } from "@/components/analytics/StudentIntelligence";
-export default function Page(){return <ProtectedPage allowed="student"><DashboardShell kind="student"><StudentIntelligence/></DashboardShell></ProtectedPage>}
+import { ProtectedPage } from "@/components/ProtectedPage";
+
+export default function Page(){
+  return <ProtectedPage allowed="student"><iframe title="Evidara complete student analytics" src="/evidara-analytics-v10-14.html" style={{position:"fixed",inset:0,width:"100%",height:"100%",border:0,background:"#fbfcfd"}} /></ProtectedPage>;
+}
