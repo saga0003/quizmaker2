@@ -7,28 +7,17 @@ import { AppSidebar } from '@/components/evidara/app-sidebar';
 import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
-import {
-  StudentResultsView,
-  StudentAchievementsView,
-  StudentBenchmarksView,
-  StudentResourcesView,
-} from '@/components/evidara/student-views';
+import { StudentResultsView, StudentResourcesView } from '@/components/evidara/student-views';
 import {
   SchoolDashboardView,
   SchoolStudentsView,
   SchoolSubscriptionView,
   SchoolResourcesView,
-  SchoolAchievementsView,
-  SchoolBenchmarksView,
-  SchoolSegmentsView,
 } from '@/components/evidara/school-views';
 import {
   AdminDashboardView,
   AdminProductsView,
   AdminSubscriptionsView,
-  AdminAchievementsView,
-  AdminBenchmarksView,
-  AdminSegmentsView,
 } from '@/components/evidara/admin-views';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
@@ -38,7 +27,6 @@ import { AccessControlView } from '@/components/evidara/access-control-view';
 import { ProductStore } from '@/components/commerce/ProductStore';
 import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
-import { AnalyticsWorkspacePhase4 } from '@/components/analytics/AnalyticsWorkspacePhase4';
 
 function SchoolQuestionWorkspace() {
   return (
@@ -64,16 +52,12 @@ function ViewRouter() {
 
   if (view === 'student-dashboard') return <StudentDashboard />;
   if (view === 'student-tests') return <LiveStudentTests />;
-  if (view === 'student-analytics') return <AnalyticsWorkspacePhase4 audience="student" />;
   if (view === 'student-results') return <StudentResultsView />;
-  if (view === 'student-achievements') return <StudentAchievementsView />;
-  if (view === 'student-benchmarks') return <StudentBenchmarksView />;
   if (view === 'student-resources') return <StudentResourcesView />;
   if (view === 'student-store') return <ProductStore />;
   if (view === 'student-purchases') return <PurchaseHistory />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view === 'school-analytics') return <AnalyticsWorkspacePhase4 audience="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -82,20 +66,13 @@ function ViewRouter() {
   if (view === 'school-product-seats') return <SchoolProductAccess mode="seats" />;
   if (view === 'school-subscription') return <SchoolSubscriptionView />;
   if (view === 'school-resources') return <SchoolResourcesView />;
-  if (view === 'school-achievements') return <SchoolAchievementsView />;
-  if (view === 'school-benchmarks') return <SchoolBenchmarksView />;
-  if (view === 'school-segments') return <SchoolSegmentsView />;
   if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
-  if (view === 'admin-analytics') return <AnalyticsWorkspacePhase4 audience="admin" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
   if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
-  if (view === 'admin-achievements') return <AdminAchievementsView />;
-  if (view === 'admin-benchmarks') return <AdminBenchmarksView />;
-  if (view === 'admin-segments') return <AdminSegmentsView />;
   if (view === 'admin-access') return <AccessControlView kind="admin" />;
 
   return null;
