@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - evidara-v11-clean-baseline
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
