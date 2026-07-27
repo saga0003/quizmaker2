@@ -1,0 +1,29 @@
+name: Evidara V11.2 Source Snapshot
+
+on:
+  push:
+    branches:
+      - evidara-v11-clean-baseline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out Evidara V11.2 worktree
+        uses: actions/checkout@v4
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidara-v11-2-source-${{ github.sha }}
+          path: |
+            .
+            !.git/**
+            !node_modules/**
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
