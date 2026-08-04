@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const releaseDir = join(root, '.release', 'v13.2');
 const requiredSource = join(root, 'src', 'components', 'analytics-v12', 'student-analytics-v12.tsx');
-const expectedSha256 = '1c17f266e366ca48fd14641b4c735044ba84a08e068020fcbc70c0d34b703074';
+const expectedSha256 = 'c2d3a2ad2bd338fea3630df7e1458806ff671fdbb771fbf2d58b623589a0f16c';
 
 if (!existsSync(releaseDir)) {
   if (existsSync(requiredSource)) process.exit(0);
