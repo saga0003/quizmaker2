@@ -1,21 +1,113 @@
-import Link from "next/link";
-import { ArrowRight, BarChart3, BookOpenCheck, ClipboardCheck, FileSpreadsheet, GraduationCap, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Users } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
-import { Logo } from "@/components/Logo";
-import { MetricLabel } from "@/components/ui/MetricInfo";
-import { metricDefinitions } from "@/lib/evidaraMetrics";
+'use client';
 
-export default function Home(){return <><Navbar/><main>
-<section className="public-hero"><div className="rm-container hero-grid"><div className="hero-copy"><span className="so-label included">EVIDENCE-DRIVEN STUDENT DEVELOPMENT</span><h1>Every assessment should lead to a clearer next step.</h1><p>Evidara brings school-created assessments, previous-year resources, secure online exams, student intelligence and annual roster management into one subscription-based school platform.</p><div className="hero-actions"><Link href="/school/register/" className="so-btn so-btn-primary">Start a school pilot <ArrowRight size={17}/></Link><Link href="/login/" className="rm-btn-secondary">Open product demo</Link></div><div className="hero-proof"><div><strong>₹0</strong><span>PER SCHOOL-CREATED TEST</span></div><div><strong>8–12</strong><span>GRADE ELIGIBILITY</span></div><div><strong>One plan</strong><span>ANNUAL SCHOOL ACCESS</span></div></div></div><div className="product-preview"><div className="preview-top"><span>Evidara · Student Development Evidence</span><span>Current cycle</span></div><div className="preview-body"><div className="preview-metrics"><div><strong>91st</strong><span><MetricLabel {...metricDefinitions.percentile}>STUDENT PERCENTILE</MetricLabel></span></div><div><strong>84%</strong><span><MetricLabel {...metricDefinitions.accuracy}>LATEST ACCURACY</MetricLabel></span></div><div><strong>+26</strong><span><MetricLabel {...metricDefinitions.trend}>SCORE IMPROVEMENT</MetricLabel></span></div></div><div className="preview-chart">{[42,65,52,81,68,92,77,98,86].map((height,index)=><i key={index} style={{height:`${height}%`}}/>)}</div><Link href="/metric-guide/" className="ev-guide-link" style={{marginTop:16}}>How Evidara measures progress <ArrowRight size={15}/></Link></div></div></div></section>
-<section id="platform" className="public-section alt"><div className="rm-container"><div className="section-head"><span className="so-kicker">ASSESS · UNDERSTAND · GUIDE · DEVELOP</span><h2>A complete assessment operating system</h2><p>The integrated testing platform is presented through the Evidara identity while retaining the current school-first functionality.</p></div><div className="feature-grid">{[
-{icon:FileSpreadsheet,title:"Question bank and imports",body:"Manual MCQ, numerical and multi-correct creation with LaTeX, images, CSV, XLSX and image ZIP imports."},
-{icon:ClipboardCheck,title:"Flexible paper builder",body:"Sections, chapter filters, auto, hybrid and manual selection, difficulty mix, marks, negative marks and scheduling."},
-{icon:ShieldCheck,title:"Secure test delivery",body:"Autosave, timer, question palette, review flags, access codes, attempt limits, fullscreen and violation events."},
-{icon:BarChart3,title:"Student intelligence",body:"Accuracy, speed, error causes, topic mastery, cognitive skill, improvement trends and teacher-ready next actions."},
-{icon:Users,title:"Student lifecycle",body:"Individual promotion, Promote All, individual revoke and Revoke All with permanent exclusion of revoked records."},
-{icon:BookOpenCheck,title:"Eligibility-controlled resources",body:"State, CBSE, ICSE and ISC board papers plus NEET, JEE, KCET, Foundation and Olympiad access by grade and track."}
-].map(({icon:Icon,title,body})=><article className="feature-card" key={title}><Icon/><h3>{title}</h3><p>{body}</p></article>)}</div></div></section>
-<section id="schools" className="public-section"><div className="rm-container"><div className="section-head"><span className="so-kicker">BUILT FOR SCHOOL OPERATIONS</span><h2>Free tests. Complimentary resources. Clear access rules.</h2><p>Schools subscribe annually. Their own tests carry no additional per-test fee, while previous-year papers are complimentary resources available during an active subscription.</p></div><div className="so-grid so-grid-3"><article className="so-card so-pad benefit-card"><span className="so-label free">FREE</span><ClipboardCheck/><h3>School-created assessments</h3><p>Teachers can build chapter, subject, mixed and full-length papers without buying each test separately.</p></article><article className="so-card so-pad benefit-card"><span className="so-label complimentary">COMPLIMENTARY</span><Sparkles/><h3>Previous-year papers</h3><p>Board and entrance-exam resources unlock during an active annual subscription and remain eligibility-controlled.</p></article><article className="so-card so-pad benefit-card"><span className="so-label included">CONTROLLED</span><LockKeyhole/><h3>Grade and track eligibility</h3><p>A Grade 10 State Board student receives the correct board papers; Grade 11–12 students receive only assigned NEET, JEE or KCET resources.</p></article></div></div></section>
-<section id="analytics" className="public-section alt"><div className="rm-container"><div className="pricing-story"><div><span className="so-kicker light">STUDENT INTELLIGENCE</span><h2>See beyond marks.</h2><p>Evidara identifies whether marks were lost through concept gaps, methods, avoidable errors, interpretation or time pressure—and converts those findings into practical teacher and student actions.</p><div className="hero-actions"><Link href="/student/analytics/" className="so-btn so-btn-accent">View analytics experience <ArrowRight size={16}/></Link><Link href="/metric-guide/" className="rm-btn-secondary">Read metric definitions</Link></div></div><div className="pricing-points"><div><span>Topic and chapter mastery</span><strong>Heatmaps + trends</strong></div><div><span>Speed vs expected time</span><strong>Per question</strong></div><div><span>Error classification</span><strong>5 cause groups</strong></div><div><span>Teacher intervention</span><strong>Small-group actions</strong></div><div><span>Retesting discipline</span><strong>7 and 21 days</strong></div></div></div></div></section>
-<section id="subscription" className="public-section"><div className="rm-container"><div className="section-head"><span className="so-kicker">ANNUAL SUBSCRIPTION MODEL</span><h2>Renew the school, promote eligible students and leave revoked records behind.</h2><p>Before the next academic year, schools can revoke students who left, promote one student, promote all remaining eligible students, or revoke all. Bulk promotion never restores a revoked student.</p></div><div className="so-grid so-grid-3"><article className="feature-card"><RefreshCw/><h3>Annual renewal</h3><p>Subscription dates, seat capacity and resource entitlement are tracked at school level.</p></article><article className="feature-card"><GraduationCap/><h3>Promotion controls</h3><p>Promote individuals or the active roster to the next academic year with Grade 12 completion handling.</p></article><article className="feature-card"><LockKeyhole/><h3>Permanent revoke lock</h3><p>Revoked students are excluded from every future Promote All operation.</p></article></div></div></section>
-</main><footer className="public-footer"><div className="rm-container footer-inner"><Logo variant="dark"/><div>Evidence-driven assessment and student development for Grades 8–12.</div><div>© 2026 Evidara</div></div></footer></>}
+import { useEffect, useState } from 'react';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { useAppStore } from '@/store/use-app-store';
+import { AppSidebar } from '@/components/evidara/app-sidebar';
+import LandingPage from '@/components/evidara/landing-page';
+import LoginPage from '@/components/evidara/login-page';
+import { StudentDashboard } from '@/components/evidara/student-dashboard';
+import { StudentResultsView, StudentResourcesView } from '@/components/evidara/student-views';
+import {
+  SchoolDashboardView,
+  SchoolStudentsView,
+  SchoolSubscriptionView,
+  SchoolResourcesView,
+} from '@/components/evidara/school-views';
+import {
+  AdminDashboardView,
+  AdminProductsView,
+  AdminSubscriptionsView,
+} from '@/components/evidara/admin-views';
+import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
+import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
+import { LiveStudentTests } from '@/components/evidara/live-student-tests';
+import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
+import { AccessControlView } from '@/components/evidara/access-control-view';
+import { ProductStore } from '@/components/commerce/ProductStore';
+import { PurchaseHistory } from '@/components/commerce/PurchaseHistory';
+import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
+
+function SchoolQuestionWorkspace() {
+  return (
+    <div className="space-y-6">
+      <SchoolQuestionReview />
+      <LiveQuestionBank kind="school" />
+    </div>
+  );
+}
+
+function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
+  const [openRequestedPaper, setOpenRequestedPaper] = useState(false);
+
+  useEffect(() => {
+    setOpenRequestedPaper(new URLSearchParams(window.location.search).has('id'));
+  }, []);
+
+  return <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />;
+}
+
+function ViewRouter() {
+  const { view } = useAppStore();
+
+  if (view === 'student-dashboard') return <StudentDashboard />;
+  if (view === 'student-tests') return <LiveStudentTests />;
+  if (view === 'student-results') return <StudentResultsView />;
+  if (view === 'student-resources') return <StudentResourcesView />;
+  if (view === 'student-store') return <ProductStore />;
+  if (view === 'student-purchases') return <PurchaseHistory />;
+
+  if (view === 'school-dashboard') return <SchoolDashboardView />;
+  if (view === 'school-questions') return <SchoolQuestionWorkspace />;
+  if (view === 'school-papers') return <PaperWorkspace kind="school" />;
+  if (view === 'school-students') return <SchoolStudentsView />;
+  if (view === 'school-store') return <ProductStore />;
+  if (view === 'school-entitlements') return <SchoolProductAccess mode="entitlements" />;
+  if (view === 'school-product-seats') return <SchoolProductAccess mode="seats" />;
+  if (view === 'school-subscription') return <SchoolSubscriptionView />;
+  if (view === 'school-resources') return <SchoolResourcesView />;
+  if (view === 'school-access') return <AccessControlView kind="school" />;
+
+  if (view === 'admin-dashboard') return <AdminDashboardView />;
+  if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
+  if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
+  if (view === 'admin-products') return <AdminProductsView />;
+  if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
+  if (view === 'admin-access') return <AccessControlView kind="admin" />;
+
+  return null;
+}
+
+export default function Home() {
+  const { view, user, sidebarOpen, authReady } = useAppStore();
+
+  if (isSupabaseConfigured && !authReady) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#F7F9F7]">
+        <div className="rounded-2xl border border-[#DCE9E7] bg-white px-8 py-6 text-center shadow-sm">
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-[#DCE9E7] border-t-[#0E5A5A]" />
+          <strong className="text-[#14232B]">Connecting to Evidara cloud…</strong>
+          <p className="mt-1 text-sm text-[#6B7980]">Confirming your Supabase session and workspace.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (view === 'landing') return <LandingPage />;
+  if (view === 'login' || view === 'register-school') return <LoginPage />;
+
+  if (user) {
+    return (
+      <div className="min-h-screen bg-[#F7F9F7]">
+        <AppSidebar />
+        <main className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-[68px]'}`}>
+          <div className="mx-auto max-w-[1540px] p-6 lg:p-8">
+            <ViewRouter />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return <LandingPage />;
+}

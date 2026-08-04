@@ -1,0 +1,114 @@
+.workspace {
+  color: #14232b;
+}
+
+.panel {
+  border: 1px solid #e7eceb;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.panelShadow {
+  box-shadow: 0 8px 24px rgba(20, 35, 43, 0.08);
+}
+
+.cardHover {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.cardHover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 90, 90, 0.34);
+  box-shadow: 0 12px 32px rgba(20, 35, 43, 0.12);
+}
+
+.featuredGlow {
+  position: relative;
+  isolation: isolate;
+}
+
+.featuredGlow::before {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(242, 184, 75, 0.34), rgba(14, 90, 90, 0.12));
+  content: '';
+}
+
+.focusRing:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid #2164d6;
+  outline-offset: 2px;
+}
+
+.fadeIn {
+  animation: commerceFadeIn 180ms ease;
+}
+
+.slideUp {
+  animation: commerceSlideUp 220ms ease;
+}
+
+.scrollArea {
+  scrollbar-width: thin;
+  scrollbar-color: #aeb8bc transparent;
+}
+
+.scrollArea::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #aeb8bc;
+}
+
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: #6b7980;
+}
+
+.tableRow {
+  transition: background-color 120ms ease;
+}
+
+.tableRow:hover {
+  background: rgba(14, 90, 90, 0.03);
+}
+
+.emptyState {
+  padding: 64px 24px;
+  text-align: center;
+  color: #6b7980;
+}
+
+.metricCard {
+  border: 1px solid #e7eceb;
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+}
+
+@keyframes commerceFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes commerceSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardHover,
+  .fadeIn,
+  .slideUp {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

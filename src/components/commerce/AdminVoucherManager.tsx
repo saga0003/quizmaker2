@@ -1,20 +1,72 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Edit3, LoaderCircle, RefreshCw, ShieldCheck, TicketPercent } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { rupees } from "@/types/commerce";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CalendarClock,
+  CheckCircle2,
+  Edit3,
+  LoaderCircle,
+  Plus,
+  RefreshCw,
+  School,
+  Search,
+  ShieldCheck,
+  TicketPercent,
+  XCircle,
+} from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthProvider';
+import { normalizeEvidaraRole } from '@/lib/roles';
+import type { AdminProduct } from '@/types/commerce';
+import { rupees } from '@/types/commerce';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import styles from '@/components/commerce/commerce-prototype.module.css';
 
-type ProductOption = { id: string; name: string };
-type Voucher = {
+const emptyForm = {
+  id: '',
+  code: '',
+  description: '',
+  discountPercent: '5',
+  purpose: 'promotion',
+  productId: 'all',
+  organizationId: 'none',
+  allowedEmail: '',
+  seatCount: '',
+  usageLimit: '',
+  perUserLimit: '1',
+  startsAt: '',
+  endsAt: '',
+  offlineReference: '',
+  offlineAmountRupees: '',
+  internalNote: '',
+  active: true,
+};
+
+type VoucherRow = {
   id: string;
   code: string;
   description: string | null;
   discount_percent: number;
-  purpose: "promotion" | "offline_payment" | "scholarship" | "manual_access";
+  purpose: string;
   product_id: string | null;
   allowed_email: string | null;
   organization_id: string | null;
+  seat_count: number | null;
   usage_limit: number | null;
   per_user_limit: number;
   used_count: number;
@@ -24,364 +76,233 @@ type Voucher = {
   offline_payment_reference: string | null;
   offline_amount_paise: number | null;
   internal_note: string | null;
-  created_at: string;
-};
-type Redemption = {
-  id: string;
-  voucher_id: string;
-  order_id: string;
-  user_id: string;
-  organization_id: string | null;
-  discount_paise: number;
-  payment_source: string;
-  offline_reference: string | null;
-  created_at: string;
+  products?: { name: string } | { name: string }[] | null;
+  organizations?: { name: string } | { name: string }[] | null;
 };
 
-type FormState = {
-  id: string;
-  code: string;
-  description: string;
-  discount_percent: string;
-  purpose: Voucher["purpose"];
-  product_id: string;
-  allowed_email: string;
-  organization_id: string;
-  usage_limit: string;
-  per_user_limit: string;
-  starts_at: string;
-  ends_at: string;
-  active: boolean;
-  offline_payment_reference: string;
-  offline_amount_rupees: string;
-  internal_note: string;
-};
+type Organization = { id: string; name: string };
+type FormState = typeof emptyForm;
+type VoucherFilter = 'all' | 'active' | 'inactive' | 'promotion' | 'offline';
 
-const emptyForm: FormState = {
-  id: "",
-  code: "",
-  description: "",
-  discount_percent: "10",
-  purpose: "promotion",
-  product_id: "",
-  allowed_email: "",
-  organization_id: "",
-  usage_limit: "1",
-  per_user_limit: "1",
-  starts_at: "",
-  ends_at: "",
-  active: true,
-  offline_payment_reference: "",
-  offline_amount_rupees: "",
-  internal_note: "",
-};
-
-function toLocalInput(value: string | null) {
-  if (!value) return "";
+const localDateTime = (value: string | null) => {
+  if (!value) return '';
   const date = new Date(value);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
+};
+
+function relationName(value: VoucherRow['products'] | VoucherRow['organizations']) {
+  if (Array.isArray(value)) return value[0]?.name || '';
+  return value?.name || '';
 }
 
-function toIso(value: string) {
-  return value ? new Date(value).toISOString() : null;
-}
-
-function generateCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(4));
-  return `EVI-${Array.from(bytes).map((value) => value.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+function voucherState(voucher: VoucherRow) {
+  const now = Date.now();
+  if (!voucher.active) return 'Inactive';
+  if (voucher.starts_at && new Date(voucher.starts_at).getTime() > now) return 'Scheduled';
+  if (voucher.ends_at && new Date(voucher.ends_at).getTime() < now) return 'Expired';
+  if (voucher.usage_limit && voucher.used_count >= voucher.usage_limit) return 'Exhausted';
+  return 'Active';
 }
 
 export function AdminVoucherManager() {
+  const { profile } = useAuth();
+  const superAdmin = normalizeEvidaraRole(profile?.role) === 'super_admin';
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [redemptions, setRedemptions] = useState<Redemption[]>([]);
-  const [products, setProducts] = useState<ProductOption[]>([]);
-  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
-  const [organizationNames, setOrganizationNames] = useState<Record<string, string>>({});
+  const [vouchers, setVouchers] = useState<VoucherRow[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<VoucherFilter>('all');
+  const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const voucherById = useMemo(
-    () => Object.fromEntries(vouchers.map((voucher) => [voucher.id, voucher])),
-    [vouchers],
-  );
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
     if (!supabase) return;
     setBusy(true);
-    setMessage("");
-
-    const [voucherResult, redemptionResult, productResult] = await Promise.all([
-      supabase.from("voucher_codes").select("*").order("created_at", { ascending: false }),
-      supabase.from("voucher_redemptions").select("id,voucher_id,order_id,user_id,organization_id,discount_paise,payment_source,offline_reference,created_at").order("created_at", { ascending: false }).limit(100),
-      supabase.from("products").select("id,name").order("name"),
+    setError('');
+    const [voucherResult, productResult, organizationResult] = await Promise.all([
+      supabase.from('voucher_codes').select('id,code,description,discount_percent,purpose,product_id,allowed_email,organization_id,seat_count,usage_limit,per_user_limit,used_count,starts_at,ends_at,active,offline_payment_reference,offline_amount_paise,internal_note,products(name),organizations(name)').order('created_at', { ascending: false }),
+      supabase.rpc('admin_list_products_v9'),
+      supabase.from('organizations').select('id,name').order('name'),
     ]);
-
-    const error = voucherResult.error ?? redemptionResult.error ?? productResult.error;
-    if (error) {
-      setMessage(error.message.includes("voucher_codes")
-        ? "Apply Supabase migration 24 before using voucher controls."
-        : error.message);
-      setBusy(false);
-      return;
+    if (voucherResult.error || productResult.error || organizationResult.error) {
+      const detail = voucherResult.error?.message || productResult.error?.message || organizationResult.error?.message || 'Unable to load vouchers.';
+      setError(/seat_count|admin_list_products_v9|admin_upsert_voucher_v9/i.test(detail)
+        ? 'Apply Supabase migration 34 to enable V9 voucher controls.'
+        : detail);
+    } else {
+      setVouchers((voucherResult.data || []) as unknown as VoucherRow[]);
+      setProducts((productResult.data || []) as AdminProduct[]);
+      setOrganizations((organizationResult.data || []) as Organization[]);
     }
-
-    const nextVouchers = (voucherResult.data ?? []) as Voucher[];
-    const nextRedemptions = (redemptionResult.data ?? []) as Redemption[];
-    setVouchers(nextVouchers);
-    setRedemptions(nextRedemptions);
-    setProducts((productResult.data ?? []) as ProductOption[]);
-
-    const userIds = [...new Set(nextRedemptions.map((item) => item.user_id))];
-    const organizationIds = [...new Set(nextRedemptions.map((item) => item.organization_id).filter(Boolean))] as string[];
-
-    const [profilesResult, organizationsResult] = await Promise.all([
-      userIds.length ? supabase.from("profiles").select("id,full_name").in("id", userIds) : Promise.resolve({ data: [], error: null }),
-      organizationIds.length ? supabase.from("organizations").select("id,name").in("id", organizationIds) : Promise.resolve({ data: [], error: null }),
-    ]);
-
-    setProfileNames(Object.fromEntries((profilesResult.data ?? []).map((item) => [item.id, item.full_name || item.id])));
-    setOrganizationNames(Object.fromEntries((organizationsResult.data ?? []).map((item) => [item.id, item.name])));
     setBusy(false);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
+
+  const offline = form.discountPercent === '100';
+  const selectedProduct = useMemo(() => products.find((product) => product.id === form.productId), [form.productId, products]);
+  const selectedOrganization = useMemo(() => organizations.find((organization) => organization.id === form.organizationId), [form.organizationId, organizations]);
+  const filteredVouchers = useMemo(() => vouchers.filter((voucher) => {
+    const state = voucherState(voucher).toLowerCase();
+    const matchesFilter = filter === 'all'
+      || (filter === 'active' && state === 'active')
+      || (filter === 'inactive' && state !== 'active')
+      || (filter === 'promotion' && voucher.discount_percent !== 100)
+      || (filter === 'offline' && voucher.discount_percent === 100);
+    const haystack = `${voucher.code} ${voucher.description || ''} ${relationName(voucher.products)} ${relationName(voucher.organizations)} ${voucher.allowed_email || ''}`.toLowerCase();
+    return matchesFilter && (!search || haystack.includes(search.toLowerCase()));
+  }), [filter, search, vouchers]);
+
+  const stats = {
+    total: vouchers.length,
+    active: vouchers.filter((voucher) => voucherState(voucher) === 'Active').length,
+    redemptions: vouchers.reduce((sum, voucher) => sum + voucher.used_count, 0),
+    offline: vouchers.filter((voucher) => voucher.discount_percent === 100).length,
+  };
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function edit(voucher: Voucher) {
+  function reset() {
+    setForm(emptyForm);
+  }
+
+  function openCreate() {
+    reset();
+    setError('');
+    setMessage('');
+    setFormOpen(true);
+  }
+
+  function edit(row: VoucherRow) {
     setForm({
-      id: voucher.id,
-      code: voucher.code,
-      description: voucher.description ?? "",
-      discount_percent: String(voucher.discount_percent),
-      purpose: voucher.purpose,
-      product_id: voucher.product_id ?? "",
-      allowed_email: voucher.allowed_email ?? "",
-      organization_id: voucher.organization_id ?? "",
-      usage_limit: voucher.usage_limit ? String(voucher.usage_limit) : "",
-      per_user_limit: String(voucher.per_user_limit),
-      starts_at: toLocalInput(voucher.starts_at),
-      ends_at: toLocalInput(voucher.ends_at),
-      active: voucher.active,
-      offline_payment_reference: voucher.offline_payment_reference ?? "",
-      offline_amount_rupees: voucher.offline_amount_paise ? String(voucher.offline_amount_paise / 100) : "",
-      internal_note: voucher.internal_note ?? "",
+      id: row.id,
+      code: row.code,
+      description: row.description || '',
+      discountPercent: String(row.discount_percent),
+      purpose: row.purpose,
+      productId: row.product_id || 'all',
+      organizationId: row.organization_id || 'none',
+      allowedEmail: row.allowed_email || '',
+      seatCount: row.seat_count ? String(row.seat_count) : '',
+      usageLimit: row.usage_limit ? String(row.usage_limit) : '',
+      perUserLimit: String(row.per_user_limit || 1),
+      startsAt: localDateTime(row.starts_at),
+      endsAt: localDateTime(row.ends_at),
+      offlineReference: row.offline_payment_reference || '',
+      offlineAmountRupees: row.offline_amount_paise ? String(row.offline_amount_paise / 100) : '',
+      internalNote: row.internal_note || '',
+      active: row.active,
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setError('');
+    setMessage('');
+    setFormOpen(true);
   }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    setMessage("");
-    if (!supabase) {
-      setMessage("Connect Supabase before creating production vouchers.");
-      return;
+    setError('');
+    setMessage('');
+    if (!supabase) return setError('Supabase is not configured.');
+    if (offline && !superAdmin) return setError('Only Super Admin can create a 100% offline school activation voucher.');
+    if (offline && (form.productId === 'all' || form.organizationId === 'none' || !form.seatCount || !form.offlineReference || !form.offlineAmountRupees)) {
+      return setError('A 100% voucher requires one product, one school, seat count, offline amount and payment reference.');
     }
-
-    const percentage = Number(form.discount_percent);
-    if (percentage === 100 && !form.allowed_email.trim() && !form.organization_id.trim()) {
-      setMessage("For security, a 100% voucher must be assigned to an email address or school ID.");
-      return;
-    }
-    if (form.purpose === "offline_payment" && (!form.offline_payment_reference.trim() || Number(form.offline_amount_rupees) <= 0)) {
-      setMessage("Offline-payment vouchers require the received amount and a transaction, receipt or invoice reference.");
-      return;
-    }
+    if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) return setError('Voucher end time must be after its start time.');
 
     setBusy(true);
-    const { error } = await supabase.rpc("admin_upsert_voucher", {
+    const { error: saveError } = await supabase.rpc('admin_upsert_voucher_v9', {
       p_voucher_id: form.id || null,
-      p_code: form.code.trim().toUpperCase(),
+      p_code: form.code.toUpperCase(),
       p_description: form.description || null,
-      p_discount_percent: percentage,
-      p_purpose: form.purpose,
-      p_product_id: form.product_id || null,
-      p_allowed_email: form.allowed_email || null,
-      p_organization_id: form.organization_id || null,
-      p_usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
-      p_per_user_limit: Number(form.per_user_limit || 1),
-      p_starts_at: toIso(form.starts_at),
-      p_ends_at: toIso(form.ends_at),
+      p_discount_percent: Number(form.discountPercent),
+      p_purpose: offline ? 'offline_payment' : 'promotion',
+      p_product_id: form.productId === 'all' ? null : form.productId,
+      p_allowed_email: form.allowedEmail || null,
+      p_organization_id: form.organizationId === 'none' ? null : form.organizationId,
+      p_seat_count: offline ? Number(form.seatCount) : null,
+      p_usage_limit: form.usageLimit ? Number(form.usageLimit) : null,
+      p_per_user_limit: Number(form.perUserLimit || 1),
+      p_starts_at: form.startsAt ? new Date(form.startsAt).toISOString() : null,
+      p_ends_at: form.endsAt ? new Date(form.endsAt).toISOString() : null,
       p_active: form.active,
-      p_offline_payment_reference: form.offline_payment_reference || null,
-      p_offline_amount_paise: form.offline_amount_rupees ? Math.round(Number(form.offline_amount_rupees) * 100) : null,
-      p_internal_note: form.internal_note || null,
+      p_offline_payment_reference: offline ? form.offlineReference : null,
+      p_offline_amount_paise: offline ? Math.round(Number(form.offlineAmountRupees) * 100) : null,
+      p_internal_note: form.internalNote || null,
     });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage(form.id ? "Voucher updated. Existing redemption history remains unchanged." : "Voucher created and ready for controlled use.");
-      setForm(emptyForm);
-      await load();
-    }
     setBusy(false);
+    if (saveError) return setError(saveError.message);
+    setMessage(form.id ? 'Voucher updated. Existing redemption history remains unchanged.' : offline ? 'Offline school activation voucher created.' : 'Promotional voucher created.');
+    setFormOpen(false);
+    reset();
+    await load();
   }
 
-  async function copyCode(code: string) {
-    await navigator.clipboard.writeText(code);
-    setMessage(`${code} copied. Share it only with the assigned account or school.`);
-  }
+  const metricCards = [
+    { label: 'Voucher codes', value: stats.total, icon: TicketPercent },
+    { label: 'Active now', value: stats.active, icon: CheckCircle2 },
+    { label: 'Redemptions', value: stats.redemptions, icon: ShieldCheck },
+    { label: 'Offline activations', value: stats.offline, icon: School },
+  ];
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <form onSubmit={save} className="rm-card" style={{ padding: 22 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-          <div>
-            <span className="rm-label">Super Admin only</span>
-            <h2 style={{ margin: "5px 0", color: "#14232B" }}>{form.id ? "Edit voucher" : "Create voucher or offline-payment access"}</h2>
-            <p style={{ margin: 0, color: "#44545C", maxWidth: 760 }}>
-              Discounts are percentage-only. A 100% voucher creates a zero-value order, preserves the offline or manual-access evidence and grants the same entitlement as a verified purchase.
-            </p>
+    <div className={`${styles.workspace} space-y-6`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div><h2 className="text-2xl font-extrabold tracking-tight text-[#14232B]">Vouchers</h2><p className="mt-1 text-sm text-[#6B7980]">Manage promotional discounts and auditable offline school activations.</p></div>
+        <Button onClick={openCreate} className="h-11 bg-[#0E5A5A] hover:bg-[#0A4A4A]"><Plus className="mr-2 h-4 w-4" />Create Voucher</Button>
+      </div>
+
+      {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#237A57]/20 bg-[#237A57]/5 text-[#237A57]'}`}>{error || message}</div>}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metricCards.map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{value}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></div></div>)}</div>
+
+      <Card className="gap-0 border-[#E7ECEB] shadow-none">
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-3 border-b border-[#E7ECEB] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search code, product, school or email" className="pl-9" /></div>
+            <div className="flex flex-wrap gap-2">{(['all', 'active', 'inactive', 'promotion', 'offline'] as VoucherFilter[]).map((item) => <Button key={item} type="button" size="sm" variant="outline" onClick={() => setFilter(item)} className={filter === item ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB]'}>{item === 'all' ? 'All' : item === 'offline' ? 'Offline 100%' : item[0].toUpperCase() + item.slice(1)}</Button>)}<Button variant="outline" size="icon" onClick={() => void load()} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button></div>
           </div>
-          {form.id && <button type="button" className="rm-btn-secondary" onClick={() => setForm(emptyForm)}>Create another</button>}
-        </div>
+          <div className={`${styles.scrollArea} overflow-x-auto`}>
+            <table className="min-w-[1050px] w-full border-collapse">
+              <thead><tr className="border-b border-[#E7ECEB] bg-[#F7F9F7] text-left text-xs font-semibold text-[#6B7980]"><th className="px-5 py-3">Voucher</th><th>Type</th><th>Product / recipient</th><th>Usage</th><th>Validity</th><th>Evidence</th><th>Status</th><th className="pr-5 text-right">Action</th></tr></thead>
+              <tbody>{filteredVouchers.map((voucher) => { const state = voucherState(voucher); const productName = relationName(voucher.products); const organizationName = relationName(voucher.organizations); return <tr key={voucher.id} className={`${styles.tableRow} border-b border-[#E7ECEB] text-sm`}><td className="px-5 py-4"><strong className="text-[#14232B]">{voucher.code}</strong><p className="mt-1 max-w-[220px] truncate text-xs text-[#6B7980]">{voucher.description || 'No description'}</p></td><td><Badge className={voucher.discount_percent === 100 ? 'bg-[#FCF1DB] text-[#9A6508]' : 'bg-[#DCE9E7] text-[#0E5A5A]'}>{voucher.discount_percent === 100 ? 'Offline 100%' : `${voucher.discount_percent}% off`}</Badge></td><td><p className="font-medium text-[#14232B]">{productName || 'All products'}</p><p className="mt-1 text-xs text-[#6B7980]">{organizationName || voucher.allowed_email || 'Any eligible customer'}{voucher.seat_count ? ` · ${voucher.seat_count} seats` : ''}</p></td><td><strong className="text-[#14232B]">{voucher.used_count}/{voucher.usage_limit || '∞'}</strong><p className="mt-1 text-xs text-[#6B7980]">{voucher.per_user_limit} per account</p></td><td className="text-xs text-[#6B7980]"><p>{voucher.starts_at ? new Date(voucher.starts_at).toLocaleDateString('en-IN') : 'Immediately'}</p><p>to {voucher.ends_at ? new Date(voucher.ends_at).toLocaleDateString('en-IN') : 'No expiry'}</p></td><td>{voucher.offline_payment_reference ? <><p className="font-medium text-[#14232B]">{voucher.offline_payment_reference}</p><p className="mt-1 text-xs text-[#6B7980]">{rupees(voucher.offline_amount_paise || 0)}</p></> : <span className="text-[#AEB8BC]">—</span>}</td><td><Badge variant="outline" className={state === 'Active' ? 'border-[#237A57]/20 bg-[#237A57]/10 text-[#237A57]' : state === 'Scheduled' ? 'border-[#2E6D8B]/20 bg-[#2E6D8B]/10 text-[#2E6D8B]' : 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]'}>{state}</Badge></td><td className="pr-5 text-right"><Button variant="ghost" size="sm" onClick={() => edit(voucher)}><Edit3 className="mr-1 h-4 w-4" />Edit</Button></td></tr>; })}{!filteredVouchers.length && <tr><td colSpan={8} className={styles.emptyState}><TicketPercent className="mx-auto mb-3 h-10 w-10 text-[#AEB8BC]" />No vouchers match the current search and filter.</td></tr>}</tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="voucher-form-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14 }}>
-          <label>
-            <span className="rm-label">Voucher code</span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input className="rm-input" value={form.code} onChange={(event) => update("code", event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))} required minLength={4} maxLength={32} />
-              <button type="button" className="rm-btn-secondary" onClick={() => update("code", generateCode())}>Generate</button>
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!busy) setFormOpen(open); }}>
+        <DialogContent className="max-h-[94vh] w-[96vw] max-w-4xl overflow-y-auto border-[#DCE9E7] p-0">
+          <form onSubmit={save}>
+            <DialogHeader className="border-b border-[#E7ECEB] px-5 py-4 text-left sm:px-6"><DialogTitle className="text-xl text-[#14232B]">{form.id ? 'Edit voucher' : 'Create voucher'}</DialogTitle><DialogDescription>Promotions are limited to 1–10%. Super Admin may record a controlled 100% offline school activation.</DialogDescription></DialogHeader>
+            <div className="space-y-5 p-5 sm:p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2"><Label>Voucher code</Label><Input required minLength={4} maxLength={32} value={form.code} onChange={(event) => update('code', event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="EVIDARA10" /></div>
+                <div className="space-y-2"><Label>Discount</Label><Select value={form.discountPercent} onValueChange={(value) => { update('discountPercent', value); update('purpose', value === '100' ? 'offline_payment' : 'promotion'); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 10 }, (_item, index) => String(index + 1)).map((value) => <SelectItem key={value} value={value}>{value}% promotional discount</SelectItem>)}{superAdmin && <SelectItem value="100">100% offline school activation</SelectItem>}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Product</Label><Select value={form.productId} onValueChange={(value) => update('productId', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!offline && <SelectItem value="all">All products</SelectItem>}{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>School</Label><Select value={form.organizationId} onValueChange={(value) => update('organizationId', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!offline && <SelectItem value="none">Any eligible customer</SelectItem>}{organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2 md:col-span-2"><Label>Description</Label><Input value={form.description} onChange={(event) => update('description', event.target.value)} placeholder="Campaign or payment context" /></div>
+                {!offline && <div className="space-y-2 md:col-span-2"><Label>Optional account email restriction</Label><Input type="email" value={form.allowedEmail} onChange={(event) => update('allowedEmail', event.target.value.toLowerCase())} placeholder="student@example.com" /></div>}
+                <div className="space-y-2"><Label>Usage limit</Label><Input type="number" min="1" value={form.usageLimit} onChange={(event) => update('usageLimit', event.target.value)} placeholder="Unlimited" /></div>
+                <div className="space-y-2"><Label>Per-account limit</Label><Input type="number" min="1" value={form.perUserLimit} onChange={(event) => update('perUserLimit', event.target.value)} /></div>
+                <div className="space-y-2"><Label>Starts at</Label><Input type="datetime-local" value={form.startsAt} onChange={(event) => update('startsAt', event.target.value)} /></div>
+                <div className="space-y-2"><Label>Ends at</Label><Input type="datetime-local" value={form.endsAt} onChange={(event) => update('endsAt', event.target.value)} /></div>
+              </div>
+
+              {offline && <div className="space-y-4 rounded-2xl border border-[#F2B84B]/40 bg-[#FCF1DB] p-4"><div className="flex items-start gap-3"><School className="mt-0.5 h-5 w-5 text-[#9A6508]" /><div><strong className="text-sm text-[#14232B]">Offline school activation</strong><p className="mt-1 text-xs leading-relaxed text-[#6B7980]">The school paid outside Razorpay. Redemption creates a paid order and grants exactly the recorded seat count.</p></div></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>Seats to activate</Label><Input required type="number" min="1" value={form.seatCount} onChange={(event) => update('seatCount', event.target.value)} /></div><div className="space-y-2"><Label>Offline amount received ₹</Label><Input required type="number" min="1" value={form.offlineAmountRupees} onChange={(event) => update('offlineAmountRupees', event.target.value)} /></div><div className="space-y-2 md:col-span-2"><Label>Receipt / invoice / transaction reference</Label><Input required value={form.offlineReference} onChange={(event) => update('offlineReference', event.target.value)} placeholder="INV-2026-104 / UTR number" /></div></div><div className="rounded-xl bg-white/70 px-4 py-3 text-xs text-[#44545C]"><strong>{selectedProduct?.name || 'Select one product'}</strong> · {selectedOrganization?.name || 'Select one school'}</div></div>}
+
+              <div className="space-y-2"><Label>Internal note</Label><Textarea rows={4} value={form.internalNote} onChange={(event) => update('internalNote', event.target.value)} placeholder="Approval context, sales owner or payment evidence note" /></div>
+              <label className="flex items-center gap-3 rounded-xl border border-[#E7ECEB] px-4 py-3"><Checkbox checked={form.active} onCheckedChange={(checked) => update('active', checked === true)} /><div><p className="text-sm font-medium text-[#14232B]">Voucher active</p><p className="text-xs text-[#6B7980]">Inactive vouchers cannot be reserved or redeemed.</p></div></label>
             </div>
-          </label>
-          <label>
-            <span className="rm-label">Discount</span>
-            <div style={{ position: "relative" }}>
-              <input type="number" min="1" max="100" className="rm-input" value={form.discount_percent} onChange={(event) => update("discount_percent", event.target.value)} required />
-              <span style={{ position: "absolute", right: 13, top: 12, fontWeight: 800, color: "#0E5A5A" }}>%</span>
-            </div>
-          </label>
-          <label>
-            <span className="rm-label">Purpose</span>
-            <select className="rm-input" value={form.purpose} onChange={(event) => update("purpose", event.target.value as Voucher["purpose"])}>
-              <option value="promotion">Promotion</option>
-              <option value="offline_payment">Offline payment received</option>
-              <option value="scholarship">Scholarship / sponsored access</option>
-              <option value="manual_access">Manual access grant</option>
-            </select>
-          </label>
-
-          <label style={{ gridColumn: "span 2" }}>
-            <span className="rm-label">Description visible to administrators</span>
-            <input className="rm-input" value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Example: Annual school plan paid by bank transfer" />
-          </label>
-          <label>
-            <span className="rm-label">Limit to product</span>
-            <select className="rm-input" value={form.product_id} onChange={(event) => update("product_id", event.target.value)}>
-              <option value="">Any published product</option>
-              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-            </select>
-          </label>
-
-          <label>
-            <span className="rm-label">Assigned email</span>
-            <input type="email" className="rm-input" value={form.allowed_email} onChange={(event) => update("allowed_email", event.target.value.toLowerCase())} placeholder="Required for account-bound 100% access" />
-          </label>
-          <label>
-            <span className="rm-label">Assigned school ID</span>
-            <input className="rm-input" value={form.organization_id} onChange={(event) => update("organization_id", event.target.value)} placeholder="Optional organization UUID" />
-          </label>
-          <label>
-            <span className="rm-label">Total uses</span>
-            <input type="number" min="1" className="rm-input" value={form.usage_limit} onChange={(event) => update("usage_limit", event.target.value)} placeholder="Blank = unlimited" />
-          </label>
-
-          <label>
-            <span className="rm-label">Uses per account</span>
-            <input type="number" min="1" className="rm-input" value={form.per_user_limit} onChange={(event) => update("per_user_limit", event.target.value)} required />
-          </label>
-          <label>
-            <span className="rm-label">Starts at</span>
-            <input type="datetime-local" className="rm-input" value={form.starts_at} onChange={(event) => update("starts_at", event.target.value)} />
-          </label>
-          <label>
-            <span className="rm-label">Ends at</span>
-            <input type="datetime-local" className="rm-input" value={form.ends_at} onChange={(event) => update("ends_at", event.target.value)} />
-          </label>
-
-          {form.purpose === "offline_payment" && <>
-            <label>
-              <span className="rm-label">Amount received ₹</span>
-              <input type="number" min="1" step="0.01" className="rm-input" value={form.offline_amount_rupees} onChange={(event) => update("offline_amount_rupees", event.target.value)} required />
-            </label>
-            <label style={{ gridColumn: "span 2" }}>
-              <span className="rm-label">Offline transaction / receipt / invoice reference</span>
-              <input className="rm-input" value={form.offline_payment_reference} onChange={(event) => update("offline_payment_reference", event.target.value)} required />
-            </label>
-          </>}
-
-          <label style={{ gridColumn: "1/-1" }}>
-            <span className="rm-label">Internal note</span>
-            <textarea className="rm-input" rows={3} value={form.internal_note} onChange={(event) => update("internal_note", event.target.value)} placeholder="Internal evidence or approval note. This is not shown to the redeemer." />
-          </label>
-          <label style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", gap: 9, fontWeight: 750 }}>
-            <input type="checkbox" checked={form.active} onChange={(event) => update("active", event.target.checked)} />
-            Voucher is active
-          </label>
-        </div>
-
-        <div style={{ marginTop: 14, padding: 14, border: "1px solid #DCE9E7", background: "#F7F9F7", borderRadius: 12, display: "flex", gap: 10, alignItems: "flex-start", color: "#44545C" }}>
-          <ShieldCheck size={20} color="#0E5A5A" style={{ flex: "0 0 auto" }} />
-          <span>100% vouchers are deliberately account- or school-bound. Server-side checks recalculate the discount and prevent reuse, product mismatch and unverified access.</span>
-        </div>
-
-        <button disabled={busy} className="rm-btn-primary" style={{ marginTop: 18, width: "100%", display: "flex", gap: 8, justifyContent: "center", alignItems: "center", background: "#0E5A5A" }}>
-          {busy ? <LoaderCircle size={18} className="spin" /> : <TicketPercent size={18} />}
-          {form.id ? "Save voucher changes" : "Create controlled voucher"}
-        </button>
-        {message && <div role="status" style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#FCF1DB", color: "#14232B" }}>{message}</div>}
-      </form>
-
-      <section className="rm-card" style={{ padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div><span className="rm-label">Voucher register</span><h2 style={{ color: "#14232B" }}>Active, scheduled and historical vouchers</h2></div>
-          <button className="rm-btn-secondary" onClick={() => void load()} disabled={busy}><RefreshCw size={16} /> Refresh</button>
-        </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1050 }}>
-            <thead><tr style={{ textAlign: "left", color: "#44545C" }}><th style={{ padding: 10 }}>Code</th><th>Discount</th><th>Purpose</th><th>Assigned to</th><th>Uses</th><th>Period</th><th>Status</th><th /></tr></thead>
-            <tbody>{vouchers.map((voucher) => <tr key={voucher.id} style={{ borderTop: "1px solid #DCE9E7" }}>
-              <td style={{ padding: 12 }}><strong>{voucher.code}</strong><div style={{ fontSize: 12, color: "#6B7980" }}>{voucher.description || "No description"}</div></td>
-              <td><strong>{voucher.discount_percent}%</strong></td>
-              <td>{voucher.purpose.replaceAll("_", " ")}{voucher.offline_amount_paise ? <div style={{ fontSize: 12, color: "#6B7980" }}>{rupees(voucher.offline_amount_paise)} received</div> : null}</td>
-              <td>{voucher.allowed_email || (voucher.organization_id ? `School ${voucher.organization_id.slice(0, 8)}…` : "General")}</td>
-              <td>{voucher.used_count} / {voucher.usage_limit ?? "∞"}</td>
-              <td style={{ fontSize: 12 }}>{voucher.starts_at ? new Date(voucher.starts_at).toLocaleString("en-IN") : "Immediately"}<br />to {voucher.ends_at ? new Date(voucher.ends_at).toLocaleString("en-IN") : "No expiry"}</td>
-              <td><span className="rm-badge" style={{ background: voucher.active ? "#DCE9E7" : "#E7ECEB", color: voucher.active ? "#0E5A5A" : "#44545C" }}>{voucher.active ? "Active" : "Inactive"}</span></td>
-              <td><div style={{ display: "flex", gap: 8 }}><button className="rm-btn-secondary" onClick={() => void copyCode(voucher.code)} title="Copy voucher"><Copy size={15} /></button><button className="rm-btn-secondary" onClick={() => edit(voucher)}><Edit3 size={15} /> Edit</button></div></td>
-            </tr>)}</tbody>
-          </table>
-          {!vouchers.length && !busy && <p style={{ color: "#6B7980" }}>No vouchers have been created.</p>}
-        </div>
-      </section>
-
-      <section className="rm-card" style={{ padding: 20 }}>
-        <div><span className="rm-label">Redemption ledger</span><h2 style={{ color: "#14232B" }}>Latest payment discounts and offline access records</h2></div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 930 }}>
-            <thead><tr style={{ textAlign: "left", color: "#44545C" }}><th style={{ padding: 10 }}>Date</th><th>Voucher</th><th>Account / school</th><th>Discount</th><th>Source</th><th>Reference</th><th>Order</th></tr></thead>
-            <tbody>{redemptions.map((redemption) => <tr key={redemption.id} style={{ borderTop: "1px solid #DCE9E7" }}>
-              <td style={{ padding: 12 }}>{new Date(redemption.created_at).toLocaleString("en-IN")}</td>
-              <td><strong>{voucherById[redemption.voucher_id]?.code ?? redemption.voucher_id.slice(0, 8)}</strong></td>
-              <td>{profileNames[redemption.user_id] ?? redemption.user_id.slice(0, 8)}{redemption.organization_id ? <div style={{ fontSize: 12, color: "#6B7980" }}>{organizationNames[redemption.organization_id] ?? redemption.organization_id.slice(0, 8)}</div> : null}</td>
-              <td>{rupees(redemption.discount_paise)}</td>
-              <td>{redemption.payment_source.replaceAll("_", " ")}</td>
-              <td>{redemption.offline_reference || "—"}</td>
-              <td><code>{redemption.order_id.slice(0, 12)}…</code></td>
-            </tr>)}</tbody>
-          </table>
-          {!redemptions.length && !busy && <p style={{ color: "#6B7980" }}>No vouchers have been redeemed yet.</p>}
-        </div>
-      </section>
-
-      <style jsx>{`@media(max-width:900px){.voucher-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.voucher-form-grid>*{grid-column:auto!important}.voucher-form-grid>label[style*="1/-1"]{grid-column:1/-1!important}}@media(max-width:620px){.voucher-form-grid{grid-template-columns:1fr!important}.voucher-form-grid>*{grid-column:1!important}}`}</style>
+            <DialogFooter className="border-t border-[#E7ECEB] px-5 py-4 sm:px-6"><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={busy}>Cancel</Button><Button disabled={busy} className="bg-[#0E5A5A] hover:bg-[#0A4A4A]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : offline ? <School className="mr-2 h-4 w-4" /> : <TicketPercent className="mr-2 h-4 w-4" />}{form.id ? 'Save changes' : 'Create voucher'}</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,8 +3,26 @@ import {
   authenticateRequest,
   isServerSupabaseConfigured,
 } from "@/lib/server/supabaseServer";
+import {
+  isPlatformAdmin,
+  isSchoolManager,
+  isSchoolStaff,
+} from "@/lib/roles";
 
-const managerRoles = new Set(["institute_owner", "institute_admin", "teacher", "super_admin"]);
+const schoolManagerMemberRoles = new Set([
+  "institute_owner",
+  "institute_admin",
+  "school_owner",
+  "school_admin",
+]);
+
+const schoolStaffMemberRoles = new Set([
+  ...schoolManagerMemberRoles,
+  "teacher",
+  "school_teacher",
+  "reviewer",
+  "invigilator",
+]);
 
 type Membership = {
   id: string;
@@ -51,7 +69,7 @@ type Resource = {
 function fail(error: unknown) {
   const value = error as { message?: string; status?: number; details?: unknown };
   return NextResponse.json(
-    { error: value.message ?? "Unexpected ScholarOS cloud error.", details: value.details ?? null },
+    { error: value.message ?? "Unexpected Evidara cloud error.", details: value.details ?? null },
     { status: value.status ?? 500, headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -63,15 +81,16 @@ async function context(request: Request) {
     .select("id,full_name,role")
     .eq("id", auth.user.id)
     .single();
-  if (error || !profile) throw Object.assign(new Error(error?.message ?? "ScholarOS profile not found."), { status: 403 });
+  if (error || !profile) throw Object.assign(new Error(error?.message ?? "Evidara profile not found."), { status: 403 });
 
   const requestedOrg = new URL(request.url).searchParams.get("organizationId");
+  const platformAdmin = isPlatformAdmin(profile.role);
   let organizationId: string | null = null;
   let memberRole: string | null = null;
 
-  if (profile.role === "super_admin" && requestedOrg) {
+  if (platformAdmin && requestedOrg) {
     organizationId = requestedOrg;
-    memberRole = "super_admin";
+    memberRole = profile.role;
   } else {
     const { data: member } = await auth.admin
       .from("organization_members")
@@ -95,7 +114,7 @@ async function context(request: Request) {
     organizationId = studentMembership?.organization_id ?? null;
   }
 
-  if (!organizationId && profile.role === "super_admin") {
+  if (!organizationId && platformAdmin) {
     const { data: firstSchool } = await auth.admin
       .from("organizations")
       .select("id")
@@ -103,12 +122,22 @@ async function context(request: Request) {
       .limit(1)
       .maybeSingle();
     organizationId = firstSchool?.id ?? null;
-    memberRole = "super_admin";
+    memberRole = profile.role;
   }
 
   if (!organizationId) throw Object.assign(new Error("No school is linked to this account yet."), { status: 404 });
-  const manager = profile.role === "super_admin" || managerRoles.has(memberRole ?? profile.role);
-  return { ...auth, profile, organizationId, manager };
+
+  const effectiveMemberRole = memberRole ?? profile.role;
+  const schoolStaff =
+    platformAdmin ||
+    isSchoolStaff(profile.role) ||
+    schoolStaffMemberRoles.has(effectiveMemberRole);
+  const manager =
+    platformAdmin ||
+    isSchoolManager(profile.role) ||
+    schoolManagerMemberRoles.has(effectiveMemberRole);
+
+  return { ...auth, profile, organizationId, schoolStaff, manager };
 }
 
 type CloudContext = Awaited<ReturnType<typeof context>>;
@@ -133,7 +162,7 @@ function subscriptionStatus(status?: string) {
 }
 
 async function snapshot(ctx: CloudContext) {
-  const { admin, organizationId, manager, user } = ctx;
+  const { admin, organizationId, schoolStaff, manager, user } = ctx;
   const { data: school, error: schoolError } = await admin
     .from("organizations")
     .select("id,name,city,state,board")
@@ -156,7 +185,7 @@ async function snapshot(ctx: CloudContext) {
     .select("id,organization_id,student_id,academic_year,grade,section,board,tracks,status,promotion_locked,revoked_at,promoted_at,parent_name,parent_phone")
     .eq("organization_id", organizationId)
     .order("grade", { ascending: true });
-  if (!manager) membershipQuery = membershipQuery.eq("student_id", user.id).limit(1);
+  if (!schoolStaff) membershipQuery = membershipQuery.eq("student_id", user.id).limit(1);
   const { data: membershipData, error: membershipError } = await membershipQuery;
   if (membershipError) throw new Error(membershipError.message);
   memberships = (membershipData ?? []) as Membership[];
@@ -176,12 +205,15 @@ async function snapshot(ctx: CloudContext) {
     .order("source_year", { ascending: false });
   if (resourceError) throw new Error(resourceError.message);
   const allResources = (resourceData ?? []) as Resource[];
-  const resources = manager ? allResources : allResources.filter((resource) => memberships[0] && eligible(resource, memberships[0], subscription));
+  const resources = schoolStaff
+    ? allResources
+    : allResources.filter((resource) => memberships[0] && eligible(resource, memberships[0], subscription));
   const today = new Date().toISOString().slice(0, 10);
 
   return {
     mode: "cloud",
     manager,
+    schoolStaff,
     state: {
       school: {
         id: school.id,
@@ -196,7 +228,7 @@ async function snapshot(ctx: CloudContext) {
           seatLimit: subscription.seat_limit,
           resourceAccess: subscription.resource_access,
         } : {
-          planName: "ScholarOS Annual School Access",
+          planName: "Evidara Annual School Access",
           status: "expired",
           startsAt: today,
           endsAt: today,
@@ -217,7 +249,7 @@ async function snapshot(ctx: CloudContext) {
         revokedAt: membership.revoked_at ?? undefined,
         promotedAt: membership.promoted_at ?? undefined,
         parentName: membership.parent_name || "",
-        parentPhone: manager ? membership.parent_phone || "" : "",
+        parentPhone: schoolStaff ? membership.parent_phone || "" : "",
       })),
       resources: resources.map((resource) => ({
         id: resource.id,
@@ -233,7 +265,7 @@ async function snapshot(ctx: CloudContext) {
         subscriptionRequired: resource.subscription_required,
         description: typeof resource.metadata?.description === "string"
           ? resource.metadata.description
-          : "ScholarOS academic resource.",
+          : "Evidara academic resource.",
         contentUrl: resource.content_url || undefined,
       })),
     },
@@ -241,7 +273,7 @@ async function snapshot(ctx: CloudContext) {
 }
 
 async function mutate(request: Request, ctx: CloudContext) {
-  if (!ctx.manager) throw Object.assign(new Error("School-manager permission is required."), { status: 403 });
+  if (!ctx.manager) throw Object.assign(new Error("School Admin permission is required."), { status: 403 });
   const body = await request.json() as Record<string, unknown>;
   const action = String(body.action ?? "");
   const { client, admin, organizationId } = ctx;

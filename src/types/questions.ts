@@ -20,6 +20,33 @@ export type QuestionOptionInput = {
   display_order: number;
 };
 
+export type MatchFollowingPair = {
+  id: string;
+  left_key: string;
+  left_text: string;
+  left_latex?: string;
+  left_image_url?: string;
+  right_key: string;
+  right_text: string;
+  right_latex?: string;
+  right_image_url?: string;
+};
+
+export type QuestionMetadata = {
+  editor?: string;
+  match_pairs?: MatchFollowingPair[];
+  biology_division?: "combined" | "botany" | "zoology";
+  import_subject?: string;
+  import_chapter?: string;
+  import_topic?: string;
+  question_image_filename?: string;
+  import_format?: string;
+  import_file?: string;
+  published_at?: string;
+  review_note?: string;
+  [key: string]: unknown;
+};
+
 export type QuestionPayload = {
   subject_id?: string;
   chapter_id?: string;
@@ -43,7 +70,7 @@ export type QuestionPayload = {
   source_year?: number;
   language: string;
   tags: string[];
-  metadata?: Record<string, unknown>;
+  metadata?: QuestionMetadata;
   options: QuestionOptionInput[];
   change_note?: string;
 };
@@ -74,17 +101,21 @@ export type QuestionRow = {
   source_year: number | null;
   language: string;
   tags: string[];
+  metadata?: QuestionMetadata | null;
   version_number: number;
   created_at: string;
   updated_at: string;
   question_options?: QuestionOptionInput[];
   subjects?: { name: string; code: string } | null;
   chapters?: { name: string } | null;
+  topics?: { name: string } | null;
+  organizations?: { id: string; name: string } | null;
+  profiles?: { full_name: string | null } | null;
 };
 
-export type TaxonomySubject = { id: string; name: string; code: string; organization_id: string | null };
-export type TaxonomyChapter = { id: string; name: string; subject_id: string; organization_id: string | null };
-export type TaxonomyTopic = { id: string; name: string; chapter_id: string; organization_id: string | null };
+export type TaxonomySubject = { id: string; name: string; code: string; organization_id: string | null; is_active?: boolean };
+export type TaxonomyChapter = { id: string; name: string; subject_id: string; organization_id: string | null; is_active?: boolean };
+export type TaxonomyTopic = { id: string; name: string; chapter_id: string; organization_id: string | null; is_active?: boolean };
 
 export type ParsedQuestionRow = {
   rowNumber: number;

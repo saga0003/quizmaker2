@@ -1,0 +1,48 @@
+name: Evidara V10 Analytics Phase 1 QA
+
+on:
+  push:
+    branches:
+      - agent/evidara-v10-analytics-phase-1
+  pull_request:
+    branches:
+      - evidara-v9-product-catalogue
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evidara-v10-analytics-phase1-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, typecheck, smoke and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Check out analytics branch
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: V8 paper smoke checks
+        run: node scripts/v8-paper-smoke.mjs
+      - name: V9 product smoke checks
+        run: node scripts/v9-product-smoke.mjs
+      - name: V10 analytics Phase 1 smoke checks
+        run: node scripts/v10-analytics-phase1-smoke.mjs
+      - name: Next.js production build
+        run: npm run build
