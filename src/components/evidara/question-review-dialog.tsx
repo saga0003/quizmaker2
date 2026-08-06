@@ -4,7 +4,7 @@ import { CalendarDays, CheckCircle2, Clock3, GraduationCap, School, Tag } from '
 import type { QuestionRow } from '@/types/questions';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { QuestionDevicePreview } from '@/components/evidara/question-device-preview';
+import { QuestionDevicePreview, RichMathContent } from '@/components/evidara/question-device-preview';
 
 function dateText(value?: string | null) {
   if (!value) return 'Not available';
@@ -25,6 +25,7 @@ export function QuestionReviewDialog({
   const options = [...(question.question_options || [])].sort((a, b) => a.display_order - b.display_order);
   const correct = Array.isArray(question.correct_answer) ? question.correct_answer.join('|') : String(question.correct_answer ?? '');
   const publishedAt = String(question.metadata?.published_at || '');
+  const hasSolution = Boolean(question.solution_text?.trim() || question.solution_latex?.trim());
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,7 +77,15 @@ export function QuestionReviewDialog({
                 <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#0E5A5A]" /><strong className="text-sm text-[#14232B]">Answer and marking</strong></div>
                 <p className="mt-2 text-xs text-[#6B7980]">Correct answer: <strong className="text-[#14232B]">{correct || 'Not set'}</strong></p>
                 <p className="mt-1 text-xs text-[#6B7980]">Marks: <strong className="text-[#14232B]">+{question.marks}</strong> · Negative: <strong className="text-[#B54747]">-{question.negative_marks}</strong></p>
-                {question.solution_text && <div className="mt-3 rounded-xl bg-[#F7F9F7] p-3 text-xs leading-relaxed text-[#14232B] whitespace-pre-wrap">{question.solution_text}</div>}
+                {hasSolution && (
+                  <div className="mt-3 rounded-xl bg-[#F7F9F7] p-3">
+                    <RichMathContent
+                      text={question.solution_text}
+                      latex={question.solution_latex}
+                      className="text-xs leading-relaxed text-[#14232B]"
+                    />
+                  </div>
+                )}
               </div>
 
               {!!question.tags?.length && (
