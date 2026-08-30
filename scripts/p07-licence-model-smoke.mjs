@@ -21,7 +21,7 @@ check('licence guard serializes concurrent activations', /pg_advisory_xact_lock/
 check('school UI states ₹199 per licensed student per year', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
 check('school UI explicitly shows Licensed students', /Licensed students/i.test(subscriptionCenter));
 check('school UI explicitly shows Active students', /Active students/i.test(subscriptionCenter));
-check('school UI reports remaining licence quantity', /licences? available/i.test(subscriptionCenter));
+check('school UI reports remaining licence quantity', /available\s*=\s*Math\.max\(0,\s*licensed\s*-\s*used\)/i.test(subscriptionCenter) && /licence\$\{available === 1 \? "" : "s"\} available/i.test(subscriptionCenter));
 check('school UI never promises unlimited students', !/Unlimited students|Unlimited on activation|No seat limits/i.test(subscriptionCenter));
 check('unlimited applies only to tests', /Unlimited tests/i.test(subscriptionCenter) && /No per-test charge/i.test(subscriptionCenter));
 check('Super Admin defaults to ₹199 in paise', /annual_price_per_student_paise:\s*Math\.max\(0, Number\(subscription\.annual_price_per_student_paise \|\| 19900\)\)/i.test(schoolControl));
