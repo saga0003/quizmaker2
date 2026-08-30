@@ -48,6 +48,9 @@ jobs:
       - name: P0.11 RPC permission allowlist checks
         run: node scripts/p011-rpc-permission-smoke.mjs
 
+      - name: P0.12 credential security checks
+        run: node scripts/p012-credential-security-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
