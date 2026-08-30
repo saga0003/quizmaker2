@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/evidara/app-sidebar';
 import { MobileTopBar } from '@/components/evidara/mobile-top-bar';
 import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
+import { CredentialSecurityGate } from '@/components/evidara/credential-security-gate';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
 import { StudentResultsView, StudentResourcesView } from '@/components/evidara/student-live-views';
 import {
@@ -214,7 +215,9 @@ export default function Home() {
               aria-disabled={readOnlyPreview || undefined}
               className={readOnlyPreview ? 'pointer-events-none select-none opacity-[0.98]' : undefined}
             >
-              <ViewRouter />
+              <CredentialSecurityGate>
+                <ViewRouter />
+              </CredentialSecurityGate>
             </div>
           </div>
         </main>
