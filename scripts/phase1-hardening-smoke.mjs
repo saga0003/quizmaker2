@@ -17,6 +17,8 @@ function check(name, condition, details = '') {
 const eligibilityMigration = read('supabase/migrations/20260830171000_phase1_real_student_test_access.sql');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
 const subscriptionCenter = read('src/components/school/SubscriptionCenter.tsx');
+const viewAsSwitcher = read('src/components/evidara/login-as-switcher.tsx');
+const homeShell = read('src/app/page.tsx');
 const releaseChecklist = read('PHASE1_RELEASE_CHECKLIST.md');
 const releaseWorkflow = read('.github/workflows/phase1-release-gate.yml');
 
@@ -32,6 +34,10 @@ check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s
 check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
 check('school licence UI does not promise unlimited students', !/Unlimited students|Unlimited on activation|No seat limits/i.test(subscriptionCenter));
 check('school licence UI shows licensed and active quantities', /Licensed students/i.test(subscriptionCenter) && /Active students/i.test(subscriptionCenter));
+check('Super Admin switcher is labelled View As', /View As · Read only|Viewing as/i.test(viewAsSwitcher));
+check('Super Admin preview is explicitly read-only', /Read-only Super Admin preview|Page actions are disabled/i.test(viewAsSwitcher));
+check('workspace shell uses inert during View As', /inert=\{readOnlyPreview \|\| undefined\}/.test(homeShell));
+check('workspace shell displays no-writes preview banner', /No writes allowed/.test(homeShell) && /Super Admin · Read-only View As/.test(homeShell));
 check('release checklist contains all P0 items', Array.from({ length: 12 }, (_, index) => `P0.${index + 1}`).every((item) => releaseChecklist.includes(item)));
 check('release workflow runs hardening checks', /phase1-hardening-smoke\.mjs/.test(releaseWorkflow));
 check('release workflow runs final QA suite', /npm run qa:final/.test(releaseWorkflow));
