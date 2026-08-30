@@ -36,6 +36,9 @@ jobs:
       - name: P0.6 historical snapshot checks
         run: node scripts/p06-historical-snapshot-smoke.mjs
 
+      - name: P0.7 annual student licence checks
+        run: node scripts/p07-licence-model-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
