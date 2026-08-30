@@ -24,7 +24,7 @@ import { useAppStore } from '@/store/use-app-store';
 const launchFeatures = [
   { icon: Upload, title: 'Easy question upload', desc: 'Import teacher question banks from Excel, CSV or LaTeX, review issues and save them into the institution question bank.' },
   { icon: FileText, title: 'Unlimited tests', desc: 'Build chapter tests, weekly tests, mocks and internal assessments without counting each paper as a separate purchase.' },
-  { icon: Users, title: 'Unlimited students', desc: 'Maintain the institution roster and let students take assigned tests from their own login.' },
+  { icon: Users, title: 'Per-student annual access', desc: 'Add the institution roster at ₹199 per active student per year, with each student using their own login.' },
   { icon: BarChart3, title: 'Actionable analysis', desc: 'Review performance by student, test, subject, chapter, topic and question using actual attempt data.' },
   { icon: FolderOpen, title: 'Study resources', desc: 'Keep the existing Evidara resource library available for schools and students alongside assessments.' },
   { icon: ShieldCheck, title: 'Institution-scoped access', desc: 'Questions, students, papers and results stay scoped to the correct institution and role.' },
@@ -89,7 +89,7 @@ export default function LandingPage() {
                 <Button size="lg" variant="outline" onClick={signIn}>Sign in</Button>
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--muted-foreground)]">
-                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Unlimited students</span>
+                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />₹199 per active student / year</span>
                 <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Unlimited tests</span>
                 <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Private institution question bank</span>
               </div>
@@ -100,10 +100,10 @@ export default function LandingPage() {
                 <div className="bg-[var(--midnight)] p-6 text-white sm:p-8">
                   <div className="flex items-center gap-3"><Building2 className="h-7 w-7 text-[var(--amber)]" /><span className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">Founding Institution Plan</span></div>
                   <div className="mt-6 flex items-end gap-2"><strong className="text-5xl font-black">₹199</strong><span className="pb-1 text-white/60">/ student / year</span></div>
-                  <p className="mt-3 max-w-md text-sm leading-6 text-white/70">One annual institution plan for Phase 1. No per-student fee and no per-test fee.</p>
+                  <p className="mt-3 max-w-md text-sm leading-6 text-white/70">Platform access is billed at ₹199 per active student per year. No additional per-test fee.</p>
                 </div>
                 <div className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
-                  {['Unlimited students', 'Unlimited tests', 'Question-bank import', 'Test creation', 'Student results', 'Performance analytics', 'Study resources', 'Institution roles'].map((item) => (
+                  {['₹199 per active student / year', 'Unlimited tests', 'Question-bank import', 'Test creation', 'Student results', 'Performance analytics', 'Study resources', 'Institution roles'].map((item) => (
                     <div key={item} className="flex items-center gap-2 text-sm font-medium"><CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--teal)]" />{item}</div>
                   ))}
                 </div>
