@@ -40,11 +40,20 @@ check('workspace shell uses inert during View As', /inert=\{readOnlyPreview \|\|
 check('workspace shell displays no-writes preview banner', /No writes allowed/.test(homeShell) && /Super Admin · Read-only View As/.test(homeShell));
 check('release checklist contains all P0 items', Array.from({ length: 12 }, (_, index) => `P0.${index + 1}`).every((item) => releaseChecklist.includes(item)));
 check('release workflow runs hardening checks', /phase1-hardening-smoke\.mjs/.test(releaseWorkflow));
+const regressionCovered = /npm run qa:regression/.test(releaseWorkflow)
+  || [
+    'phase1-clean-school-ux-smoke.mjs', 'phase1-launch-smoke.mjs', 'institution-analytics-smoke.mjs',
+    'phase1-increment3-smoke.mjs', 'phase1-increment4-smoke.mjs', 'phase1-increment5-8-smoke.mjs',
+    'post8-public-student-smoke.mjs', 'profile-authorization-smoke.mjs', 'student-live-dashboard-resources-smoke.mjs',
+    'v13-2-analytics-smoke.mjs', 'v13-2-vercel-smoke.mjs', 'v14-smoke.mjs', 'v15-seo-smoke.mjs',
+    'v16-neet-pyq-smoke.mjs', 'v18-pyq-paper-engine-smoke.mjs', 'v19-pyq-source-fidelity-smoke.mjs',
+    'v19-1-latex-paper-import-smoke.mjs',
+  ].every((script) => releaseWorkflow.includes(script));
 check(
   'release workflow runs complete final QA gate',
   /npm run typecheck -- --incremental false/.test(releaseWorkflow)
     && /npm run lint/.test(releaseWorkflow)
-    && /npm run qa:regression/.test(releaseWorkflow)
+    && regressionCovered
     && /npm run build/.test(releaseWorkflow),
 );
 
