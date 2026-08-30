@@ -25,6 +25,7 @@ import {
 import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
+import { PaperAssignmentCenter } from '@/components/evidara/paper-assignment-center';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
 import { AccessControlView } from '@/components/evidara/access-control-view';
@@ -65,7 +66,12 @@ function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
     setOpenRequestedPaper(params.has('id') || params.get('create') === '1');
   }, []);
 
-  return <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />;
+  return (
+    <div className="space-y-6">
+      <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />
+      {kind === 'school' && <PaperAssignmentCenter />}
+    </div>
+  );
 }
 
 function ViewRouter() {
