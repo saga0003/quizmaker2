@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ElementType } from 'react';
+import { useEffect, useState, type ElementType, type MouseEvent } from 'react';
 import { useAppStore, type AppView } from '@/store/use-app-store';
 import { supabase } from '@/lib/supabase';
 import { evidaraRoleLabel } from '@/lib/roles';
@@ -136,6 +136,10 @@ function navigationForUser(role: 'student' | 'school' | 'admin', accessRole: str
     .filter((entry) => isGroup(entry) ? entry.children.length > 0 : phase1AllowsWorkspaceView(accessRole, entry.view));
 }
 
+function hrefForView(view: AppView) {
+  return `/?view=${encodeURIComponent(view)}`;
+}
+
 export function AppSidebar() {
   const { user, view, setView, logout, sidebarOpen, setSidebarOpen } = useAppStore();
   const { canAccess } = useModuleAccess();
@@ -156,7 +160,6 @@ export function AppSidebar() {
     return () => { cancelled = true; };
   }, [user?.id, user?.role]);
 
-
   if (!user) return null;
 
   const nav = navigationForUser(user.role, user.accessRole)
@@ -166,13 +169,24 @@ export function AppSidebar() {
     .filter((entry) => !isGroup(entry) || entry.children.length > 0);
   const roleLabel = evidaraRoleLabel(user.accessRole);
 
+  function openView(event: MouseEvent<HTMLAnchorElement>, next: AppView) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    setView(next);
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('view', next);
+    window.history.pushState({ evidaraView: next }, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
   function itemButton(item: NavItem, nested = false) {
     const isActive = view === item.view;
     const Icon = item.icon;
     const button = (
-      <button
+      <a
         key={item.view}
-        onClick={() => setView(item.view)}
+        href={hrefForView(item.view)}
+        onClick={(event) => openView(event, item.view)}
         className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${
           nested ? 'pl-7 text-[12px]' : ''
         } ${
@@ -186,7 +200,7 @@ export function AppSidebar() {
         <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-white/40 group-hover:text-white'}`} />
         {sidebarOpen && <span>{item.label}</span>}
         {isActive && sidebarOpen && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--amber)]" />}
-      </button>
+      </a>
     );
     if (!sidebarOpen) {
       return (
@@ -201,12 +215,11 @@ export function AppSidebar() {
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 flex h-screen flex-col bg-[var(--midnight)] text-white transition-all duration-200 ${
+      className={`fixed left-0 top-0 z-40 flex h-screen flex-col overflow-hidden bg-[var(--midnight)] text-white transition-all duration-200 ${
         sidebarOpen ? 'w-[260px]' : 'w-[64px]'
       }`}
     >
-      {/* Header */}
-      <div className="flex h-14 items-center justify-between px-3">
+      <div className="flex h-14 shrink-0 items-center justify-between px-3">
         {sidebarOpen && (
           <div className="flex items-center gap-2">
             <img src="/brand/evidara-logo-light.png" alt="Evidara" className="h-7 w-auto" />
@@ -225,31 +238,35 @@ export function AppSidebar() {
         </Button>
       </div>
 
-      <Separator className="bg-white/8" />
+      <Separator className="shrink-0 bg-white/8" />
 
-      {/* Role label */}
-      {sidebarOpen && (
-        <div className="px-3 pb-1 pt-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
-            {roleLabel}
-          </span>
-        </div>
-      )}
+      <ScrollArea className="min-h-0 flex-1">
+        {sidebarOpen && (
+          <div className="px-3 pb-1 pt-3">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
+              {roleLabel}
+            </span>
+          </div>
+        )}
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-1.5 py-1">
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-0.5 px-1.5 py-1">
           {nav.map((entry) => {
             if (!isGroup(entry)) return itemButton(entry);
             const Icon = entry.icon;
             const active = entry.children.some((item) => item.view === view);
+            const firstView = entry.children[0].view;
             return (
               <div key={entry.label} className="space-y-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!sidebarOpen) setView(entry.children[0].view);
-                    else setAnalyticsOpen((current) => !current);
+                <a
+                  href={hrefForView(firstView)}
+                  onClick={(event) => {
+                    if (!sidebarOpen) {
+                      openView(event, firstView);
+                      return;
+                    }
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    setAnalyticsOpen((current) => !current);
                   }}
                   className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all ${
                     active ? 'text-white' : 'text-white/55 hover:bg-white/6 hover:text-white'
@@ -262,7 +279,7 @@ export function AppSidebar() {
                       <ChevronDown className={`ml-auto h-3.5 w-3.5 transition-transform ${analyticsOpen ? 'rotate-180' : ''}`} />
                     </>
                   )}
-                </button>
+                </a>
                 {sidebarOpen && analyticsOpen && (
                   <div className="space-y-0.5 border-l border-white/8 pl-1">
                     {entry.children.map((item) => itemButton(item, true))}
@@ -272,18 +289,17 @@ export function AppSidebar() {
             );
           })}
         </nav>
+
+        {sidebarOpen && (
+          <div className="px-3 pb-5 pt-4">
+            <LoginAsSwitcher />
+          </div>
+        )}
       </ScrollArea>
 
-      {sidebarOpen && (
-        <div className="px-3 py-3">
-          <LoginAsSwitcher />
-        </div>
-      )}
+      <Separator className="shrink-0 bg-white/8" />
 
-      <Separator className="bg-white/8" />
-
-      {/* User footer */}
-      <div className="p-2">
+      <div className="shrink-0 p-2">
         {sidebarOpen ? (
           <div className="flex items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2">
             <Avatar className="h-7 w-7 shrink-0">
