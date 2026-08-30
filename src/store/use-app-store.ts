@@ -203,7 +203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       impersonatingAs: role,
       impersonatedUser: effectiveUser,
       user: effectiveUser,
-      view: role === 'student' && identity?.id ? 'student-analytics-overview' : defaultViewForRole(workspaceRole),
+      view: role === 'student' ? 'student-analytics-overview' : defaultViewForRole(workspaceRole),
       sidebarOpen: true,
     });
   },
