@@ -198,12 +198,12 @@ export type AttemptResult = {
   paper_id: string;
   paper_title: string;
   status: AttemptStatus;
-  score: number | null;
-  maximum_marks: number | null;
-  percentage: number | null;
-  correct_count: number | null;
-  incorrect_count: number | null;
-  unanswered_count: number | null;
+  score: number;
+  maximum_marks: number;
+  percentage: number;
+  correct_count: number;
+  incorrect_count: number;
+  unanswered_count: number;
   started_at: string;
   submitted_at: string | null;
   result_mode: ResultMode;
