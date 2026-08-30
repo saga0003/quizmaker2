@@ -40,7 +40,13 @@ check('workspace shell uses inert during View As', /inert=\{readOnlyPreview \|\|
 check('workspace shell displays no-writes preview banner', /No writes allowed/.test(homeShell) && /Super Admin · Read-only View As/.test(homeShell));
 check('release checklist contains all P0 items', Array.from({ length: 12 }, (_, index) => `P0.${index + 1}`).every((item) => releaseChecklist.includes(item)));
 check('release workflow runs hardening checks', /phase1-hardening-smoke\.mjs/.test(releaseWorkflow));
-check('release workflow runs final QA suite', /npm run qa:final/.test(releaseWorkflow));
+check(
+  'release workflow runs complete final QA gate',
+  /npm run typecheck -- --incremental false/.test(releaseWorkflow)
+    && /npm run lint/.test(releaseWorkflow)
+    && /npm run qa:regression/.test(releaseWorkflow)
+    && /npm run build/.test(releaseWorkflow),
+);
 
 for (const item of checks) {
   console.log(`${item.ok ? 'PASS' : 'FAIL'}  ${item.name}${item.details ? ` — ${item.details}` : ''}`);
