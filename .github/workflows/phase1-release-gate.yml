@@ -54,6 +54,9 @@ jobs:
       - name: A2 tenant isolation checks
         run: node scripts/a2-tenant-isolation-smoke.mjs
 
+      - name: A3 privileged audit checks
+        run: node scripts/a3-privileged-audit-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
