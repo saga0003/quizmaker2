@@ -34,8 +34,7 @@ import { SelfAssessmentCenter } from '@/components/evidara/self-assessment-cente
 import { AdminInstitutionsView, AdminResourcesView, ReferralSettingsView, AdminSelfAssessmentView } from '@/components/evidara/admin-v14-views';
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
-import { InstitutionAnalyticsWorkspace } from '@/components/institution-analytics/institution-analytics-workspace';
-import { SalesDemoAnalyticsWorkspace, useSalesDemoMode } from '@/components/evidara/sales-demo-workspace';
+import { EvidaraAnalyticsWorkspace } from '@/components/evidara/analytics-hierarchy';
 import type { AnalyticsV12View } from '@/types/analytics-v12';
 
 function analyticsView(view: string): AnalyticsV12View {
@@ -71,7 +70,6 @@ function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
 function ViewRouter() {
   const { view, user } = useAppStore();
   const { access } = useModuleAccess();
-  const salesDemoMode = useSalesDemoMode();
 
   if (user && !canOpenAppView(user, view, access)) {
     const fallback = defaultViewForRole(user.role);
@@ -91,7 +89,7 @@ function ViewRouter() {
   if (view === 'student-self-assessment') return <SelfAssessmentCenter />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view.startsWith('school-analytics-')) return salesDemoMode ? <SalesDemoAnalyticsWorkspace /> : <InstitutionAnalyticsWorkspace mode="school" />;
+  if (view.startsWith('school-analytics-')) return <EvidaraAnalyticsWorkspace mode="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -103,7 +101,7 @@ function ViewRouter() {
   if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
-  if (view === 'admin-analytics') return <InstitutionAnalyticsWorkspace mode="platform" />;
+  if (view === 'admin-analytics') return <EvidaraAnalyticsWorkspace mode="platform" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
