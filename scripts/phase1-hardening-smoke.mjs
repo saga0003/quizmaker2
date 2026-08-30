@@ -20,6 +20,7 @@ const assignmentSearchMigration = read('supabase/migrations/20260830172700_phase
 const assignmentPublishGuard = read('supabase/migrations/20260830231500_phase1_assignment_publish_guard.sql');
 const resultReleaseMigration = read('supabase/migrations/20260830235800_phase1_result_release_security.sql');
 const resultLegacyLockdown = read('supabase/migrations/20260830235900_phase1_result_release_legacy_rpc_lockdown.sql');
+const crossSchoolMigration = read('supabase/migrations/20260831001200_phase1_cross_school_analytics_isolation.sql');
 const assignmentCenter = read('src/components/evidara/paper-assignment-center.tsx');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
 const studentResults = read('src/components/papers/StudentResults.tsx');
@@ -67,6 +68,15 @@ check('legacy result analytics helpers are browser-locked', [
   'analytics_attempt_time_snapshot_v12',
 ].every((fn) => new RegExp(`revoke all on function public\\.${fn}[^;]*authenticated`, 'i').test(resultLegacyLockdown)));
 check('student results UI shows withheld state', /Result not released/.test(studentResults) && /result_released/.test(studentResults));
+
+check('membership-specific analytics authorization exists', /create or replace function public\.analytics_can_view_membership_v20/i.test(crossSchoolMigration));
+check('school-staff analytics resolves a single shared institution', /create or replace function public\.analytics_scope_organization_v20/i.test(crossSchoolMigration) && /Multiple institutions match this student/.test(crossSchoolMigration));
+check('analytics directory filters each membership row, not only student identity', /list_analytics_students_v12[\s\S]*analytics_can_view_membership_v20\(membership\.organization_id, membership\.section_id\)/i.test(crossSchoolMigration));
+check('live analytics membership is institution-scoped', /membership\.organization_id = v_scope_org/i.test(crossSchoolMigration));
+check('live analytics attempts are institution-scoped', /attempt\.organization_id = v_scope_org/i.test(crossSchoolMigration));
+check('live analytics comparison cohort is institution-scoped', /cohort_attempt\.organization_id = v_scope_org/i.test(crossSchoolMigration));
+check('cross-school answer review is rejected', /This assessment belongs to another institution/i.test(crossSchoolMigration));
+check('scoped helper RPCs are internal-only', /revoke all on function public\.analytics_scope_organization_v20\(uuid\) from public, anon, authenticated/i.test(crossSchoolMigration));
 
 check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s*\(/.test(responseAudit));
 check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
