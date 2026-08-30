@@ -18,8 +18,11 @@ const eligibilityMigration = read('supabase/migrations/20260830171000_phase1_rea
 const assignmentMigration = read('supabase/migrations/20260830172500_phase1_assignment_and_subscription_core.sql');
 const assignmentSearchMigration = read('supabase/migrations/20260830172700_phase1_assignment_student_search.sql');
 const assignmentPublishGuard = read('supabase/migrations/20260830231500_phase1_assignment_publish_guard.sql');
+const resultReleaseMigration = read('supabase/migrations/20260830235800_phase1_result_release_security.sql');
+const resultLegacyLockdown = read('supabase/migrations/20260830235900_phase1_result_release_legacy_rpc_lockdown.sql');
 const assignmentCenter = read('src/components/evidara/paper-assignment-center.tsx');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
+const studentResults = read('src/components/papers/StudentResults.tsx');
 const subscriptionCenter = read('src/components/school/SubscriptionCenter.tsx');
 const viewAsSwitcher = read('src/components/evidara/login-as-switcher.tsx');
 const homeShell = read('src/app/page.tsx');
@@ -44,6 +47,26 @@ check('assignment UI previews exact audience count', /Preview audience/.test(ass
 check('assignment UI supports class filters and specific students', /Class filters/.test(assignmentCenter) && /Specific students/.test(assignmentCenter));
 check('new institutional papers require assigned cohort before publish', /phase1_require_assigned_audience_v19/.test(assignmentPublishGuard) && /Assign this test to students before publishing it/.test(assignmentPublishGuard));
 check('zero-student assignment cannot be published', /has no eligible students/.test(assignmentPublishGuard));
+
+check('result release policy is server-authoritative', /create or replace function public\.student_result_release_level/i.test(resultReleaseMigration));
+check('hidden results resolve to no release', /when v_mode = 'hidden' then 'none'/i.test(resultReleaseMigration));
+check('score-only results expose only score level', /when v_mode = 'score_only' then 'score'/i.test(resultReleaseMigration));
+check('score-and-answers results expose answer level', /when v_mode = 'score_and_answers' then 'answers'/i.test(resultReleaseMigration));
+check('in-depth results expose analytics level', /when v_mode = 'in_depth_analytics' then 'analytics'/i.test(resultReleaseMigration));
+check('after-close uses authoritative server time', /v_mode = 'after_close'[\s\S]*now\(\) >= v_until/i.test(resultReleaseMigration));
+check('submission masks unreleased score facts', /'score', case when v_released then v_attempt\.score else null end/i.test(resultReleaseMigration));
+check('student results listing masks unreleased score facts', /create or replace function public\.list_my_attempt_results[\s\S]*case when release\.level in \('score','answers','analytics'\) then a\.score else null end/i.test(resultReleaseMigration));
+check('answer review requires answers release', /Answers and solutions have not been released/i.test(resultReleaseMigration));
+check('post-test reflection requires answers release', /Post-test reflection is available after answers are released/i.test(resultReleaseMigration));
+check('raw live analytics is not browser executable', /revoke all on function public\.get_live_student_analytics_v12[\s\S]*authenticated/i.test(resultReleaseMigration));
+check('student self analytics fails closed on unreleased evidence', /Detailed analytics contains assessment evidence that has not been released/i.test(resultReleaseMigration));
+check('legacy result analytics helpers are browser-locked', [
+  'get_student_test_comparison_base_v12', 'get_student_test_comparison_v11',
+  'analytics_test_snapshot_base_v12', 'analytics_test_snapshot_v11',
+  'analytics_subject_snapshot_base_v12', 'analytics_subject_snapshot_v11',
+  'analytics_attempt_time_snapshot_v12',
+].every((fn) => new RegExp(`revoke all on function public\\.${fn}[^;]*authenticated`, 'i').test(resultLegacyLockdown)));
+check('student results UI shows withheld state', /Result not released/.test(studentResults) && /result_released/.test(studentResults));
 
 check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s*\(/.test(responseAudit));
 check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
