@@ -54,6 +54,12 @@ function accuracy(rows: DemoAttempt[]) {
   return correct + incorrect ? rounded((correct / (correct + incorrect)) * 100) : 0;
 }
 
+function attemptAccuracy(row: DemoAttempt) {
+  const correct = Number(row.correct_count || 0);
+  const incorrect = Number(row.incorrect_count || 0);
+  return correct + incorrect ? rounded((correct / (correct + incorrect)) * 100) : 0;
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await authenticateRequest(request);
@@ -169,12 +175,27 @@ export async function GET(request: Request) {
         const chapterTests = subjectTests.filter((row) => row.chapter_name === chapterName);
         const chapterIds = new Set(chapterTests.map((row) => row.id));
         const chapterAttempts = attemptRows.filter((row) => chapterIds.has(row.test_id));
-        return { name: chapterName, tests: chapterTests.length, attempts: chapterAttempts.length, averagePercentage: average(chapterAttempts.map((row) => Number(row.percentage || 0))) };
+        const topics = [...new Set(chapterTests.map((row) => row.topic_name).filter((value): value is string => Boolean(value)))].map((topicName) => {
+          const topicTests = chapterTests.filter((row) => row.topic_name === topicName);
+          const topicIds = new Set(topicTests.map((row) => row.id));
+          const topicAttempts = attemptRows.filter((row) => topicIds.has(row.test_id));
+          return { name: topicName, tests: topicTests.length, attempts: topicAttempts.length, averagePercentage: average(topicAttempts.map((row) => Number(row.percentage || 0))), accuracy: accuracy(topicAttempts) };
+        });
+        return { name: chapterName, tests: chapterTests.length, attempts: chapterAttempts.length, averagePercentage: average(chapterAttempts.map((row) => Number(row.percentage || 0))), accuracy: accuracy(chapterAttempts), topics };
       });
       return { name, tests: subjectTests.length, attempts: rows.length, averagePercentage: average(rows.map((row) => Number(row.percentage || 0))), accuracy: accuracy(rows), chapters };
     });
 
     const questionInstances = testRows.reduce((sum, row) => sum + Number(row.question_count || 0), 0);
+    const includeResults = new URL(request.url).searchParams.get('includeResults') === '1';
+    const results = includeResults ? attemptRows.map((row) => ({
+      studentId: row.student_id,
+      testId: row.test_id,
+      percentage: Number(row.percentage || 0),
+      accuracy: attemptAccuracy(row),
+      submittedAt: row.submitted_at,
+    })) : undefined;
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       school,
@@ -193,6 +214,7 @@ export async function GET(request: Request) {
       subjects,
       students: enrichedStudents,
       tests: enrichedTests,
+      ...(includeResults ? { results } : {}),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to load sales demo data.' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
