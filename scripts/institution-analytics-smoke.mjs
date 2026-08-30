@@ -73,6 +73,7 @@ check('live-fix installer payload is absent after installation', !exists('_insti
 
 const failed = checks.filter((item) => !item.ok);
 for (const item of checks) console.log(`${item.ok ? '✓' : '✗'} ${item.label}`);
+for (const item of failed) console.error(`::error title=Institution analytics regression::${item.label}`);
 if (failed.length) {
   console.error(`\nInstitution analytics live validation failed (${failed.length}/${checks.length} checks).`);
   process.exit(1);
