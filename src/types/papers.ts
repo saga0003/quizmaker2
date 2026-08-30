@@ -12,6 +12,7 @@ export type PaperStatus =
 
 export type PaperAccessMode = "public" | "organization" | "code";
 export type ResultMode = "score_only" | "score_and_answers" | "in_depth_analytics" | "after_close" | "hidden";
+export type ResultReleaseLevel = "none" | "score" | "answers" | "analytics";
 export type AttemptStatus = "in_progress" | "submitted" | "expired";
 export type PaperSelectionMode = "manual" | "automatic" | "hybrid";
 export type BiologyDivision = "combined" | "botany" | "zoology";
@@ -197,13 +198,18 @@ export type AttemptResult = {
   paper_id: string;
   paper_title: string;
   status: AttemptStatus;
-  score: number;
-  maximum_marks: number;
-  percentage: number;
-  correct_count: number;
-  incorrect_count: number;
-  unanswered_count: number;
+  score: number | null;
+  maximum_marks: number | null;
+  percentage: number | null;
+  correct_count: number | null;
+  incorrect_count: number | null;
+  unanswered_count: number | null;
   started_at: string;
   submitted_at: string | null;
   result_mode: ResultMode;
+  result_release_level?: ResultReleaseLevel;
+  result_released?: boolean;
+  answers_released?: boolean;
+  analytics_released?: boolean;
+  available_until?: string | null;
 };
