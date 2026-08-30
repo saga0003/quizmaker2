@@ -12,6 +12,7 @@ type DemoStudent = {
   exam_track: string;
   board: string;
   status: string;
+  auth_user_id: string | null;
 };
 
 type DemoTest = {
@@ -39,6 +40,8 @@ type DemoAttempt = {
   submitted_at: string;
 };
 
+const DEMO_MANAGER_ROLES = new Set(['institute_owner', 'institute_admin', 'school_owner', 'school_admin']);
+
 function rounded(value: number, digits = 1) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -60,48 +63,69 @@ function attemptAccuracy(row: DemoAttempt) {
   return correct + incorrect ? rounded((correct / (correct + incorrect)) * 100) : 0;
 }
 
+async function demoContext(request: Request) {
+  const auth = await authenticateRequest(request);
+  const { data: profile, error: profileError } = await auth.admin
+    .from('profiles')
+    .select('id,role')
+    .eq('id', auth.user.id)
+    .single();
+  if (profileError || !profile) throw new Error('Evidara profile not found.');
+
+  const { data: school, error: schoolError } = await auth.admin
+    .from('organizations')
+    .select('id,name,city,state,board,status,address_line1,address_line2,postal_code,contact_name,contact_email,phone,secondary_phone,website,is_demo')
+    .eq('is_demo', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (schoolError || !school) throw new Error('Evidara Sales Demo School is not configured.');
+
+  const [{ data: member }, { data: studentMember }] = await Promise.all([
+    auth.admin.from('organization_members').select('organization_id,member_role,is_active').eq('user_id', auth.user.id).eq('organization_id', school.id).eq('is_active', true).limit(1).maybeSingle(),
+    auth.admin.from('student_school_memberships').select('organization_id').eq('student_id', auth.user.id).eq('organization_id', school.id).eq('status', 'active').limit(1).maybeSingle(),
+  ]);
+
+  const platformAdmin = isPlatformAdmin(profile.role);
+  const authorised = platformAdmin || Boolean(member || studentMember);
+  const manager = platformAdmin || Boolean(member?.is_active && DEMO_MANAGER_ROLES.has(String(member.member_role)));
+  return { auth, profile, school, authorised, manager };
+}
+
 export async function GET(request: Request) {
   try {
-    const auth = await authenticateRequest(request);
-    const { data: profile, error: profileError } = await auth.admin
-      .from('profiles')
-      .select('id,role')
-      .eq('id', auth.user.id)
-      .single();
-    if (profileError || !profile) return NextResponse.json({ error: 'Evidara profile not found.' }, { status: 403 });
-
-    const { data: school, error: schoolError } = await auth.admin
-      .from('organizations')
-      .select('id,name,city,state,board,status,address_line1,address_line2,postal_code,contact_name,contact_email,phone,secondary_phone,website,is_demo')
-      .eq('is_demo', true)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (schoolError || !school) return NextResponse.json({ error: 'Evidara Sales Demo School is not configured.' }, { status: 404 });
-
-    let authorised = isPlatformAdmin(profile.role);
-    if (!authorised) {
-      const [{ data: member }, { data: studentMember }] = await Promise.all([
-        auth.admin.from('organization_members').select('organization_id').eq('user_id', auth.user.id).eq('organization_id', school.id).eq('is_active', true).limit(1).maybeSingle(),
-        auth.admin.from('student_school_memberships').select('organization_id').eq('student_id', auth.user.id).eq('organization_id', school.id).eq('status', 'active').limit(1).maybeSingle(),
-      ]);
-      authorised = Boolean(member || studentMember);
-    }
+    const { auth, school, authorised } = await demoContext(request);
     if (!authorised) return NextResponse.json({ error: 'Sales demo access is restricted to the Evidara Demo School.' }, { status: 403 });
 
-    const [{ data: students, error: studentsError }, { data: tests, error: testsError }, { data: attempts, error: attemptsError }, { data: subscription }] = await Promise.all([
-      auth.admin.from('sales_demo_students').select('id,full_name,email,grade,section_code,academic_year,exam_track,board,status').eq('organization_id', school.id).eq('status', 'active').order('student_no'),
+    const [{ data: students, error: studentsError }, { data: tests, error: testsError }, { data: subscription }] = await Promise.all([
+      auth.admin.from('sales_demo_students').select('id,full_name,email,grade,section_code,academic_year,exam_track,board,status,auth_user_id').eq('organization_id', school.id).eq('status', 'active').order('student_no'),
       auth.admin.from('sales_demo_tests').select('id,title,test_type,exam_type,subject_name,chapter_name,topic_name,question_count,maximum_marks,duration_minutes,conducted_at').eq('organization_id', school.id).order('conducted_at', { ascending: false }),
-      auth.admin.from('sales_demo_attempts').select('id,student_id,test_id,percentage,correct_count,incorrect_count,unanswered_count,submitted_at').eq('organization_id', school.id).order('submitted_at', { ascending: false }),
       auth.admin.from('school_subscriptions').select('id,plan_name,status,starts_at,ends_at,seat_limit,resource_access,annual_price_per_student_paise,manual_amount_paise,payment_date,payment_method,payment_reference,invoice_reference,payment_notes,payment_status').eq('organization_id', school.id).order('ends_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
-    if (studentsError || testsError || attemptsError) {
-      return NextResponse.json({ error: studentsError?.message || testsError?.message || attemptsError?.message || 'Demo dataset could not be loaded.' }, { status: 500 });
+    if (studentsError || testsError) {
+      return NextResponse.json({ error: studentsError?.message || testsError?.message || 'Demo dataset could not be loaded.' }, { status: 500 });
+    }
+
+    // PostgREST projects commonly cap a single response at 1,000 rows. The demo
+    // school has 6,497 attempts, so page explicitly instead of silently dropping
+    // NEET or older attempts from every aggregate.
+    const attemptRows: DemoAttempt[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error: pageError } = await auth.admin
+        .from('sales_demo_attempts')
+        .select('id,student_id,test_id,percentage,correct_count,incorrect_count,unanswered_count,submitted_at')
+        .eq('organization_id', school.id)
+        .order('submitted_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (pageError) return NextResponse.json({ error: pageError.message }, { status: 500 });
+      const rows = (page || []) as DemoAttempt[];
+      attemptRows.push(...rows);
+      if (rows.length < pageSize) break;
     }
 
     const studentRows = (students || []) as DemoStudent[];
     const testRows = (tests || []) as DemoTest[];
-    const attemptRows = (attempts || []) as DemoAttempt[];
     const attemptsByStudent = new Map<string, DemoAttempt[]>();
     const attemptsByTest = new Map<string, DemoAttempt[]>();
     for (const attempt of attemptRows) {
@@ -122,6 +146,7 @@ export async function GET(request: Request) {
         track: student.exam_track,
         board: student.board,
         status: student.status,
+        linkedAccount: Boolean(student.auth_user_id),
         completedTests: rows.length,
         averagePercentage: average(percentages),
         accuracy: accuracy(rows),
@@ -218,5 +243,67 @@ export async function GET(request: Request) {
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to load sales demo data.' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { auth, school, manager } = await demoContext(request);
+    if (!manager) return NextResponse.json({ error: 'Only a School Admin or Evidara Admin can edit student details.' }, { status: 403 });
+
+    const body = await request.json() as Record<string, unknown>;
+    const studentId = String(body.studentId || '').trim();
+    const fullName = String(body.fullName || '').trim();
+    const grade = Number(body.grade);
+    const section = String(body.section || '').trim();
+    const academicYear = String(body.academicYear || '').trim();
+    const board = String(body.board || '').trim();
+    const status = String(body.status || 'active').trim();
+    const email = body.email === null ? null : String(body.email || '').trim() || null;
+
+    if (!studentId || !fullName || !section || !academicYear || !Number.isInteger(grade) || grade < 1 || grade > 12) {
+      return NextResponse.json({ error: 'Name, grade, section and academic year are required.' }, { status: 400 });
+    }
+    if (!['active', 'revoked', 'completed'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid student status.' }, { status: 400 });
+    }
+
+    const { data: existing, error: existingError } = await auth.admin
+      .from('sales_demo_students')
+      .select('id,email,auth_user_id')
+      .eq('id', studentId)
+      .eq('organization_id', school.id)
+      .maybeSingle();
+    if (existingError || !existing) return NextResponse.json({ error: 'Demo student not found.' }, { status: 404 });
+    if (existing.auth_user_id && email !== existing.email) {
+      return NextResponse.json({ error: 'This student email is linked to a demo login account and cannot be changed here.' }, { status: 409 });
+    }
+
+    const { data: updated, error: updateError } = await auth.admin
+      .from('sales_demo_students')
+      .update({ full_name: fullName, email, grade, section_code: section, academic_year: academicYear, board: board || null, status })
+      .eq('id', studentId)
+      .eq('organization_id', school.id)
+      .select('id,full_name,email,grade,section_code,academic_year,exam_track,board,status,auth_user_id')
+      .single();
+    if (updateError || !updated) return NextResponse.json({ error: updateError?.message || 'Unable to update student.' }, { status: 500 });
+
+    return NextResponse.json({
+      ok: true,
+      student: {
+        id: updated.id,
+        name: updated.full_name,
+        email: updated.email,
+        grade: updated.grade,
+        section: updated.section_code,
+        academicYear: updated.academic_year,
+        track: updated.exam_track,
+        board: updated.board,
+        status: updated.status,
+        linkedAccount: Boolean(updated.auth_user_id),
+      },
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to update demo student.' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
