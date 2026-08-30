@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { BarChart3, BookOpen, GraduationCap, Search, Target, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useAppStore } from '@/store/use-app-store';
@@ -90,6 +90,16 @@ export function SalesDemoAnalyticsWorkspace() {
   if (loading) return <div className="p-6 text-sm text-[var(--muted-foreground)]">Loading Evidara Sales Demo analytics…</div>;
   if (error || !data) return <div className="p-6 text-sm text-destructive">{error || 'Sales Demo analytics are unavailable.'}</div>;
 
+  const summaryCards: Array<[string, number | string, ElementType]> = [
+    ['Students', data.stats.students, Users],
+    ['NEET', data.stats.neetStudents, Target],
+    ['JEE', data.stats.jeeStudents, Target],
+    ['Tests', data.stats.tests, BookOpen],
+    ['Attempts', data.stats.attempts, BarChart3],
+    ['Avg score', percent(data.stats.averagePercentage), BarChart3],
+    ['Accuracy', percent(data.stats.accuracy), BarChart3],
+  ];
+
   return (
     <div className="space-y-5 p-4 md:p-6">
       <div className="rounded-2xl border border-[var(--line)] bg-gradient-to-r from-[#14232B] to-[#117C78] p-5 text-white md:p-7">
@@ -104,16 +114,8 @@ export function SalesDemoAnalyticsWorkspace() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        {[
-          ['Students', data.stats.students, Users],
-          ['NEET', data.stats.neetStudents, Target],
-          ['JEE', data.stats.jeeStudents, Target],
-          ['Tests', data.stats.tests, BookOpen],
-          ['Attempts', data.stats.attempts, BarChart3],
-          ['Avg score', percent(data.stats.averagePercentage), BarChart3],
-          ['Accuracy', percent(data.stats.accuracy), BarChart3],
-        ].map(([label, value, Icon]) => (
-          <Card key={String(label)} className="rounded-xl shadow-sm"><CardContent className="p-4"><Icon className="mb-3 h-5 w-5 text-[var(--teal)]" /><p className="text-xs text-[var(--muted-foreground)]">{String(label)}</p><p className="mt-1 text-xl font-bold text-[var(--foreground)]">{typeof value === 'number' ? metric(value) : String(value)}</p></CardContent></Card>
+        {summaryCards.map(([label, value, Icon]) => (
+          <Card key={label} className="rounded-xl shadow-sm"><CardContent className="p-4"><Icon className="mb-3 h-5 w-5 text-[var(--teal)]" /><p className="text-xs text-[var(--muted-foreground)]">{label}</p><p className="mt-1 text-xl font-bold text-[var(--foreground)]">{typeof value === 'number' ? metric(value) : value}</p></CardContent></Card>
         ))}
       </div>
 
