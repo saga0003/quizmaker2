@@ -31,7 +31,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [x] **P0.9 Safe Super Admin `View As`** — hardening branch verified by release smoke and full gate: role preview is explicitly read-only, workspace content is `inert`, page actions are disabled and a persistent `Super Admin · Read-only View As / No writes allowed` banner is shown.
 - [x] **P0.10 Exam network reliability** — verified 31 Aug 2026. The exam client persists pending responses per attempt, recovers them after reload, retries with bounded backoff, automatically resynchronizes when connectivity returns, performs periodic recovery, debounces numeric saves, shows `All saved / Syncing / Offline` state, and refuses final submission until every pending answer has been confirmed by the server. Dedicated 12-point P0.10 assertions plus TypeScript, lint, all regression suites and production build passed the hardening release gate before this checklist update; the physical disconnect→answer→reconnect exercise remains independently required as acceptance item R10 and is not waived by this P0 completion.
 - [x] **P0.11 RPC permission allowlist** — verified 31 Aug 2026. Live Supabase no longer gives `anon` implicit EXECUTE on the broad private `SECURITY DEFINER` surface. Every public-schema SECURITY DEFINER routine has PUBLIC/anon/authenticated EXECUTE reset, authenticated application access is explicitly restored, and anonymous access is limited to a documented nine-RPC compatibility/read/lead allowlist (`create_institute`, username availability and legacy public catalogue reads). Critical exam, paper-assignment, question mutation and analytics RPCs were live-verified authenticated-only. Migration `phase1_rpc_permission_allowlist` is applied; dedicated P0.11 assertions plus the complete release gate passed on commit `d34f417ac18a2d871858c499382b9fc5eafd5b83` in run `33334097055`; matching Vercel preview is READY.
-- [ ] **P0.12 Credential hardening** — cryptographically secure temporary credentials, first-login reset/setup flow, privileged MFA recommendation/requirement.
+- [x] **P0.12 Credential hardening** — implementation verified 31 Aug 2026 on hardening commit `47930604b55bb40a229c8583cc059dccaa4095bd`. School-issued/reset student passwords use cryptographically secure randomness and now create a server-side `must_change_password` state through an audited database trigger; the workspace blocks until the student replaces that temporary credential with a server-validated 12+ character password. Privileged platform/institution-admin accounts are gated through Supabase TOTP MFA/AAL2 at both server-route and database permission-helper layers. A dedicated 14-point P0.12 regression, TypeScript, lint, every regression suite and production build passed release gate run `33337396700`; the matching Vercel preview is READY. The safe password-state/RLS/trigger foundation is already live. The final AAL2 database-helper activation is deliberately staged for the coordinated production cutover (Z8) so the currently served pre-MFA production UI cannot lock existing administrators out before the new credential gate is deployed.
 
 ---
 
@@ -155,8 +155,8 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [ ] R1 Create Test School A as a real institution.
 - [ ] R2 Create a 100-seat annual licence at ₹199/student.
 - [ ] R3 Create School Admin and Teacher accounts.
-- [ ] R4 Import 100 real student memberships.
-- [ ] R5 Assign Teacher to Physics/section.
+- [ ] R4 Import 100 real student accounts.
+- [ ] R5 Assign teacher to Physics/section scope.
 - [ ] R6 Import at least 500 questions and resolve invalid rows.
 - [ ] R7 Approve questions.
 - [ ] R8 Create Physics test and assign Grade 11 section/programme.
@@ -189,3 +189,4 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [ ] Z5 Production deployment is READY and permanent domain serves the release commit.
 - [ ] Z6 Runtime error/health check is clean after deployment.
 - [ ] Z7 Phase 1 release version/tag/changelog recorded.
+- [ ] Z8 Coordinated credential-security cutover: deploy the MFA/password-gated web release, apply the full idempotent `phase1_credential_hardening` migration so privileged database helpers require AAL2, then verify an AAL1 privileged session is blocked, TOTP AAL2 is accepted and school-issued student passwords force first-login replacement. This must be performed as one release operation; do not activate the database AAL2 gate while the old pre-MFA production UI is still being served.
