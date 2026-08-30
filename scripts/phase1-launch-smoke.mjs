@@ -41,7 +41,8 @@ check('school study resources retained on desktop', sidebar.includes("view: 'sch
 
 const landing = read('src/components/evidara/landing-page.tsx');
 check('landing shows Rs 199 student annual price', landing.includes('₹199') && landing.includes('/ student / year'));
-check('landing sells unlimited students', landing.includes('Unlimited students'));
+check('landing sells per-student licensed access', landing.includes('Per-student annual access') && landing.includes('₹199 per active student per year'));
+check('landing does not promise unlimited students', !landing.includes('Unlimited students'));
 check('landing sells unlimited tests', landing.includes('Unlimited tests'));
 check('landing keeps study resources in offer', landing.includes('Study resources'));
 
