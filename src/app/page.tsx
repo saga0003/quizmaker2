@@ -33,8 +33,8 @@ import { ReferralCenter } from '@/components/commerce/ReferralCenter';
 import { SelfAssessmentCenter } from '@/components/evidara/self-assessment-center';
 import { AdminInstitutionsView, AdminResourcesView, ReferralSettingsView, AdminSelfAssessmentView } from '@/components/evidara/admin-v14-views';
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
-import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
-import { EvidaraAnalyticsWorkspace } from '@/components/evidara/analytics-hierarchy';
+import { StudentPreviewAnalytics } from '@/components/evidara/student-preview-analytics';
+import { LaunchAnalyticsWorkspace } from '@/components/evidara/launch-analytics-workspace';
 import type { AnalyticsV12View } from '@/types/analytics-v12';
 
 function analyticsView(view: string): AnalyticsV12View {
@@ -81,7 +81,7 @@ function ViewRouter() {
   if (view === 'student-dashboard') return <StudentDashboard />;
   if (view === 'student-tests') return <LiveStudentTests />;
   if (view === 'student-results') return <StudentResultsView />;
-  if (view.startsWith('student-analytics-')) return <AnalyticsV12Workspace mode="student" view={analyticsView(view)} />;
+  if (view.startsWith('student-analytics-')) return <StudentPreviewAnalytics view={analyticsView(view)} />;
   if (view === 'student-resources') return <StudentResourcesView />;
   if (view === 'student-store') return <ProductStore />;
   if (view === 'student-purchases') return <PurchaseHistory />;
@@ -89,7 +89,7 @@ function ViewRouter() {
   if (view === 'student-self-assessment') return <SelfAssessmentCenter />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view.startsWith('school-analytics-')) return <EvidaraAnalyticsWorkspace mode="school" />;
+  if (view.startsWith('school-analytics-')) return <LaunchAnalyticsWorkspace mode="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -101,7 +101,7 @@ function ViewRouter() {
   if (view === 'school-access') return <AccessControlView kind="school" />;
 
   if (view === 'admin-dashboard') return <AdminDashboardView />;
-  if (view === 'admin-analytics') return <EvidaraAnalyticsWorkspace mode="platform" />;
+  if (view === 'admin-analytics') return <LaunchAnalyticsWorkspace mode="platform" />;
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
