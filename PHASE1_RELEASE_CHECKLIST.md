@@ -20,15 +20,15 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # P0 — Launch blockers
 
-- [ ] **P0.1 Release gate / current main build** — latest code must pass TypeScript + production build + Phase 1 smoke tests before main is promoted. Current latest main deployment failed on `question-response-audit.tsx` PromiseLike `.finally()` type-check.
-- [ ] **P0.2 Canonical real-student paper eligibility** — use `student_school_memberships` for student access; do not require students to be duplicated in `organization_members`.
+- [x] **P0.1 Release gate / current main build** — hardening release candidate `12768d564ea19ea73599def24ce9b074f502f4d1` passed the complete GitHub Actions release gate (run `33326695104`) on 30 Aug 2026: install, hardening smoke, TypeScript, lint, all regression suites and production build; matching Vercel preview is READY. Production `main` remains on its last known-good READY deployment until all remaining P0/release acceptance items are complete.
+- [x] **P0.2 Canonical real-student paper eligibility** — live Supabase verified 30 Aug 2026: `list_available_papers`, `find_paper_by_code` and `start_exam_attempt` accept active `student_school_memberships`; students do not need duplicated `organization_members`. Internal `is_active_student_member` is not executable by `anon`/`authenticated` browser roles.
 - [ ] **P0.3 Test assignment engine** — institution/academic-year/grade/programme/section/selected-student targeting with an exact assigned-student preview count.
 - [ ] **P0.4 Server-enforced result release modes** — hidden, score-only, score+answers, after-close, in-depth analytics; never rely on UI hiding.
 - [ ] **P0.5 Cross-school analytics isolation** — school staff can only read attempts belonging to their institution; student personal history and Super Admin support access must be explicitly scoped/audited.
 - [ ] **P0.6 Historical analytics snapshots** — analytics must use test-time question/taxonomy snapshot so later question edits do not rewrite historical reports.
 - [ ] **P0.7 ₹199/student/year licence model** — remove all “unlimited students” behaviour/text; licensed quantity and active count must be explicit.
 - [ ] **P0.8 Subscription enforcement** — active/grace/expired/suspended policy must be enforced by backend operations, not only UI.
-- [ ] **P0.9 Safe Super Admin `View As`** — replace role-changing preview semantics with read-only institution-scoped preview; privileged writes remain disabled while previewing.
+- [x] **P0.9 Safe Super Admin `View As`** — hardening branch verified by release smoke and full gate: role preview is explicitly read-only, workspace content is `inert`, page actions are disabled and a persistent `Super Admin · Read-only View As / No writes allowed` banner is shown.
 - [ ] **P0.10 Exam network reliability** — pending-answer/offline retry queue, visible sync state, and block final submit until pending responses are confirmed.
 - [ ] **P0.11 RPC permission allowlist** — revoke unnecessary `anon` EXECUTE grants on private/legacy SECURITY DEFINER RPCs; document intentionally public RPCs.
 - [ ] **P0.12 Credential hardening** — cryptographically secure temporary credentials, first-login reset/setup flow, privileged MFA recommendation/requirement.
@@ -37,7 +37,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # A — Stability, security and tenancy
 
-- [ ] A1 Automated preview QA before production promotion.
+- [x] A1 Automated preview QA before production promotion. GitHub release gate is bound to `phase1-hardening`/`main`; exact release candidate must pass TypeScript, lint, hardening/regression suites and production build, with a matching READY Vercel preview before promotion.
 - [ ] A2 Tenant-isolation regression suite for School A vs School B.
 - [ ] A3 Audit every privileged change: institution/subscription/account/password/question/paper/result/view-as/resource.
 - [ ] A4 RLS cleanup for legacy staging/recovery tables and documented grants.
