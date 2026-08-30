@@ -151,7 +151,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ item: data, duplicate: false }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-
     if (action === 'bulkCreate') {
       const entity = String(body.entity || '');
       const names = Array.isArray(body.names) ? body.names.map((value) => String(value || '').replace(/^\s*\d+[.)-]?\s*/, '').trim()).filter(Boolean) : [];
@@ -169,12 +168,34 @@ export async function POST(request: Request) {
         if (entity === 'topic' && parentId) await ensureParentVisible(ctx, 'chapters', parentId, organizationId);
         const duplicate = await duplicateName(ctx, table, name, organizationId, parentColumn, parentId);
         if (duplicate) { skipped.push(name); continue; }
-        const insert = entity === 'subject'
-          ? { name, code: subjectCode('', name), organization_id: organizationId, is_active: true }
-          : entity === 'chapter'
-            ? { name, subject_id: parentId, organization_id: organizationId, is_active: true }
-            : { name, chapter_id: parentId, organization_id: organizationId, is_active: true };
-        const { data, error } = await ctx.admin.from(table).insert(insert).select('*').single();
+
+        if (entity === 'subject') {
+          const { data, error } = await ctx.admin
+            .from('subjects')
+            .insert({ name, code: subjectCode('', name), organization_id: organizationId, is_active: true })
+            .select('*')
+            .single();
+          if (error) throw new Error(error.message);
+          created.push(data);
+          continue;
+        }
+
+        if (entity === 'chapter') {
+          const { data, error } = await ctx.admin
+            .from('chapters')
+            .insert({ name, subject_id: parentId as string, organization_id: organizationId, is_active: true })
+            .select('*')
+            .single();
+          if (error) throw new Error(error.message);
+          created.push(data);
+          continue;
+        }
+
+        const { data, error } = await ctx.admin
+          .from('topics')
+          .insert({ name, chapter_id: parentId as string, organization_id: organizationId, is_active: true })
+          .select('*')
+          .single();
         if (error) throw new Error(error.message);
         created.push(data);
       }
