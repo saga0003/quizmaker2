@@ -1,12 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-
 
 type SecurityState = {
   mustChangePassword: boolean;
@@ -202,7 +202,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
 
           {mfaMode === 'enroll' && enrollment && (
             <div className="mt-6 space-y-4">
-              <div className="rounded-xl border border-[#E7ECEB] bg-white p-4 text-center"><img src={enrollment.qrCode} alt="Authenticator QR code" className="mx-auto h-48 w-48" /></div>
+              <div className="rounded-xl border border-[#E7ECEB] bg-white p-4 text-center"><Image unoptimized src={enrollment.qrCode} alt="Authenticator QR code" width={192} height={192} className="mx-auto h-48 w-48" /></div>
               <div className="rounded-xl bg-[#F7F9F7] p-4 text-xs leading-5 text-[#5E6E74]">Scan the QR code in Google Authenticator, Microsoft Authenticator, 1Password or another TOTP app. If scanning is unavailable, enter this setup key: <strong className="break-all text-[#14232B]">{enrollment.secret}</strong></div>
             </div>
           )}
