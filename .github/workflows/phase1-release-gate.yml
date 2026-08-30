@@ -39,6 +39,9 @@ jobs:
       - name: P0.7 annual student licence checks
         run: node scripts/p07-licence-model-smoke.mjs
 
+      - name: P0.8 subscription enforcement checks
+        run: node scripts/p08-subscription-enforcement-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
