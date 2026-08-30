@@ -47,7 +47,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Security check failed (${response.status}).`);
     return payload as SecurityState;
-  }, [session?.access_token]);
+  }, [session]);
 
   const checkMfa = useCallback(async (state: SecurityState) => {
     if (!state.privileged || !supabase) {
@@ -103,7 +103,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [checkMfa, requestSecurity, session?.access_token]);
+  }, [checkMfa, requestSecurity, session]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
