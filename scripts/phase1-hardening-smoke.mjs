@@ -16,7 +16,7 @@ function check(name, condition, details = '') {
 
 const eligibilityMigration = read('supabase/migrations/20260830171000_phase1_real_student_test_access.sql');
 const assignmentMigration = read('supabase/migrations/20260830172500_phase1_assignment_and_subscription_core.sql');
-const assignmentSearchMigration = read('supabase/migrations/20260830185000_phase1_assignment_student_search.sql');
+const assignmentSearchMigration = read('supabase/migrations/20260830172700_phase1_assignment_student_search.sql');
 const assignmentPublishGuard = read('supabase/migrations/20260830231500_phase1_assignment_publish_guard.sql');
 const assignmentCenter = read('src/components/evidara/paper-assignment-center.tsx');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
