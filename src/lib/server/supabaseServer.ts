@@ -12,6 +12,17 @@ const serviceKey = (
   ""
 ).trim();
 
+const privilegedRoles = new Set([
+  "super_admin",
+  "evidara_admin",
+  "admin",
+  "platform_admin",
+  "school_admin",
+  "school_owner",
+  "institute_admin",
+  "institute_owner",
+]);
+
 function isPlaceholder(value: string): boolean {
   const normalized = value.toLowerCase();
   return (
@@ -29,6 +40,17 @@ function isValidHttpUrl(value: string): boolean {
     return parsed.protocol === "http:" || parsed.protocol === "https:";
   } catch {
     return false;
+  }
+}
+
+function accessTokenAal(accessToken: string) {
+  try {
+    const payload = accessToken.split(".")[1] ?? "";
+    if (!payload) return "aal1";
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { aal?: string };
+    return decoded.aal === "aal2" ? "aal2" : "aal1";
+  } catch {
+    return "aal1";
   }
 }
 
@@ -64,7 +86,10 @@ export function createRequestClient(accessToken: string): SupabaseClient {
   });
 }
 
-export async function authenticateRequest(request: Request): Promise<{
+export async function authenticateRequest(
+  request: Request,
+  options: { allowPrivilegedAal1?: boolean } = {},
+): Promise<{
   accessToken: string;
   user: User;
   client: SupabaseClient;
@@ -91,5 +116,20 @@ export async function authenticateRequest(request: Request): Promise<{
     throw Object.assign(new Error(error?.message ?? "Invalid cloud session."), { status: 401 });
   }
 
-  return { accessToken, user: data.user, client, admin: createServiceClient() };
+  const admin = createServiceClient();
+  if (!options.allowPrivilegedAal1) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profile && privilegedRoles.has(String(profile.role)) && accessTokenAal(accessToken) !== "aal2") {
+      throw Object.assign(new Error("Multi-factor authentication is required for this privileged account."), {
+        status: 403,
+        code: "MFA_REQUIRED",
+      });
+    }
+  }
+
+  return { accessToken, user: data.user, client, admin };
 }
