@@ -39,40 +39,91 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Regression — clean school UX
+      - id: clean_school
+        name: Regression — clean school UX
+        continue-on-error: true
         run: node scripts/phase1-clean-school-ux-smoke.mjs
-      - name: Regression — launch
+      - id: launch
+        name: Regression — launch
+        continue-on-error: true
         run: node scripts/phase1-launch-smoke.mjs
-      - name: Regression — institution analytics
+      - id: institution_analytics
+        name: Regression — institution analytics
+        continue-on-error: true
         run: node scripts/institution-analytics-smoke.mjs
-      - name: Regression — increment 3
+      - id: increment3
+        name: Regression — increment 3
+        continue-on-error: true
         run: node scripts/phase1-increment3-smoke.mjs
-      - name: Regression — increment 4
+      - id: increment4
+        name: Regression — increment 4
+        continue-on-error: true
         run: node scripts/phase1-increment4-smoke.mjs
-      - name: Regression — increment 5-8
+      - id: increment58
+        name: Regression — increment 5-8
+        continue-on-error: true
         run: node scripts/phase1-increment5-8-smoke.mjs
-      - name: Regression — public student
+      - id: public_student
+        name: Regression — public student
+        continue-on-error: true
         run: node scripts/post8-public-student-smoke.mjs
-      - name: Regression — profile authorization
+      - id: profile_auth
+        name: Regression — profile authorization
+        continue-on-error: true
         run: node scripts/profile-authorization-smoke.mjs
-      - name: Regression — student live dashboard
+      - id: student_live
+        name: Regression — student live dashboard
+        continue-on-error: true
         run: node scripts/student-live-dashboard-resources-smoke.mjs
-      - name: Regression — analytics
+      - id: analytics
+        name: Regression — analytics
+        continue-on-error: true
         run: node scripts/v13-2-analytics-smoke.mjs
-      - name: Regression — Vercel smoke
+      - id: vercel_smoke
+        name: Regression — Vercel smoke
+        continue-on-error: true
         run: node scripts/v13-2-vercel-smoke.mjs
-      - name: Regression — v14
+      - id: v14
+        name: Regression — v14
+        continue-on-error: true
         run: node scripts/v14-smoke.mjs
-      - name: Regression — v15 SEO
+      - id: v15seo
+        name: Regression — v15 SEO
+        continue-on-error: true
         run: node scripts/v15-seo-smoke.mjs
-      - name: Regression — v16 PYQ
+      - id: v16pyq
+        name: Regression — v16 PYQ
+        continue-on-error: true
         run: node scripts/v16-neet-pyq-smoke.mjs
-      - name: Regression — v18 paper engine
+      - id: v18paper
+        name: Regression — v18 paper engine
+        continue-on-error: true
         run: node scripts/v18-pyq-paper-engine-smoke.mjs
-      - name: Regression — v19 fidelity
+      - id: v19fidelity
+        name: Regression — v19 fidelity
+        continue-on-error: true
         run: node scripts/v19-pyq-source-fidelity-smoke.mjs
-      - name: Regression — v19.1 import
+      - id: v191import
+        name: Regression — v19.1 import
+        continue-on-error: true
         run: node scripts/v19-1-latex-paper-import-smoke.mjs
 
       - name: Production build
         run: npm run build
+
+      - name: Enforce regression gate
+        if: always()
+        env:
+          OUTCOMES: >-
+            ${{ steps.clean_school.outcome }} ${{ steps.launch.outcome }} ${{ steps.institution_analytics.outcome }}
+            ${{ steps.increment3.outcome }} ${{ steps.increment4.outcome }} ${{ steps.increment58.outcome }}
+            ${{ steps.public_student.outcome }} ${{ steps.profile_auth.outcome }} ${{ steps.student_live.outcome }}
+            ${{ steps.analytics.outcome }} ${{ steps.vercel_smoke.outcome }} ${{ steps.v14.outcome }}
+            ${{ steps.v15seo.outcome }} ${{ steps.v16pyq.outcome }} ${{ steps.v18paper.outcome }}
+            ${{ steps.v19fidelity.outcome }} ${{ steps.v191import.outcome }}
+        run: |
+          echo "Regression outcomes: $OUTCOMES"
+          if echo "$OUTCOMES" | grep -q failure; then
+            echo "One or more regression checks failed."
+            exit 1
+          fi
