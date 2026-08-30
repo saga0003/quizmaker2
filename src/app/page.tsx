@@ -20,8 +20,8 @@ import {
 import {
   AdminDashboardView,
   AdminProductsView,
-  AdminSubscriptionsView,
 } from '@/components/evidara/admin-views';
+import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
@@ -35,8 +35,8 @@ import { AdminInstitutionsView, AdminResourcesView, ReferralSettingsView, AdminS
 import { SchoolProductAccess } from '@/components/commerce/SchoolProductAccess';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
 import { InstitutionAnalyticsWorkspace } from '@/components/institution-analytics/institution-analytics-workspace';
+import { SalesDemoAnalyticsWorkspace, useSalesDemoMode } from '@/components/evidara/sales-demo-workspace';
 import type { AnalyticsV12View } from '@/types/analytics-v12';
-
 
 function analyticsView(view: string): AnalyticsV12View {
   if (view.endsWith('-question-intelligence')) return 'question-intelligence';
@@ -71,6 +71,7 @@ function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
 function ViewRouter() {
   const { view, user } = useAppStore();
   const { access } = useModuleAccess();
+  const salesDemoMode = useSalesDemoMode();
 
   if (user && !canOpenAppView(user, view, access)) {
     const fallback = defaultViewForRole(user.role);
@@ -90,7 +91,7 @@ function ViewRouter() {
   if (view === 'student-self-assessment') return <SelfAssessmentCenter />;
 
   if (view === 'school-dashboard') return <SchoolDashboardView />;
-  if (view.startsWith('school-analytics-')) return <InstitutionAnalyticsWorkspace mode="school" />;
+  if (view.startsWith('school-analytics-')) return salesDemoMode ? <SalesDemoAnalyticsWorkspace /> : <InstitutionAnalyticsWorkspace mode="school" />;
   if (view === 'school-questions') return <SchoolQuestionWorkspace />;
   if (view === 'school-papers') return <PaperWorkspace kind="school" />;
   if (view === 'school-students') return <SchoolStudentsView />;
@@ -106,7 +107,7 @@ function ViewRouter() {
   if (view === 'admin-questions') return <LiveQuestionBank kind="admin" />;
   if (view === 'admin-papers') return <PaperWorkspace kind="admin" />;
   if (view === 'admin-products') return <AdminProductsView />;
-  if (view === 'admin-subscriptions') return <AdminSubscriptionsView />;
+  if (view === 'admin-subscriptions') return <AdminSchoolControlView />;
   if (view === 'admin-institutions') return <AdminInstitutionsView />;
   if (view === 'admin-resources') return <AdminResourcesView />;
   if (view === 'admin-referrals') return <ReferralSettingsView />;
@@ -121,7 +122,6 @@ export default function Home() {
   const { access } = useModuleAccess();
   const [isMobile, setIsMobile] = useState(false);
 
-  /* Track viewport width */
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
@@ -180,12 +180,8 @@ export default function Home() {
   if (user) {
     return (
       <div className="min-h-screen bg-[var(--canvas)]">
-        {/* Desktop sidebar */}
         {!isMobile && <AppSidebar />}
-
-        {/* Mobile top bar */}
         {isMobile && <MobileTopBar />}
-
         <main
           className={`transition-all duration-200 ${
             isMobile
