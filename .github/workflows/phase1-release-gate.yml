@@ -33,5 +33,14 @@ jobs:
       - name: Phase 1 hardening checks
         run: node scripts/phase1-hardening-smoke.mjs
 
-      - name: Full regression gate
-        run: npm run qa:final
+      - name: TypeScript
+        run: npm run typecheck -- --incremental false
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Regression suite
+        run: npm run qa:regression
+
+      - name: Production build
+        run: npm run build
