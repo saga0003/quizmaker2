@@ -41,6 +41,29 @@ function compare(a: DemoAccount, b: DemoAccount, key: SortKey) {
   return String(av ?? '').localeCompare(String(bv ?? ''), undefined, { numeric: true, sensitivity: 'base' });
 }
 
+function SortHead({
+  label,
+  value,
+  sortKey,
+  sortDirection,
+  onSort,
+}: {
+  label: string;
+  value: SortKey;
+  sortKey: SortKey;
+  sortDirection: 'asc' | 'desc';
+  onSort: (key: SortKey) => void;
+}) {
+  return (
+    <TableHead>
+      <button type="button" className="inline-flex items-center gap-1 font-semibold" onClick={() => onSort(value)}>
+        {label}
+        {sortKey === value ? (sortDirection === 'asc' ? <ArrowDownAZ className="h-3.5 w-3.5" /> : <ArrowUpAZ className="h-3.5 w-3.5" />) : null}
+      </button>
+    </TableHead>
+  );
+}
+
 export function AdminAccessWorkspace() {
   const { session } = useAuth();
   const [data, setData] = useState<Payload | null>(null);
@@ -124,9 +147,7 @@ export function AdminAccessWorkspace() {
     return [...filtered].sort((a, b) => compare(a, b, sortKey) * (sortDirection === 'asc' ? 1 : -1));
   }, [data?.students, search, sortDirection, sortKey, track]);
 
-  const SortHead = ({ label, value }: { label: string; value: SortKey }) => (
-    <TableHead><button type="button" className="inline-flex items-center gap-1 font-semibold" onClick={() => sortBy(value)}>{label}{sortKey === value ? (sortDirection === 'asc' ? <ArrowDownAZ className="h-3.5 w-3.5" /> : <ArrowUpAZ className="h-3.5 w-3.5" />) : null}</button></TableHead>
-  );
+  const sortProps = { sortKey, sortDirection, onSort: sortBy };
 
   return <div className="space-y-6">
     <AccessControlView kind="admin" />
@@ -151,7 +172,7 @@ export function AdminAccessWorkspace() {
           <select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={track} onChange={(event) => setTrack(event.target.value)}><option value="all">All programs</option><option value="NEET">NEET</option><option value="JEE">JEE</option></select>
         </div>
 
-        <Card className="rounded-xl shadow-sm"><CardContent className="max-h-[620px] overflow-auto p-0"><Table className="min-w-[960px]"><TableHeader><TableRow><SortHead label="#" value="student_no" /><SortHead label="Student" value="full_name" /><SortHead label="Program" value="exam_track" /><SortHead label="Grade" value="grade" /><SortHead label="Section" value="section_code" /><SortHead label="Login" value="provisioned" /><TableHead>Action</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell>{row.student_no}</TableCell><TableCell><button type="button" className="text-left" onClick={() => setSelected(row)}><strong className="block text-[var(--foreground)]">{row.full_name}</strong><small className="text-[var(--muted-foreground)]">{row.email}</small></button></TableCell><TableCell><Badge variant="outline">{row.exam_track}</Badge></TableCell><TableCell>{row.grade}</TableCell><TableCell>{row.section_code}</TableCell><TableCell>{row.provisioned ? <Badge className="bg-[var(--teal)] text-white">Ready</Badge> : <Badge variant="outline">Pending</Badge>}</TableCell><TableCell><Button size="sm" variant="outline" disabled={!row.provisioned} onClick={() => setSelected(row)}><KeyRound className="mr-1 h-4 w-4" />Set password</Button></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+        <Card className="rounded-xl shadow-sm"><CardContent className="max-h-[620px] overflow-auto p-0"><Table className="min-w-[960px]"><TableHeader><TableRow><SortHead label="#" value="student_no" {...sortProps} /><SortHead label="Student" value="full_name" {...sortProps} /><SortHead label="Program" value="exam_track" {...sortProps} /><SortHead label="Grade" value="grade" {...sortProps} /><SortHead label="Section" value="section_code" {...sortProps} /><SortHead label="Login" value="provisioned" {...sortProps} /><TableHead>Action</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell>{row.student_no}</TableCell><TableCell><button type="button" className="text-left" onClick={() => setSelected(row)}><strong className="block text-[var(--foreground)]">{row.full_name}</strong><small className="text-[var(--muted-foreground)]">{row.email}</small></button></TableCell><TableCell><Badge variant="outline">{row.exam_track}</Badge></TableCell><TableCell>{row.grade}</TableCell><TableCell>{row.section_code}</TableCell><TableCell>{row.provisioned ? <Badge className="bg-[var(--teal)] text-white">Ready</Badge> : <Badge variant="outline">Pending</Badge>}</TableCell><TableCell><Button size="sm" variant="outline" disabled={!row.provisioned} onClick={() => setSelected(row)}><KeyRound className="mr-1 h-4 w-4" />Set password</Button></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
         <p className="text-xs text-[var(--muted-foreground)]">Showing {rows.length} matching students. Click any sortable header again to reverse the order.</p>
       </>}
     </section>
