@@ -54,8 +54,21 @@ jobs:
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
-      - name: Lint
-        run: npm run lint
+      - id: lint
+        name: Lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-regression.log
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-regression-${{ github.run_id }}
+          path: lint-regression.log
+          retention-days: 2
 
       - id: clean_school
         name: Regression — clean school UX
@@ -136,13 +149,16 @@ jobs:
         continue-on-error: true
         run: node scripts/v19-1-latex-paper-import-smoke.mjs
 
-      - name: Production build
+      - id: build
+        name: Production build
+        continue-on-error: true
         run: npm run build
 
-      - name: Enforce regression gate
+      - name: Enforce release gate
         if: always()
         env:
           OUTCOMES: >-
+            ${{ steps.lint.outcome }} ${{ steps.build.outcome }}
             ${{ steps.clean_school.outcome }} ${{ steps.launch.outcome }} ${{ steps.institution_analytics.outcome }}
             ${{ steps.increment3.outcome }} ${{ steps.increment4.outcome }} ${{ steps.increment58.outcome }}
             ${{ steps.public_student.outcome }} ${{ steps.profile_auth.outcome }} ${{ steps.student_live.outcome }}
@@ -150,8 +166,8 @@ jobs:
             ${{ steps.v15seo.outcome }} ${{ steps.v16pyq.outcome }} ${{ steps.v18paper.outcome }}
             ${{ steps.v19fidelity.outcome }} ${{ steps.v191import.outcome }}
         run: |
-          echo "Regression outcomes: $OUTCOMES"
+          echo "Release outcomes: $OUTCOMES"
           if echo "$OUTCOMES" | grep -q failure; then
-            echo "One or more regression checks failed."
+            echo "One or more required release checks failed."
             exit 1
           fi
