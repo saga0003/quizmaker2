@@ -16,6 +16,7 @@ function check(name, condition, details = '') {
 
 const eligibilityMigration = read('supabase/migrations/20260830171000_phase1_real_student_test_access.sql');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
+const subscriptionCenter = read('src/components/school/SubscriptionCenter.tsx');
 const releaseChecklist = read('PHASE1_RELEASE_CHECKLIST.md');
 const releaseWorkflow = read('.github/workflows/phase1-release-gate.yml');
 
@@ -28,7 +29,11 @@ check('exam start accepts active student membership', /create or replace functio
 check('staff is_org_member helper is not redefined', !/create or replace function public\.is_org_member/i.test(eligibilityMigration));
 check('student membership helper is not directly browser-executable', /revoke all on function public\.is_active_student_member\(uuid, uuid\) from authenticated/i.test(eligibilityMigration));
 check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s*\(/.test(responseAudit));
+check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
+check('school licence UI does not promise unlimited students', !/Unlimited students|Unlimited on activation|No seat limits/i.test(subscriptionCenter));
+check('school licence UI shows licensed and active quantities', /Licensed students/i.test(subscriptionCenter) && /Active students/i.test(subscriptionCenter));
 check('release checklist contains all P0 items', Array.from({ length: 12 }, (_, index) => `P0.${index + 1}`).every((item) => releaseChecklist.includes(item)));
+check('release workflow runs hardening checks', /phase1-hardening-smoke\.mjs/.test(releaseWorkflow));
 check('release workflow runs final QA suite', /npm run qa:final/.test(releaseWorkflow));
 
 for (const item of checks) {
