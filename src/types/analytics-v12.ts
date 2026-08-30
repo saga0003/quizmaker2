@@ -98,6 +98,29 @@ export type AnalyticsReviewRow = {
   last_seen_at: string | null;
 };
 
+export type AnalyticsQuestionEvidenceRow = {
+  response_id: string;
+  attempt_id: string;
+  paper_id: string;
+  paper_title: string;
+  submitted_at: string;
+  question_id: string;
+  question_no: number;
+  question_text: string;
+  difficulty: string;
+  subject_id: string;
+  subject_name: string;
+  chapter_id: string;
+  chapter_name: string;
+  topic_id: string;
+  topic_name: string;
+  outcome: 'correct' | 'incorrect' | 'unanswered';
+  marks: number;
+  negative_marks: number;
+  marks_awarded: number;
+  time_spent_seconds: number | null;
+};
+
 export type AnalyticsDirectoryStudent = {
   student_id: string;
   full_name: string;
@@ -158,6 +181,7 @@ export type AnalyticsV12Payload = {
   priorities: AnalyticsPriority[];
   history: AnalyticsHistoryRow[];
   review_queue: AnalyticsReviewRow[];
+  question_evidence?: AnalyticsQuestionEvidenceRow[];
   chapter_error_breakdown?: ChapterErrorBreakdownRow[];
   evidence_policy: {
     semantic_error_types: boolean;
