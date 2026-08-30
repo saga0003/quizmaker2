@@ -43,7 +43,6 @@
 }
 
 :root {
-  /* ── Core palette ── */
   --radius: 12px;
   --background: #FAFBFC;
   --foreground: #0F172A;
@@ -64,14 +63,12 @@
   --input: #E2E8F0;
   --ring: #0C6969;
 
-  /* ── Chart palette (professional, colour-blind safe) ── */
   --chart-1: #0C6969;
   --chart-2: #2563EB;
   --chart-3: #D97706;
   --chart-4: #DC2626;
   --chart-5: #7C3AED;
 
-  /* ── Sidebar (dark midnight) ── */
   --sidebar: #0F1A24;
   --sidebar-foreground: #CBD5E1;
   --sidebar-primary: #14B8A6;
@@ -81,14 +78,12 @@
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #F59E0B;
 
-  /* ── Shadows ── */
   --ev-shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.04);
   --ev-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
   --ev-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
   --ev-shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.1);
   --ev-shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.12);
 
-  /* ── Semantic colours ── */
   --teal: #0C6969;
   --midnight: #0F1A24;
   --canvas: #F8FAFB;
@@ -105,7 +100,6 @@
   --ev-info: #2563EB;
   --ev-info-bg: #EFF6FF;
 
-  /* ── Typography scale ── */
   --ev-text-xs: 0.6875rem;
   --ev-text-sm: 0.8125rem;
   --ev-text-base: 0.9375rem;
@@ -160,7 +154,6 @@
   }
 }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -176,7 +169,6 @@
   background: #94A3B8;
 }
 
-/* ── Evidara card base ── */
 .ev-card,
 .rm-card,
 .so-card,
@@ -187,7 +179,6 @@
   background: var(--card);
 }
 
-/* ── Evidara button variants ── */
 .ev-btn-primary,
 .rm-btn-primary,
 .so-btn-primary {
@@ -204,7 +195,6 @@
   background: #0A5353;
 }
 
-/* ── Universal product surfaces ── */
 button,
 [role="button"],
 a,
@@ -213,12 +203,10 @@ select {
   min-height: 40px;
 }
 
-/* ── Secure exam mode: hide unwanted elements ── */
 .secure-exam-content main.rm-card > div:first-child > div:first-child > div {
   display: none;
 }
 
-/* ── Page-level responsive padding ── */
 .ev-page-padding {
   padding: 16px;
 }
@@ -233,7 +221,6 @@ select {
   }
 }
 
-/* ── Responsive grid helpers ── */
 .ev-grid-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -273,7 +260,6 @@ select {
   }
 }
 
-/* ── Table responsive wrapper ── */
 .ev-table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -282,7 +268,6 @@ select {
   min-width: 640px;
 }
 
-/* ── Mobile-first utility ── */
 @media (max-width: 639px) {
   .hide-mobile {
     display: none !important;
@@ -300,8 +285,6 @@ select {
   }
 }
 
-/* V19 question typography: prose is never pushed through KaTeX. Genuine math
-   stays mathematically correct while text fragments inherit Evidara's UI font. */
 .evidara-math .katex {
   font-size: 1em;
   line-height: inherit;
@@ -318,4 +301,30 @@ select {
 .source-fidelity-content svg {
   max-width: 100%;
   background: #fff;
+}
+
+/* Launch analytics guard: long semantic labels such as "Evidence only" must
+   stay inside metric cards at desktop, tablet and mobile widths. */
+.analytics-v12 .analytics-v12-metric-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.analytics-v12 .analytics-v12-metric-value {
+  max-width: 100%;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: clamp(1.35rem, 2vw, 1.95rem) !important;
+  line-height: 1.08 !important;
+}
+@media (max-width: 1100px) {
+  .analytics-v12 .analytics-v12-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .analytics-v12 .analytics-v12-metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
