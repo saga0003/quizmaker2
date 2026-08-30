@@ -33,6 +33,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+type PendingSave = {
+  attemptId: string;
+  questionId: string;
+  response: unknown;
+  markedForReview: boolean;
+  timeSpentSeconds: number;
+  queuedAt: number;
+};
+
+const pendingStorageKey = (attemptId: string) => `evidara-exam-pending:${attemptId}`;
+const retryDelays = [0, 350, 1200];
+const sleep = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
 function hash(value: string) {
   let output = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -61,6 +74,9 @@ export function LiveExam() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveText, setSaveText] = useState('Ready');
+  const [online, setOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncingPending, setSyncingPending] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AttemptResult | null>(null);
@@ -72,8 +88,103 @@ export function LiveExam() {
   const submittingRef = useRef(false);
   const questionOpenedAt = useRef(Date.now());
   const lastSecurityEvent = useRef(0);
+  const pendingRef = useRef<Record<string, PendingSave>>({});
+  const flushPromiseRef = useRef<Promise<boolean> | null>(null);
+  const numericSyncTimer = useRef<number | null>(null);
+
+  function persistPending(attemptId: string, next: Record<string, PendingSave>) {
+    pendingRef.current = next;
+    setPendingCount(Object.keys(next).length);
+    try {
+      if (Object.keys(next).length) localStorage.setItem(pendingStorageKey(attemptId), JSON.stringify(next));
+      else localStorage.removeItem(pendingStorageKey(attemptId));
+    } catch {
+      // Local storage may be unavailable in locked-down browser modes; server sync still proceeds.
+    }
+  }
+
+  function queuePending(item: PendingSave) {
+    const next = { ...pendingRef.current, [item.questionId]: item };
+    persistPending(item.attemptId, next);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOnline(false);
+      setSaveText(`${Object.keys(next).length} waiting to sync`);
+    } else {
+      setSaveText('Waiting to sync…');
+    }
+  }
+
+  function acknowledgePending(item: PendingSave) {
+    const currentPending = pendingRef.current[item.questionId];
+    if (!currentPending || currentPending.queuedAt !== item.queuedAt) return;
+    const next = { ...pendingRef.current };
+    delete next[item.questionId];
+    persistPending(item.attemptId, next);
+  }
+
+  async function flushPending(attemptId?: string | null) {
+    const targetAttempt = attemptId || payload?.attempt_id;
+    if (!targetAttempt || !supabase) return false;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOnline(false);
+      setSaveText(`${Object.keys(pendingRef.current).length} waiting to sync`);
+      return Object.keys(pendingRef.current).length === 0;
+    }
+    if (flushPromiseRef.current) return flushPromiseRef.current;
+
+    const task = (async () => {
+      setOnline(true);
+      setSyncingPending(true);
+      setSaving(true);
+      const entries = Object.values(pendingRef.current)
+        .filter((item) => item.attemptId === targetAttempt)
+        .sort((a, b) => a.queuedAt - b.queuedAt);
+
+      for (const item of entries) {
+        let saved = false;
+        let lastMessage = '';
+        for (const delay of retryDelays) {
+          if (delay) await sleep(delay);
+          if (typeof navigator !== 'undefined' && !navigator.onLine) break;
+          const { error: saveError } = await supabase.rpc('save_exam_response', {
+            p_attempt_id: item.attemptId,
+            p_paper_question_id: item.questionId,
+            p_response: item.response === undefined ? null : item.response,
+            p_marked_for_review: item.markedForReview,
+            p_time_spent_seconds: item.timeSpentSeconds,
+          });
+          if (!saveError) {
+            acknowledgePending(item);
+            saved = true;
+            break;
+          }
+          lastMessage = saveError.message;
+          if (/no longer active|attempt not found|does not belong/i.test(lastMessage)) break;
+        }
+        if (!saved && lastMessage && typeof navigator !== 'undefined' && navigator.onLine) {
+          setError(`An answer is still waiting to sync: ${lastMessage}`);
+        }
+      }
+
+      const left = Object.values(pendingRef.current).filter((item) => item.attemptId === targetAttempt).length;
+      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+      setOnline(isOnline);
+      setSaveText(left === 0 ? 'All answers saved' : isOnline ? `${left} waiting to sync` : `Offline · ${left} waiting`);
+      setSaving(false);
+      setSyncingPending(false);
+      return left === 0;
+    })();
+
+    flushPromiseRef.current = task;
+    try {
+      return await task;
+    } finally {
+      flushPromiseRef.current = null;
+    }
+  }
 
   useEffect(() => {
+    setOnline(typeof navigator === 'undefined' ? true : navigator.onLine);
     const attempt = new URLSearchParams(window.location.search).get('attempt');
     if (!attempt) {
       setError('Attempt ID is missing.');
@@ -109,12 +220,32 @@ export function LiveExam() {
       initialVisited[item.paper_question_id] = item.visited;
     });
 
+    let restored: Record<string, PendingSave> = {};
+    try {
+      const raw = localStorage.getItem(pendingStorageKey(attempt));
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, PendingSave>;
+        const validIds = new Set(value.questions.map((item) => item.paper_question_id));
+        restored = Object.fromEntries(Object.entries(parsed).filter(([, item]) => item.attemptId === attempt && validIds.has(item.questionId)));
+      }
+    } catch {
+      restored = {};
+    }
+    persistPending(attempt, restored);
+    for (const item of Object.values(restored)) {
+      initialResponses[item.questionId] = item.response;
+      initialReview[item.questionId] = item.markedForReview;
+      initialVisited[item.questionId] = true;
+    }
+
     setPayload(value);
     setResponses(initialResponses);
     setReview(initialReview);
     setVisited({ ...initialVisited, [value.questions[0]?.paper_question_id]: true });
     setRemaining(Math.max(0, Math.floor((new Date(value.expires_at).getTime() - Date.now()) / 1000)));
+    setSaveText(Object.keys(restored).length ? `${Object.keys(restored).length} restored · waiting to sync` : 'All answers saved');
     setLoading(false);
+    if (Object.keys(restored).length && navigator.onLine) window.setTimeout(() => void flushPending(attempt), 0);
   }
 
   useEffect(() => {
@@ -128,6 +259,30 @@ export function LiveExam() {
       }
     }, 1000);
     return () => window.clearInterval(timer);
+  }, [payload, result]);
+
+  useEffect(() => {
+    if (!payload || result) return;
+    const connected = () => {
+      setOnline(true);
+      setSaveText(Object.keys(pendingRef.current).length ? 'Connection restored · syncing…' : 'All answers saved');
+      void flushPending(payload.attempt_id);
+    };
+    const disconnected = () => {
+      setOnline(false);
+      const count = Object.keys(pendingRef.current).length;
+      setSaveText(count ? `Offline · ${count} waiting` : 'Offline · answers saved locally');
+    };
+    const periodic = window.setInterval(() => {
+      if (navigator.onLine && Object.keys(pendingRef.current).length) void flushPending(payload.attempt_id);
+    }, 8000);
+    window.addEventListener('online', connected);
+    window.addEventListener('offline', disconnected);
+    return () => {
+      window.clearInterval(periodic);
+      window.removeEventListener('online', connected);
+      window.removeEventListener('offline', disconnected);
+    };
   }, [payload, result]);
 
   useEffect(() => {
@@ -245,25 +400,24 @@ export function LiveExam() {
     return [String(value)];
   }
 
+  function pendingItem(questionId: string, nextValue: unknown, nextReview: boolean): PendingSave | null {
+    if (!payload) return null;
+    return {
+      attemptId: payload.attempt_id,
+      questionId,
+      response: nextValue === undefined ? null : nextValue,
+      markedForReview: nextReview,
+      timeSpentSeconds: Math.max(0, Math.floor((Date.now() - questionOpenedAt.current) / 1000)),
+      queuedAt: Date.now(),
+    };
+  }
+
   async function saveAnswer(nextValue: unknown, nextReview = review[question?.paper_question_id || ''] || false) {
-    if (!payload || !question || !supabase) return;
-    setSaving(true);
-    setSaveText('Saving…');
-    const elapsed = Math.floor((Date.now() - questionOpenedAt.current) / 1000);
-    const { error: saveError } = await supabase.rpc('save_exam_response', {
-      p_attempt_id: payload.attempt_id,
-      p_paper_question_id: question.paper_question_id,
-      p_response: nextValue === undefined ? null : nextValue,
-      p_marked_for_review: nextReview,
-      p_time_spent_seconds: elapsed,
-    });
-    if (saveError) {
-      setError(saveError.message);
-      setSaveText('Save failed');
-    } else {
-      setSaveText('Saved');
-    }
-    setSaving(false);
+    if (!payload || !question || !supabase) return false;
+    const item = pendingItem(question.paper_question_id, nextValue, nextReview);
+    if (!item) return false;
+    queuePending(item);
+    return flushPending(payload.attempt_id);
   }
 
   async function selectOption(key: string) {
@@ -279,14 +433,23 @@ export function LiveExam() {
   }
 
   function setNumeric(value: string) {
-    if (!question) return;
+    if (!question || !payload) return;
     setResponses((previous) => ({ ...previous, [question.paper_question_id]: value }));
-    setSaveText('Unsaved');
+    const item = pendingItem(question.paper_question_id, value, review[question.paper_question_id] || false);
+    if (item) queuePending(item);
+    if (numericSyncTimer.current) window.clearTimeout(numericSyncTimer.current);
+    numericSyncTimer.current = window.setTimeout(() => void flushPending(payload.attempt_id), 500);
   }
 
   async function commitNumeric() {
-    if (!question) return;
-    await saveAnswer(responses[question.paper_question_id] ?? null);
+    if (!question || !payload) return false;
+    if (numericSyncTimer.current) {
+      window.clearTimeout(numericSyncTimer.current);
+      numericSyncTimer.current = null;
+    }
+    const item = pendingItem(question.paper_question_id, responses[question.paper_question_id] ?? null, review[question.paper_question_id] || false);
+    if (item) queuePending(item);
+    return flushPending(payload.attempt_id);
   }
 
   async function toggleReview() {
@@ -300,6 +463,8 @@ export function LiveExam() {
     if (index < 0 || !payload || index >= payload.questions.length) return;
     if (question && (question.question_type === 'numerical' || question.question_type === 'integer')) {
       void commitNumeric();
+    } else if (Object.keys(pendingRef.current).length) {
+      void flushPending(payload.attempt_id);
     }
     setCurrent(index);
   }
@@ -313,6 +478,17 @@ export function LiveExam() {
     if (question && (question.question_type === 'numerical' || question.question_type === 'integer')) {
       await commitNumeric();
     }
+    const synced = await flushPending(payload.attempt_id);
+    const stillPending = Object.values(pendingRef.current).filter((item) => item.attemptId === payload.attempt_id).length;
+    if (!synced || stillPending > 0) {
+      const offlineNow = typeof navigator !== 'undefined' && !navigator.onLine;
+      setError(offlineNow
+        ? `Internet is disconnected. ${stillPending} answer${stillPending === 1 ? '' : 's'} ${stillPending === 1 ? 'is' : 'are'} saved on this device and must sync before final submission.`
+        : `${stillPending} answer${stillPending === 1 ? '' : 's'} ${stillPending === 1 ? 'is' : 'are'} still syncing. Final submission is blocked until the server confirms every answer.`);
+      setSubmitting(false);
+      submittingRef.current = false;
+      return;
+    }
     const { data, error: submitError } = await supabase.rpc('submit_exam_attempt', {
       p_attempt_id: payload.attempt_id,
     });
@@ -322,6 +498,7 @@ export function LiveExam() {
       submittingRef.current = false;
       return;
     }
+    persistPending(payload.attempt_id, {});
     setResult(data as AttemptResult);
     setReflectionOpen(true);
     setSubmitting(false);
@@ -412,6 +589,14 @@ export function LiveExam() {
   const currentAnswer = responses[question.paper_question_id];
   const answerKeys = answerArray(currentAnswer);
   const answeredCount = payload.questions.filter((item) => answerArray(responses[item.paper_question_id]).length > 0).length;
+  const syncLabel = !online
+    ? pendingCount > 0 ? `Offline · ${pendingCount} waiting` : 'Offline · saved locally'
+    : syncingPending || saving
+      ? pendingCount > 0 ? `Syncing ${pendingCount}…` : 'Saving…'
+      : pendingCount > 0
+        ? `${pendingCount} waiting to sync`
+        : 'All answers saved';
+  const syncColor = !online || pendingCount > 0 ? '#ffd970' : '#c6f6d5';
 
   return (
     <div
@@ -422,7 +607,7 @@ export function LiveExam() {
       <header style={{ position: 'sticky', top: 0, zIndex: 20, background: '#131e35', color: 'white', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
           <strong>{payload.paper.title}</strong>
-          <div style={{ fontSize: 11, color: '#c6d0e0' }}>{payload.paper.exam_type} · Attempt autosaves</div>
+          <div style={{ fontSize: 11, color: '#c6d0e0' }}>{payload.paper.exam_type} · Answers are protected by local + server sync</div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: '1px solid rgba(255,255,255,.18)', borderRadius: 999, padding: '6px 9px', fontSize: 11, color: superAdminInspection ? '#ffd970' : '#c6f6d5' }}>
@@ -430,14 +615,15 @@ export function LiveExam() {
             {superAdminInspection ? 'Super Admin inspection mode' : 'Protected assessment content'}
           </span>
           <button className="rm-btn-secondary" style={{ padding: '8px 10px' }} onClick={() => void enterFullscreen()}><Expand size={15} />Fullscreen</button>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: saving ? '#ffd970' : '#c6f6d5', fontSize: 12 }}>
-            {saving ? <LoaderCircle className="spin" size={14} /> : <Wifi size={14} />} {saveText}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: syncColor, fontSize: 12 }} title={saveText}>
+            {syncingPending || saving ? <LoaderCircle className="spin" size={14} /> : <Wifi size={14} />} {syncLabel}
           </span>
           <strong style={{ fontSize: 20, color: remaining < 300 ? '#ffb4ab' : '#ffd970' }}><Clock3 size={18} /> {secondsText(remaining)}</strong>
         </div>
       </header>
 
       {securityNotice && <div style={{ padding: 10, background: '#fff8e6', color: '#775600', textAlign: 'center', fontSize: 13 }}><LockKeyhole size={15} /> {securityNotice}</div>}
+      {!online && <div style={{ padding: 10, background: '#fff8e6', color: '#775600', textAlign: 'center', fontSize: 13 }}><Wifi size={15} /> Internet disconnected. Your latest answers are stored on this device and will sync automatically when the connection returns.</div>}
       {error && <div style={{ padding: 10, background: '#fef3f2', color: '#b42318', textAlign: 'center' }}><AlertTriangle size={15} /> {error}</div>}
 
       <div className="exam-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 15, padding: 15, maxWidth: 1500, margin: 'auto' }}>
@@ -483,9 +669,7 @@ export function LiveExam() {
                       {sourceFidelity ? (
                         <strong>Option {orderedOptions.findIndex((item) => item.option_key === option.option_key) + 1}</strong>
                       ) : (
-                        <>
-                          <RichOptionContent text={option.content_text} latex={option.content_latex || undefined} imageUrl={option.image_url || undefined} imageAlt={`Option ${option.option_key}`} />
-                        </>
+                        <RichOptionContent text={option.content_text} latex={option.content_latex || undefined} imageUrl={option.image_url || undefined} imageAlt={`Option ${option.option_key}`} />
                       )}
                     </span>
                   </button>
@@ -516,8 +700,8 @@ export function LiveExam() {
             <span><i style={{ display: 'inline-block', width: 10, height: 10, background: '#f4ebff', marginRight: 5 }} />Review</span>
             <span><i style={{ display: 'inline-block', width: 10, height: 10, background: '#fff8e6', marginRight: 5 }} />Visited</span>
           </div>
-          <button className="rm-btn-dark" style={{ width: '100%', marginTop: 18 }} disabled={submitting} onClick={() => setSubmitDialogOpen(true)}>{submitting ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />}Submit test</button>
-          <div style={{ fontSize: 11, color: '#667085', marginTop: 10, textAlign: 'center' }}><Save size={12} /> Answers are stored in Supabase.</div>
+          <button className="rm-btn-dark" style={{ width: '100%', marginTop: 18 }} disabled={submitting || pendingCount > 0 || !online} onClick={() => setSubmitDialogOpen(true)}>{submitting ? <LoaderCircle className="spin" size={17} /> : <Send size={17} />}Submit test</button>
+          <div style={{ fontSize: 11, color: pendingCount || !online ? '#8a5f00' : '#667085', marginTop: 10, textAlign: 'center' }}><Save size={12} /> {pendingCount ? `${pendingCount} answer${pendingCount === 1 ? '' : 's'} waiting for server confirmation.` : online ? 'All answers confirmed by the server.' : 'Answers are safe locally until connection returns.'}</div>
         </aside>
       </div>
 
@@ -533,12 +717,13 @@ export function LiveExam() {
           <div className="px-6 py-5">
             <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4 text-sm text-[#475467]">
               Marked for review: <strong className="text-[#6941C6]">{Object.values(review).filter(Boolean).length}</strong><br />
-              Unanswered: <strong className="text-[var(--destructive)]">{payload.questions.length - answeredCount}</strong>
+              Unanswered: <strong className="text-[var(--destructive)]">{payload.questions.length - answeredCount}</strong><br />
+              Sync status: <strong className={pendingCount ? 'text-[#8A5F00]' : 'text-[#137A3A]'}>{pendingCount ? `${pendingCount} waiting` : 'All answers confirmed'}</strong>
             </div>
           </div>
           <AlertDialogFooter className="border-t border-[var(--line)] px-6 py-4">
             <AlertDialogCancel>Continue test</AlertDialogCancel>
-            <Button type="button" onClick={() => void submit(false)} disabled={submitting} className="bg-[var(--teal)] text-white hover:bg-[#0A4747]">
+            <Button type="button" onClick={() => void submit(false)} disabled={submitting || pendingCount > 0 || !online} className="bg-[var(--teal)] text-white hover:bg-[#0A4747]">
               {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit final answers
             </Button>
           </AlertDialogFooter>
