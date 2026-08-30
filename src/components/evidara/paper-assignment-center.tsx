@@ -136,9 +136,10 @@ export function PaperAssignmentCenter() {
   }, [paperId, mode, academicYear, grades, sectionIds, tracks, studentIds]);
 
   useEffect(() => {
-    if (mode !== 'students' || !supabase || !organizationId) return;
+    const client = supabase;
+    if (mode !== 'students' || !client || !organizationId) return;
     const timer = window.setTimeout(async () => {
-      const { data, error: searchError } = await supabase.rpc('search_assignment_students_v19', {
+      const { data, error: searchError } = await client.rpc('search_assignment_students_v19', {
         p_organization_id: organizationId,
         p_search: studentSearch.trim() || null,
         p_limit: 40,
