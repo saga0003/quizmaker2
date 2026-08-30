@@ -15,6 +15,7 @@ alter table public.credential_security_states enable row level security;
 revoke all on public.credential_security_states from public, anon, authenticated;
 grant select on public.credential_security_states to authenticated;
 
+drop policy if exists credential_security_states_self_read on public.credential_security_states;
 create policy credential_security_states_self_read
 on public.credential_security_states
 for select
@@ -69,7 +70,7 @@ $$;
 
 revoke all on function public.capture_temporary_password_issue_v20() from public, anon, authenticated;
 
- drop trigger if exists capture_temporary_password_issue_v20 on public.audit_logs;
+drop trigger if exists capture_temporary_password_issue_v20 on public.audit_logs;
 create trigger capture_temporary_password_issue_v20
 after insert on public.audit_logs
 for each row
