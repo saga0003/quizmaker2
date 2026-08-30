@@ -38,7 +38,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 # A — Stability, security and tenancy
 
 - [x] A1 Automated preview QA before production promotion. GitHub release gate is bound to `phase1-hardening`/`main`; exact release candidate must pass TypeScript, lint, hardening/regression suites and production build, with a matching READY Vercel preview before promotion.
-- [ ] A2 Tenant-isolation regression suite for School A vs School B.
+- [x] A2 Tenant-isolation regression suite for School A vs School B — verified 31 Aug 2026. A production-safe SQL policy audit covers student memberships, organization questions, papers, assignments, attempts/answers and analytics authorization boundaries; the automated `a2-tenant-isolation-smoke.mjs` is wired into every Phase-1 release gate. Hardening commit `7fffbd46cd226db2c6f01e76b2c8b41433bfbd13` passed the complete release gate in run `33337647257`, and the matching Vercel preview is READY. The real two-school end-to-end proof remains independently required under R16.
 - [ ] A3 Audit every privileged change: institution/subscription/account/password/question/paper/result/view-as/resource.
 - [ ] A4 RLS cleanup for legacy staging/recovery tables and documented grants.
 - [ ] A5 Protected resources use authenticated/signed URLs where content is private.
@@ -182,7 +182,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # Production sign-off
 
-- [ ] Z1 All P0 items complete.
+- [x] Z1 All P0 items complete — verified 31 Aug 2026; P0.1 through P0.12 are checked with release-gate/live-enforcement evidence. Credential AAL2 production activation remains correctly staged under Z8 as part of coordinated cutover, not as an unchecked P0 implementation item.
 - [ ] Z2 Real-school acceptance test complete.
 - [ ] Z3 Tenant-isolation tests pass.
 - [ ] Z4 Production build passes from exact release commit.
