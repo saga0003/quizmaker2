@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowUpDown, ChevronRight, Search, School, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
+import { QuestionResponseAudit } from '@/components/analytics-v12/question-response-audit';
 import { InstitutionAnalyticsWorkspace } from '@/components/institution-analytics/institution-analytics-workspace';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -188,7 +189,7 @@ export function LaunchAnalyticsWorkspace({ mode }: { mode: 'platform' | 'school'
       .finally(() => setLoading(false));
   }, [session?.access_token]);
 
-  if (selectedStudent) return <div className="space-y-4"><Button variant="outline" onClick={() => setSelectedStudent(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to student list</Button><div className="rounded-xl border border-[var(--line)] bg-white p-2 shadow-sm"><AnalyticsV12Workspace mode="school" selectedStudentId={selectedStudent.id} embedded hideStudentSelector /></div></div>;
+  if (selectedStudent) return <div className="space-y-4"><Button variant="outline" onClick={() => setSelectedStudent(null)}><ArrowLeft className="mr-2 h-4 w-4" />Back to student list</Button><div className="rounded-xl border border-[var(--line)] bg-white p-2 shadow-sm"><AnalyticsV12Workspace mode="school" selectedStudentId={selectedStudent.id} embedded hideStudentSelector /></div><QuestionResponseAudit studentId={selectedStudent.id} /></div>;
   if (liveExplorer) return <div className="space-y-4"><Button variant="outline" onClick={() => setLiveExplorer(false)}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button><InstitutionAnalyticsWorkspace mode={mode} /></div>;
   if (loading) return <div className="p-6 text-sm text-[var(--muted-foreground)]">Loading Supabase analytics evidence…</div>;
 
