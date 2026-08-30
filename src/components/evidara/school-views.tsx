@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, BookOpen, CreditCard, FilePlus, FileText, GraduationCap, Users } from 'lucide-react';
-import { useAppStore } from '@/store/use-app-store';
+import { BarChart3, BookOpen, FilePlus, FileText, GraduationCap, Users } from 'lucide-react';
+import { useAppStore, type AppView } from '@/store/use-app-store';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { normalizeEvidaraRole } from '@/lib/roles';
@@ -23,7 +23,7 @@ const fadeUp = {
 
 function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; label: string; value: string; sub?: string }) {
   return (
-    <Card className="shadow-sm rounded-xl">
+    <Card className="rounded-xl shadow-sm">
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -38,6 +38,10 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; 
   );
 }
 
+function viewHref(view: AppView) {
+  return `/?view=${encodeURIComponent(view)}`;
+}
+
 export function SchoolDashboardView() {
   const setView = useAppStore((s) => s.setView);
   const { profile } = useAuth();
@@ -50,10 +54,6 @@ export function SchoolDashboardView() {
   });
   const activeStudents = state.students.filter((student) => student.status === 'active').length;
   const seatLimit = state.school.subscription.seatLimit || 0;
-  const daysRemaining = Math.max(
-    0,
-    Math.ceil((new Date(`${state.school.subscription.endsAt}T23:59:59`).getTime() - Date.now()) / 86400000),
-  );
 
   const quickActions = [
     { label: teacher ? 'New My Question' : 'New Question', icon: FilePlus, view: 'school-questions' as const },
@@ -61,6 +61,16 @@ export function SchoolDashboardView() {
     { label: teacher ? 'Assigned Students' : 'Manage Students', icon: Users, view: 'school-students' as const },
     { label: 'View Analytics', icon: BarChart3, view: 'school-analytics-overview' as const },
   ];
+
+  function openView(event: MouseEvent<HTMLAnchorElement>, next: AppView) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    setView(next);
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('view', next);
+    window.history.pushState({ evidaraView: next }, '', `${url.pathname}${url.search}${url.hash}`);
+  }
 
   useEffect(() => {
     if (!supabase || !profile?.id || !state.school.id) return;
@@ -87,7 +97,7 @@ export function SchoolDashboardView() {
   if (error)
     return (
       <div className="p-6">
-        <Card className="shadow-sm rounded-xl">
+        <Card className="rounded-xl shadow-sm">
           <CardContent className="p-6">
             <p className="font-semibold text-[var(--foreground)]">Institution dashboard unavailable</p>
             <p className="mt-2 text-sm text-[var(--muted-foreground)]">{error}</p>
@@ -100,31 +110,29 @@ export function SchoolDashboardView() {
     );
 
   return (
-    <motion.div className="space-y-4 md:space-y-6 p-4 md:p-6" {...fadeUp} initial="initial" animate="animate">
-      {/* Welcome Banner */}
-      <div className="rounded-xl border border-[var(--line)] bg-gradient-to-r from-[#14232B] to-[var(--teal)] px-4 py-5 sm:px-6 sm:py-6 text-white">
+    <motion.div className="space-y-4 p-4 md:space-y-6 md:p-6" {...fadeUp} initial="initial" animate="animate">
+      <div className="rounded-xl border border-[var(--line)] bg-gradient-to-r from-[#14232B] to-[#117C78] px-4 py-5 text-white sm:px-6 sm:py-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
             <GraduationCap className="h-6 w-6" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-xl font-bold md:text-2xl">
+            <h1 className="text-xl font-bold !text-white md:text-2xl">
               {teacher ? `Teacher Dashboard · ${state.school.name}` : `Welcome, ${state.school.name}`}
             </h1>
-            <p className="text-sm text-white/70">
+            <p className="text-sm !text-white/80">
               {state.school.board}{state.school.city ? ` · ${state.school.city}` : ''}
             </p>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Badge className="border-white/20 bg-white/10 text-white">{state.school.subscription.planName}</Badge>
-          <Badge variant="outline" className="border-white/20 text-white/80">{state.school.subscription.status}</Badge>
-          <Badge variant="outline" className="border-white/20 text-white/80">Live · {mode}</Badge>
+          <Badge className="border-white/25 bg-white/15 !text-white">{state.school.subscription.planName}</Badge>
+          <Badge variant="outline" className="border-white/30 bg-transparent !text-white">{state.school.subscription.status}</Badge>
+          <Badge variant="outline" className="border-white/30 bg-transparent !text-white">Live · {mode}</Badge>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <StatCard
           icon={Users}
           label={teacher ? 'Students in scope' : 'Active students'}
@@ -159,22 +167,21 @@ export function SchoolDashboardView() {
         />
       </div>
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {quickActions.map((action) => (
-          <button
+          <a
             key={action.view}
-            onClick={() => setView(action.view)}
-            className="flex min-h-[4.5rem] items-center gap-3 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left shadow-sm hover:border-[var(--teal)]"
+            href={viewHref(action.view)}
+            onClick={(event) => openView(event, action.view)}
+            className="flex min-h-[4.5rem] items-center gap-3 rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-left shadow-sm transition hover:border-[var(--teal)]"
           >
             <action.icon className="h-5 w-5 shrink-0 text-[var(--teal)]" />
             <span className="text-sm font-semibold text-[var(--foreground)]">{action.label}</span>
-          </button>
+          </a>
         ))}
       </div>
 
-      {/* Info Note */}
-      <Card className="shadow-sm rounded-xl">
+      <Card className="rounded-xl shadow-sm">
         <CardContent className="p-5">
           <p className="text-sm font-semibold text-[var(--foreground)]">Live data only</p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
