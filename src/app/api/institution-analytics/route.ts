@@ -434,7 +434,7 @@ async function responseEvidence(ctx: CloudContext, attemptIds: string[]) {
     const ids = attemptIds.slice(start, start + 150);
     const rows = await paged<Record<string, unknown>>((from, to) => ctx.admin
       .from('exam_responses')
-      .select('attempt_id,is_correct,marks_awarded,time_spent_seconds,paper_questions(marks,questions(id,subject_id,chapter_id,topic_id,subjects(id,name),chapters(id,name),topics(id,name)))')
+      .select('attempt_id,is_correct,marks_awarded,time_spent_seconds,paper_questions(marks,question_snapshot,questions(id,subject_id,chapter_id,topic_id,subjects(id,name),chapters(id,name),topics(id,name)))')
       .in('attempt_id', ids)
       .range(from, to) as unknown as PromiseLike<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>);
     output.push(...rows);
@@ -447,13 +447,24 @@ function taxonomyObject(response: Record<string, unknown>) {
   const paperQuestion = Array.isArray(paperQuestionRaw) ? paperQuestionRaw[0] : paperQuestionRaw as Record<string, unknown> | null;
   const questionRaw = paperQuestion?.questions;
   const question = Array.isArray(questionRaw) ? questionRaw[0] : questionRaw as Record<string, unknown> | null;
+  const snapshotRaw = paperQuestion?.question_snapshot;
+  const snapshot = snapshotRaw && typeof snapshotRaw === 'object' && !Array.isArray(snapshotRaw)
+    ? snapshotRaw as Record<string, unknown>
+    : null;
   const object = (value: unknown) => Array.isArray(value) ? value[0] as Record<string, unknown> : value as Record<string, unknown> | null;
+  const frozenTaxonomy = (idKey: string, nameKey: string, fallback: Record<string, unknown> | null) => {
+    const id = snapshot?.[idKey];
+    const name = snapshot?.[nameKey];
+    if (typeof id === 'string' && id && typeof name === 'string' && name) return { id, name };
+    if (typeof id === 'string' && id) return { id, name: typeof name === 'string' && name ? name : String(fallback?.name || id) };
+    return fallback;
+  };
   return {
     paperQuestion,
     question,
-    subject: object(question?.subjects),
-    chapter: object(question?.chapters),
-    topic: object(question?.topics),
+    subject: frozenTaxonomy('subject_id', 'subject_name', object(question?.subjects)),
+    chapter: frozenTaxonomy('chapter_id', 'chapter_name', object(question?.chapters)),
+    topic: frozenTaxonomy('topic_id', 'topic_name', object(question?.topics)),
   };
 }
 
