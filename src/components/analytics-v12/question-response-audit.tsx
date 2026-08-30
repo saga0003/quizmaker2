@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronUp, Clock3, Search, XCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -40,26 +39,29 @@ export function QuestionResponseAudit({ studentId, defaultOpen = false }: { stud
     }
     let cancelled = false;
     setLoading(true);
-    void supabase.rpc('get_student_analytics_v12', {
-      p_student_id: studentId,
-      p_product_id: null,
-      p_date_from: null,
-      p_date_to: null,
-    }).then(({ data, error: rpcError }) => {
-      if (cancelled) return;
-      if (rpcError) {
-        setError(rpcError.message);
-        setRows([]);
-        return;
+    void (async () => {
+      try {
+        const { data, error: rpcError } = await supabase.rpc('get_student_analytics_v12', {
+          p_student_id: studentId,
+          p_product_id: null,
+          p_date_from: null,
+          p_date_to: null,
+        });
+        if (cancelled) return;
+        if (rpcError) {
+          setError(rpcError.message);
+          setRows([]);
+          return;
+        }
+        const payload = (data || {}) as AnalyticsV12Payload;
+        const evidence = Array.isArray(payload.question_evidence) ? payload.question_evidence : [];
+        setRows(evidence);
+        setError('');
+        if (evidence.length) document.documentElement.classList.add('demo-question-evidence-ready');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      const payload = (data || {}) as AnalyticsV12Payload;
-      const evidence = Array.isArray(payload.question_evidence) ? payload.question_evidence : [];
-      setRows(evidence);
-      setError('');
-      if (evidence.length) document.documentElement.classList.add('demo-question-evidence-ready');
-    }).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    })();
     return () => {
       cancelled = true;
       document.documentElement.classList.remove('demo-question-evidence-ready');
