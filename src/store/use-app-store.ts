@@ -66,6 +66,12 @@ export interface AppUser {
   avatar?: string;
 }
 
+type PreviewIdentity = {
+  id?: string;
+  name?: string;
+  email?: string;
+};
+
 export function cloudRoleToWorkspaceRole(role?: string | null): Exclude<UserRole, null> {
   const normalized = normalizeEvidaraRole(role);
   if (normalized === 'super_admin' || normalized === 'evidara_admin') return 'admin';
@@ -84,13 +90,14 @@ interface AppState {
   user: AppUser | null;
   baseUser: AppUser | null;
   impersonatingAs: EvidaraRole | null;
+  impersonatedUser: AppUser | null;
   sidebarOpen: boolean;
   authReady: boolean;
   setView: (view: AppView) => void;
   setCloudUser: (user: AppUser | null) => void;
   setAuthReady: (ready: boolean) => void;
   login: (role: 'student' | 'school' | 'admin') => void;
-  loginAs: (role: Exclude<EvidaraRole, 'super_admin'>) => void;
+  loginAs: (role: Exclude<EvidaraRole, 'super_admin'>, identity?: PreviewIdentity) => void;
   exitLoginAs: () => void;
   logout: () => Promise<void>;
   setSidebarOpen: (open: boolean) => void;
@@ -101,6 +108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   user: null,
   baseUser: null,
   impersonatingAs: null,
+  impersonatedUser: null,
   sidebarOpen: true,
   authReady: !isSupabaseConfigured,
   setView: (view) => {
@@ -115,16 +123,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setCloudUser: (user) => {
     if (!user) {
-      set({ user: null, baseUser: null, impersonatingAs: null, view: 'landing', sidebarOpen: true });
+      set({ user: null, baseUser: null, impersonatingAs: null, impersonatedUser: null, view: 'landing', sidebarOpen: true });
       return;
     }
     const current = get();
     const targetRole = current.baseUser?.id === user.id && current.baseUser.accessRole === 'super_admin'
       ? current.impersonatingAs
       : null;
-    const effectiveUser = targetRole
-      ? { ...user, role: cloudRoleToWorkspaceRole(targetRole), accessRole: targetRole }
-      : user;
+    const preservedPreview = targetRole && current.impersonatedUser?.accessRole === targetRole
+      ? current.impersonatedUser
+      : null;
+    const effectiveUser = preservedPreview || (targetRole
+      ? { ...user, role: cloudRoleToWorkspaceRole(targetRole), accessRole: targetRole, name: `${user.name} · ${evidaraRoleLabel(targetRole)}` }
+      : user);
     const sameIdentity =
       current.user?.id === effectiveUser.id &&
       current.user?.role === effectiveUser.role &&
@@ -134,6 +145,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       user: effectiveUser,
       baseUser: user,
       impersonatingAs: targetRole,
+      impersonatedUser: preservedPreview,
       view: sameIdentity && authenticatedView ? current.view : defaultViewForRole(effectiveUser.role),
       sidebarOpen: true,
     });
@@ -165,18 +177,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     };
     const selected = users[role];
-    set({ user: selected, baseUser: selected, impersonatingAs: null, view: defaultViewForRole(role), sidebarOpen: true, authReady: true });
+    set({ user: selected, baseUser: selected, impersonatingAs: null, impersonatedUser: null, view: defaultViewForRole(role), sidebarOpen: true, authReady: true });
   },
-  loginAs: (role) => {
+  loginAs: (role, identity) => {
     const current = get();
     const baseUser = current.baseUser ?? current.user;
     if (!baseUser || baseUser.accessRole !== 'super_admin') return;
     const workspaceRole = cloudRoleToWorkspaceRole(role);
+    const effectiveUser: AppUser = role === 'student' && identity?.id
+      ? {
+          id: identity.id,
+          name: identity.name || 'Demo Student',
+          email: identity.email || '',
+          role: 'student',
+          accessRole: 'student',
+        }
+      : {
+          ...baseUser,
+          role: workspaceRole,
+          accessRole: role,
+          name: `${baseUser.name} · ${evidaraRoleLabel(role)}`,
+        };
     set({
       baseUser,
       impersonatingAs: role,
-      user: { ...baseUser, role: workspaceRole, accessRole: role, name: `${baseUser.name} · ${evidaraRoleLabel(role)}` },
-      view: defaultViewForRole(workspaceRole),
+      impersonatedUser: effectiveUser,
+      user: effectiveUser,
+      view: role === 'student' && identity?.id ? 'student-analytics-overview' : defaultViewForRole(workspaceRole),
       sidebarOpen: true,
     });
   },
@@ -187,13 +214,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       user: baseUser,
       impersonatingAs: null,
+      impersonatedUser: null,
       view: defaultViewForRole(baseUser.role),
       sidebarOpen: true,
     });
   },
   logout: async () => {
     if (supabase) await supabase.auth.signOut();
-    set({ user: null, baseUser: null, impersonatingAs: null, view: 'landing', sidebarOpen: true, authReady: true });
+    set({ user: null, baseUser: null, impersonatingAs: null, impersonatedUser: null, view: 'landing', sidebarOpen: true, authReady: true });
   },
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
 }));
