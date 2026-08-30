@@ -15,6 +15,10 @@ function check(name, condition, details = '') {
 }
 
 const eligibilityMigration = read('supabase/migrations/20260830171000_phase1_real_student_test_access.sql');
+const assignmentMigration = read('supabase/migrations/20260830172500_phase1_assignment_and_subscription_core.sql');
+const assignmentSearchMigration = read('supabase/migrations/20260830185000_phase1_assignment_student_search.sql');
+const assignmentPublishGuard = read('supabase/migrations/20260830231500_phase1_assignment_publish_guard.sql');
+const assignmentCenter = read('src/components/evidara/paper-assignment-center.tsx');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
 const subscriptionCenter = read('src/components/school/SubscriptionCenter.tsx');
 const viewAsSwitcher = read('src/components/evidara/login-as-switcher.tsx');
@@ -30,6 +34,17 @@ check('private-code lookup accepts active student membership', /create or replac
 check('exam start accepts active student membership', /create or replace function public\.start_exam_attempt[\s\S]*is_active_student_member/i.test(eligibilityMigration));
 check('staff is_org_member helper is not redefined', !/create or replace function public\.is_org_member/i.test(eligibilityMigration));
 check('student membership helper is not directly browser-executable', /revoke all on function public\.is_active_student_member\(uuid, uuid\) from authenticated/i.test(eligibilityMigration));
+
+check('assignment tables are defined', /create table if not exists public\.paper_assignment_profiles/i.test(assignmentMigration) && /create table if not exists public\.paper_student_assignments/i.test(assignmentMigration));
+check('assignment preview is server-authoritative', /create or replace function public\.preview_paper_assignment_v19/i.test(assignmentMigration));
+check('assignment cohort is materialized server-side', /create or replace function public\.(assign_paper_audience_v19|materialize_paper_assignment_v19)/i.test(assignmentMigration));
+check('student assignment search RPC exists', /create or replace function public\.search_assignment_students_v19/i.test(assignmentSearchMigration));
+check('school papers workspace renders assignment center', /import \{ PaperAssignmentCenter \}/.test(homeShell) && /kind === 'school' && <PaperAssignmentCenter/.test(homeShell));
+check('assignment UI previews exact audience count', /Preview audience/.test(assignmentCenter) && /assigned_count/.test(assignmentCenter));
+check('assignment UI supports class filters and specific students', /Class filters/.test(assignmentCenter) && /Specific students/.test(assignmentCenter));
+check('new institutional papers require assigned cohort before publish', /phase1_require_assigned_audience_v19/.test(assignmentPublishGuard) && /Assign this test to students before publishing it/.test(assignmentPublishGuard));
+check('zero-student assignment cannot be published', /has no eligible students/.test(assignmentPublishGuard));
+
 check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s*\(/.test(responseAudit));
 check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
 check('school licence UI does not promise unlimited students', !/Unlimited students|Unlimited on activation|No seat limits/i.test(subscriptionCenter));
