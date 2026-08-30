@@ -11,6 +11,7 @@ import { StudentLifecycleManager } from '@/components/school/StudentLifecycleMan
 import { ResourceLibrary } from '@/components/school/ResourceLibrary';
 import { SubscriptionCenter } from '@/components/school/SubscriptionCenter';
 import { useSchoolPlatform } from '@/components/school/useSchoolPlatform';
+import { SalesDemoStudentRoster, useSalesDemoData, useSalesDemoMode } from '@/components/evidara/sales-demo-workspace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,13 +48,18 @@ export function SchoolDashboardView() {
   const { profile } = useAuth();
   const accessRole = normalizeEvidaraRole(profile?.role);
   const teacher = accessRole === 'school_teacher';
+  const salesDemoMode = useSalesDemoMode();
+  const { data: salesDemo } = useSalesDemoData(salesDemoMode);
   const [contentMetrics, setContentMetrics] = useState({ questions: 0, papers: 0 });
   const { state, ready, mode, error, syncing, refresh } = useSchoolPlatform({
     allowDemo: false,
     unavailableMessage: 'Live institution dashboard requires configured Evidara cloud access.',
   });
-  const activeStudents = state.students.filter((student) => student.status === 'active').length;
-  const seatLimit = state.school.subscription.seatLimit || 0;
+  const liveActiveStudents = state.students.filter((student) => student.status === 'active').length;
+  const activeStudents = salesDemoMode && salesDemo ? salesDemo.stats.students : liveActiveStudents;
+  const seatLimit = state.school.subscription.seatLimit || salesDemo?.subscription?.seat_limit || 0;
+  const displayedQuestions = salesDemoMode && salesDemo ? salesDemo.stats.questionInstances : contentMetrics.questions;
+  const displayedPapers = salesDemoMode && salesDemo ? salesDemo.stats.tests : contentMetrics.papers;
 
   const quickActions = [
     { label: teacher ? 'New My Question' : 'New Question', icon: FilePlus, view: 'school-questions' as const },
@@ -73,6 +79,7 @@ export function SchoolDashboardView() {
   }
 
   useEffect(() => {
+    if (salesDemoMode) return;
     if (!supabase || !profile?.id || !state.school.id) return;
     let cancelled = false;
     void (async () => {
@@ -89,7 +96,7 @@ export function SchoolDashboardView() {
       if (!cancelled) setContentMetrics({ questions: questions.count || 0, papers: papers.count || 0 });
     })();
     return () => { cancelled = true; };
-  }, [profile?.id, state.school.id, teacher]);
+  }, [profile?.id, salesDemoMode, state.school.id, teacher]);
 
   if (!ready)
     return <div className="p-6 text-sm text-[var(--muted-foreground)]">Loading live institution dashboard…</div>;
@@ -128,7 +135,7 @@ export function SchoolDashboardView() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge className="border-white/25 bg-white/15 !text-white">{state.school.subscription.planName}</Badge>
           <Badge variant="outline" className="border-white/30 bg-transparent !text-white">{state.school.subscription.status}</Badge>
-          <Badge variant="outline" className="border-white/30 bg-transparent !text-white">Live · {mode}</Badge>
+          <Badge variant="outline" className="border-white/30 bg-transparent !text-white">{salesDemoMode ? 'Sales demo dataset' : `Live · ${mode}`}</Badge>
         </div>
       </div>
 
@@ -138,26 +145,28 @@ export function SchoolDashboardView() {
           label={teacher ? 'Students in scope' : 'Active students'}
           value={String(activeStudents)}
           sub={
-            teacher
-              ? 'Only actively assigned sections'
-              : seatLimit > 0
-                ? `${Math.max(0, seatLimit - activeStudents)} of ${seatLimit} seats available`
-                : state.school.subscription.status === 'active'
-                  ? 'Unlimited student access'
-                  : 'Activates with institution plan'
+            salesDemoMode && salesDemo
+              ? `${salesDemo.stats.neetStudents} NEET + ${salesDemo.stats.jeeStudents} JEE · ${Math.max(0, seatLimit - activeStudents)} of ${seatLimit} licences available`
+              : teacher
+                ? 'Only actively assigned sections'
+                : seatLimit > 0
+                  ? `${Math.max(0, seatLimit - activeStudents)} of ${seatLimit} seats available`
+                  : state.school.subscription.status === 'active'
+                    ? 'Unlimited student access'
+                    : 'Activates with institution plan'
           }
         />
         <StatCard
           icon={BookOpen}
-          label={teacher ? 'My questions' : 'School questions'}
-          value={String(contentMetrics.questions)}
-          sub="Live question count"
+          label={salesDemoMode ? 'Demo question instances' : teacher ? 'My questions' : 'School questions'}
+          value={String(displayedQuestions)}
+          sub={salesDemoMode ? 'Across seeded chapter, topic, mock and full-length tests' : 'Live question count'}
         />
         <StatCard
           icon={FileText}
-          label={teacher ? 'My papers' : 'School papers'}
-          value={String(contentMetrics.papers)}
-          sub="Live paper count"
+          label={salesDemoMode ? 'Demo tests' : teacher ? 'My papers' : 'School papers'}
+          value={String(displayedPapers)}
+          sub={salesDemoMode && salesDemo ? `${salesDemo.stats.attempts.toLocaleString('en-IN')} submitted demo attempts` : 'Live paper count'}
         />
         <StatCard
           icon={BookOpen}
@@ -183,10 +192,11 @@ export function SchoolDashboardView() {
 
       <Card className="rounded-xl shadow-sm">
         <CardContent className="p-5">
-          <p className="text-sm font-semibold text-[var(--foreground)]">Live data only</p>
+          <p className="text-sm font-semibold text-[var(--foreground)]">{salesDemoMode ? 'Sales Demo School data' : 'Live data only'}</p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            All cards above are sourced from authorized live records. Teacher counts are narrowed to the signed-in
-            teacher and assigned student scope; school admins receive institution scope.
+            {salesDemoMode
+              ? 'This one authorised demo school uses a clearly separated synthetic roster and assessment dataset for product demonstrations. No other school receives these records.'
+              : 'All cards above are sourced from authorized live records. Teacher counts are narrowed to the signed-in teacher and assigned student scope; school admins receive institution scope.'}
           </p>
         </CardContent>
       </Card>
@@ -195,6 +205,15 @@ export function SchoolDashboardView() {
 }
 
 export function SchoolStudentsView() {
+  const salesDemoMode = useSalesDemoMode();
+  if (salesDemoMode) {
+    return (
+      <motion.div className="min-w-0 space-y-6 p-4 md:p-6" {...fadeUp} initial="initial" animate="animate">
+        <div><h1 className="text-2xl font-bold">Demo student roster</h1><p className="text-sm text-[var(--muted-foreground)]">500 seeded sales-demo students. Real school rosters are never mixed with this dataset.</p></div>
+        <SalesDemoStudentRoster />
+      </motion.div>
+    );
+  }
   return (
     <motion.div className="min-w-0 space-y-6 p-4 md:p-6" {...fadeUp} initial="initial" animate="animate">
       <StudentLifecycleManager />
