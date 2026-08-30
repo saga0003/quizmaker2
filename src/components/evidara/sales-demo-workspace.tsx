@@ -1,13 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ElementType } from 'react';
-import { BarChart3, BookOpen, GraduationCap, Search, Target, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ElementType } from 'react';
+import { BarChart3, BookOpen, GraduationCap, LoaderCircle, Pencil, Search, Target, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
 import { useAppStore } from '@/store/use-app-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+export type SalesDemoStudentRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  grade: number;
+  section: string;
+  academicYear: string;
+  track: string;
+  board: string | null;
+  status: string;
+  linkedAccount?: boolean;
+  completedTests: number;
+  averagePercentage: number;
+  accuracy: number;
+  highestPercentage: number;
+  lowestPercentage: number;
+  lastTestAt: string | null;
+};
 
 export type SalesDemoPayload = {
   generatedAt: string;
@@ -16,7 +37,7 @@ export type SalesDemoPayload = {
   stats: { students: number; neetStudents: number; jeeStudents: number; tests: number; attempts: number; questionInstances: number; averagePercentage: number; accuracy: number };
   tracks: Array<{ name: string; students: number; tests: number; attempts: number; averagePercentage: number; accuracy: number }>;
   subjects: Array<{ name: string; tests: number; attempts: number; averagePercentage: number; accuracy: number; chapters: Array<{ name: string; tests: number; attempts: number; averagePercentage: number }> }>;
-  students: Array<{ id: string; name: string; email: string | null; grade: number; section: string; academicYear: string; track: string; board: string; status: string; completedTests: number; averagePercentage: number; accuracy: number; highestPercentage: number; lowestPercentage: number; lastTestAt: string | null }>;
+  students: SalesDemoStudentRow[];
   tests: Array<{ id: string; title: string; testType: string; examType: string; subject: string | null; chapter: string | null; topic: string | null; questionCount: number; maximumMarks: number; durationMinutes: number; conductedAt: string; attempts: number; participants: number; averagePercentage: number; accuracy: number }>;
 };
 
@@ -39,6 +60,8 @@ export function useSalesDemoData(enabled = true) {
   const [data, setData] = useState<SalesDemoPayload | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
     if (!enabled) {
@@ -63,9 +86,9 @@ export function useSalesDemoData(enabled = true) {
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [enabled, session?.access_token]);
+  }, [enabled, revision, session?.access_token]);
 
-  return { data, loading, error };
+  return { data, loading, error, refresh };
 }
 
 function metric(value: number) {
@@ -134,13 +157,110 @@ export function SalesDemoAnalyticsWorkspace() {
   );
 }
 
+type StudentDraft = {
+  id: string;
+  name: string;
+  email: string;
+  grade: number;
+  section: string;
+  academicYear: string;
+  track: string;
+  board: string;
+  status: string;
+  linkedAccount: boolean;
+};
+
 export function SalesDemoStudentRoster() {
-  const { data, loading, error } = useSalesDemoData(true);
+  const { session } = useAuth();
+  const user = useAppStore((state) => state.user);
+  const baseUser = useAppStore((state) => state.baseUser);
+  const { data, loading, error, refresh } = useSalesDemoData(true);
   const [search, setSearch] = useState('');
   const [track, setTrack] = useState('all');
   const [grade, setGrade] = useState('all');
+  const [editing, setEditing] = useState<StudentDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [editError, setEditError] = useState('');
+  const canEdit = baseUser?.accessRole === 'super_admin' || user?.accessRole === 'school_admin';
+
   const rows = useMemo(() => (data?.students || []).filter((row) => (track === 'all' || row.track === track) && (grade === 'all' || String(row.grade) === grade) && (!search || `${row.name} ${row.email || ''} ${row.section}`.toLowerCase().includes(search.toLowerCase()))), [data?.students, grade, search, track]);
+
+  function openEdit(student: SalesDemoStudentRow) {
+    setMessage('');
+    setEditError('');
+    setEditing({
+      id: student.id,
+      name: student.name,
+      email: student.email || '',
+      grade: student.grade,
+      section: student.section,
+      academicYear: student.academicYear,
+      track: student.track,
+      board: student.board || data?.school.board || '',
+      status: student.status,
+      linkedAccount: Boolean(student.linkedAccount),
+    });
+  }
+
+  async function saveStudent() {
+    if (!editing || !session?.access_token) return;
+    setSaving(true);
+    setEditError('');
+    try {
+      const response = await fetch('/api/sales-demo/', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: editing.id,
+          fullName: editing.name,
+          email: editing.email || null,
+          grade: editing.grade,
+          section: editing.section,
+          academicYear: editing.academicYear,
+          board: editing.board,
+          status: editing.status,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to update student.');
+      setMessage(`${editing.name}'s student details were updated.`);
+      setEditing(null);
+      refresh();
+    } catch (value) {
+      setEditError(value instanceof Error ? value.message : 'Unable to update student.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <div className="p-6 text-sm text-[var(--muted-foreground)]">Loading 500 demo students…</div>;
   if (error || !data) return <div className="p-6 text-sm text-destructive">{error || 'Demo roster unavailable.'}</div>;
-  return <div className="space-y-4"><div className="flex flex-col gap-3 rounded-xl border border-[var(--line)] bg-white p-4 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" /><Input className="pl-9" placeholder="Search 500 demo students" value={search} onChange={(event) => setSearch(event.target.value)} /></div><select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={track} onChange={(event) => setTrack(event.target.value)}><option value="all">All tracks</option><option value="NEET">NEET · 250</option><option value="JEE">JEE · 250</option></select><select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={grade} onChange={(event) => setGrade(event.target.value)}><option value="all">All grades</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select></div><Card className="rounded-xl shadow-sm"><CardContent className="p-0"><div className="max-h-[650px] overflow-auto"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Track</TableHead><TableHead>Grade / Section</TableHead><TableHead>Academic year</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead></TableRow></TableHeader><TableBody>{rows.map((student) => <TableRow key={student.id}><TableCell><div className="font-medium">{student.name}</div><div className="text-xs text-[var(--muted-foreground)]">{student.email}</div></TableCell><TableCell><Badge variant="outline">{student.track}</Badge></TableCell><TableCell>Grade {student.grade} · {student.section}</TableCell><TableCell>{student.academicYear}</TableCell><TableCell>{student.completedTests}</TableCell><TableCell className="font-semibold">{percent(student.averagePercentage)}</TableCell></TableRow>)}</TableBody></Table></div><div className="border-t border-[var(--line)] p-3 text-xs text-[var(--muted-foreground)]">{rows.length} matching students · 250 NEET + 250 JEE seeded records.</div></CardContent></Card></div>;
+
+  return <div className="space-y-4">
+    {message && <div className="rounded-xl border border-[#B8DDD4] bg-[#F0FAF7] px-4 py-3 text-sm text-[#0E5A5A]">{message}</div>}
+    <div className="flex flex-col gap-3 rounded-xl border border-[var(--line)] bg-white p-4 sm:flex-row">
+      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" /><Input className="pl-9" placeholder="Search 500 demo students" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={track} onChange={(event) => setTrack(event.target.value)}><option value="all">All tracks</option><option value="NEET">NEET · 250</option><option value="JEE">JEE · 250</option></select>
+      <select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={grade} onChange={(event) => setGrade(event.target.value)}><option value="all">All grades</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select>
+    </div>
+    <Card className="rounded-xl shadow-sm"><CardContent className="p-0"><div className="max-h-[650px] overflow-auto"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Track</TableHead><TableHead>Grade / Section</TableHead><TableHead>Academic year</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead>{canEdit && <TableHead className="text-right">Actions</TableHead>}</TableRow></TableHeader><TableBody>{rows.map((student) => <TableRow key={student.id}><TableCell><div className="font-medium">{student.name}</div><div className="text-xs text-[var(--muted-foreground)]">{student.email}</div></TableCell><TableCell><Badge variant="outline">{student.track}</Badge></TableCell><TableCell>Grade {student.grade} · {student.section}</TableCell><TableCell>{student.academicYear}</TableCell><TableCell>{student.completedTests}</TableCell><TableCell className="font-semibold">{percent(student.averagePercentage)}</TableCell>{canEdit && <TableCell className="text-right"><Button type="button" size="sm" variant="outline" onClick={() => openEdit(student)}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button></TableCell>}</TableRow>)}</TableBody></Table></div><div className="border-t border-[var(--line)] p-3 text-xs text-[var(--muted-foreground)]">{rows.length} matching students · 250 NEET + 250 JEE seeded records.</div></CardContent></Card>
+
+    <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Edit student details</DialogTitle><DialogDescription>Update roster details without changing the student's assessment history. Program is locked once test evidence exists.</DialogDescription></DialogHeader>
+        {editing && <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Full name</span><Input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Email</span><Input type="email" value={editing.email} disabled={editing.linkedAccount} onChange={(event) => setEditing({ ...editing, email: event.target.value })} />{editing.linkedAccount && <small className="text-[var(--muted-foreground)]">Linked demo login email is managed under Access & Accounts.</small>}</label>
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Grade</span><select className="min-h-10 rounded-md border border-[var(--line)] bg-white px-3" value={editing.grade} onChange={(event) => setEditing({ ...editing, grade: Number(event.target.value) })}><option value={11}>Grade 11</option><option value={12}>Grade 12</option></select></label>
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Section</span><Input value={editing.section} onChange={(event) => setEditing({ ...editing, section: event.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Academic year</span><Input value={editing.academicYear} onChange={(event) => setEditing({ ...editing, academicYear: event.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm"><span className="font-medium">Board</span><Input value={editing.board} onChange={(event) => setEditing({ ...editing, board: event.target.value })} /></label>
+          <label className="grid gap-1.5 text-sm sm:col-span-2"><span className="font-medium">Program / Track</span><Input value={editing.track} disabled /><small className="text-[var(--muted-foreground)]">Locked so completed NEET/JEE test history stays internally consistent.</small></label>
+        </div>}
+        {editError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>}
+        <DialogFooter><Button type="button" variant="outline" disabled={saving} onClick={() => setEditing(null)}>Cancel</Button><Button type="button" disabled={saving || !editing?.name.trim() || !editing?.section.trim()} onClick={() => void saveStudent()}>{saving && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}{saving ? 'Saving…' : 'Save changes'}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>;
 }
