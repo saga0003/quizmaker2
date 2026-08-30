@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
+import { QuestionResponseAudit } from '@/components/analytics-v12/question-response-audit';
 import { useAppStore } from '@/store/use-app-store';
 import type { AnalyticsV12View } from '@/types/analytics-v12';
 
@@ -66,5 +67,5 @@ export function StudentPreviewAnalytics({ view }: { view: AnalyticsV12View }) {
     return <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>;
   }
 
-  return <AnalyticsV12Workspace mode="student" view={view} key={user?.id || 'student-analytics'} />;
+  return <div className="space-y-4"><AnalyticsV12Workspace mode="student" view={view} key={user?.id || 'student-analytics'} />{view === 'question-intelligence' && user?.id && <QuestionResponseAudit studentId={user.id} defaultOpen />}</div>;
 }
