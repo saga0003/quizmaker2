@@ -1,0 +1,32 @@
+EVIDARA R2 SETUP — FROM THE CURRENT BUCKET SCREEN
+
+1. In the evidara-question-assets bucket, click Settings.
+2. Find Public Development URL and click Enable.
+3. Type allow and confirm.
+4. Copy the generated https://pub-....r2.dev address. This is R2_PUBLIC_BASE_URL for testing.
+5. Return to R2 Object Storage > Overview.
+6. Under Account Details/API Tokens, click Manage.
+7. Create an Account API token or User API token.
+8. Permission: Object Read & Write.
+9. Scope: Apply to specific buckets only > evidara-question-assets.
+10. Create the token and securely save:
+    - Access Key ID
+    - Secret Access Key (shown only once)
+    - Account ID
+    - S3 endpoint
+
+Add to the existing .env.local without deleting the Supabase lines:
+
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=evidara-question-assets
+R2_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com
+R2_PUBLIC_BASE_URL=https://pub-....r2.dev
+
+Do not use quotation marks. Do not share the secret in ChatGPT.
+Run CHECK_R2_LOCAL.bat, then stop and restart TEST_EVIDARA.bat.
+
+Add the same six variables to Vercel Project > Settings > Environment Variables for Development, Preview and Production. Mark R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY as Sensitive. Redeploy after saving.
+
+Later, replace R2_PUBLIC_BASE_URL with https://assets.evidara.natscix.com after the custom domain is connected.

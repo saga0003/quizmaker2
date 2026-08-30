@@ -1,0 +1,1 @@
+update public.products p set status='draft',updated_at=now() where p.status='published' and p.product_type='test_series' and not exists(select 1 from public.product_papers pp where pp.product_id=p.id);

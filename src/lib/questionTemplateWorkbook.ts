@@ -85,12 +85,12 @@ const guideRows: Array<[string, string, string, string]> = [
   ['exam_types', 'Required', 'Choose one active examination. Multiple values may be separated by |.', 'The dropdown is generated from the current Evidara settings.'],
   ['subject', 'Required', 'Choose an existing subject from the dropdown.', 'Only Super Admin can add or alter universal subjects.'],
   ['biology_division', 'Biology only', 'Choose combined, botany or zoology.', 'Keeps Biology analytics unified while allowing Botany/Zoology paper sections.'],
-  ['chapter', 'Recommended', 'Choose a chapter or type a new chapter name.', 'V7.1 can create a missing chapter from the review screen.'],
-  ['topic', 'Optional', 'Choose a topic or type a new topic name.', 'V7.1 can create a missing topic from the review screen.'],
+  ['chapter', 'Recommended', 'Choose a chapter or type a new chapter name.', 'V12 can create a missing chapter from the review screen.'],
+  ['topic', 'Optional', 'Choose a topic or type a new topic name.', 'V12 can create a missing topic from the review screen.'],
   ['question_type', 'Required', 'Choose one exact dropdown value.', 'Match the Following remains in the manual editor, not this simple template.'],
   ['difficulty', 'Required', 'Choose very_easy, easy, moderate, difficult or very_difficult.', 'The dropdown prevents spelling mistakes.'],
   ['question', 'Required', 'Enter learner-facing question text.', 'Do not include the answer key in this field.'],
-  ['question_latex', 'Optional', 'Paste mathematical or scientific LaTeX only.', 'The V7.1 review screen renders it immediately.'],
+  ['question_latex', 'Optional', 'Paste mathematical or scientific LaTeX only.', 'The V12 review screen renders it immediately.'],
   ['question_image', 'Optional', 'Use a real public HTTPS URL or an exact image filename.', 'A local filename requires the matching Image ZIP during import.'],
   ['option_a to option_d', 'Required for MCQ', 'Enter option text and optional LaTeX/image filename.', 'At least two answer options are required.'],
   ['correct_answer', 'Required', 'A, B, C or D; multiple-correct uses A|B.', 'Numerical/integer questions use the exact numeric answer.'],
@@ -104,7 +104,7 @@ function listRange(columnIndex: number, count: number) {
 }
 
 function validation(type: 'list' | 'decimal' | 'whole', column: string, formula: string, prompt: string) {
-  return `<dataValidation type="${type}" allowBlank="1" showErrorMessage="1" showInputMessage="1" errorStyle="stop" errorTitle="Invalid value" error="Choose or enter a supported value." promptTitle="Evidara V7.1 template" prompt="${escapeXml(prompt)}" sqref="${column}2:${column}500"><formula1>${escapeXml(formula)}</formula1></dataValidation>`;
+  return `<dataValidation type="${type}" allowBlank="1" showErrorMessage="1" showInputMessage="1" errorStyle="stop" errorTitle="Invalid value" error="Choose or enter a supported value." promptTitle="Evidara V12 template" prompt="${escapeXml(prompt)}" sqref="${column}2:${column}500"><formula1>${escapeXml(formula)}</formula1></dataValidation>`;
 }
 
 export async function buildQuestionTemplateWorkbook({
@@ -227,14 +227,14 @@ export async function downloadQuestionTemplateWorkbook(input: {
 
 export async function downloadQuestionImageZipTemplate() {
   const guide = [
-    'EVIDARA V7.1 QUESTION IMAGE ZIP TEMPLATE',
+    'EVIDARA V12 QUESTION IMAGE ZIP TEMPLATE',
     '',
     '1. Put every question and option image inside this ZIP.',
     '2. Use simple unique names such as physics-q001.png and physics-q001-a.png.',
     '3. Enter the exact filename in the Excel question_image or option image column.',
     '4. After selecting Excel, the Image ZIP selector remains visible in Evidara.',
     '5. Evidara uploads images to the Supabase question-assets bucket and replaces filenames with public URLs.',
-    '6. Cloudflare R2 is optional and is not required for V7.1 imports.',
+    '6. Cloudflare R2 is optional and is not required for V12 imports.',
   ].join('\n');
   downloadBlob(await createZipBlob([
     { name: 'README.txt', data: guide },
@@ -244,5 +244,5 @@ export async function downloadQuestionImageZipTemplate() {
 
 export function downloadQuestionImportGuide() {
   const guide = guideRows.map(([column, requirement, how, note]) => `${column}\nRequirement: ${requirement}\nHow: ${how}\nNote: ${note}\n`).join('\n');
-  downloadBlob(new Blob([`EVIDARA V7.1 BULK QUESTION IMPORT GUIDE\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-v7-1-question-import-guide.txt');
+  downloadBlob(new Blob([`EVIDARA V12 BULK QUESTION IMPORT GUIDE\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-v7-1-question-import-guide.txt');
 }

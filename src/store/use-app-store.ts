@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import {
+  evidaraRoleLabel,
   normalizeEvidaraRole,
   type EvidaraRole,
 } from '@/lib/roles';
@@ -14,15 +15,27 @@ export type AppView =
   | 'register-school'
   | 'student-dashboard'
   | 'student-tests'
-  | 'student-analytics'
   | 'student-results'
-  | 'student-achievements'
-  | 'student-benchmarks'
+  | 'student-analytics-overview'
+  | 'student-analytics-subject'
+  | 'student-analytics-chapter'
+  | 'student-analytics-topic'
+  | 'student-analytics-question-intelligence'
+  | 'student-analytics-priorities'
+  | 'student-analytics-history'
   | 'student-resources'
   | 'student-store'
   | 'student-purchases'
+  | 'student-referrals'
+  | 'student-self-assessment'
   | 'school-dashboard'
-  | 'school-analytics'
+  | 'school-analytics-overview'
+  | 'school-analytics-subject'
+  | 'school-analytics-chapter'
+  | 'school-analytics-topic'
+  | 'school-analytics-question-intelligence'
+  | 'school-analytics-priorities'
+  | 'school-analytics-history'
   | 'school-questions'
   | 'school-papers'
   | 'school-students'
@@ -31,9 +44,6 @@ export type AppView =
   | 'school-product-seats'
   | 'school-subscription'
   | 'school-resources'
-  | 'school-achievements'
-  | 'school-benchmarks'
-  | 'school-segments'
   | 'school-access'
   | 'admin-dashboard'
   | 'admin-analytics'
@@ -41,9 +51,10 @@ export type AppView =
   | 'admin-papers'
   | 'admin-products'
   | 'admin-subscriptions'
-  | 'admin-achievements'
-  | 'admin-benchmarks'
-  | 'admin-segments'
+  | 'admin-institutions'
+  | 'admin-resources'
+  | 'admin-referrals'
+  | 'admin-self-assessment'
   | 'admin-access';
 
 export interface AppUser {
@@ -55,7 +66,7 @@ export interface AppUser {
   avatar?: string;
 }
 
-export function cloudRoleToV7Role(role?: string | null): Exclude<UserRole, null> {
+export function cloudRoleToWorkspaceRole(role?: string | null): Exclude<UserRole, null> {
   const normalized = normalizeEvidaraRole(role);
   if (normalized === 'super_admin' || normalized === 'evidara_admin') return 'admin';
   if (normalized === 'school_admin' || normalized === 'school_teacher') return 'school';
@@ -71,12 +82,16 @@ export function defaultViewForRole(role: Exclude<UserRole, null>): AppView {
 interface AppState {
   view: AppView;
   user: AppUser | null;
+  baseUser: AppUser | null;
+  impersonatingAs: EvidaraRole | null;
   sidebarOpen: boolean;
   authReady: boolean;
   setView: (view: AppView) => void;
   setCloudUser: (user: AppUser | null) => void;
   setAuthReady: (ready: boolean) => void;
   login: (role: 'student' | 'school' | 'admin') => void;
+  loginAs: (role: Exclude<EvidaraRole, 'super_admin'>) => void;
+  exitLoginAs: () => void;
   logout: () => Promise<void>;
   setSidebarOpen: (open: boolean) => void;
 }
@@ -84,23 +99,42 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   view: 'landing',
   user: null,
+  baseUser: null,
+  impersonatingAs: null,
   sidebarOpen: true,
   authReady: !isSupabaseConfigured,
-  setView: (view) => set({ view }),
+  setView: (view) => {
+    set({ view });
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('view', view);
+    url.searchParams.delete('id');
+    url.searchParams.delete('create');
+    window.history.pushState({ evidaraView: view }, '', `${url.pathname}${url.search}${url.hash}`);
+  },
   setCloudUser: (user) => {
     if (!user) {
-      set({ user: null, view: 'landing', sidebarOpen: true });
+      set({ user: null, baseUser: null, impersonatingAs: null, view: 'landing', sidebarOpen: true });
       return;
     }
     const current = get();
+    const targetRole = current.baseUser?.id === user.id && current.baseUser.accessRole === 'super_admin'
+      ? current.impersonatingAs
+      : null;
+    const effectiveUser = targetRole
+      ? { ...user, role: cloudRoleToWorkspaceRole(targetRole), accessRole: targetRole }
+      : user;
     const sameIdentity =
-      current.user?.id === user.id &&
-      current.user?.role === user.role &&
-      current.user?.accessRole === user.accessRole;
+      current.user?.id === effectiveUser.id &&
+      current.user?.role === effectiveUser.role &&
+      current.user?.accessRole === effectiveUser.accessRole;
     const authenticatedView = !['landing', 'login', 'register-school'].includes(current.view);
     set({
-      user,
-      view: sameIdentity && authenticatedView ? current.view : defaultViewForRole(user.role),
+      user: effectiveUser,
+      baseUser: user,
+      impersonatingAs: targetRole,
+      view: sameIdentity && authenticatedView ? current.view : defaultViewForRole(effectiveUser.role),
       sidebarOpen: true,
     });
   },
@@ -130,11 +164,36 @@ export const useAppStore = create<AppState>((set, get) => ({
         accessRole: 'super_admin',
       },
     };
-    set({ user: users[role], view: defaultViewForRole(role), sidebarOpen: true, authReady: true });
+    const selected = users[role];
+    set({ user: selected, baseUser: selected, impersonatingAs: null, view: defaultViewForRole(role), sidebarOpen: true, authReady: true });
+  },
+  loginAs: (role) => {
+    const current = get();
+    const baseUser = current.baseUser ?? current.user;
+    if (!baseUser || baseUser.accessRole !== 'super_admin') return;
+    const workspaceRole = cloudRoleToWorkspaceRole(role);
+    set({
+      baseUser,
+      impersonatingAs: role,
+      user: { ...baseUser, role: workspaceRole, accessRole: role, name: `${baseUser.name} · ${evidaraRoleLabel(role)}` },
+      view: defaultViewForRole(workspaceRole),
+      sidebarOpen: true,
+    });
+  },
+  exitLoginAs: () => {
+    const current = get();
+    const baseUser = current.baseUser;
+    if (!baseUser || baseUser.accessRole !== 'super_admin') return;
+    set({
+      user: baseUser,
+      impersonatingAs: null,
+      view: defaultViewForRole(baseUser.role),
+      sidebarOpen: true,
+    });
   },
   logout: async () => {
     if (supabase) await supabase.auth.signOut();
-    set({ user: null, view: 'landing', sidebarOpen: true, authReady: true });
+    set({ user: null, baseUser: null, impersonatingAs: null, view: 'landing', sidebarOpen: true, authReady: true });
   },
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
 }));

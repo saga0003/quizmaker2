@@ -1,13 +1,7 @@
-import { DashboardShell } from '@/components/DashboardShell';
-import { ProtectedPage } from '@/components/ProtectedPage';
-import { ProductCommerceWorkspace } from '@/components/commerce/ProductCommerceWorkspace';
+import { redirectToWorkspace } from '@/lib/workspaceRedirect';
 
-export default function AdminProducts() {
-  return (
-    <ProtectedPage allowed="admin">
-      <DashboardShell kind="admin">
-        <ProductCommerceWorkspace />
-      </DashboardShell>
-    </ProtectedPage>
-  );
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function LegacyWorkspaceRedirect({ searchParams }: Props) {
+  return redirectToWorkspace('admin-products', searchParams);
 }

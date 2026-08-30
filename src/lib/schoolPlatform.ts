@@ -1,6 +1,7 @@
 export type SchoolBoard = "Karnataka State" | "CBSE" | "ICSE" | "ISC" | "Other";
 export type StudentTrack = "Foundation" | "NEET" | "JEE" | "KCET" | "Olympiad" | "Boards";
 export type StudentLifecycleStatus = "active" | "revoked" | "completed";
+export type StudentInvitationStatus = "active" | "invited" | "pending";
 export type SubscriptionStatus = "active" | "trial" | "expired" | "suspended";
 
 export type SchoolSubscription = {
@@ -17,15 +18,25 @@ export type SchoolStudent = {
   name: string;
   grade: number;
   section: string;
+  sectionId?: string;
   board: SchoolBoard;
   academicYear: string;
   tracks: StudentTrack[];
   status: StudentLifecycleStatus;
+  invitationStatus?: StudentInvitationStatus;
   promotionLocked: boolean;
   revokedAt?: string;
   promotedAt?: string;
-  parentName: string;
-  parentPhone: string;
+  parentName?: string;
+  parentPhone?: string;
+};
+
+export type SchoolSection = {
+  id: string;
+  academicYear: string;
+  grade: number;
+  name: string;
+  code?: string;
 };
 
 export type LearningResource = {
@@ -41,6 +52,9 @@ export type LearningResource = {
   subject: string;
   subscriptionRequired: boolean;
   description: string;
+  scope?: "platform" | "organization";
+  organizationId?: string;
+  contentUrl?: string;
 };
 
 export type SchoolPlatformState = {
@@ -52,6 +66,7 @@ export type SchoolPlatformState = {
     subscription: SchoolSubscription;
   };
   students: SchoolStudent[];
+  sections: SchoolSection[];
   resources: LearningResource[];
 };
 
@@ -79,6 +94,7 @@ export const defaultSchoolPlatformState: SchoolPlatformState = {
     { id: "st-4", name: "Kiran P.", grade: 8, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Foundation", "Olympiad"], status: "active", promotionLocked: false, parentName: "Prakash P.", parentPhone: "9000000004" },
     { id: "st-5", name: "Nidhi S.", grade: 10, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Boards", "NEET"], status: "revoked", promotionLocked: true, revokedAt: "2026-07-01", parentName: "Shilpa S.", parentPhone: "9000000005" },
   ],
+  sections: [],
   resources: [
     { id: "r1", title: "School-created chapter and full-length tests", kind: "school_test", accessLabel: "FREE", gradeMin: 8, gradeMax: 12, subject: "All subjects", subscriptionRequired: true, description: "Unlimited school-authored tests with no per-test charge during the active annual plan." },
     { id: "r2", title: "Karnataka SSLC Grade 10 Previous Papers", kind: "previous_year_board", accessLabel: "COMPLIMENTARY", board: "Karnataka State", gradeMin: 10, gradeMax: 10, track: "Boards", year: 2026, subject: "Grade 10 Board", subscriptionRequired: true, description: "Previous-year State Board papers, answer keys and practice copies." },
@@ -95,7 +111,9 @@ export function loadSchoolPlatformState(): SchoolPlatformState {
   if (typeof window === "undefined") return defaultSchoolPlatformState;
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (parsed?.school && Array.isArray(parsed.students) && Array.isArray(parsed.resources)) return parsed;
+    if (parsed?.school && Array.isArray(parsed.students) && Array.isArray(parsed.resources)) {
+      return { ...parsed, sections: Array.isArray(parsed.sections) ? parsed.sections : [] };
+    }
   } catch {}
   localStorage.setItem(KEY, JSON.stringify(defaultSchoolPlatformState));
   return structuredClone(defaultSchoolPlatformState);

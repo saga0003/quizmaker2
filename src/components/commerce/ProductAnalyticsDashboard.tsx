@@ -65,7 +65,7 @@ export function ProductAnalyticsDashboard() {
     setBusy(false);
     if (loadError) {
       setError(/get_product_commerce_analytics_v9/i.test(loadError.message)
-        ? 'Apply Supabase migration 34 to enable product analytics.'
+        ? 'Apply Supabase migration 34 to enable commerce reporting.'
         : loadError.message);
       return;
     }
@@ -100,7 +100,7 @@ export function ProductAnalyticsDashboard() {
   return (
     <div className={`${styles.workspace} space-y-6`}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div><h2 className="text-2xl font-extrabold tracking-tight text-[#14232B]">Commerce Analytics</h2><p className="mt-1 text-sm text-[#6B7980]">Verified student and school purchases, revenue, discounts and seat activation.</p></div>
+        <div><h2 className="text-2xl font-extrabold tracking-tight text-[#14232B]">Commerce Reporting</h2><p className="mt-1 text-sm text-[#6B7980]">Verified student and school purchases, revenue, discounts and seat activation.</p></div>
         <Card className="gap-0 border-[#E7ECEB] shadow-none"><CardContent className="p-4"><div className="grid gap-3 sm:grid-cols-[145px_145px_150px_auto] sm:items-end"><div className="space-y-2"><Label>From</Label><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></div><div className="space-y-2"><Label>To</Label><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></div><div className="space-y-2"><Label>Group by</Label><Select value={granularity} onValueChange={(value) => setGranularity(value as 'day' | 'month' | 'year')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="day">Daily</SelectItem><SelectItem value="month">Monthly</SelectItem><SelectItem value="year">Annual</SelectItem></SelectContent></Select></div><Button onClick={() => void load()} disabled={busy} className="bg-[#0E5A5A] hover:bg-[#0A4A4A]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Apply</Button></div></CardContent></Card>
       </div>
 

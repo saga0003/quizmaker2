@@ -70,6 +70,7 @@ import { QuestionEditorDialog } from '@/components/evidara/question-editor-dialo
 import { QuestionBulkImportDialog } from '@/components/evidara/question-bulk-import-dialog';
 import { QuestionReviewDialog } from '@/components/evidara/question-review-dialog';
 import { QuestionTaxonomySettings } from '@/components/evidara/question-taxonomy-settings';
+import { NeetPyqImporter } from '@/components/evidara/neet-pyq-importer';
 
 const PAGE_SIZE = 20;
 type BankView = 'master' | 'school' | 'settings';
@@ -104,17 +105,17 @@ function statusLabel(status: QuestionStatus) {
 }
 
 function statusClass(status: QuestionStatus) {
-  if (status === 'approved') return 'bg-[#DCE9E7] text-[#0E5A5A]';
-  if (status === 'in_review') return 'bg-[#F2B84B]/20 text-[#8A5F00]';
-  if (status === 'rejected') return 'bg-[#B54747]/10 text-[#B54747]';
-  if (status === 'archived') return 'bg-[#14232B]/10 text-[#14232B]';
-  return 'bg-[#E7ECEB] text-[#6B7980]';
+  if (status === 'approved') return 'bg-[var(--secondary)] text-[var(--teal)]';
+  if (status === 'in_review') return 'bg-[var(--amber)]/20 text-[#8A5F00]';
+  if (status === 'rejected') return 'bg-[var(--destructive)]/10 text-[var(--destructive)]';
+  if (status === 'archived') return 'bg-[var(--foreground)]/10 text-[var(--foreground)]';
+  return 'bg-[var(--line)] text-[var(--muted-foreground)]';
 }
 
 function difficultyClass(difficulty: QuestionDifficulty) {
-  if (difficulty === 'very_easy' || difficulty === 'easy') return 'bg-[#DCE9E7] text-[#0E5A5A]';
-  if (difficulty === 'moderate') return 'bg-[#F2B84B]/20 text-[#8A5F00]';
-  return 'bg-[#B54747]/10 text-[#B54747]';
+  if (difficulty === 'very_easy' || difficulty === 'easy') return 'bg-[var(--secondary)] text-[var(--teal)]';
+  if (difficulty === 'moderate') return 'bg-[var(--amber)]/20 text-[#8A5F00]';
+  return 'bg-[var(--destructive)]/10 text-[var(--destructive)]';
 }
 
 function organizationName(question: QuestionRow) {
@@ -143,8 +144,8 @@ function shortDate(value?: string | null) {
 export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
   const { configured, profile } = useAuth();
   const role = normalizeEvidaraRole(profile?.role);
-  const canPublish = role === 'super_admin' || role === 'evidara_admin' || role === 'school_admin';
-  const canDelete = role === 'super_admin' || role === 'evidara_admin';
+  const canPublish = role === 'super_admin' || role === 'school_admin';
+  const canDelete = role === 'super_admin';
   const teacher = role === 'school_teacher';
   const {
     organizationId,
@@ -162,10 +163,12 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
   const [message, setMessage] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [pyqImportOpen, setPyqImportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionRow | null>(null);
   const [reviewQuestion, setReviewQuestion] = useState<QuestionRow | null>(null);
-  const [bank, setBank] = useState<BankView>('master');
+  const [reviewResumeId, setReviewResumeId] = useState<string | null>(null);
+  const [bank, setBank] = useState<BankView>(kind === 'school' ? 'school' : 'master');
   const [selectedSchoolId, setSelectedSchoolId] = useState('all');
   const [search, setSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('all');
@@ -191,47 +194,59 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
       setQuestions([]);
       setLoading(false);
       setError('Supabase is not configured. Question management is live-data only.');
-      return;
+      return [] as QuestionRow[];
     }
-    if (kind === 'school' && scopeLoading) return;
+    if (kind === 'school' && scopeLoading) return [] as QuestionRow[];
     if (kind === 'school' && !organizationId) {
       setQuestions([]);
       setLoading(false);
       setError(scopeError || 'This account is not linked to a school organization.');
-      return;
+      return [] as QuestionRow[];
     }
 
     setLoading(true);
     setError('');
     const [questionResult, subjectResult, chapterResult, topicResult] = await Promise.all([
-      supabase
-        .from('questions')
-        .select('*,subjects(name,code),chapters(name),topics(name),organizations(id,name),question_options(option_key,content_text,content_latex,image_url,is_correct,display_order)')
-        .order('updated_at', { ascending: false })
-        .limit(5000),
+      (async () => {
+        const allRows: unknown[] = [];
+        const batchSize = 1000;
+        for (let from = 0; ; from += batchSize) {
+          const result = await supabase
+            .from('questions')
+            .select('*,subjects(name,code),chapters(name),topics(name),organizations(id,name),question_options(option_key,content_text,content_latex,image_url,is_correct,display_order),question_pyq_occurrences(id,source_question_number,subject_label,metadata,pyq_source_papers(id,exam_type,source_year,variant,paper_code,paper_key,display_name,source_key,expected_question_count))')
+            .order('updated_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, from + batchSize - 1);
+          if (result.error) return { data: null, error: result.error };
+          const rows = result.data || [];
+          allRows.push(...rows);
+          if (rows.length < batchSize) break;
+        }
+        return { data: allRows, error: null };
+      })(),
       supabase.from('subjects').select('id,name,code,organization_id').eq('is_active', true).order('name'),
       supabase.from('chapters').select('id,name,subject_id,organization_id').eq('is_active', true).order('name'),
       supabase.from('topics').select('id,name,chapter_id,organization_id').eq('is_active', true).order('name'),
     ]);
 
     const loadError = questionResult.error || subjectResult.error || chapterResult.error || topicResult.error;
+    let loadedVisible: QuestionRow[] = [];
     if (loadError) {
       setError(loadError.message || 'Unable to load question data.');
     } else {
       const all = (questionResult.data || []) as unknown as QuestionRow[];
       const visible = kind === 'admin'
-        ? all
-        : all.filter((question) =>
-          (question.organization_id === null && question.status === 'approved')
-          || question.organization_id === organizationId,
-        );
+        ? (role === 'super_admin' ? all : all.filter((question) => question.organization_id === null))
+        : all.filter((question) => question.organization_id === organizationId && (!teacher || question.created_by === profile?.id));
+      loadedVisible = visible;
       setQuestions(visible);
       setSubjects((subjectResult.data || []) as TaxonomySubject[]);
       setChapters((chapterResult.data || []) as TaxonomyChapter[]);
       setTopics((topicResult.data || []) as TaxonomyTopic[]);
     }
     setLoading(false);
-  }, [configured, kind, organizationId, scopeError, scopeLoading]);
+    return loadedVisible;
+  }, [configured, kind, organizationId, profile?.id, role, scopeError, scopeLoading, teacher]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -269,10 +284,10 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
     .sort((a, b) => a.name.localeCompare(b.name)), [chapterFilter, topics]);
 
   const bankQuestions = useMemo(() => questions.filter((question) => {
-    if (bank === 'master') return question.organization_id === null;
+    if (bank === 'master') return kind === 'admin' && question.organization_id === null;
     if (bank === 'settings') return false;
     if (question.organization_id === null) return false;
-    if (kind === 'school') return question.organization_id === organizationId;
+    if (kind === 'school') return question.organization_id === organizationId && (!teacher || question.created_by === profile?.id);
     return selectedSchoolId === 'all' || question.organization_id === selectedSchoolId;
   }), [bank, kind, organizationId, questions, selectedSchoolId]);
 
@@ -310,6 +325,8 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const visibleRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const reviewIndex = reviewQuestion ? filtered.findIndex((question) => question.id === reviewQuestion.id) : -1;
+  const reviewPosition = reviewIndex >= 0 ? reviewIndex + 1 : 0;
   const visibleIds = visibleRows.map((question) => question.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
   const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
@@ -327,10 +344,11 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
     return role === 'school_teacher' && ['draft', 'in_review'].includes(question.status);
   };
   const archivable = (question: QuestionRow) => canPublish && (kind === 'admin' || question.organization_id === organizationId);
-  const showCreationActions = bank !== 'settings' && !(kind === 'admin' && bank === 'school');
+  const showCreationActions = bank !== 'settings' && !(kind === 'admin' && bank === 'school') && !(kind === 'admin' && role === 'evidara_admin' && bank !== 'master');
 
   function openCreate() {
     if (kind === 'school') setBank('school');
+    if (kind === 'admin') setBank('master');
     setSelectedQuestion(null);
     setError('');
     setMessage('');
@@ -347,7 +365,25 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
 
   function openReview(question: QuestionRow) {
     setReviewQuestion(question);
+    const index = filtered.findIndex((row) => row.id === question.id);
+    if (index >= 0) setPage(Math.floor(index / PAGE_SIZE) + 1);
     setReviewOpen(true);
+  }
+
+  function navigateReview(direction: -1 | 1) {
+    if (reviewIndex < 0) return;
+    const nextIndex = reviewIndex + direction;
+    if (nextIndex < 0 || nextIndex >= filtered.length) return;
+    const nextQuestion = filtered[nextIndex];
+    setReviewQuestion(nextQuestion);
+    setPage(Math.floor(nextIndex / PAGE_SIZE) + 1);
+  }
+
+  function editFromReview() {
+    if (!reviewQuestion || !editable(reviewQuestion)) return;
+    setReviewResumeId(reviewQuestion.id);
+    setReviewOpen(false);
+    openEdit(reviewQuestion);
   }
 
   function toggleQuestion(id: string, checked: boolean) {
@@ -446,14 +482,14 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
   }
 
   const title = bank === 'settings'
-    ? 'Question Settings'
+    ? 'Academic Setup'
     : bank === 'master'
       ? 'Evidara Question Bank'
       : kind === 'admin'
         ? 'School-Created Questions'
         : 'My School Question Bank';
   const description = bank === 'settings'
-    ? 'Manage the searchable subject, chapter and topic hierarchy used throughout the question module.'
+    ? 'Manage your institution subjects, chapters and topics. This classification powers imports and chapter-wise/topic-wise analysis.'
     : bank === 'master'
       ? 'Platform-owned questions available for approved reuse. Evidara master questions cannot be exported.'
       : 'School-created questions remain isolated from the Evidara master bank and retain school attribution.';
@@ -466,32 +502,37 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">
             <ShieldCheck className="h-4 w-4" />
             {kind === 'admin' ? 'Question governance' : currentOrganizationName}
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-[#14232B]">{title}</h1>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
             <HelpIcon text={description} />
           </div>
-          <p className="mt-1 text-sm text-[#6B7980]">{description}</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading} className="border-[#E7ECEB]">
+          <Button variant="outline" onClick={() => void load()} disabled={loading} className="border-[var(--line)]">
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
           </Button>
           {bank === 'school' && (kind === 'school' || selectedSchoolId !== 'all') && (
-            <Button variant="outline" onClick={() => void exportQuestions()} disabled={exporting || filtered.length === 0} className="border-[#E7ECEB]">
+            <Button variant="outline" onClick={() => void exportQuestions()} disabled={exporting || filtered.length === 0} className="border-[var(--line)]">
               <Download className="mr-2 h-4 w-4" />{exporting ? 'Packaging…' : 'Export School ZIP'}
             </Button>
           )}
           {showCreationActions && (
-            <Button variant="outline" onClick={() => { if (kind === 'school') setBank('school'); setImportOpen(true); }} className="border-[#E7ECEB]">
+            <Button variant="outline" onClick={() => { if (kind === 'school') setBank('school'); setImportOpen(true); }} className="border-[var(--line)]">
               <Upload className="mr-2 h-4 w-4" />Bulk Import
             </Button>
           )}
+          {kind === 'admin' && role === 'super_admin' && bank === 'master' && (
+            <Button variant="outline" onClick={() => setPyqImportOpen(true)} className="border-[var(--teal)]/30 text-[var(--teal)] hover:bg-[var(--secondary)]/50">
+              <Archive className="mr-2 h-4 w-4" />Import NEET PYQ Archive
+            </Button>
+          )}
           {showCreationActions && (
-            <Button onClick={openCreate} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">
+            <Button onClick={openCreate} className="bg-[var(--teal)] text-white hover:bg-[#0A4747]">
               <Plus className="mr-2 h-4 w-4" />Add Question
             </Button>
           )}
@@ -499,36 +540,37 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
       </div>
 
       <Tabs value={bank} onValueChange={(value) => setBank(value as BankView)}>
-        <TabsList className="h-auto bg-[#E7ECEB]/60 p-1">
-          <TabsTrigger value="master" className="px-4 py-2">Evidara Question Bank</TabsTrigger>
-          <TabsTrigger value="school" className="px-4 py-2">{kind === 'admin' ? 'School-Created Questions' : 'My School Questions'}</TabsTrigger>
-          <TabsTrigger value="settings" className="px-4 py-2"><Settings2 className="mr-1.5 h-4 w-4" />Settings</TabsTrigger>
+        <TabsList className="h-auto flex-wrap bg-[var(--line)]/60 p-1">
+          {kind === 'admin' && <TabsTrigger value="master" className="px-4 py-2">Evidara Question Bank</TabsTrigger>}
+          {kind === 'admin' && role === 'super_admin' && <TabsTrigger value="school" className="px-4 py-2">School-Created Questions</TabsTrigger>}
+          {kind === 'school' && <TabsTrigger value="school" className="px-4 py-2">{teacher ? 'My Questions' : 'School Questions'}</TabsTrigger>}
+          {(role === 'super_admin' || (kind === 'school' && !teacher)) && <TabsTrigger value="settings" className="px-4 py-2"><Settings2 className="mr-1.5 h-4 w-4" />Academic Setup</TabsTrigger>}
         </TabsList>
       </Tabs>
 
-      {(scopeError || error) && <div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{scopeError || error}</div>}
-      {message && <div className="rounded-xl border border-[#0E5A5A]/20 bg-[#DCE9E7]/60 px-4 py-3 text-sm text-[#0E5A5A]">{message}</div>}
+      {(scopeError || error) && <div className="rounded-xl border border-[var(--destructive)]/20 bg-[var(--destructive)]/5 px-4 py-3 text-sm text-[var(--destructive)]">{scopeError || error}</div>}
+      {message && <div className="rounded-xl border border-[var(--teal)]/20 bg-[var(--secondary)]/60 px-4 py-3 text-sm text-[var(--teal)]">{message}</div>}
 
       {bank === 'settings' ? (
-        <QuestionTaxonomySettings kind={kind} organizationId={organizationId} subjects={subjects} chapters={chapters} topics={topics} onChanged={load} />
+        <QuestionTaxonomySettings kind={kind} organizationId={organizationId} subjects={subjects} chapters={chapters} topics={topics} onChanged={async () => { await load(); }} />
       ) : (
         <>
           {kind === 'admin' && bank === 'school' && (
-            <Card className="gap-0 border-[#E7ECEB] shadow-none">
+            <Card className="gap-0 border-[var(--line)] shadow-sm rounded-xl">
               <CardContent className="p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <div><strong className="text-sm text-[#14232B]">Schools contributing questions</strong><p className="text-xs text-[#6B7980]">Choose a school to review or export only that school’s question bank.</p></div>
-                  <Button variant={selectedSchoolId === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSelectedSchoolId('all')} className={selectedSchoolId === 'all' ? 'bg-[#0E5A5A]' : 'border-[#E7ECEB]'}>All schools</Button>
+                  <div><strong className="text-sm text-[var(--foreground)]">Schools contributing questions</strong><p className="text-xs text-[var(--muted-foreground)]">Choose a school to review or export only that school’s question bank.</p></div>
+                  <Button variant={selectedSchoolId === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSelectedSchoolId('all')} className={selectedSchoolId === 'all' ? 'bg-[var(--teal)]' : 'border-[var(--line)]'}>All schools</Button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {schoolGroups.map((school) => (
-                    <button key={school.id} type="button" onClick={() => setSelectedSchoolId(school.id)} className={`rounded-xl border p-3 text-left transition ${selectedSchoolId === school.id ? 'border-[#0E5A5A] bg-[#DCE9E7]/40' : 'border-[#E7ECEB] bg-white hover:border-[#0E5A5A]/40'}`}>
-                      <div className="flex items-start justify-between gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2E6D8B]/10 text-[#2E6D8B]"><Building2 className="h-4 w-4" /></div>{school.review > 0 && <Badge className="bg-[#F2B84B]/20 text-[#8A5F00]">{school.review} review</Badge>}</div>
-                      <strong className="mt-3 block truncate text-sm text-[#14232B]">{school.name}</strong>
-                      <span className="mt-1 block text-xs text-[#6B7980]">{school.count} question{school.count === 1 ? '' : 's'}</span>
+                    <button key={school.id} type="button" onClick={() => setSelectedSchoolId(school.id)} className={`min-w-0 rounded-xl border p-3 text-left transition ${selectedSchoolId === school.id ? 'border-[var(--teal)] bg-[var(--secondary)]/40' : 'border-[var(--line)] bg-white hover:border-[var(--teal)]/40'}`}>
+                      <div className="flex items-start justify-between gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--info)]/10 text-[var(--info)]"><Building2 className="h-4 w-4" /></div>{school.review > 0 && <Badge className="bg-[var(--amber)]/20 text-[#8A5F00]">{school.review} review</Badge>}</div>
+                      <strong className="mt-3 block truncate text-sm text-[var(--foreground)]">{school.name}</strong>
+                      <span className="mt-1 block text-xs text-[var(--muted-foreground)]">{school.count} question{school.count === 1 ? '' : 's'}</span>
                     </button>
                   ))}
-                  {!schoolGroups.length && <div className="col-span-full py-5 text-center text-sm text-[#6B7980]">No school has added questions yet.</div>}
+                  {!schoolGroups.length && <div className="col-span-full py-5 text-center text-sm text-[var(--muted-foreground)]">No school has added questions yet.</div>}
                 </div>
               </CardContent>
             </Card>
@@ -536,41 +578,41 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              { label: 'Questions in view', value: stats.total, icon: FileQuestion, tone: '#14232B' },
-              { label: 'Published', value: stats.approved, icon: CheckCircle2, tone: '#0E5A5A' },
+              { label: 'Questions in view', value: stats.total, icon: FileQuestion, tone: 'var(--foreground)' },
+              { label: 'Published', value: stats.approved, icon: CheckCircle2, tone: 'var(--teal)' },
               { label: 'Awaiting review', value: stats.review, icon: CircleAlert, tone: '#8A5F00' },
-              { label: 'Topics represented', value: stats.topics, icon: Settings2, tone: '#2E6D8B' },
+              { label: 'Topics represented', value: stats.topics, icon: Settings2, tone: 'var(--info)' },
             ].map(({ label, value, icon: Icon, tone }) => (
-              <Card key={label} className="gap-0 border-[#E7ECEB] shadow-none"><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-bold" style={{ color: tone }}>{value}</p></div><div className="rounded-lg p-2.5" style={{ backgroundColor: `${tone}12`, color: tone }}><Icon className="h-5 w-5" /></div></CardContent></Card>
+              <Card key={label} className="min-w-0 gap-0 border-[var(--line)] shadow-sm rounded-xl"><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs font-medium text-[var(--muted-foreground)]">{label}</p><p className="mt-1 text-2xl font-bold" style={{ color: tone }}>{value}</p></div><div className="rounded-lg p-2.5" style={{ backgroundColor: `${tone}12`, color: tone }}><Icon className="h-5 w-5" /></div></CardContent></Card>
             ))}
           </div>
 
-          <Card className="gap-0 border-[#E7ECEB] shadow-none">
+          <Card className="gap-0 border-[var(--line)] shadow-sm rounded-xl">
             <CardContent className="p-4">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="relative md:col-span-2"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search question, option, answer, solution, image, school, topic or tag" className="border-[#E7ECEB] pl-9" /></div>
-                <Select value={subjectFilter} onValueChange={setSubjectFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Subject" /></SelectTrigger><SelectContent><SelectItem value="all">All subjects</SelectItem>{orderedSubjects.map((subject) => <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>)}</SelectContent></Select>
-                <Select value={chapterFilter} onValueChange={setChapterFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Chapter" /></SelectTrigger><SelectContent><SelectItem value="all">All chapters</SelectItem>{filteredChapterOptions.map((chapter) => <SelectItem key={chapter.id} value={chapter.id}>{chapter.name}</SelectItem>)}</SelectContent></Select>
-                <Select value={topicFilter} onValueChange={setTopicFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Topic" /></SelectTrigger><SelectContent><SelectItem value="all">All topics</SelectItem>{filteredTopicOptions.map((topic) => <SelectItem key={topic.id} value={topic.id}>{topic.name}</SelectItem>)}</SelectContent></Select>
-                <Select value={gradeFilter} onValueChange={setGradeFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All grades</SelectItem>{gradeOptions.map((grade) => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select>
-                <Select value={examFilter} onValueChange={setExamFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Exam" /></SelectTrigger><SelectContent><SelectItem value="all">All exams</SelectItem>{examOptions.map((exam) => <SelectItem key={exam} value={exam}>{exam}</SelectItem>)}</SelectContent></Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{(['draft', 'in_review', 'approved', 'rejected', 'archived'] as QuestionStatus[]).map((status) => <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>)}</SelectContent></Select>
-                <Select value={difficultyFilter} onValueChange={setDifficultyFilter}><SelectTrigger className="border-[#E7ECEB]"><SelectValue placeholder="Difficulty" /></SelectTrigger><SelectContent><SelectItem value="all">All difficulty</SelectItem>{Object.entries(difficultyLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
+                <div className="relative md:col-span-2"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search question, option, answer, solution, image, school, topic or tag" className="border-[var(--line)] pl-9" /></div>
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Subject" /></SelectTrigger><SelectContent><SelectItem value="all">All subjects</SelectItem>{orderedSubjects.map((subject) => <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>)}</SelectContent></Select>
+                <Select value={chapterFilter} onValueChange={setChapterFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Chapter" /></SelectTrigger><SelectContent><SelectItem value="all">All chapters</SelectItem>{filteredChapterOptions.map((chapter) => <SelectItem key={chapter.id} value={chapter.id}>{chapter.name}</SelectItem>)}</SelectContent></Select>
+                <Select value={topicFilter} onValueChange={setTopicFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Topic" /></SelectTrigger><SelectContent><SelectItem value="all">All topics</SelectItem>{filteredTopicOptions.map((topic) => <SelectItem key={topic.id} value={topic.id}>{topic.name}</SelectItem>)}</SelectContent></Select>
+                <Select value={gradeFilter} onValueChange={setGradeFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Grade" /></SelectTrigger><SelectContent><SelectItem value="all">All grades</SelectItem>{gradeOptions.map((grade) => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}</SelectContent></Select>
+                <Select value={examFilter} onValueChange={setExamFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Exam" /></SelectTrigger><SelectContent><SelectItem value="all">All exams</SelectItem>{examOptions.map((exam) => <SelectItem key={exam} value={exam}>{exam}</SelectItem>)}</SelectContent></Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{(['draft', 'in_review', 'approved', 'rejected', 'archived'] as QuestionStatus[]).map((status) => <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>)}</SelectContent></Select>
+                <Select value={difficultyFilter} onValueChange={setDifficultyFilter}><SelectTrigger className="border-[var(--line)]"><SelectValue placeholder="Difficulty" /></SelectTrigger><SelectContent><SelectItem value="all">All difficulty</SelectItem>{Object.entries(difficultyLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
               </div>
-              <div className="mt-3 grid gap-3 border-t border-[#E7ECEB] pt-3 md:grid-cols-2 xl:grid-cols-[170px_180px_180px_190px_1fr]">
-                <Select value={dateMode} onValueChange={(value) => setDateMode(value as 'published' | 'updated')}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="published">Published date</SelectItem><SelectItem value="updated">Updated date</SelectItem></SelectContent></Select>
-                <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="border-[#E7ECEB]" title="From date" />
-                <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="border-[#E7ECEB]" title="To date" />
-                <Select value={sort} onValueChange={setSort}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="recent">Recently updated</SelectItem><SelectItem value="oldest">Oldest updated</SelectItem><SelectItem value="subject">Subject A-Z</SelectItem><SelectItem value="topic">Topic A-Z</SelectItem></SelectContent></Select>
-                <div className="flex items-center justify-end text-xs text-[#6B7980]">{filtered.length} matching question{filtered.length === 1 ? '' : 's'}</div>
+              <div className="mt-3 grid gap-3 border-t border-[var(--line)] pt-3 md:grid-cols-2 xl:grid-cols-[170px_180px_180px_190px_1fr]">
+                <Select value={dateMode} onValueChange={(value) => setDateMode(value as 'published' | 'updated')}><SelectTrigger className="border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="published">Published date</SelectItem><SelectItem value="updated">Updated date</SelectItem></SelectContent></Select>
+                <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="border-[var(--line)]" title="From date" />
+                <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="border-[var(--line)]" title="To date" />
+                <Select value={sort} onValueChange={setSort}><SelectTrigger className="border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="recent">Recently updated</SelectItem><SelectItem value="oldest">Oldest updated</SelectItem><SelectItem value="subject">Subject A-Z</SelectItem><SelectItem value="topic">Topic A-Z</SelectItem></SelectContent></Select>
+                <div className="flex items-center justify-end text-xs text-[var(--muted-foreground)]">{filtered.length} matching question{filtered.length === 1 ? '' : 's'}</div>
               </div>
             </CardContent>
           </Card>
 
           {canDelete && (
-            <div className="flex flex-col gap-3 rounded-xl border border-[#DCE9E7] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--secondary)] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="font-semibold text-[#14232B]">{selectedIds.size} selected</span>
+                <span className="font-semibold text-[var(--foreground)]">{selectedIds.size} selected</span>
                 <Button type="button" variant="ghost" size="sm" onClick={() => toggleVisible(true)} disabled={!visibleIds.length || allVisibleSelected}>Select this page</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={selectAllMatching} disabled={!filtered.length || selectedIds.size === filtered.length}>Select all {filtered.length} matching</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} disabled={!selectedIds.size}>Clear</Button>
@@ -581,61 +623,99 @@ export function LiveQuestionBank({ kind }: { kind: 'admin' | 'school' }) {
             </div>
           )}
 
-          <Card className="gap-0 overflow-hidden border-[#E7ECEB] shadow-none">
+          <Card className="gap-0 overflow-hidden border-[var(--line)] shadow-sm rounded-xl">
             <div className="overflow-x-auto">
               <Table className="min-w-[1520px]">
                 <TableHeader>
-                  <TableRow className="border-[#E7ECEB] bg-[#F7F9F7] hover:bg-[#F7F9F7]">
-                    {canDelete && <TableHead className="w-12"><Checkbox checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false} onCheckedChange={(checked) => toggleVisible(checked === true)} aria-label="Select all questions on this page" /></TableHead>}
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">S.No.</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Question</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">School / Ownership</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Subject / Chapter / Topic</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Question type</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Difficulty</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Status</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Published</TableHead>
-                    <TableHead className="text-xs font-semibold text-[#6B7980]">Updated</TableHead>
-                    <TableHead className="text-right text-xs font-semibold text-[#6B7980]">Actions</TableHead>
+                  <TableRow className="border-[var(--line)] bg-[var(--canvas)] hover:bg-[var(--canvas)]">
+                    {canDelete && <TableHead className="w-[44px] min-w-[44px] max-w-[44px] px-0 text-center"><Checkbox className="mx-auto" checked={allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false} onCheckedChange={(checked) => toggleVisible(checked === true)} aria-label="Select all questions on this page" /></TableHead>}
+                    <TableHead className="w-[72px] min-w-[72px] max-w-[72px] text-xs font-semibold text-[var(--muted-foreground)]">S.No.</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Question</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">School / Ownership</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Subject / Chapter / Topic</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Question type</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Difficulty</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Status</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Published</TableHead>
+                    <TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Updated</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-[var(--muted-foreground)]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={canDelete ? 11 : 10} className="py-14 text-center text-sm text-[#6B7980]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading question banks…</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canDelete ? 11 : 10} className="py-14 text-center text-sm text-[var(--muted-foreground)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading question banks…</TableCell></TableRow>
                   ) : visibleRows.length === 0 ? (
-                    <TableRow><TableCell colSpan={canDelete ? 11 : 10} className="py-14 text-center text-sm text-[#6B7980]">No questions match the current filters.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={canDelete ? 11 : 10} className="py-14 text-center text-sm text-[var(--muted-foreground)]">No questions match the current filters.</TableCell></TableRow>
                   ) : visibleRows.map((question, rowIndex) => (
-                    <TableRow key={question.id} onClick={() => openReview(question)} className={`cursor-pointer border-[#E7ECEB] hover:bg-[#F7F9F7]/70 ${selectedIds.has(question.id) ? 'bg-[#DCE9E7]/30' : ''}`}>
-                      {canDelete && <TableCell onClick={(event) => event.stopPropagation()}><Checkbox checked={selectedIds.has(question.id)} onCheckedChange={(checked) => toggleQuestion(question.id, checked === true)} aria-label={`Select question ${rowIndex + 1}`} /></TableCell>}
-                      <TableCell><Badge variant="outline" className="border-[#DCE9E7] bg-[#F7F9F7] text-[#0E5A5A]">{(safePage - 1) * PAGE_SIZE + rowIndex + 1}</Badge></TableCell>
-                      <TableCell className="max-w-[390px]"><p className="line-clamp-2 text-sm font-medium text-[#14232B]">{question.stem_text}</p><div className="mt-1 flex flex-wrap gap-1">{(question.exam_types || []).slice(0, 3).map((exam) => <Badge key={exam} variant="outline" className="border-[#E7ECEB] text-[10px] text-[#6B7980]">{exam}</Badge>)}</div></TableCell>
-                      <TableCell><Badge className={question.organization_id ? 'bg-[#2E6D8B]/10 text-[#2E6D8B]' : 'bg-[#F2B84B]/20 text-[#8A5F00]'}>{question.organization_id ? organizationName(question) : 'Evidara Master'}</Badge><p className="mt-1 text-[11px] text-[#6B7980]">{question.organization_id ? 'School-created question' : 'Evidara-created question'}</p></TableCell>
-                      <TableCell><p className="text-sm text-[#14232B]">{question.subjects?.name || 'Unclassified'}</p><p className="mt-0.5 text-xs text-[#6B7980]">{question.chapters?.name || 'No chapter'} · {question.topics?.name || 'No topic'}</p></TableCell>
-                      <TableCell><p className="text-xs font-medium text-[#14232B]">{questionTypeLabels[question.question_type]}</p></TableCell>
+                    <TableRow key={question.id} onClick={() => openReview(question)} className={`cursor-pointer border-[var(--line)] hover:bg-[var(--canvas)]/70 ${selectedIds.has(question.id) ? 'bg-[var(--secondary)]/30' : ''}`}>
+                      {canDelete && <TableCell className="w-[44px] min-w-[44px] max-w-[44px] px-0 text-center" onClick={(event) => event.stopPropagation()}><Checkbox className="mx-auto" checked={selectedIds.has(question.id)} onCheckedChange={(checked) => toggleQuestion(question.id, checked === true)} aria-label={`Select question ${rowIndex + 1}`} /></TableCell>}
+                      <TableCell><Badge variant="outline" className="border-[var(--secondary)] bg-[var(--canvas)] text-[var(--teal)]">{(safePage - 1) * PAGE_SIZE + rowIndex + 1}</Badge></TableCell>
+                      <TableCell className="max-w-[390px]"><p className="line-clamp-2 text-sm font-medium text-[var(--foreground)]">{question.stem_text}</p><div className="mt-1 flex flex-wrap gap-1">{(question.exam_types || []).slice(0, 3).map((exam) => <Badge key={exam} variant="outline" className="border-[var(--line)] text-[10px] text-[var(--muted-foreground)]">{exam}</Badge>)}{(question.question_pyq_occurrences || []).slice(0, 2).map((occurrence,index)=><Badge key={occurrence.id || index} className="bg-[var(--secondary)] text-[10px] text-[var(--teal)]">{occurrence.pyq_source_papers?.display_name || `${occurrence.pyq_source_papers?.source_year || question.source_year || ''} PYQ`}{occurrence.pyq_source_papers?.variant && occurrence.pyq_source_papers.variant !== 'Main' ? ` · ${occurrence.pyq_source_papers.variant}` : ''}</Badge>)}</div></TableCell>
+                      <TableCell><Badge className={question.organization_id ? 'bg-[var(--info)]/10 text-[var(--info)]' : 'bg-[var(--amber)]/20 text-[#8A5F00]'}>{question.organization_id ? organizationName(question) : 'Evidara Master'}</Badge><p className="mt-1 text-[11px] text-[var(--muted-foreground)]">{question.organization_id ? 'School-created question' : 'Evidara-created question'}</p></TableCell>
+                      <TableCell><p className="text-sm text-[var(--foreground)]">{question.subjects?.name || 'Unclassified'}</p><p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{question.chapters?.name || 'No chapter'} · {question.topics?.name || 'No topic'}</p></TableCell>
+                      <TableCell><p className="text-xs font-medium text-[var(--foreground)]">{questionTypeLabels[question.question_type]}</p></TableCell>
                       <TableCell><Badge className={difficultyClass(question.difficulty)}>{difficultyLabels[question.difficulty]}</Badge></TableCell>
-                      <TableCell><Badge className={statusClass(question.status)}>{statusLabel(question.status)}</Badge>{teacher && ['approved', 'rejected'].includes(question.status) && <p className="mt-1 text-[10px] text-[#6B7980]">Decision visible · read only</p>}</TableCell>
-                      <TableCell className="text-xs text-[#14232B]">{shortDate(publishedAt(question))}</TableCell>
-                      <TableCell className="text-xs text-[#6B7980]">{shortDate(question.updated_at)}</TableCell>
-                      <TableCell className="text-right"><div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="icon" title="Review learner view" onClick={() => openReview(question)} className="h-8 w-8 text-[#2E6D8B] hover:bg-[#2E6D8B]/10"><Eye className="h-4 w-4" /></Button>{editable(question) && <Button variant="ghost" size="icon" title="Edit question" onClick={() => openEdit(question)} className="h-8 w-8 text-[#0E5A5A] hover:bg-[#0E5A5A]/10"><Edit3 className="h-4 w-4" /></Button>}{question.status !== 'archived' && archivable(question) && <Button variant="ghost" size="icon" title="Archive question" onClick={() => void archiveQuestion(question)} className="h-8 w-8 text-[#8A5F00] hover:bg-[#F2B84B]/15"><Archive className="h-4 w-4" /></Button>}{canDelete && <Button variant="ghost" size="icon" title="Permanently delete question" onClick={() => requestDelete([question.id])} className="h-8 w-8 text-[#B54747] hover:bg-[#B54747]/10"><Trash2 className="h-4 w-4" /></Button>}{!editable(question) && !archivable(question) && !canDelete && <Badge variant="outline" className="border-[#E7ECEB] text-[10px] text-[#6B7980]">Read only</Badge>}</div></TableCell>
+                      <TableCell><Badge className={statusClass(question.status)}>{statusLabel(question.status)}</Badge>{teacher && ['approved', 'rejected'].includes(question.status) && <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">Decision visible · read only</p>}</TableCell>
+                      <TableCell className="text-xs text-[var(--foreground)]">{shortDate(publishedAt(question))}</TableCell>
+                      <TableCell className="text-xs text-[var(--muted-foreground)]">{shortDate(question.updated_at)}</TableCell>
+                      <TableCell className="text-right"><div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}><Button variant="ghost" size="icon" title="Review learner view" onClick={() => openReview(question)} className="h-8 w-8 text-[var(--info)] hover:bg-[var(--info)]/10"><Eye className="h-4 w-4" /></Button>{editable(question) && <Button variant="ghost" size="icon" title="Edit question" onClick={() => openEdit(question)} className="h-8 w-8 text-[var(--teal)] hover:bg-[var(--teal)]/10"><Edit3 className="h-4 w-4" /></Button>}{question.status !== 'archived' && archivable(question) && <Button variant="ghost" size="icon" title="Archive question" onClick={() => void archiveQuestion(question)} className="h-8 w-8 text-[#8A5F00] hover:bg-[var(--amber)]/15"><Archive className="h-4 w-4" /></Button>}{canDelete && <Button variant="ghost" size="icon" title="Permanently delete question" onClick={() => requestDelete([question.id])} className="h-8 w-8 text-[var(--destructive)] hover:bg-[var(--destructive)]/10"><Trash2 className="h-4 w-4" /></Button>}{!editable(question) && !archivable(question) && !canDelete && <Badge variant="outline" className="border-[var(--line)] text-[10px] text-[var(--muted-foreground)]">Read only</Badge>}</div></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            <div className="flex items-center justify-between border-t border-[#E7ECEB] px-4 py-3"><p className="text-xs text-[#6B7980]">Page {safePage} of {totalPages}</p><div className="flex gap-2"><Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="border-[#E7ECEB]"><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="border-[#E7ECEB]">Next<ChevronRight className="ml-1 h-4 w-4" /></Button></div></div>
+            <div className="flex items-center justify-between border-t border-[var(--line)] px-4 py-3"><p className="text-xs text-[var(--muted-foreground)]">Page {safePage} of {totalPages}</p><div className="flex gap-2"><Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="border-[var(--line)]"><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button><Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))} className="border-[var(--line)]">Next<ChevronRight className="ml-1 h-4 w-4" /></Button></div></div>
           </Card>
         </>
       )}
 
-      <QuestionEditorDialog open={editorOpen} onOpenChange={setEditorOpen} kind={kind} organizationId={organizationId} subjects={subjects} chapters={chapters} topics={topics} question={selectedQuestion} onTaxonomyChanged={load} onSaved={async () => { setMessage(selectedQuestion ? 'Question updated successfully.' : 'Question created successfully.'); setSelectedQuestion(null); await load(); }} />
+      <QuestionEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        kind={kind}
+        organizationId={organizationId}
+        subjects={subjects}
+        chapters={chapters}
+        topics={topics}
+        question={selectedQuestion}
+        onTaxonomyChanged={async () => { await load(); }}
+        onSaved={async () => {
+          const wasEditing = Boolean(selectedQuestion);
+          const resumeId = reviewResumeId;
+          setMessage(wasEditing ? 'Question updated successfully.' : 'Question created successfully.');
+          const refreshed = await load();
+          if (resumeId) {
+            const updated = refreshed.find((question) => question.id === resumeId);
+            if (updated) {
+              setReviewQuestion(updated);
+              setReviewOpen(true);
+            }
+            setReviewResumeId(null);
+          }
+          setSelectedQuestion(null);
+        }}
+      />
       <QuestionBulkImportDialog open={importOpen} onOpenChange={setImportOpen} kind={kind} organizationId={organizationId} subjects={subjects} chapters={chapters} topics={topics} onImported={async () => { setMessage('Question import completed.'); await load(); }} />
-      <QuestionReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} question={reviewQuestion} />
+      <QuestionReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        question={reviewQuestion}
+        canEdit={Boolean(reviewQuestion && editable(reviewQuestion))}
+        onEdit={editFromReview}
+        position={reviewPosition}
+        total={filtered.length}
+        onPrevious={() => navigateReview(-1)}
+        onNext={() => navigateReview(1)}
+      />
+      {kind === 'admin' && role === 'super_admin' && (
+        <NeetPyqImporter open={pyqImportOpen} onOpenChange={setPyqImportOpen} onPromoted={() => void load()} />
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={(next) => { if (!deleting) setDeleteDialogOpen(next); }}>
-        <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-xl">
-          <div className="bg-[#14232B] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#B54747]"><Trash2 className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Permanently delete {deleteIds.length} question{deleteIds.length === 1 ? '' : 's'}?</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">This is available only to Super Admin and Evidara Admin. A deletion audit is retained, but the question will disappear from the active question banks.</AlertDialogDescription></AlertDialogHeader></div>
-          <div className="space-y-3 px-6 py-5"><div className="rounded-xl border border-[#F2B84B]/40 bg-[#FFFDF7] p-3 text-sm text-[#8A5F00]"><strong>Questions already used in a paper or test are protected.</strong><p className="mt-1 text-xs">Protected questions will not be deleted and should be archived instead.</p></div>{deletePreview.length > 0 && <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#6B7980]">Selection preview</p><ul className="space-y-2 text-sm text-[#14232B]">{deletePreview.map((stem, index) => <li key={`${stem}-${index}`} className="line-clamp-2 rounded-lg bg-[#F7F9F7] px-3 py-2">{index + 1}. {stem}</li>)}</ul>{deleteIds.length > deletePreview.length && <p className="mt-2 text-xs text-[#6B7980]">+ {deleteIds.length - deletePreview.length} more selected</p>}</div>}</div>
-          <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><AlertDialogCancel disabled={deleting}>Keep questions</AlertDialogCancel><Button type="button" variant="destructive" onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Delete permanently</Button></AlertDialogFooter>
+        <AlertDialogContent className="overflow-hidden border-[var(--line)] p-0 sm:max-w-xl">
+          <div className="bg-[var(--foreground)] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--destructive)]"><Trash2 className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Permanently delete {deleteIds.length} question{deleteIds.length === 1 ? '' : 's'}?</AlertDialogTitle><AlertDialogDescription className="text-[var(--secondary)]">This is available only to Super Admin and Evidara Admin. A deletion audit is retained, but the question will disappear from the active question banks.</AlertDialogDescription></AlertDialogHeader></div>
+          <div className="space-y-3 px-6 py-5"><div className="rounded-xl border border-[var(--amber)]/40 bg-[#FFFDF7] p-3 text-sm text-[#8A5F00]"><strong>Questions already used in a paper or test are protected.</strong><p className="mt-1 text-xs">Protected questions will not be deleted and should be archived instead.</p></div>{deletePreview.length > 0 && <div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Selection preview</p><ul className="space-y-2 text-sm text-[var(--foreground)]">{deletePreview.map((stem, index) => <li key={`${stem}-${index}`} className="line-clamp-2 rounded-lg bg-[var(--canvas)] px-3 py-2">{index + 1}. {stem}</li>)}</ul>{deleteIds.length > deletePreview.length && <p className="mt-2 text-xs text-[var(--muted-foreground)]">+ {deleteIds.length - deletePreview.length} more selected</p>}</div>}</div>
+          <AlertDialogFooter className="border-t border-[var(--line)] px-6 py-4"><AlertDialogCancel disabled={deleting}>Keep questions</AlertDialogCancel><Button type="button" variant="destructive" onClick={() => void confirmDelete()} disabled={deleting}>{deleting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Delete permanently</Button></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

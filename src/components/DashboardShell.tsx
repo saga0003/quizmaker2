@@ -3,30 +3,47 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpenCheck, Brain, Building2, CalendarRange, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, CreditCard, FileQuestion, LogOut, Menu, Package, Settings, ShieldCheck, Sparkles, TableProperties, Upload, Users, X, Home } from 'lucide-react';
+import { BookOpenCheck, Building2, CalendarRange, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, CreditCard, FileQuestion, LogOut, Menu, Package, ShieldCheck, Sparkles, TableProperties, Users, X, Home } from 'lucide-react';
 import { Logo } from './Logo';
 import { useAuth } from '@/context/AuthProvider';
+import { EVIDARA_RELEASE_LABEL } from '@/lib/release';
+import { normalizeEvidaraRole } from '@/lib/roles';
+import { phase1AllowsWorkspaceView } from '@/config/phase1-launch';
 
 type Kind = 'student' | 'school' | 'admin';
 type DemoIdentity = { id:string; fullName:string; email:string; username:string; role:string };
-type NavItem = { h:string; l:string; i:typeof Home; tag?:string };
+type NavItem = { h:string; l:string; i:typeof Home; tag?:string; view?:string; superAdminOnly?:boolean };
 
 const links: Record<Kind, NavItem[]> = {
   student: [
-    {h:'/student/',l:'My Overview',i:Home},
-    {h:'/student/tests/',l:'Available Tests',i:ClipboardList},
-    {h:'/student/segment/',l:'My Development Pattern',i:Brain,tag:'Explained'},
-    {h:'/student/resources/',l:'My Resources',i:BookOpenCheck,tag:'Included'},
-    {h:'/student/purchases/',l:'My Access',i:CreditCard},
+    {h:'/?view=student-dashboard',l:'My Overview',i:Home},
+    {h:'/?view=student-tests',l:'Available Tests',i:ClipboardList},
+    {h:'/?view=student-resources',l:'My Resources',i:BookOpenCheck,tag:'Included'},
+    {h:'/?view=student-purchases',l:'My Access',i:CreditCard,view:'student-purchases'},
     {h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},
     {h:'/data-guide/',l:'Data Controls',i:TableProperties},
-    {h:'/student/#profile',l:'Profile',i:Settings},
   ],
   school: [
-    {h:'/school/',l:'School Overview',i:Home},{h:'/school/subscription/',l:'Annual Subscription',i:CreditCard,tag:'Active'},{h:'/school/students/',l:'Students & Promotion',i:Users},{h:'/school/segments/',l:'Development Patterns',i:Brain},{h:'/school/resources/',l:'Resource Library',i:BookOpenCheck},{h:'/school/questions/',l:'Question Bank',i:FileQuestion},{h:'/school/questions/import/',l:'Bulk Question Import',i:Upload},{h:'/school/papers/',l:'Tests & Papers',i:ClipboardList},{h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},{h:'/data-guide/',l:'Data Controls',i:TableProperties},{h:'/school/register/',l:'School Profile',i:Building2},
+    {h:'/?view=school-dashboard',l:'School Overview',i:Home},
+    {h:'/?view=school-subscription',l:'Annual Subscription',i:CreditCard,tag:'Active'},
+    {h:'/?view=school-students',l:'Students & Promotion',i:Users},
+    {h:'/?view=school-resources',l:'Resource Library',i:BookOpenCheck},
+    {h:'/?view=school-questions',l:'Question Bank',i:FileQuestion},
+    {h:'/?view=school-papers',l:'Tests & Papers',i:ClipboardList},
+    {h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},
+    {h:'/data-guide/',l:'Data Controls',i:TableProperties},
+    {h:'/school/register/',l:'School Profile',i:Building2},
   ],
   admin: [
-    {h:'/admin/',l:'Command Centre',i:Home},{h:'/admin/subscriptions/',l:'School Subscriptions',i:CreditCard},{h:'/admin/questions/',l:'Master Question Bank',i:FileQuestion},{h:'/admin/questions/import/',l:'Bulk Import',i:Upload},{h:'/admin/papers/',l:'Assessment Catalogue',i:ClipboardList},{h:'/admin/segments/',l:'Segment Governance',i:Brain},{h:'/admin/products/',l:'Plans & Pricing',i:Package},{h:'/admin/readiness/',l:'Launch Readiness',i:ShieldCheck},{h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},{h:'/data-guide/',l:'Data Controls',i:TableProperties},
+    {h:'/?view=admin-dashboard',l:'Command Centre',i:Home},
+    {h:'/?view=admin-subscriptions',l:'School Subscriptions',i:CreditCard},
+    {h:'/?view=admin-questions',l:'Master Question Bank',i:FileQuestion},
+    {h:'/?view=admin-papers',l:'Assessment Catalogue',i:ClipboardList},
+    {h:'/?view=admin-products',l:'Plans & Pricing',i:Package,view:'admin-products',superAdminOnly:true},
+    {h:'/?view=admin-access',l:'Access & Accounts',i:ShieldCheck},
+    {h:'/admin/readiness/',l:'Launch Readiness',i:ShieldCheck,superAdminOnly:true},
+    {h:'/metric-guide/',l:'Metric Guide',i:CircleHelp},
+    {h:'/data-guide/',l:'Data Controls',i:TableProperties},
   ],
 };
 
@@ -49,6 +66,12 @@ export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNo
   const displayRole=profile?.role||demoIdentity?.role||`${kind} role`;
   const avatarText=displayName.slice(0,2).toUpperCase();
   const workspaceName=kind==='school'?'School workspace':kind==='admin'?'Evidara platform':displayName;
+  const accessRole=normalizeEvidaraRole(profile?.role||demoIdentity?.role);
+  const visibleLinks=links[kind].filter((item)=>{
+    if(item.superAdminOnly && accessRole!=='super_admin') return false;
+    if(item.view && !phase1AllowsWorkspaceView(accessRole,item.view)) return false;
+    return true;
+  });
 
   async function logout(){
     if(user)await signOut();
@@ -64,11 +87,11 @@ export function DashboardShell({kind,children}:{kind:Kind;children:React.ReactNo
       <div className="so-sidebar-brand"><Link href="/"><Logo variant="dark"/></Link><button className="so-collapse" onClick={()=>setNavPinned(false)} aria-label="Close navigation"><ChevronLeft size={17}/></button></div>
       <div className="so-workspace"><span>{kind==='admin'?'Platform workspace':kind==='school'?'School workspace':'Student workspace'}</span><strong>{workspaceName}</strong></div>
       <nav className="so-nav">
-        {links[kind].map(({h,l,i:Icon,tag})=>{const active=pathname===h||pathname.startsWith(h.replace(/\/$/,'')+(h==='/student/'||h==='/school/'||h==='/admin/'?'__never':'/'));return <Link key={h} href={h} className={active?'active':''} onClick={()=>window.innerWidth<1100&&setNavPinned(false)}><span><Icon size={18}/>{l}</span>{tag&&<em>{tag}</em>}</Link>})}
+        {visibleLinks.map(({h,l,i:Icon,tag})=>{const active=h.startsWith('/?')?false:pathname===h||pathname.startsWith(h.replace(/\/$/,'')+'/');return <Link key={h} href={h} className={active?'active':''} onClick={()=>window.innerWidth<1100&&setNavPinned(false)}><span><Icon size={18}/>{l}</span>{tag&&<em>{tag}</em>}</Link>})}
       </nav>
       <div className="so-sidebar-card"><Sparkles size={18}/><div><strong>Evidara</strong><span>{kind==='student'?'Evidence with a clear next step':'Evidence-driven student development'}</span></div></div>
       <div className="so-account"><div className="so-avatar">{avatarText}</div><div><strong>{displayName}</strong><span>{displayRole.replaceAll('_',' ')}</span></div>{(user||demoIdentity)&&<button onClick={()=>void logout()} title="Sign out"><LogOut size={17}/></button>}</div>
     </aside>
-    <main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?'Cloud data connected':'Interactive demo mode'}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><ChevronRight size={15}/> Evidara 11</span></div></header><div className="so-content">{children}</div></main>
+    <main className="so-main"><header className="so-topbar"><div><span className="so-live-dot"/> {configured?'Cloud data connected':'Interactive demo mode'}</div><div className="so-top-summary"><span><CalendarRange size={15}/> Academic year 2026–27</span><span><ChevronRight size={15}/> {EVIDARA_RELEASE_LABEL}</span></div></header><div className="so-content">{children}</div></main>
   </div>;
 }

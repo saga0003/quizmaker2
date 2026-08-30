@@ -11,6 +11,40 @@ export type QuestionType =
 export type QuestionStatus = "draft" | "in_review" | "approved" | "rejected" | "archived";
 export type QuestionDifficulty = "very_easy" | "easy" | "moderate" | "difficult" | "very_difficult";
 
+
+export type PyqSourcePaper = {
+  id?: string;
+  exam_type: string;
+  source_year: number;
+  variant: string;
+  paper_code?: string | null;
+  paper_key?: string;
+  display_name?: string;
+  source_key?: string | null;
+  expected_question_count?: number;
+};
+
+export type QuestionPyqOccurrence = {
+  id?: string;
+  source_question_number?: number | null;
+  subject_label?: string | null;
+  metadata?: Record<string, unknown>;
+  pyq_source_papers?: PyqSourcePaper | null;
+};
+
+export type QuestionPyqOccurrenceInput = {
+  exam_type: string;
+  year: number;
+  variant: string;
+  paper_code?: string;
+  paper_key?: string;
+  display_name?: string;
+  source_key?: string;
+  question_number?: number;
+  subject_label?: string;
+  expected_question_count?: number;
+};
+
 export type QuestionOptionInput = {
   option_key: string;
   content_text: string;
@@ -32,6 +66,27 @@ export type MatchFollowingPair = {
   right_image_url?: string;
 };
 
+export type SourceFidelitySegment = {
+  page?: number;
+  viewBox: [number, number, number, number];
+  asset?: string;
+  url?: string;
+  standalone?: boolean;
+  sourceViewBox?: [number, number, number, number];
+};
+
+export type SourceFidelityRender = {
+  version?: string;
+  mode?: "source_fidelity" | string;
+  asset_kind?: string;
+  prompt_segments?: SourceFidelitySegment[];
+  solution_segments?: SourceFidelitySegment[];
+  answer_controls?: string;
+  text_fallback?: boolean;
+  font_policy?: string;
+  source_pdf_page_size?: [number, number];
+};
+
 export type QuestionMetadata = {
   editor?: string;
   match_pairs?: MatchFollowingPair[];
@@ -44,6 +99,9 @@ export type QuestionMetadata = {
   import_file?: string;
   published_at?: string;
   review_note?: string;
+  v19_render?: SourceFidelityRender;
+  v19_quality?: Record<string, unknown>;
+  source_fidelity?: boolean;
   [key: string]: unknown;
 };
 
@@ -106,6 +164,7 @@ export type QuestionRow = {
   created_at: string;
   updated_at: string;
   question_options?: QuestionOptionInput[];
+  question_pyq_occurrences?: QuestionPyqOccurrence[];
   subjects?: { name: string; code: string } | null;
   chapters?: { name: string } | null;
   topics?: { name: string } | null;

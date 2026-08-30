@@ -41,6 +41,8 @@ import { useAuth } from '@/context/AuthProvider';
 import { normalizeEvidaraRole } from '@/lib/roles';
 import { useQuestionScope } from '@/components/questions/useQuestionScope';
 import { QuestionBulkImportDialog } from '@/components/evidara/question-bulk-import-dialog';
+import { PaperFileImportDialog } from '@/components/evidara/paper-file-import-dialog';
+import { PyqPaperManager } from '@/components/evidara/pyq-paper-manager';
 import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 import type {
 QuestionDifficulty,
@@ -204,6 +206,10 @@ openForever: boolean;
 shuffleQuestions: boolean;
 shuffleOptions: boolean;
 defaultMode: PaperSelectionMode;
+isPyq: boolean;
+sourceYear: string;
+sourceVariant: string;
+sourcePaperCode: string;
 };
 const emptyBuilder = (): Builder => ({
 id: null,
@@ -224,15 +230,19 @@ openForever: true,
 shuffleQuestions: false,
 shuffleOptions: false,
 defaultMode: 'manual',
+isPyq: false,
+sourceYear: '',
+sourceVariant: 'Main',
+sourcePaperCode: '',
 });
 function statusClass(status: PaperStatus) {
-if (status === 'published') return 'border-[#0E5A5A]/15 bg-[#DCE9E7] text-[#0E5A5A]';
+if (status === 'published') return 'border-[var(--teal)]/15 bg-[var(--secondary)] text-[var(--teal)]';
 if (status === 'approved') return 'border-[#237A57]/15 bg-[#237A57]/10 text-[#237A57]';
-if (status === 'under_review') return 'border-[#F2B84B]/30 bg-[#F2B84B]/20 text-[#8A5F00]';
-if (status === 'rejected') return 'border-[#B54747]/20 bg-[#B54747]/10 text-[#B54747]';
-if (status === 'paused') return 'border-[#2E6D8B]/20 bg-[#2E6D8B]/10 text-[#2E6D8B]';
-if (status === 'closed' || status === 'archived') return 'border-[#14232B]/10 bg-[#14232B]/10 text-[#44545C]';
-return 'border-[#E7ECEB] bg-[#F7F9F7] text-[#6B7980]';
+if (status === 'under_review') return 'border-[var(--amber)]/30 bg-[var(--amber)]/20 text-[#8A5F00]';
+if (status === 'rejected') return 'border-[var(--destructive)]/20 bg-[var(--destructive)]/10 text-[var(--destructive)]';
+if (status === 'paused') return 'border-[var(--info)]/20 bg-[var(--info)]/10 text-[var(--info)]';
+if (status === 'closed' || status === 'archived') return 'border-[var(--foreground)]/10 bg-[var(--foreground)]/10 text-[#44545C]';
+return 'border-[var(--line)] bg-[var(--canvas)] text-[var(--muted-foreground)]';
 }
 function SectionHeading({ number, title, description, action }: {
 number: string;
@@ -241,12 +251,12 @@ description: string;
 action?: ReactNode;
 }) {
 return (
-<div className="flex flex-col gap-3 border-b border-[#E7ECEB] pb-4 sm:flex-row sm:items-start sm:justify-between">
+<div className="flex flex-col gap-3 border-b border-[var(--line)] pb-4 sm:flex-row sm:items-start sm:justify-between">
 <div className="flex items-start gap-3">
-<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0E5A5A] text-xs font-bold text-white">{number}</span>
+<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--teal)] text-xs font-bold text-white">{number}</span>
 <div>
-<h3 className="font-semibold text-[#14232B]">{title}</h3>
-<p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-[#6B7980]">{description}</p>
+<h3 className="font-semibold text-[var(--foreground)]">{title}</h3>
+<p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-[var(--muted-foreground)]">{description}</p>
 </div>
 </div>
 {action && <div className="shrink-0">{action}</div>}
@@ -272,14 +282,14 @@ const tools = [
 { title: 'Clear formatting', icon: Eraser, run: () => command('removeFormat') },
 ];
 return (
-<div className="overflow-hidden rounded-xl border border-[#E7ECEB] bg-white">
-<div className="flex flex-wrap items-center gap-1 border-b border-[#E7ECEB] bg-[#F7F9F7] p-2">
+<div className="overflow-hidden rounded-xl border border-[var(--line)] bg-white">
+<div className="flex flex-wrap items-center gap-1 border-b border-[var(--line)] bg-[var(--canvas)] p-2">
 {tools.map(({ title, icon: Icon, run }) => (
-<Button key={title} type="button" variant="ghost" size="icon" title={title} onClick={run} className="h-9 w-9 text-[#44545C] hover:bg-[#DCE9E7] hover:text-[#0E5A5A]">
+<Button key={title} type="button" variant="ghost" size="icon" title={title} onClick={run} className="h-9 w-9 text-[#44545C] hover:bg-[var(--secondary)] hover:text-[var(--teal)]">
 <Icon className="h-4 w-4" />
 </Button>
 ))}
-<label className="ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-[#44545C] hover:bg-[#DCE9E7]">
+<label className="ml-1 flex h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-xs font-medium text-[#44545C] hover:bg-[var(--secondary)]">
 Text colour
 <input aria-label="Text colour" type="color" className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0" onChange={(event) => command('foreColor', event.target.value)} />
 </label>
@@ -289,7 +299,7 @@ ref={ref}
 contentEditable
 suppressContentEditableWarning
 onInput={(event) => onChange(sanitize(event.currentTarget.innerHTML))}
-className="min-h-32 px-4 py-3 text-sm leading-6 text-[#14232B] outline-none empty:before:text-[#AEB8BC] empty:before:content-['Add_a_formatted_description_for_students'] [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+className="min-h-32 px-4 py-3 text-sm leading-6 text-[var(--foreground)] outline-none empty:before:text-[#AEB8BC] empty:before:content-['Add_a_formatted_description_for_students'] [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
 />
 </div>
 );
@@ -313,6 +323,8 @@ const [statusFilter, setStatusFilter] = useState('all');
 const [builderOpen, setBuilderOpen] = useState(false);
 const [previewOpen, setPreviewOpen] = useState(false);
 const [importOpen, setImportOpen] = useState(false);
+const [paperFileImportOpen, setPaperFileImportOpen] = useState(false);
+const [pyqManagerOpen, setPyqManagerOpen] = useState(false);
 const [builder, setBuilder] = useState<Builder>(emptyBuilder);
 const [sections, setSections] = useState<PaperSectionInput[]>([emptySection()]);
 const [activeSection, setActiveSection] = useState('');
@@ -433,6 +445,7 @@ const filteredPapers = useMemo(() => papers.filter((paper) => (
 && (!search || `${paper.title} ${paper.code || ''} ${paper.exam_type} ${paper.grade_level || ''}`.toLowerCase().includes(search.toLowerCase()))
 )), [papers, search, statusFilter]);
 const canApprove = role === 'super_admin' || (kind === 'school' && role === 'school_admin');
+const canDeletePaper = role === 'super_admin' || (kind === 'school' && role === 'school_admin');
 const submitStatus: PaperStatus = canApprove ? 'published' : 'under_review';
 const totalMarks = selected.reduce((sum, item) => sum + Number(item.marks || 0), 0);
 const selectedInActive = selected.filter((item) => item.section_client_id === active?.client_id).length;
@@ -462,11 +475,11 @@ const hydrated = (draft.selected || []).map((item: PaperQuestionInput) => {
 const question = questions.find((candidate) => candidate.id === item.question_id);
 return question ? { ...item, question } : null;
 }).filter(Boolean) as Selected[];
-setBuilder(draft.builder);
+setBuilder({ ...emptyBuilder(), ...draft.builder });
 setSections(draft.sections?.length ? draft.sections : [emptySection()]);
 setActiveSection(draft.sections?.[0]?.client_id || '');
 setSelected(hydrated);
-setMessage('Recovered your autosaved V8 paper draft.');
+setMessage('Recovered your autosaved paper draft.');
 }
 } catch {
 localStorage.removeItem(`${draftBase}:new`);
@@ -539,6 +552,10 @@ openForever: Boolean(row.open_forever),
 shuffleQuestions: Boolean(row.shuffle_questions),
 shuffleOptions: Boolean(row.shuffle_options),
 defaultMode: row.settings?.default_selection_mode || 'manual',
+isPyq: Boolean(row.is_previous_year_paper),
+sourceYear: row.source_year ? String(row.source_year) : '',
+sourceVariant: String(row.source_variant || 'Main'),
+sourcePaperCode: String(row.source_paper_code || ''),
 });
 setSections(sectionsReady);
 setActiveSection(sectionsReady[0].client_id);
@@ -664,6 +681,7 @@ if (status === 'draft') return '';
 if (builder.title.trim().length < 3) return 'Enter a complete paper title.';
 if (!resolvedGrade.trim()) return 'Select or enter a grade.';
 if (builder.testType === 'custom_test' && builder.customTestType.trim().length < 2) return 'Name the custom test type.';
+if (kind === 'admin' && builder.isPyq && (!builder.sourceYear || Number(builder.sourceYear) < 1990 || Number(builder.sourceYear) > 2100)) return 'Choose the official PYQ year.';
 if (!selected.length) return 'Add at least one approved question.';
 if (!builder.openForever && builder.from && builder.until && new Date(builder.until) <= new Date(builder.from)) return 'Closing time must be later than opening time.';
 for (const section of sections) {
@@ -722,6 +740,24 @@ p_paper_id: builder.id,
 p_organization_id: kind === 'admin' ? null : organizationId,
 p_payload: payload,
 });
+if (!saveError && kind === 'admin' && role === 'super_admin') {
+  const savedPaperId = String(data || builder.id || '');
+  if (savedPaperId) {
+    const { error: pyqIdentityError } = await supabase.rpc('set_question_paper_pyq_identity_v18', {
+      p_paper_id: savedPaperId,
+      p_is_pyq: builder.isPyq,
+      p_year: builder.isPyq && builder.sourceYear ? Number(builder.sourceYear) : null,
+      p_variant: builder.isPyq ? (builder.sourceVariant.trim() || 'Main') : null,
+      p_paper_code: builder.isPyq ? (builder.sourcePaperCode.trim() || null) : null,
+    });
+    if (pyqIdentityError) {
+      setSaving(false);
+      setError(`Paper saved, but PYQ identity could not be updated: ${pyqIdentityError.message}`);
+      await load();
+      return;
+    }
+  }
+}
 setSaving(false);
 if (saveError) {
 setError(saveError.message);
@@ -780,45 +816,47 @@ const toggle = (values: string[] | undefined, value: string) => (values || []).i
 ? (values || []).filter((item) => item !== value)
 : [...(values || []), value];
 const stats = [
-{ label: 'Total papers', value: papers.length, icon: FileQuestion, tone: '#14232B' },
-{ label: 'Published', value: papers.filter((paper) => paper.status === 'published').length, icon: CheckCircle2, tone: '#0E5A5A' },
+{ label: 'Total papers', value: papers.length, icon: FileQuestion, tone: 'var(--foreground)' },
+{ label: 'Published', value: papers.filter((paper) => paper.status === 'published').length, icon: CheckCircle2, tone: 'var(--teal)' },
 { label: 'Under review', value: papers.filter((paper) => paper.status === 'under_review').length, icon: ShieldCheck, tone: '#8A5F00' },
-{ label: 'Drafts', value: papers.filter((paper) => paper.status === 'draft').length, icon: Edit3, tone: '#2E6D8B' },
+{ label: 'Drafts', value: papers.filter((paper) => paper.status === 'draft').length, icon: Edit3, tone: 'var(--info)' },
 ];
 return (
 <div className="space-y-6">
 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 <div>
-<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0E5A5A]">
+<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--teal)]">
 <ShieldCheck className="h-4 w-4" />
 {kind === 'admin' ? 'Assessment governance' : organizationName}
 </div>
-<h1 className="mt-2 text-2xl font-bold text-[#14232B]">Tests and Question Papers</h1>
-<p className="mt-1 max-w-3xl text-sm leading-relaxed text-[#6B7980]">
-Build grade-aware papers, configure each section and prepare approved assessments for product bundles.
+<h1 className="mt-2 text-2xl font-bold text-[var(--foreground)]">Tests and Question Papers</h1>
+<p className="mt-1 max-w-3xl text-sm leading-relaxed text-[var(--muted-foreground)]">
+Build grade-aware papers, configure each section and prepare approved assessments for your institution.
 </p>
 </div>
 <div className="flex flex-wrap gap-2">
-<Button variant="outline" onClick={() => void load()} disabled={loading} className="h-11 border-[#E7ECEB] bg-white">
+<Button variant="outline" onClick={() => void load()} disabled={loading} className="h-11 border-[var(--line)] bg-white">
 <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh
 </Button>
-<Button onClick={openCreate} className="h-11 bg-[#0E5A5A] text-white hover:bg-[#0A4747]">
+{kind === 'admin' && role === 'super_admin' && <Button variant="outline" onClick={()=>setPyqManagerOpen(true)} className="h-11 border-[var(--teal)]/30 bg-white text-[var(--teal)]"><Archive className="mr-2 h-4 w-4" />Build PYQ Paper</Button>}
+{kind === 'admin' && <Button variant="outline" onClick={()=>setPaperFileImportOpen(true)} className="h-11 border-[var(--line)] bg-white"><Upload className="mr-2 h-4 w-4" />Import Year / Paper</Button>}
+<Button onClick={openCreate} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">
 <FilePlus2 className="mr-2 h-4 w-4" />Create Paper
 </Button>
 </div>
 </div>
 {(scopeError || error || settingsError) && (
-<div className="rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{scopeError || error || settingsError}</div>
+<div className="rounded-xl border border-[var(--destructive)]/20 bg-[var(--destructive)]/5 px-4 py-3 text-sm text-[var(--destructive)]">{scopeError || error || settingsError}</div>
 )}
 {message && (
-<div className="rounded-xl border border-[#0E5A5A]/20 bg-[#DCE9E7]/60 px-4 py-3 text-sm text-[#0E5A5A]">{message}</div>
+<div className="rounded-xl border border-[var(--teal)]/20 bg-[var(--secondary)]/60 px-4 py-3 text-sm text-[var(--teal)]">{message}</div>
 )}
 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 {stats.map(({ label, value, icon: Icon, tone }) => (
-<Card key={label} className="gap-0 border-[#E7ECEB] shadow-none">
+<Card key={label} className="min-w-0 gap-0 border-[var(--line)] shadow-sm rounded-xl">
 <CardContent className="flex items-center justify-between p-4">
 <div>
-<p className="text-xs font-medium text-[#6B7980]">{label}</p>
+<p className="text-xs font-medium text-[var(--muted-foreground)]">{label}</p>
 <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: tone }}>{value}</p>
 </div>
 <div className="rounded-lg p-2.5" style={{ backgroundColor: `${tone}12`, color: tone }}>
@@ -828,82 +866,82 @@ Build grade-aware papers, configure each section and prepare approved assessment
 </Card>
 ))}
 </div>
-<Card className="gap-0 border-[#E7ECEB] shadow-none">
+<Card className="gap-0 border-[var(--line)] shadow-sm rounded-xl">
 <CardContent className="p-4">
 <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
 <div className="relative">
-<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" />
+<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
 <Input
 value={search}
 onChange={(event) => setSearch(event.target.value)}
 placeholder="Search paper title, code, exam or grade"
-className="h-11 border-[#E7ECEB] pl-9"
+className="h-11 border-[var(--line)] pl-9"
 />
 </div>
 <Select value={statusFilter} onValueChange={setStatusFilter}>
-<SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger>
+<SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger>
 <SelectContent>
 <SelectItem value="all">All statuses</SelectItem>
 {STATUSES.map((status) => <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>)}
 </SelectContent>
 </Select>
 </div>
-<div className="mt-3 flex items-center justify-between border-t border-[#E7ECEB] pt-3 text-xs text-[#6B7980]">
+<div className="mt-3 flex items-center justify-between border-t border-[var(--line)] pt-3 text-xs text-[var(--muted-foreground)]">
 <span>{filteredPapers.length} matching paper{filteredPapers.length === 1 ? '' : 's'}</span>
-<span>V8 paper workflow</span>
+<span>Paper workflow</span>
 </div>
 </CardContent>
 </Card>
-<Card className="gap-0 overflow-hidden border-[#E7ECEB] shadow-none">
+<Card className="gap-0 overflow-hidden border-[var(--line)] shadow-sm rounded-xl">
 <div className="overflow-x-auto">
 <Table className="min-w-[1240px]">
 <TableHeader>
-<TableRow className="border-[#E7ECEB] bg-[#F7F9F7] hover:bg-[#F7F9F7]">
-<TableHead className="text-xs font-semibold text-[#6B7980]">Paper</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Exam and grade</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Test type</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Questions</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Marks</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Duration</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Results</TableHead>
-<TableHead className="text-xs font-semibold text-[#6B7980]">Status</TableHead>
-<TableHead className="text-right text-xs font-semibold text-[#6B7980]">Actions</TableHead>
+<TableRow className="border-[var(--line)] bg-[var(--canvas)] hover:bg-[var(--canvas)]">
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Paper</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Exam and grade</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Test type</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Questions</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Marks</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Duration</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Results</TableHead>
+<TableHead className="text-xs font-semibold text-[var(--muted-foreground)]">Status</TableHead>
+<TableHead className="text-right text-xs font-semibold text-[var(--muted-foreground)]">Actions</TableHead>
 </TableRow>
 </TableHeader>
 <TableBody>
 {loading ? (
-<TableRow><TableCell colSpan={9} className="py-14 text-center text-sm text-[#6B7980]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading papers…</TableCell></TableRow>
+<TableRow><TableCell colSpan={9} className="py-14 text-center text-sm text-[var(--muted-foreground)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading papers…</TableCell></TableRow>
 ) : filteredPapers.length === 0 ? (
-<TableRow><TableCell colSpan={9} className="py-14 text-center text-sm text-[#6B7980]">No papers match the current filters.</TableCell></TableRow>
+<TableRow><TableCell colSpan={9} className="py-14 text-center text-sm text-[var(--muted-foreground)]">No papers match the current filters.</TableCell></TableRow>
 ) : filteredPapers.map((paper) => (
-<TableRow key={paper.id} className="border-[#E7ECEB] hover:bg-[#F7F9F7]/70">
+<TableRow key={paper.id} className="border-[var(--line)] hover:bg-[var(--canvas)]/70">
 <TableCell className="max-w-[300px]">
-<p className="font-semibold text-[#14232B]">{paper.title}</p>
-<p className="mt-1 text-xs text-[#6B7980]">{paper.code || 'No paper code'}</p>
-{paper.rejection_reason && <p className="mt-1 line-clamp-2 text-xs text-[#B54747]">Reason: {paper.rejection_reason}</p>}
+<div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[var(--foreground)]">{paper.title}</p>{paper.is_previous_year_paper && <Badge className="bg-[var(--secondary)] text-[var(--teal)]">PYQ {paper.source_year || ""}</Badge>}{paper.source_variant && paper.source_variant !== "Main" && <Badge variant="outline">{paper.source_variant}</Badge>}</div>
+<p className="mt-1 text-xs text-[var(--muted-foreground)]">{paper.source_paper_code ? `Code ${paper.source_paper_code} · ` : ""}{paper.code || 'No paper code'}{paper.paper_origin === "file_import" ? " · File import" : paper.paper_origin === "pyq_generated" ? " · Exact PYQ build" : ""}</p>
+{paper.rejection_reason && <p className="mt-1 line-clamp-2 text-xs text-[var(--destructive)]">Reason: {paper.rejection_reason}</p>}
 </TableCell>
-<TableCell><p className="text-sm font-medium text-[#14232B]">{paper.exam_type}</p><p className="mt-1 text-xs text-[#6B7980]">{paper.grade_level || 'No grade'}</p></TableCell>
+<TableCell><p className="text-sm font-medium text-[var(--foreground)]">{paper.exam_type}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{paper.grade_level || 'No grade'}</p></TableCell>
 <TableCell className="max-w-[190px] text-sm text-[#44545C]">{paper.test_type === 'custom_test' ? paper.custom_test_type : testTypes.find((item) => item.value === paper.test_type)?.label || statusLabel(String(paper.test_type || ''))}</TableCell>
-<TableCell className="text-sm tabular-nums text-[#14232B]">{paper.total_questions}</TableCell>
-<TableCell className="text-sm tabular-nums text-[#14232B]">{paper.total_marks}</TableCell>
+<TableCell className="text-sm tabular-nums text-[var(--foreground)]">{paper.total_questions}</TableCell>
+<TableCell className="text-sm tabular-nums text-[var(--foreground)]">{paper.total_marks}</TableCell>
 <TableCell className="text-sm text-[#44545C]">{paper.duration_minutes} min</TableCell>
-<TableCell className="text-sm text-[#44545C]">{paper.result_mode === 'in_depth_analytics' ? 'In-depth analytics' : statusLabel(paper.result_mode)}</TableCell>
+<TableCell className="text-sm text-[#44545C]">{paper.result_mode === 'in_depth_analytics' ? 'Score and answers' : statusLabel(paper.result_mode)}</TableCell>
 <TableCell><Badge variant="outline" className={statusClass(paper.status)}>{statusLabel(paper.status)}</Badge></TableCell>
 <TableCell className="text-right">
 <div className="flex justify-end gap-1">
-<Button variant="ghost" size="icon" title="Edit paper" onClick={() => void openEdit(paper)} className="h-9 w-9 text-[#0E5A5A] hover:bg-[#DCE9E7]"><Edit3 className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Edit paper" onClick={() => void openEdit(paper)} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><Edit3 className="h-4 w-4" /></Button>
 {paper.status === 'under_review' && canApprove && (
 <>
 <Button variant="ghost" size="icon" title="Approve paper" onClick={() => void setStatus(paper, 'approved')} className="h-9 w-9 text-[#237A57] hover:bg-[#237A57]/10"><Check className="h-4 w-4" /></Button>
-<Button variant="ghost" size="icon" title="Reject paper" onClick={() => { setRejectTarget(paper); setRejectionReason(''); }} className="h-9 w-9 text-[#B54747] hover:bg-[#B54747]/10"><XCircle className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Reject paper" onClick={() => { setRejectTarget(paper); setRejectionReason(''); }} className="h-9 w-9 text-[var(--destructive)] hover:bg-[var(--destructive)]/10"><XCircle className="h-4 w-4" /></Button>
 </>
 )}
-{paper.status === 'approved' && canApprove && <Button variant="ghost" size="icon" title="Publish paper" onClick={() => void setStatus(paper, 'published')} className="h-9 w-9 text-[#0E5A5A] hover:bg-[#DCE9E7]"><PlayCircle className="h-4 w-4" /></Button>}
-{paper.status === 'published' && <Button variant="ghost" size="icon" title="Pause paper" onClick={() => void setStatus(paper, 'paused')} className="h-9 w-9 text-[#2E6D8B] hover:bg-[#2E6D8B]/10"><PauseCircle className="h-4 w-4" /></Button>}
-{paper.status === 'paused' && canApprove && <Button variant="ghost" size="icon" title="Resume paper" onClick={() => void setStatus(paper, 'published')} className="h-9 w-9 text-[#0E5A5A] hover:bg-[#DCE9E7]"><PlayCircle className="h-4 w-4" /></Button>}
-{['published', 'paused'].includes(paper.status) && <Button variant="ghost" size="icon" title="Close paper" onClick={() => void setStatus(paper, 'closed')} className="h-9 w-9 text-[#44545C] hover:bg-[#E7ECEB]"><CircleStop className="h-4 w-4" /></Button>}
-{paper.status !== 'archived' && <Button variant="ghost" size="icon" title="Archive paper" onClick={() => void setStatus(paper, 'archived')} className="h-9 w-9 text-[#8A5F00] hover:bg-[#F2B84B]/15"><Archive className="h-4 w-4" /></Button>}
-<Button variant="ghost" size="icon" title="Delete paper" onClick={() => setDeleteTarget(paper)} className="h-9 w-9 text-[#B54747] hover:bg-[#B54747]/10"><Trash2 className="h-4 w-4" /></Button>
+{paper.status === 'approved' && canApprove && <Button variant="ghost" size="icon" title="Publish paper" onClick={() => void setStatus(paper, 'published')} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><PlayCircle className="h-4 w-4" /></Button>}
+{paper.status === 'published' && canApprove && <Button variant="ghost" size="icon" title="Pause paper" onClick={() => void setStatus(paper, 'paused')} className="h-9 w-9 text-[var(--info)] hover:bg-[var(--info)]/10"><PauseCircle className="h-4 w-4" /></Button>}
+{paper.status === 'paused' && canApprove && <Button variant="ghost" size="icon" title="Resume paper" onClick={() => void setStatus(paper, 'published')} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><PlayCircle className="h-4 w-4" /></Button>}
+{['published', 'paused'].includes(paper.status) && canApprove && <Button variant="ghost" size="icon" title="Close paper" onClick={() => void setStatus(paper, 'closed')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><CircleStop className="h-4 w-4" /></Button>}
+{paper.status !== 'archived' && canApprove && <Button variant="ghost" size="icon" title="Archive paper" onClick={() => void setStatus(paper, 'archived')} className="h-9 w-9 text-[#8A5F00] hover:bg-[var(--amber)]/15"><Archive className="h-4 w-4" /></Button>}
+{canDeletePaper && <Button variant="ghost" size="icon" title="Delete paper" onClick={() => setDeleteTarget(paper)} className="h-9 w-9 text-[var(--destructive)] hover:bg-[var(--destructive)]/10"><Trash2 className="h-4 w-4" /></Button>}
 </div>
 </TableCell>
 </TableRow>
@@ -913,22 +951,22 @@ className="h-11 border-[#E7ECEB] pl-9"
 </div>
 </Card>
 <Dialog open={builderOpen} onOpenChange={(next) => { if (!saving) setBuilderOpen(next); }}>
-<DialogContent className="flex max-h-[96vh] w-[96vw] max-w-[1540px] flex-col overflow-hidden border-[#E7ECEB] p-0">
-<DialogHeader className="border-b border-[#E7ECEB] px-4 py-4 sm:px-6">
+<DialogContent className="flex max-h-[96vh] w-[96vw] max-w-[1540px] flex-col overflow-hidden border-[var(--line)] p-0">
+<DialogHeader className="border-b border-[var(--line)] px-4 py-4 sm:px-6">
 <div className="flex flex-col gap-3 pr-8 lg:flex-row lg:items-start lg:justify-between">
 <div>
-<DialogTitle className="text-xl text-[#14232B]">{builder.id ? 'Edit Question Paper' : 'Create Question Paper'}</DialogTitle>
+<DialogTitle className="text-xl text-[var(--foreground)]">{builder.id ? 'Edit Question Paper' : 'Create Question Paper'}</DialogTitle>
 <DialogDescription className="mt-1 max-w-3xl">Complete the setup, configure each section, select approved questions and review the learner-facing paper in one workspace.</DialogDescription>
 </div>
 <div className="flex flex-wrap items-center gap-2">
-<Badge className="bg-[#DCE9E7] text-[#0E5A5A]">{builder.exam}</Badge>
-<Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{resolvedGrade || 'Grade pending'}</Badge>
-<Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{autosave}</Badge>
+<Badge className="bg-[var(--secondary)] text-[var(--teal)]">{builder.exam}</Badge>
+<Badge variant="outline" className="border-[var(--line)] text-[var(--muted-foreground)]">{resolvedGrade || 'Grade pending'}</Badge>
+<Badge variant="outline" className="border-[var(--line)] text-[var(--muted-foreground)]">{autosave}</Badge>
 </div>
 </div>
 </DialogHeader>
 <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
-{error && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error}</div>}
+{error && <div className="mb-4 rounded-xl border border-[var(--destructive)]/20 bg-[var(--destructive)]/5 px-4 py-3 text-sm text-[var(--destructive)]">{error}</div>}
 <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 {[
 { label: 'Sections', value: sections.length, icon: Layers3 },
@@ -936,115 +974,127 @@ className="h-11 border-[#E7ECEB] pl-9"
 { label: 'Total marks', value: totalMarks, icon: BookOpenCheck },
 { label: 'Duration', value: `${builder.duration} min`, icon: Clock3 },
 ].map(({ label, value, icon: Icon }) => (
-<div key={label} className="flex items-center justify-between rounded-xl border border-[#E7ECEB] bg-white px-4 py-3">
-<div><p className="text-xs text-[#6B7980]">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-[#14232B]">{value}</p></div>
-<Icon className="h-5 w-5 text-[#0E5A5A]" />
+<div key={label} className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-white px-4 py-3">
+<div><p className="text-xs text-[var(--muted-foreground)]">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-[var(--foreground)]">{value}</p></div>
+<Icon className="h-5 w-5 text-[var(--teal)]" />
 </div>
 ))}
 </div>
 <div className="space-y-5">
-<Card className="gap-0 border-[#E7ECEB] bg-white shadow-none">
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading number="1" title="Paper identity" description="Define the paper once so question filtering, approval and future product bundling remain accurate." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-<div className="space-y-2 md:col-span-2"><Label>Paper title</Label><Input value={builder.title} onChange={(event) => setBuilder((current) => ({ ...current, title: event.target.value }))} placeholder="NEET Full Syllabus Mock 01" className="h-11 border-[#E7ECEB]" /></div>
-<div className="space-y-2"><Label>Paper code</Label><Input value={builder.code} onChange={(event) => setBuilder((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="NEET-M01" className="h-11 border-[#E7ECEB]" /></div>
-<div className="space-y-2"><Label>Exam type</Label><Select value={builder.exam} onValueChange={(exam) => setBuilder((current) => ({ ...current, exam }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
-<div className="space-y-2"><span className="text-sm font-medium text-[#14232B]">Grade</span><Select value={builder.grade} onValueChange={(grade) => setBuilder((current) => ({ ...current, grade }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2 md:col-span-2"><Label>Paper title</Label><Input value={builder.title} onChange={(event) => setBuilder((current) => ({ ...current, title: event.target.value }))} placeholder="NEET Full Syllabus Mock 01" className="h-11 border-[var(--line)]" /></div>
+<div className="space-y-2"><Label>Paper code</Label><Input value={builder.code} onChange={(event) => setBuilder((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="NEET-M01" className="h-11 border-[var(--line)]" /></div>
+<div className="space-y-2"><Label>Exam type</Label><Select value={builder.exam} onValueChange={(exam) => setBuilder((current) => ({ ...current, exam }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2"><span className="text-sm font-medium text-[var(--foreground)]">Grade</span><Select value={builder.grade} onValueChange={(grade) => setBuilder((current) => ({ ...current, grade }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
 
-<div className="space-y-2"><Label>Test type</Label><Select value={builder.testType} onValueChange={(testType) => setBuilder((current) => ({ ...current, testType: testType as PaperTestType }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{testTypes.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
-{builder.testType === 'custom_test' && <div className="space-y-2"><Label>Custom test name</Label><Input value={builder.customTestType} onChange={(event) => setBuilder((current) => ({ ...current, customTestType: event.target.value }))} placeholder="School Pre-Board Test" className="h-11 border-[#E7ECEB]" /></div>}
-<div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Formatted description</Label><p className="text-xs text-[#6B7980]">This is the only student-facing description. Use headings, emphasis, colours or highlights when needed.</p><RichDescription value={builder.description} onChange={(description) => setBuilder((current) => ({ ...current, description }))} /></div>
+{kind === 'admin' && role === 'super_admin' && <div className="md:col-span-2 xl:col-span-4 rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4">
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <div><Label>Official previous-year paper</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Attach an exact exam year/variant to this paper and map its selected questions to that official paper.</p></div>
+    <Switch checked={builder.isPyq} onCheckedChange={(isPyq) => setBuilder((current) => ({ ...current, isPyq, testType: isPyq ? 'previous_year_paper' : current.testType }))} />
+  </div>
+  {builder.isPyq && <div className="mt-4 grid gap-3 sm:grid-cols-3">
+    <div className="space-y-2"><Label>Year</Label><Input type="number" min={1990} max={2100} value={builder.sourceYear} onChange={(event) => setBuilder((current) => ({ ...current, sourceYear: event.target.value }))} placeholder="2026" className="h-10 border-[var(--line)] bg-white" /></div>
+    <div className="space-y-2"><Label>Variant</Label><Input value={builder.sourceVariant} onChange={(event) => setBuilder((current) => ({ ...current, sourceVariant: event.target.value }))} placeholder="Main / Re-NEET / Phase II" className="h-10 border-[var(--line)] bg-white" /></div>
+    <div className="space-y-2"><Label>Paper / set code</Label><Input value={builder.sourcePaperCode} onChange={(event) => setBuilder((current) => ({ ...current, sourcePaperCode: event.target.value }))} placeholder="11 / C1 / AA" className="h-10 border-[var(--line)] bg-white" /></div>
+  </div>}
+</div>}
+
+<div className="space-y-2"><Label>Test type</Label><Select value={builder.testType} onValueChange={(testType) => setBuilder((current) => ({ ...current, testType: testType as PaperTestType }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent>{testTypes.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div>
+{builder.testType === 'custom_test' && <div className="space-y-2"><Label>Custom test name</Label><Input value={builder.customTestType} onChange={(event) => setBuilder((current) => ({ ...current, customTestType: event.target.value }))} placeholder="School Pre-Board Test" className="h-11 border-[var(--line)]" /></div>}
+<div className="space-y-2 md:col-span-2 xl:col-span-4"><Label>Formatted description</Label><p className="text-xs text-[var(--muted-foreground)]">This is the only student-facing description. Use headings, emphasis, colours or highlights when needed.</p><RichDescription value={builder.description} onChange={(description) => setBuilder((current) => ({ ...current, description }))} /></div>
 </div>
 </CardContent>
 </Card>
-<Card className="gap-0 border-[#E7ECEB] bg-white shadow-none">
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts and result visibility. Product purchase or school entitlement controls access outside this builder." />
+<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts and result visibility. Institution assignment and publishing rules control access outside this builder." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-<div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[#E7ECEB]" /></div>
-<div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[#E7ECEB]" /></div>
-<div className="space-y-2"><Label>Result display</Label><Select value={builder.resultMode} onValueChange={(resultMode) => setBuilder((current) => ({ ...current, resultMode: resultMode as ResultMode }))}><SelectTrigger className="h-11 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="score_only">Score only</SelectItem><SelectItem value="score_and_answers">Score and answers</SelectItem><SelectItem value="in_depth_analytics">In-depth analytics</SelectItem></SelectContent></Select></div>
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[#E7ECEB] px-4 py-3"><div><Label>Open forever</Label><p className="mt-1 text-xs text-[#6B7980]">No opening or closing date</p></div><Switch checked={builder.openForever} onCheckedChange={(openForever) => setBuilder((current) => ({ ...current, openForever }))} /></div>
-{!builder.openForever && <><div className="space-y-2"><Label>Opens at</Label><Input type="datetime-local" value={builder.from} onChange={(event) => setBuilder((current) => ({ ...current, from: event.target.value }))} className="h-11 border-[#E7ECEB]" /></div><div className="space-y-2"><Label>Closes at</Label><Input type="datetime-local" value={builder.until} onChange={(event) => setBuilder((current) => ({ ...current, until: event.target.value }))} className="h-11 border-[#E7ECEB]" /></div></>}
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[#E7ECEB] px-4 py-3"><div><Label>Shuffle questions</Label><p className="mt-1 text-xs text-[#6B7980]">Change order per attempt</p></div><Switch checked={builder.shuffleQuestions} onCheckedChange={(shuffleQuestions) => setBuilder((current) => ({ ...current, shuffleQuestions }))} /></div>
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[#E7ECEB] px-4 py-3"><div><Label>Shuffle options</Label><p className="mt-1 text-xs text-[#6B7980]">Randomise MCQ choices</p></div><Switch checked={builder.shuffleOptions} onCheckedChange={(shuffleOptions) => setBuilder((current) => ({ ...current, shuffleOptions }))} /></div>
+<div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
+<div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
+<div className="space-y-2"><Label>Result display</Label><Select value={builder.resultMode} onValueChange={(resultMode) => setBuilder((current) => ({ ...current, resultMode: resultMode as ResultMode }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="score_only">Score only</SelectItem><SelectItem value="score_and_answers">Score and answers</SelectItem></SelectContent></Select></div>
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Open forever</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">No opening or closing date</p></div><Switch checked={builder.openForever} onCheckedChange={(openForever) => setBuilder((current) => ({ ...current, openForever }))} /></div>
+{!builder.openForever && <><div className="space-y-2"><Label>Opens at</Label><Input type="datetime-local" value={builder.from} onChange={(event) => setBuilder((current) => ({ ...current, from: event.target.value }))} className="h-11 border-[var(--line)]" /></div><div className="space-y-2"><Label>Closes at</Label><Input type="datetime-local" value={builder.until} onChange={(event) => setBuilder((current) => ({ ...current, until: event.target.value }))} className="h-11 border-[var(--line)]" /></div></>}
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle questions</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Change order per attempt</p></div><Switch checked={builder.shuffleQuestions} onCheckedChange={(shuffleQuestions) => setBuilder((current) => ({ ...current, shuffleQuestions }))} /></div>
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle options</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Randomise MCQ choices</p></div><Switch checked={builder.shuffleOptions} onCheckedChange={(shuffleOptions) => setBuilder((current) => ({ ...current, shuffleOptions }))} /></div>
 
 </div>
 </CardContent>
 </Card>
-<Card className="gap-0 border-[#E7ECEB] bg-white shadow-none">
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading
 number="3"
 title="Sections and selection strategy"
 description="Use one paper-wide default or choose Manual, Automatic or Hybrid independently for every section."
-action={<Button type="button" variant="outline" onClick={addSection} className="h-10 border-[#E7ECEB]"><Plus className="mr-2 h-4 w-4" />Add Section</Button>}
+action={<Button type="button" variant="outline" onClick={addSection} className="h-10 border-[var(--line)]"><Plus className="mr-2 h-4 w-4" />Add Section</Button>}
 />
-<div className="grid gap-3 rounded-xl border border-[#E7ECEB] bg-[#F7F9F7] p-3 md:grid-cols-[minmax(0,220px)_auto_auto] md:items-end">
-<div className="space-y-2"><Label>Default selection mode</Label><Select value={builder.defaultMode} onValueChange={(defaultMode) => setBuilder((current) => ({ ...current, defaultMode: defaultMode as PaperSelectionMode }))}><SelectTrigger className="h-10 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{MODES.map((mode) => <SelectItem key={mode} value={mode}>{statusLabel(mode)}</SelectItem>)}</SelectContent></Select></div>
-<Button type="button" variant="outline" onClick={() => setSections((current) => current.map((section) => ({ ...section, selection_mode: builder.defaultMode })))} className="h-10 border-[#E7ECEB] bg-white">Apply to all sections</Button>
-<Button type="button" variant="outline" onClick={generateAll} className="h-10 border-[#0E5A5A]/30 bg-white text-[#0E5A5A] hover:bg-[#DCE9E7]"><Sparkles className="mr-2 h-4 w-4" />Generate Auto/Hybrid</Button>
+<div className="grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-3 md:grid-cols-[minmax(0,220px)_auto_auto] md:items-end">
+<div className="space-y-2"><Label>Default selection mode</Label><Select value={builder.defaultMode} onValueChange={(defaultMode) => setBuilder((current) => ({ ...current, defaultMode: defaultMode as PaperSelectionMode }))}><SelectTrigger className="h-10 border-[var(--line)] bg-white"><SelectValue /></SelectTrigger><SelectContent>{MODES.map((mode) => <SelectItem key={mode} value={mode}>{statusLabel(mode)}</SelectItem>)}</SelectContent></Select></div>
+<Button type="button" variant="outline" onClick={() => setSections((current) => current.map((section) => ({ ...section, selection_mode: builder.defaultMode })))} className="h-10 border-[var(--line)] bg-white">Apply to all sections</Button>
+<Button type="button" variant="outline" onClick={generateAll} className="h-10 border-[var(--teal)]/30 bg-white text-[var(--teal)] hover:bg-[var(--secondary)]"><Sparkles className="mr-2 h-4 w-4" />Generate Auto/Hybrid</Button>
 </div>
 <div className="flex gap-2 overflow-x-auto pb-1">
 {sections.map((section, index) => {
 const count = selected.filter((item) => item.section_client_id === section.client_id).length;
 const selectedSection = section.client_id === activeSection;
 return (
-<button key={section.client_id} type="button" onClick={() => setActiveSection(section.client_id)} className={`min-w-[190px] rounded-xl border p-3 text-left transition ${selectedSection ? 'border-[#0E5A5A] bg-[#DCE9E7]/50' : 'border-[#E7ECEB] bg-white hover:border-[#0E5A5A]/40'}`}>
-<div className="flex items-start justify-between gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-[#6B7980]">Section {index + 1}</span><Badge variant="outline" className={selectedSection ? 'border-[#0E5A5A]/20 bg-white text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#6B7980]'}>{count} Q</Badge></div>
-<strong className="mt-2 block truncate text-sm text-[#14232B]">{section.title}</strong>
-<span className="mt-1 block text-xs text-[#6B7980]">{section.subject_key} · {statusLabel(section.selection_mode || 'manual')}</span>
+<button key={section.client_id} type="button" onClick={() => setActiveSection(section.client_id)} className={`min-w-[190px] rounded-xl border p-3 text-left transition ${selectedSection ? 'border-[var(--teal)] bg-[var(--secondary)]/50' : 'border-[var(--line)] bg-white hover:border-[var(--teal)]/40'}`}>
+<div className="flex items-start justify-between gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">Section {index + 1}</span><Badge variant="outline" className={selectedSection ? 'border-[var(--teal)]/20 bg-white text-[var(--teal)]' : 'border-[var(--line)] text-[var(--muted-foreground)]'}>{count} Q</Badge></div>
+<strong className="mt-2 block truncate text-sm text-[var(--foreground)]">{section.title}</strong>
+<span className="mt-1 block text-xs text-[var(--muted-foreground)]">{section.subject_key} · {statusLabel(section.selection_mode || 'manual')}</span>
 </button>
 );
 })}
 </div>
 {active && (
-<div className="space-y-5 rounded-xl border border-[#DCE9E7] bg-[#FBFCFC] p-4">
+<div className="space-y-5 rounded-xl border border-[var(--secondary)] bg-[#FBFCFC] p-4">
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1fr_auto]">
-<div className="space-y-2"><Label>Section title</Label><Input value={active.title} onChange={(event) => updateSection(active.client_id, { title: event.target.value })} className="h-11 border-[#E7ECEB] bg-white" /></div>
-<div className="space-y-2"><Label>Subject</Label><Select value={active.subject_key} onValueChange={(subject_key) => updateSection(active.client_id, { subject_key, chapter_ids: [], topic_ids: [] })}><SelectTrigger className="h-11 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{subjectNames.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select></div>
-<div className="space-y-2"><Label>Selection mode</Label><Select value={active.selection_mode} onValueChange={(selection_mode) => updateSection(active.client_id, { selection_mode: selection_mode as PaperSelectionMode })}><SelectTrigger className="h-11 border-[#E7ECEB] bg-white"><SelectValue /></SelectTrigger><SelectContent>{MODES.map((mode) => <SelectItem key={mode} value={mode}>{statusLabel(mode)}</SelectItem>)}</SelectContent></Select></div>
-<Button type="button" variant="ghost" onClick={() => removeSection(active.client_id)} disabled={sections.length === 1} className="self-end text-[#B54747] hover:bg-[#B54747]/10 hover:text-[#B54747]"><Trash2 className="mr-2 h-4 w-4" />Remove</Button>
+<div className="space-y-2"><Label>Section title</Label><Input value={active.title} onChange={(event) => updateSection(active.client_id, { title: event.target.value })} className="h-11 border-[var(--line)] bg-white" /></div>
+<div className="space-y-2"><Label>Subject</Label><Select value={active.subject_key} onValueChange={(subject_key) => updateSection(active.client_id, { subject_key, chapter_ids: [], topic_ids: [] })}><SelectTrigger className="h-11 border-[var(--line)] bg-white"><SelectValue /></SelectTrigger><SelectContent>{subjectNames.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select></div>
+<div className="space-y-2"><Label>Selection mode</Label><Select value={active.selection_mode} onValueChange={(selection_mode) => updateSection(active.client_id, { selection_mode: selection_mode as PaperSelectionMode })}><SelectTrigger className="h-11 border-[var(--line)] bg-white"><SelectValue /></SelectTrigger><SelectContent>{MODES.map((mode) => <SelectItem key={mode} value={mode}>{statusLabel(mode)}</SelectItem>)}</SelectContent></Select></div>
+<Button type="button" variant="ghost" onClick={() => removeSection(active.client_id)} disabled={sections.length === 1} className="self-end text-[var(--destructive)] hover:bg-[var(--destructive)]/10 hover:text-[var(--destructive)]"><Trash2 className="mr-2 h-4 w-4" />Remove</Button>
 </div>
 {active.subject_key === 'Biology' && (
 <div>
 <Label>Biology division</Label>
 <div className="mt-2 flex flex-wrap gap-2">
 {([['combined', 'Biology combined'], ['botany', 'Botany'], ['zoology', 'Zoology']] as const).map(([value, label]) => (
-<Button key={value} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { biology_division: value })} className={active.biology_division === value ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] bg-white text-[#44545C]'}>{label}</Button>
+<Button key={value} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { biology_division: value })} className={active.biology_division === value ? 'border-[var(--teal)] bg-[var(--secondary)] text-[var(--teal)]' : 'border-[var(--line)] bg-white text-[#44545C]'}>{label}</Button>
 ))}
 </div>
 </div>
 )}
 {['chapter_test', 'topic_test', 'unit_test', 'custom_test'].includes(builder.testType) && (
 <div>
-<div className="flex items-center justify-between"><Label>Chapters</Label><span className="text-xs text-[#6B7980]">{active.chapter_ids?.length || 0} selected</span></div>
-<div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E7ECEB] bg-white p-3">
-{chapterOptions.map((chapter) => <Button key={chapter.id} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { chapter_ids: toggle(active.chapter_ids, chapter.id), topic_ids: [] })} className={active.chapter_ids?.includes(chapter.id) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#44545C]'}>{chapter.name}</Button>)}
-{!chapterOptions.length && <span className="text-xs text-[#6B7980]">No matching chapters are available for this subject.</span>}
+<div className="flex items-center justify-between"><Label>Chapters</Label><span className="text-xs text-[var(--muted-foreground)]">{active.chapter_ids?.length || 0} selected</span></div>
+<div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[var(--line)] bg-white p-3">
+{chapterOptions.map((chapter) => <Button key={chapter.id} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { chapter_ids: toggle(active.chapter_ids, chapter.id), topic_ids: [] })} className={active.chapter_ids?.includes(chapter.id) ? 'border-[var(--teal)] bg-[var(--secondary)] text-[var(--teal)]' : 'border-[var(--line)] text-[#44545C]'}>{chapter.name}</Button>)}
+{!chapterOptions.length && <span className="text-xs text-[var(--muted-foreground)]">No matching chapters are available for this subject.</span>}
 </div>
 </div>
 )}
 {builder.testType === 'topic_test' && (
 <div>
-<div className="flex items-center justify-between"><Label>Topics</Label><span className="text-xs text-[#6B7980]">{active.topic_ids?.length || 0} selected</span></div>
-<div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#E7ECEB] bg-white p-3">
-{topicOptions.map((topic) => <Button key={topic.id} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { topic_ids: toggle(active.topic_ids, topic.id) })} className={active.topic_ids?.includes(topic.id) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#44545C]'}>{topic.name}</Button>)}
-{!topicOptions.length && <span className="text-xs text-[#6B7980]">Select at least one chapter to see topics.</span>}
+<div className="flex items-center justify-between"><Label>Topics</Label><span className="text-xs text-[var(--muted-foreground)]">{active.topic_ids?.length || 0} selected</span></div>
+<div className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[var(--line)] bg-white p-3">
+{topicOptions.map((topic) => <Button key={topic.id} type="button" variant="outline" size="sm" onClick={() => updateSection(active.client_id, { topic_ids: toggle(active.topic_ids, topic.id) })} className={active.topic_ids?.includes(topic.id) ? 'border-[var(--teal)] bg-[var(--secondary)] text-[var(--teal)]' : 'border-[var(--line)] text-[#44545C]'}>{topic.name}</Button>)}
+{!topicOptions.length && <span className="text-xs text-[var(--muted-foreground)]">Select at least one chapter to see topics.</span>}
 </div>
 </div>
 )}
 {active.selection_mode !== 'manual' && (
-<div className="rounded-xl border border-[#E7ECEB] bg-white p-4">
+<div className="rounded-xl border border-[var(--line)] bg-white p-4">
 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-<div><h4 className="text-sm font-semibold text-[#14232B]">Difficulty distribution</h4><p className="mt-1 text-xs text-[#6B7980]">The five values must equal the section question target.</p></div>
-<div className="flex items-end gap-2"><div className="space-y-2"><Label>Total questions</Label><Input type="number" min={1} value={active.question_target || 0} onChange={(event) => updateSection(active.client_id, { question_target: Number(event.target.value) })} className="h-10 w-32 border-[#E7ECEB]" /></div><Button type="button" onClick={() => generateSection(active)} className="h-10 bg-[#0E5A5A] text-white hover:bg-[#0A4747]"><Sparkles className="mr-2 h-4 w-4" />Generate</Button></div>
+<div><h4 className="text-sm font-semibold text-[var(--foreground)]">Difficulty distribution</h4><p className="mt-1 text-xs text-[var(--muted-foreground)]">The five values must equal the section question target.</p></div>
+<div className="flex items-end gap-2"><div className="space-y-2"><Label>Total questions</Label><Input type="number" min={1} value={active.question_target || 0} onChange={(event) => updateSection(active.client_id, { question_target: Number(event.target.value) })} className="h-10 w-32 border-[var(--line)]" /></div><Button type="button" onClick={() => generateSection(active)} className="h-10 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Sparkles className="mr-2 h-4 w-4" />Generate</Button></div>
 </div>
 <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-{DIFFICULTIES.map((difficulty) => <div key={difficulty} className="space-y-2"><Label>{DIFFICULTY_LABEL[difficulty]}</Label><Input type="number" min={0} value={active.difficulty_distribution?.[difficulty] || 0} onChange={(event) => updateSection(active.client_id, { difficulty_distribution: { ...emptyDistribution(), ...(active.difficulty_distribution || {}), [difficulty]: Number(event.target.value) } })} className="h-10 border-[#E7ECEB]" /></div>)}
+{DIFFICULTIES.map((difficulty) => <div key={difficulty} className="space-y-2"><Label>{DIFFICULTY_LABEL[difficulty]}</Label><Input type="number" min={0} value={active.difficulty_distribution?.[difficulty] || 0} onChange={(event) => updateSection(active.client_id, { difficulty_distribution: { ...emptyDistribution(), ...(active.difficulty_distribution || {}), [difficulty]: Number(event.target.value) } })} className="h-10 border-[var(--line)]" /></div>)}
 </div>
-<div className={`mt-3 rounded-lg px-3 py-2 text-xs ${distributionTotal === Number(active.question_target || 0) ? 'bg-[#DCE9E7]/60 text-[#0E5A5A]' : 'bg-[#F2B84B]/15 text-[#8A5F00]'}`}>Distribution total: {distributionTotal} of {active.question_target || 0}</div>
+<div className={`mt-3 rounded-lg px-3 py-2 text-xs ${distributionTotal === Number(active.question_target || 0) ? 'bg-[var(--secondary)]/60 text-[var(--teal)]' : 'bg-[var(--amber)]/15 text-[#8A5F00]'}`}>Distribution total: {distributionTotal} of {active.question_target || 0}</div>
 </div>
 )}
 </div>
@@ -1052,92 +1102,92 @@ return (
 </CardContent>
 </Card>
 <div className="grid min-w-0 gap-5 xl:grid-cols-2">
-<Card className="min-w-0 gap-0 border-[#E7ECEB] bg-white shadow-none">
+<Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
 number="4"
 title="Matching question bank"
 description="Only approved questions matching the paper exam, grade and active-section classification are shown."
-action={<div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => { setImportBefore(new Set(questions.map((question) => question.id))); setImportSection(activeSection); setImportOpen(true); }} className="border-[#E7ECEB]"><Upload className="mr-2 h-4 w-4" />Upload questions here</Button><Button type="button" variant="outline" size="sm" onClick={() => filteredQuestions.forEach((question) => addQuestion(question))} disabled={!filteredQuestions.length} className="border-[#E7ECEB]">Select all</Button></div>}
+action={<div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => { setImportBefore(new Set(questions.map((question) => question.id))); setImportSection(activeSection); setImportOpen(true); }} className="border-[var(--line)]"><Upload className="mr-2 h-4 w-4" />Upload questions here</Button><Button type="button" variant="outline" size="sm" onClick={() => filteredQuestions.forEach((question) => addQuestion(question))} disabled={!filteredQuestions.length} className="border-[var(--line)]">Select all</Button></div>}
 />
 <div className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
-<div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7980]" /><Input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search matching questions" className="h-10 border-[#E7ECEB] pl-9" /></div>
-<Select value={difficultyFilter} onValueChange={setDifficultyFilter}><SelectTrigger className="h-10 border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All difficulties</SelectItem>{DIFFICULTIES.map((difficulty) => <SelectItem key={difficulty} value={difficulty}>{DIFFICULTY_LABEL[difficulty]}</SelectItem>)}</SelectContent></Select>
+<div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" /><Input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search matching questions" className="h-10 border-[var(--line)] pl-9" /></div>
+<Select value={difficultyFilter} onValueChange={setDifficultyFilter}><SelectTrigger className="h-10 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All difficulties</SelectItem>{DIFFICULTIES.map((difficulty) => <SelectItem key={difficulty} value={difficulty}>{DIFFICULTY_LABEL[difficulty]}</SelectItem>)}</SelectContent></Select>
 </div>
-<div className="mt-3 grid gap-2 sm:grid-cols-5">{DIFFICULTIES.map((difficulty) => <button key={difficulty} type="button" onClick={() => setDifficultyFilter(difficultyFilter === difficulty ? 'all' : difficulty)} className={`rounded-xl border px-3 py-2 text-left transition ${difficultyFilter === difficulty ? 'border-[#0E5A5A] bg-[#DCE9E7]' : 'border-[#E7ECEB] bg-white hover:border-[#0E5A5A]/40'}`}><span className="block text-[10px] font-semibold uppercase tracking-wide text-[#6B7980]">{DIFFICULTY_LABEL[difficulty]}</span><strong className="mt-1 block text-lg tabular-nums text-[#14232B]">{difficultyCounts[difficulty]}</strong></button>)}</div>
-<div className="mt-3 flex items-center justify-between text-xs text-[#6B7980]"><span>{active?.title || 'Active section'}</span><span>{filteredQuestions.length} shown · {matchingQuestions.length} total matching · {selectedInActive} selected</span></div>
+<div className="mt-3 grid gap-2 sm:grid-cols-5">{DIFFICULTIES.map((difficulty) => <button key={difficulty} type="button" onClick={() => setDifficultyFilter(difficultyFilter === difficulty ? 'all' : difficulty)} className={`rounded-xl border px-3 py-2 text-left transition ${difficultyFilter === difficulty ? 'border-[var(--teal)] bg-[var(--secondary)]' : 'border-[var(--line)] bg-white hover:border-[var(--teal)]/40'}`}><span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">{DIFFICULTY_LABEL[difficulty]}</span><strong className="mt-1 block text-lg tabular-nums text-[var(--foreground)]">{difficultyCounts[difficulty]}</strong></button>)}</div>
+<div className="mt-3 flex items-center justify-between text-xs text-[var(--muted-foreground)]"><span>{active?.title || 'Active section'}</span><span>{filteredQuestions.length} shown · {matchingQuestions.length} total matching · {selectedInActive} selected</span></div>
 <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
 {filteredQuestions.map((question) => (
-<div key={question.id} className="rounded-xl border border-[#E7ECEB] p-3 transition hover:border-[#0E5A5A]/30">
+<div key={question.id} className="rounded-xl border border-[var(--line)] p-3 transition hover:border-[var(--teal)]/30">
 <div className="flex items-start justify-between gap-3">
-<div className="min-w-0"><p className="line-clamp-3 text-sm font-medium leading-relaxed text-[#14232B]">{question.stem_text}</p><div className="mt-2 flex flex-wrap gap-1"><Badge variant="outline" className="border-[#E7ECEB] text-[10px] text-[#6B7980]">{question.chapters?.name || 'No chapter'}</Badge>{question.topics?.name && <Badge variant="outline" className="border-[#E7ECEB] text-[10px] text-[#6B7980]">{question.topics.name}</Badge>}<Badge variant="outline" className="border-[#E7ECEB] text-[10px] text-[#6B7980]">{DIFFICULTY_LABEL[question.difficulty]}</Badge></div></div>
-<Button type="button" variant={selectedIds.has(question.id) ? 'secondary' : 'outline'} size="sm" disabled={selectedIds.has(question.id)} onClick={() => addQuestion(question)} className={selectedIds.has(question.id) ? 'shrink-0 bg-[#DCE9E7] text-[#0E5A5A]' : 'shrink-0 border-[#0E5A5A]/30 text-[#0E5A5A]'}>{selectedIds.has(question.id) ? 'Added' : 'Add'}</Button>
+<div className="min-w-0"><p className="line-clamp-3 text-sm font-medium leading-relaxed text-[var(--foreground)]">{question.stem_text}</p><div className="mt-2 flex flex-wrap gap-1"><Badge variant="outline" className="border-[var(--line)] text-[10px] text-[var(--muted-foreground)]">{question.chapters?.name || 'No chapter'}</Badge>{question.topics?.name && <Badge variant="outline" className="border-[var(--line)] text-[10px] text-[var(--muted-foreground)]">{question.topics.name}</Badge>}<Badge variant="outline" className="border-[var(--line)] text-[10px] text-[var(--muted-foreground)]">{DIFFICULTY_LABEL[question.difficulty]}</Badge></div></div>
+<Button type="button" variant={selectedIds.has(question.id) ? 'secondary' : 'outline'} size="sm" disabled={selectedIds.has(question.id)} onClick={() => addQuestion(question)} className={selectedIds.has(question.id) ? 'shrink-0 bg-[var(--secondary)] text-[var(--teal)]' : 'shrink-0 border-[var(--teal)]/30 text-[var(--teal)]'}>{selectedIds.has(question.id) ? 'Added' : 'Add'}</Button>
 </div>
 </div>
 ))}
-{!filteredQuestions.length && <div className="py-12 text-center text-sm text-[#6B7980]">No approved questions match the current paper and section filters.</div>}
+{!filteredQuestions.length && <div className="py-12 text-center text-sm text-[var(--muted-foreground)]">No approved questions match the current paper and section filters.</div>}
 </div>
 </CardContent>
 </Card>
-<Card className="min-w-0 gap-0 border-[#E7ECEB] bg-white shadow-none">
+<Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
 number="5"
 title="Paper questions"
 description="Review order, section assignment and marks before saving or submitting the paper."
-action={<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="border-[#E7ECEB]"><Eye className="mr-2 h-4 w-4" />Test Preview</Button>}
+action={<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="border-[var(--line)]"><Eye className="mr-2 h-4 w-4" />Test Preview</Button>}
 />
 <div className="mt-4 max-h-[590px] space-y-2 overflow-y-auto pr-1">
 {selected.map((item, index) => (
-<div key={item.question_id} className="rounded-xl border border-[#E7ECEB] p-3">
+<div key={item.question_id} className="rounded-xl border border-[var(--line)] p-3">
 <div className="flex items-start gap-2">
 <div className="flex shrink-0 flex-col gap-1">
 <Button type="button" variant="ghost" size="icon" disabled={index === 0} onClick={() => moveQuestion(index, -1)} className="h-7 w-7"><ChevronUp className="h-3.5 w-3.5" /></Button>
 <Button type="button" variant="ghost" size="icon" disabled={index === selected.length - 1} onClick={() => moveQuestion(index, 1)} className="h-7 w-7"><ChevronDown className="h-3.5 w-3.5" /></Button>
 </div>
 <div className="min-w-0 flex-1">
-<p className="line-clamp-3 text-sm font-medium leading-relaxed text-[#14232B]">{index + 1}. {item.question.stem_text}</p>
+<p className="line-clamp-3 text-sm font-medium leading-relaxed text-[var(--foreground)]">{index + 1}. {item.question.stem_text}</p>
 <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_100px_110px]">
-<Select value={item.section_client_id} onValueChange={(section_client_id) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, section_client_id } : candidate))}><SelectTrigger className="h-9 border-[#E7ECEB] text-xs"><SelectValue /></SelectTrigger><SelectContent>{sections.map((section) => <SelectItem key={section.client_id} value={section.client_id}>{section.title}</SelectItem>)}</SelectContent></Select>
-<Input aria-label="Marks" title="Marks" type="number" step="0.25" value={item.marks} onChange={(event) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, marks: Number(event.target.value) } : candidate))} className="h-9 border-[#E7ECEB] text-xs" />
-<Input aria-label="Negative marks" title="Negative marks" type="number" step="0.25" min={0} value={item.negative_marks} onChange={(event) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, negative_marks: Number(event.target.value) } : candidate))} className="h-9 border-[#E7ECEB] text-xs" />
+<Select value={item.section_client_id} onValueChange={(section_client_id) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, section_client_id } : candidate))}><SelectTrigger className="h-9 border-[var(--line)] text-xs"><SelectValue /></SelectTrigger><SelectContent>{sections.map((section) => <SelectItem key={section.client_id} value={section.client_id}>{section.title}</SelectItem>)}</SelectContent></Select>
+<Input aria-label="Marks" title="Marks" type="number" step="0.25" value={item.marks} onChange={(event) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, marks: Number(event.target.value) } : candidate))} className="h-9 border-[var(--line)] text-xs" />
+<Input aria-label="Negative marks" title="Negative marks" type="number" step="0.25" min={0} value={item.negative_marks} onChange={(event) => setSelected((current) => current.map((candidate) => candidate.question_id === item.question_id ? { ...candidate, negative_marks: Number(event.target.value) } : candidate))} className="h-9 border-[var(--line)] text-xs" />
 </div>
 </div>
-<Button type="button" variant="ghost" size="icon" onClick={() => removeQuestion(item.question_id)} className="h-8 w-8 shrink-0 text-[#B54747] hover:bg-[#B54747]/10 hover:text-[#B54747]"><Trash2 className="h-4 w-4" /></Button>
+<Button type="button" variant="ghost" size="icon" onClick={() => removeQuestion(item.question_id)} className="h-8 w-8 shrink-0 text-[var(--destructive)] hover:bg-[var(--destructive)]/10 hover:text-[var(--destructive)]"><Trash2 className="h-4 w-4" /></Button>
 </div>
 </div>
 ))}
-{!selected.length && <div className="py-12 text-center text-sm text-[#6B7980]">Add approved questions from the matching question bank.</div>}
+{!selected.length && <div className="py-12 text-center text-sm text-[var(--muted-foreground)]">Add approved questions from the matching question bank.</div>}
 </div>
 </CardContent>
 </Card>
 </div>
 </div>
 </div>
-<DialogFooter className="border-t border-[#E7ECEB] bg-white px-4 py-4 sm:px-6">
-<div className="mr-auto text-sm text-[#6B7980]">{selected.length} questions · {totalMarks} marks · {builder.duration} minutes</div>
-<Button type="button" variant="outline" onClick={() => setBuilderOpen(false)} disabled={saving} className="h-11 border-[#E7ECEB]">Close</Button>
-<Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[#0E5A5A]/30 text-[#0E5A5A]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
-<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>
+<DialogFooter className="border-t border-[var(--line)] bg-white px-4 py-4 sm:px-6">
+<div className="mr-auto text-sm text-[var(--muted-foreground)]">{selected.length} questions · {totalMarks} marks · {builder.duration} minutes</div>
+<Button type="button" variant="outline" onClick={() => setBuilderOpen(false)} disabled={saving} className="h-11 border-[var(--line)]">Close</Button>
+<Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
+<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>
 </DialogFooter>
 </DialogContent>
 </Dialog>
 <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-<DialogContent className="max-h-[94vh] w-[96vw] max-w-5xl overflow-y-auto border-[#E7ECEB] p-0">
-<DialogHeader className="border-b border-[#E7ECEB] px-5 py-4 sm:px-7">
-<div className="pr-8"><DialogTitle className="text-xl text-[#14232B]">{builder.title || 'Question Paper Preview'}</DialogTitle><DialogDescription className="mt-1">Learner-facing preview · {builder.exam} · {resolvedGrade} · {builder.duration} minutes</DialogDescription></div>
+<DialogContent className="max-h-[94vh] w-[96vw] max-w-5xl overflow-y-auto border-[var(--line)] p-0">
+<DialogHeader className="border-b border-[var(--line)] px-5 py-4 sm:px-7">
+<div className="pr-8"><DialogTitle className="text-xl text-[var(--foreground)]">{builder.title || 'Question Paper Preview'}</DialogTitle><DialogDescription className="mt-1">Learner-facing preview · {builder.exam} · {resolvedGrade} · {builder.duration} minutes</DialogDescription></div>
 </DialogHeader>
 <div className="bg-[#FBFCFC] px-4 py-5 sm:px-7">
-{builder.description && <div className="rounded-xl border border-[#DCE9E7] bg-white p-4 text-sm leading-relaxed text-[#44545C]" dangerouslySetInnerHTML={{ __html: sanitize(builder.description) }} />}
+{builder.description && <div className="rounded-xl border border-[var(--secondary)] bg-white p-4 text-sm leading-relaxed text-[#44545C]" dangerouslySetInnerHTML={{ __html: sanitize(builder.description) }} />}
 {sections.map((section) => (
-<section key={section.client_id} className="mt-6 rounded-xl border border-[#E7ECEB] bg-white p-4 sm:p-5">
-<div className="border-b border-[#E7ECEB] pb-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0E5A5A]">Section</span><h3 className="mt-1 text-xl font-bold text-[#14232B]">{section.title}</h3></div>
+<section key={section.client_id} className="mt-6 rounded-xl border border-[var(--line)] bg-white p-4 sm:p-5">
+<div className="border-b border-[var(--line)] pb-3"><span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--teal)]">Section</span><h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{section.title}</h3></div>
 {selected.filter((item) => item.section_client_id === section.client_id).map((item, index) => (
-<article key={item.question_id} className="border-b border-[#E7ECEB] py-5 last:border-b-0">
-<p className="font-semibold leading-relaxed text-[#14232B]">{index + 1}. {item.question.stem_text}</p>
+<article key={item.question_id} className="border-b border-[var(--line)] py-5 last:border-b-0">
+<p className="font-semibold leading-relaxed text-[var(--foreground)]">{index + 1}. {item.question.stem_text}</p>
 {item.question.question_image_url && <img src={item.question.question_image_url} alt="Question" className="mt-3 max-h-64 max-w-full rounded-lg object-contain" />}
 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-{[...(item.question.question_options || [])].sort((a, b) => a.display_order - b.display_order).map((option) => <div key={option.option_key} className="rounded-lg border border-[#E7ECEB] px-3 py-2 text-sm text-[#44545C]"><strong className="mr-1 text-[#14232B]">{option.option_key}.</strong>{option.content_text}</div>)}
+{[...(item.question.question_options || [])].sort((a, b) => a.display_order - b.display_order).map((option) => <div key={option.option_key} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[#44545C]"><strong className="mr-1 text-[var(--foreground)]">{option.option_key}.</strong>{option.content_text}</div>)}
 </div>
 </article>
 ))}
@@ -1147,19 +1197,21 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 </DialogContent>
 </Dialog>
 <Dialog open={Boolean(rejectTarget)} onOpenChange={(open) => { if (!open) { setRejectTarget(null); setRejectionReason(''); } }}>
-<DialogContent className="border-[#E7ECEB] sm:max-w-lg">
-<DialogHeader><DialogTitle className="text-[#14232B]">Reject question paper</DialogTitle><DialogDescription>Provide a clear correction note so the creator can fix the paper and submit it again.</DialogDescription></DialogHeader>
-<div className="space-y-2"><Label>Reason for rejection</Label><Textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={4} placeholder="Explain the required correction." className="border-[#E7ECEB]" /></div>
-<DialogFooter><Button type="button" variant="outline" onClick={() => { setRejectTarget(null); setRejectionReason(''); }} className="border-[#E7ECEB]">Cancel</Button><Button type="button" variant="destructive" disabled={!rejectionReason.trim()} onClick={() => void confirmReject()}><XCircle className="mr-2 h-4 w-4" />Reject Paper</Button></DialogFooter>
+<DialogContent className="border-[var(--line)] sm:max-w-lg">
+<DialogHeader><DialogTitle className="text-[var(--foreground)]">Reject question paper</DialogTitle><DialogDescription>Provide a clear correction note so the creator can fix the paper and submit it again.</DialogDescription></DialogHeader>
+<div className="space-y-2"><Label>Reason for rejection</Label><Textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} rows={4} placeholder="Explain the required correction." className="border-[var(--line)]" /></div>
+<DialogFooter><Button type="button" variant="outline" onClick={() => { setRejectTarget(null); setRejectionReason(''); }} className="border-[var(--line)]">Cancel</Button><Button type="button" variant="destructive" disabled={!rejectionReason.trim()} onClick={() => void confirmReject()}><XCircle className="mr-2 h-4 w-4" />Reject Paper</Button></DialogFooter>
 </DialogContent>
 </Dialog>
 <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open && !saving) setDeleteTarget(null); }}>
-<AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-xl">
-<div className="bg-[#14232B] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#B54747]"><Trash2 className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Delete this paper?</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">{deleteTarget?.title} will be permanently removed only when it has no protected student attempts.</AlertDialogDescription></AlertDialogHeader></div>
+<AlertDialogContent className="overflow-hidden border-[var(--line)] p-0 sm:max-w-xl">
+<div className="bg-[var(--foreground)] px-6 py-5 text-white"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--destructive)]"><Trash2 className="h-5 w-5" /></div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Delete this paper?</AlertDialogTitle><AlertDialogDescription className="text-[var(--secondary)]">{deleteTarget?.title} will be permanently removed only when it has no protected student attempts.</AlertDialogDescription></AlertDialogHeader></div>
 <div className="px-6 py-5 text-sm text-[#44545C]">Archiving is safer when a paper has already been used or may be needed for audit history.</div>
-<AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><AlertDialogCancel disabled={saving}>Keep Paper</AlertDialogCancel><Button type="button" variant="destructive" onClick={() => void confirmDelete()} disabled={saving}>{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Delete Permanently</Button></AlertDialogFooter>
+<AlertDialogFooter className="border-t border-[var(--line)] px-6 py-4"><AlertDialogCancel disabled={saving}>Keep Paper</AlertDialogCancel><Button type="button" variant="destructive" onClick={() => void confirmDelete()} disabled={saving}>{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}Delete Permanently</Button></AlertDialogFooter>
 </AlertDialogContent>
 </AlertDialog>
+{kind === 'admin' && role === 'super_admin' && <PyqPaperManager open={pyqManagerOpen} onOpenChange={setPyqManagerOpen} onBuilt={()=>void load()} />}
+{kind === 'admin' && <PaperFileImportDialog open={paperFileImportOpen} onOpenChange={setPaperFileImportOpen} onImported={()=>void load()} />}
 <QuestionBulkImportDialog
 open={importOpen}
 onOpenChange={(open) => {

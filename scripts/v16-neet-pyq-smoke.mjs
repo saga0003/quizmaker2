@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+const read=(p)=>fs.readFileSync(p,'utf8'); let n=0;
+function ok(name,cond){if(!cond)throw new Error(`V16 smoke failed: ${name}`);console.log(`PASS ${++n}: ${name}`)}
+const pkg=JSON.parse(read('package.json'));
+const release=read('src/lib/release.ts');
+const bank=read('src/components/evidara/live-question-bank.tsx');
+const importer=read('src/components/evidara/neet-pyq-importer.tsx');
+const route=read('src/app/api/admin/pyq-staging-import/route.ts');
+const migration=read('supabase/migrations/20260810183000_neet_pyq_staging_import_v16.sql');
+ok('package release is 19.1.0',pkg.version==='19.1.0');
+ok('release metadata is Evidara V19',release.includes("19.1.0")&&release.includes('Evidara V19'));
+ok('V15 dynamic SEO remains installed',fs.existsSync('src/app/sitemap.ts')&&fs.existsSync('src/app/questions/[slug]/page.tsx'));
+ok('NEET importer component exists',fs.existsSync('src/components/evidara/neet-pyq-importer.tsx'));
+ok('question bank opens the NEET importer',bank.includes('NeetPyqImporter')&&bank.includes('Import NEET PYQ Archive'));
+ok('V19 importer goes directly to Question Bank In Review',importer.includes('Choose V19 Folder')&&importer.includes('importV19Direct')&&importer.includes('In Review'));
+ok('promote flow remains In Review',route.includes("status: 'in_review'")||route.includes("status:'in_review'")||route.includes("status: 'In Review'"));
+ok('route calls V16 staging RPC',route.includes('import_neet_pyq_staging_batch_v16'));
+ok('migration creates V16 staging RPC',migration.includes('create or replace function public.import_neet_pyq_staging_batch_v16'));
+ok('staging RPC is service-role only',migration.includes('grant execute on function public.import_neet_pyq_staging_batch_v16(jsonb,jsonb) to service_role'));
+console.log(`V16 smoke passed (${n}/${n}).`);

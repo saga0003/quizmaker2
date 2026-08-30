@@ -37,13 +37,16 @@ export default function CallbackPage() {
         }
         if (!active) return;
 
+        const requestedDestination = localStorage.getItem('evidara_after_login');
         localStorage.removeItem('evidara_after_login');
         localStorage.removeItem('scholaros_after_login');
+        const destination = requestedDestination && requestedDestination.startsWith('/') && !requestedDestination.startsWith('//')
+          ? requestedDestination
+          : '/';
 
-        // Use one full-page navigation after PKCE completion. Do not refresh or
-        // rewrite the callback URL first; on Vercel that can reload this route
-        // before Next.js finishes the client-side redirect.
-        window.location.replace('/');
+        // Use one full-page navigation after PKCE completion. Keep the destination
+        // same-origin so a public-store login cannot become an open redirect.
+        window.location.replace(destination);
       } catch (caught) {
         if (!active) return;
         setFailed(true);

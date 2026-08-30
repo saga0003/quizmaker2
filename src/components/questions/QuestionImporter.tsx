@@ -12,6 +12,7 @@ import { parseQuestionRows } from "@/lib/questionImport";
 import type { ParsedQuestionRow, QuestionPayload, TaxonomyChapter, TaxonomySubject } from "@/types/questions";
 import { useQuestionScope } from "./useQuestionScope";
 import { normalizeImageBytes, safeImageFileName } from "@/lib/imageFiles";
+import { uploadQuestionAsset } from "@/lib/questionAssetUpload";
 
 const isUrl=(value:string)=>/^https?:\/\//i.test(value);
 const baseName=(path:string)=>path.split(/[\\/]/).pop()?.toLowerCase()||"";
@@ -47,8 +48,6 @@ export function QuestionImporter({kind}:{kind:"admin"|"school"}){
  async function prepareImages(payloads:QuestionPayload[]){
   if(!zipFile)return payloads;
   if(!supabase||!user)throw new Error("Sign in before uploading image ZIP files.");
-  const client=supabase;
-  const userId=user.id;
   const selectedZip=zipFile;
   setStage("Opening image ZIP…");const zip=await readZip(await selectedZip.arrayBuffer());
   const zipName=selectedZip.name;
@@ -57,10 +56,8 @@ export function QuestionImporter({kind}:{kind:"admin"|"school"}){
    if(!value||isUrl(value))return value;
    const key=baseName(value);if(uploaded.has(key))return uploaded.get(key)!;
    const entry=byName.get(key);if(!entry)throw new Error(`Image '${value}' was referenced but not found inside ${zipName}.`);
-   const {blob,mime}=normalizeImageBytes(entry.bytes,key);
-   const safe=safeImageFileName(key);const path=`${userId}/imports/${crypto.randomUUID()}-${safe}`;
-   setStage(`Uploading ${key}…`);const {error:uploadError}=await client.storage.from("question-assets").upload(path,blob,{upsert:false,contentType:mime,cacheControl:"3600"});if(uploadError)throw uploadError;
-   const {data}=client.storage.from("question-assets").getPublicUrl(path);uploaded.set(key,data.publicUrl);return data.publicUrl;
+   const {blob}=normalizeImageBytes(entry.bytes,key,4*1024*1024);
+   setStage(`Uploading ${key} to Cloudflare R2…`);const result=await uploadQuestionAsset(blob,safeImageFileName(key),"imports");uploaded.set(key,result.publicUrl);return result.publicUrl;
   }
   for(const payload of payloads){payload.question_image_url=await resolve(payload.question_image_url||"");for(const option of payload.options)option.image_url=await resolve(option.image_url||"")}
   return payloads;

@@ -1,0 +1,18 @@
+EVIDARA V19.1 — START HERE
+
+1. Add your existing .env or .env.local file to this folder.
+2. Run TEST_EVIDARA.bat for local preflight.
+3. Open Evidara as Super Admin.
+4. Go to Papers / Paper Catalogue.
+5. Choose "Import Year / Paper".
+6. Download the bundled LaTeX template from the importer if needed.
+7. Import ONE year/paper/set at a time as .tex/.latex/.ltx, or use a ZIP when local images are included.
+8. Review duplicate matches and choose reuse/keep-both for any near matches.
+9. Click "Create Draft Paper". The imported questions are connected to that source paper in original order immediately.
+
+Recommended naming:
+NEET_2016_Main.tex
+NEET_2017_Main.tex
+NEET_2026_Set_A.zip
+
+See EVIDARA_V19_1_LATEX_PAPER_IMPORT_GUIDE.md and EVIDARA_V19_1_RELEASE_NOTES.md for details.

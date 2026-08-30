@@ -15,6 +15,12 @@ export type ProductPaper = {
   total_questions?: number | null;
   total_marks?: number | null;
   status?: string;
+  is_previous_year_paper?: boolean;
+  source_year?: number | null;
+  source_variant?: string | null;
+  source_paper_code?: string | null;
+  paper_origin?: "manual" | "pyq_generated" | "file_import";
+  pyq_source_paper_id?: string | null;
 };
 
 export type StoreProduct = {
@@ -42,6 +48,10 @@ export type StoreProduct = {
   ends_at: string | null;
   paper_count: number;
   papers: ProductPaper[];
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_keywords?: string[];
+  public_content?: { whoFor?: string; outcomes?: string[]; faq?: Array<{ question: string; answer: string }> };
 };
 
 export type AdminProduct = Omit<StoreProduct, 'version_id' | 'paper_count'> & {
@@ -77,6 +87,12 @@ export type BuilderPaper = {
   total_questions: number;
   total_marks: number;
   published_at: string | null;
+  is_previous_year_paper?: boolean;
+  source_year?: number | null;
+  source_variant?: string | null;
+  source_paper_code?: string | null;
+  paper_origin?: "manual" | "pyq_generated" | "file_import";
+  pyq_source_paper_id?: string | null;
 };
 
 export type CommerceAnalytics = {

@@ -1,0 +1,10 @@
+EVIDARA V15 SEO PATCH
+
+1. Stop TEST_EVIDARA.bat / Next.js dev server.
+2. Extract this ZIP directly over the current V14 project folder.
+3. Choose Replace All when Windows asks.
+4. Delete .next cache: rmdir /S /Q .next
+5. Start TEST_EVIDARA.bat again.
+6. Optional verification: npm run qa:v15-seo
+
+The matching Supabase migrations have already been applied to project xzfozpnzvznqrvcsoail. Do not manually re-run SQL.

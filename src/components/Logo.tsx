@@ -10,6 +10,6 @@ export function Logo({ compact = false, variant = "light" }: { compact?: boolean
   const alt = resolvedVariant === "emblem" ? "Evidara emblem" : "Evidara — Evidence-Driven Student Development";
 
   return <span className={`so-logo ev-logo ${compact ? "compact" : ""} ${resolvedVariant}`} aria-label={alt}>
-    <img src={src} alt={alt}/>
+   <img src={src} alt={alt}/>
   </span>;
 }

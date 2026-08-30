@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EVIDARA_RELEASE } from "@/lib/release";
 import { canAccessWorkspace, protectedRouteSmokeCases } from "@/lib/accessControl";
 import { overallReadiness, summarizeReadiness, type ReadinessCheck, type ReadinessReport } from "@/lib/readiness";
 import {
@@ -8,7 +9,7 @@ import {
   isServerSupabaseReady,
 } from "@/lib/server/supabaseServer";
 
-const RELEASE = "6.8.0";
+const RELEASE = EVIDARA_RELEASE;
 const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
 type DiagnosticError = { message?: string; code?: string; details?: string; hint?: string };
@@ -75,6 +76,7 @@ function envChecks(): ReadinessCheck[] {
   const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const serverSecret = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
   const appUrlValid = /^https:\/\//i.test(appUrl) || /^http:\/\/localhost(?::\d+)?$/i.test(appUrl);
   const appUrlLocal = /^http:\/\/localhost/i.test(appUrl);
 
@@ -93,7 +95,7 @@ function envChecks(): ReadinessCheck[] {
       "release",
       "Deployment boundary",
       "pass",
-      "The release remains configured for Cloudflare Workers and Supabase. No Vercel deployment integration is required or tested by this release.",
+      "The release is configured for Vercel + Supabase, with Cloudflare R2 used for file assets when R2 variables are configured.",
     ),
     check(
       "supabase-public-url",
@@ -115,11 +117,11 @@ function envChecks(): ReadinessCheck[] {
       "supabase-service-key",
       "configuration",
       "Supabase service-role key",
-      process.env.SUPABASE_SERVICE_ROLE_KEY ? "pass" : "fail",
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-        ? "The server-only service-role key is present. Its value is never returned by this endpoint."
-        : "SUPABASE_SERVICE_ROLE_KEY is missing, so authenticated server diagnostics and protected APIs must fail closed.",
-      process.env.SUPABASE_SERVICE_ROLE_KEY ? null : "Add the service-role key as a server secret. Never expose it through NEXT_PUBLIC variables.",
+      serverSecret ? "pass" : "fail",
+      serverSecret
+        ? "A server-only Supabase secret is present. Its value is never returned by this endpoint."
+        : "SUPABASE_SECRET_KEY (or legacy SUPABASE_SERVICE_ROLE_KEY) is missing, so authenticated server diagnostics and protected APIs must fail closed.",
+      serverSecret ? null : "Add SUPABASE_SECRET_KEY (preferred) or the legacy service-role key as a server secret. Never expose it through NEXT_PUBLIC variables.",
     ),
     check(
       "canonical-app-url",
@@ -251,16 +253,43 @@ export async function GET(request: Request) {
       return response({ error: "Super Admin access is required for system-readiness diagnostics." }, 403);
     }
 
-    const [profiles, organizations, products, orders, vouchers, redemptions, migrationColumns] = await Promise.all([
+    const [profiles, organizations, products, orders, vouchers, redemptions, migrationColumns, attemptUsage] = await Promise.all([
       tableCheck(auth.admin, "db-profiles", "supabase", "Profiles table", "profiles", "id,role", "Profiles and role data are reachable with the service client.", "Apply the core profile migration and confirm the service-role key belongs to this project."),
       tableCheck(auth.admin, "db-organizations", "supabase", "Organizations table", "organizations", "id", "School organization data is reachable.", "Apply the organization migrations before launch."),
       tableCheck(auth.admin, "db-products", "supabase", "Products table", "products", "id,status", "The production catalogue schema is reachable.", "Apply the commerce migrations before launch."),
       tableCheck(auth.admin, "db-orders", "supabase", "Orders table", "orders", "id,status,currency", "The orders ledger is reachable.", "Apply the commerce migrations before launch."),
-      tableCheck(auth.admin, "migration-24-vouchers", "migration", "Migration 24 voucher table", "voucher_codes", "id,discount_percent,purpose,active", "voucher_codes exists with the V6.7.1 hardening fields.", "Apply supabase/24_voucher_offline_payment_hardening.sql."),
-      tableCheck(auth.admin, "migration-24-redemptions", "migration", "Migration 24 redemption ledger", "voucher_redemptions", "id,order_id,payment_source", "voucher_redemptions exists and is queryable.", "Apply supabase/24_voucher_offline_payment_hardening.sql."),
-      tableCheck(auth.admin, "migration-24-order-columns", "migration", "Migration 24 order evidence", "orders", "id,voucher_id,payment_source,offline_reference,commerce_metadata", "orders contains voucher and payment-source evidence columns.", "Apply migration 24 and refresh the PostgREST schema cache."),
+      tableCheck(auth.admin, "migration-24-vouchers", "migration", "Migration 24 voucher table", "voucher_codes", "id,discount_percent,purpose,active", "The hardened voucher schema is reachable.", "Apply supabase/24_voucher_offline_payment_hardening.sql."),
+      tableCheck(auth.admin, "migration-24-redemptions", "migration", "Migration 24 redemption ledger", "voucher_redemptions", "id,order_id,payment_source", "The voucher redemption ledger is reachable.", "Apply supabase/24_voucher_offline_payment_hardening.sql."),
+      tableCheck(auth.admin, "migration-24-order-columns", "migration", "Migration 24 order evidence", "orders", "id,voucher_id,payment_source,offline_reference,commerce_metadata", "Orders contain voucher and payment-source evidence columns.", "Apply migration 24 and refresh the PostgREST schema cache."),
+      tableCheck(auth.admin, "migration-44-attempt-usage", "migration", "V12 security-foundation attempt ledger", "product_attempt_usage", "id,entitlement_id,paper_id,student_id,attempts_used", "The transaction-safe product attempt ledger is reachable.", "Apply supabase/44_v12_security_foundation.sql and refresh the PostgREST schema cache."),
     ]);
-    checks.push(profiles, organizations, products, orders, vouchers, redemptions, migrationColumns);
+    checks.push(profiles, organizations, products, orders, vouchers, redemptions, migrationColumns, attemptUsage);
+
+    const { data: directoryProbe, error: directoryError } = await auth.admin.rpc("admin_account_directory_v12", {
+      p_actor_id: auth.user.id,
+      p_organization_id: null,
+      p_search: null,
+      p_role: null,
+      p_page: 1,
+      p_page_size: 1,
+    });
+    checks.push(directoryError
+      ? check("migration-44-directory", "migration", "V12 security-foundation account directory", "fail", directoryError.message, "Apply migration 44 and confirm the signed-in account is Super Admin.")
+      : check("migration-44-directory", "migration", "V12 security-foundation account directory", "pass", "The paginated service-role account directory is available.", null, { sampledAccounts: Array.isArray(directoryProbe?.accounts) ? directoryProbe.accounts.length : 0 }));
+
+    const { data: analyticsProbe, error: analyticsError } = await auth.admin.rpc("get_student_analytics_v12", {
+      p_student_id: auth.user.id,
+      p_product_id: null,
+      p_date_from: null,
+      p_date_to: null,
+    });
+    checks.push(analyticsError
+      ? check("migration-45-analytics", "migration", "V12 evidence analytics", "fail", analyticsError.message, "Apply supabase/45_v12_evidence_analytics.sql and reload the PostgREST schema cache.")
+      : check("migration-45-analytics", "migration", "V12 evidence analytics", "pass", "The authorised V12 evidence analytics RPC is available.", null, {
+          completedTests: Number(analyticsProbe?.summary?.completed_tests || 0),
+          semanticErrorInference: Boolean(analyticsProbe?.evidence_policy?.semantic_error_types),
+          confidenceInput: Boolean(analyticsProbe?.evidence_policy?.confidence_self_rating),
+        }));
 
     const { data: authUsers, error: authAdminError } = await auth.admin.auth.admin.listUsers({ page: 1, perPage: 1 });
     checks.push(
@@ -306,7 +335,7 @@ export async function GET(request: Request) {
           razorpayData.test_mode
             ? "RAZORPAY_KEY_ID is a Test Mode key. The key value is not exposed."
             : razorpayData.live_mode_detected
-              ? "A Live Mode Razorpay key was detected. V6.8 production QA must be completed in Test Mode."
+              ? "A Live Mode Razorpay key was detected. V12 production QA must be completed in Test Mode."
               : "RAZORPAY_KEY_ID is missing or does not match a Razorpay Test Mode key format.",
           razorpayData.test_mode ? null : "Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Supabase Edge Function secrets using Test Mode credentials.",
         ),

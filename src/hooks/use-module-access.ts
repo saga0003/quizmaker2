@@ -4,16 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { normalizeEvidaraRole } from '@/lib/roles';
-
-export type EvidaraModuleKey =
-  | 'questions'
-  | 'papers'
-  | 'students'
-  | 'analytics'
-  | 'resources'
-  | 'achievements'
-  | 'benchmarks'
-  | 'subscriptions';
+import { EVIDARA_MODULE_KEYS, type EvidaraModuleAccess, type EvidaraModuleKey } from '@/lib/modules';
 
 type ModuleSetting = {
   organization_id: string | null;
@@ -22,16 +13,7 @@ type ModuleSetting = {
   enabled: boolean;
 };
 
-const modules: EvidaraModuleKey[] = [
-  'questions',
-  'papers',
-  'students',
-  'analytics',
-  'resources',
-  'achievements',
-  'benchmarks',
-  'subscriptions',
-];
+const modules = EVIDARA_MODULE_KEYS;
 
 function defaults(role: string) {
   const normalized = normalizeEvidaraRole(role);
@@ -39,19 +21,19 @@ function defaults(role: string) {
     moduleKey,
     !(normalized === 'student' && moduleKey === 'questions')
       && !(normalized === 'school_teacher' && (moduleKey === 'students' || moduleKey === 'subscriptions')),
-  ])) as Record<EvidaraModuleKey, boolean>;
+  ])) as EvidaraModuleAccess;
 }
 
 export function useModuleAccess() {
   const user = useAppStore((state) => state.user);
-  const [access, setAccess] = useState<Record<EvidaraModuleKey, boolean>>(() => defaults(user?.accessRole || 'student'));
+  const [access, setAccess] = useState<EvidaraModuleAccess>(() => defaults(user?.accessRole || 'student'));
 
   useEffect(() => {
     const role = normalizeEvidaraRole(user?.accessRole);
     setAccess(defaults(role));
     if (!user || !supabase) return;
     if (role === 'super_admin' || role === 'evidara_admin') {
-      setAccess(Object.fromEntries(modules.map((moduleKey) => [moduleKey, true])) as Record<EvidaraModuleKey, boolean>);
+      setAccess(Object.fromEntries(modules.map((moduleKey) => [moduleKey, true])) as EvidaraModuleAccess);
       return;
     }
 

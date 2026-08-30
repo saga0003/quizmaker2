@@ -121,7 +121,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}/reset-password/`,
       });
       if (error) throw error;
       setMessage('Password recovery instructions have been sent to your email.');

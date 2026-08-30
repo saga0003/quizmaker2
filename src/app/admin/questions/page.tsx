@@ -1,4 +1,7 @@
-import { DashboardShell } from "@/components/DashboardShell";
-import { ProtectedPage } from "@/components/ProtectedPage";
-import { QuestionBank } from "@/components/questions/QuestionBank";
-export default function Page(){return <ProtectedPage allowed="admin"><DashboardShell kind="admin"><QuestionBank kind="admin"/></DashboardShell></ProtectedPage>}
+import { redirectToWorkspace } from '@/lib/workspaceRedirect';
+
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function LegacyWorkspaceRedirect({ searchParams }: Props) {
+  return redirectToWorkspace('admin-questions', searchParams);
+}

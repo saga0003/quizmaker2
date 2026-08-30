@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthProvider';
 import { normalizeEvidaraRole } from '@/lib/roles';
 import { normalizeImageBytes, safeImageFileName } from '@/lib/imageFiles';
+import { uploadQuestionAsset } from '@/lib/questionAssetUpload';
 import { bulkQuestionTemplateHeaders, parseQuestionRows } from '@/lib/questionImport';
 import { parseStructuredQuestionText, readQuestionDocument } from '@/lib/questionDocumentReader';
 import { readZip } from '@/lib/zipReader';
@@ -76,6 +77,7 @@ import { GuidedLabel } from '@/components/evidara/question-help';
 import { QuestionDevicePreview } from '@/components/evidara/question-device-preview';
 import { SearchableTaxonomySelect } from '@/components/evidara/searchable-taxonomy-select';
 import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
+import { AiImportHelper } from '@/components/evidara/ai-import-helper';
 
 const simpleQuestionTypes: QuestionType[] = [
   'single_correct',
@@ -115,7 +117,9 @@ type ResolvedRow = ParsedQuestionRow & {
 
 type ImportResult = {
   imported: number;
+  reused?: number;
   failed: number;
+  paper_id?: string | null;
   errors?: Array<{ row?: number; error?: string } | string>;
 };
 
@@ -186,7 +190,7 @@ function friendlyDatabaseError(value: string) {
   if (/btrim\(app_role\)/i.test(message)) return 'The database role compatibility update is missing. Apply Supabase migration 30 and retry.';
   if (/bulk_import_questions_v71/i.test(message) && /does not exist|not found/i.test(message)) return 'The V7.1 database migration is not applied yet. Run migration 30 in Supabase SQL Editor.';
   if (/row-level security|permission denied|42501/i.test(message)) return 'Your account does not have permission for this import. Check the Evidara role and school assignment.';
-  if (/question-assets|bucket/i.test(message)) return 'Question image storage is not ready. Apply migration 30, then refresh the page.';
+  if (/question-assets|bucket|r2/i.test(message)) return 'Question image storage is not ready. Check the Cloudflare R2 environment values, bucket token and public URL.';
   return message || 'The database could not save this import.';
 }
 
@@ -243,11 +247,26 @@ export function QuestionBulkImportDialog({
   const [resultOpen, setResultOpen] = useState(false);
   const [undoStack, setUndoStack] = useState<EditPatch[]>([]);
   const [redoStack, setRedoStack] = useState<EditPatch[]>([]);
+  const [createPaper, setCreatePaper] = useState(kind === 'school');
+  const [paperTitle, setPaperTitle] = useState('');
+  const [paperExam, setPaperExam] = useState('');
+  const [paperGrade, setPaperGrade] = useState('');
+  const [paperDuration, setPaperDuration] = useState('90');
+  const [paperSetName, setPaperSetName] = useState('');
 
   useEffect(() => { setLocalSubjects(subjects); }, [subjects]);
   useEffect(() => { setLocalChapters(chapters); }, [chapters]);
   useEffect(() => { setLocalTopics(topics); }, [topics]);
   useEffect(() => { setPublishMaster(platformImport); }, [platformImport]);
+  useEffect(() => { setCreatePaper(kind === 'school'); }, [kind]);
+  useEffect(() => {
+    if (!rawRows.length) return;
+    const firstExam = rawRows.map((row) => String(row.exam_types || row.exam_type || '').split(/[|,;]/)[0].trim()).find(Boolean) || '';
+    const firstGrade = rawRows.map((row) => String(row.grade || row.class_level || '').trim()).find(Boolean) || '';
+    if (!paperExam && firstExam) setPaperExam(firstExam);
+    if (!paperGrade && firstGrade) setPaperGrade(firstGrade);
+    if (!paperTitle && questionFile?.name) setPaperTitle(questionFile.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim());
+  }, [rawRows, questionFile, paperExam, paperGrade, paperTitle]);
 
   const orderedSubjects = useMemo(() => [...localSubjects].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })), [localSubjects]);
   const orderedChapters = useMemo(() => [...localChapters].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })), [localChapters]);
@@ -262,7 +281,7 @@ export function QuestionBulkImportDialog({
       const warnings: string[] = [];
       const subjectName = normalizeName(row.raw.subject || payload.metadata?.import_subject);
       const selectedSubject = subjectByName.get(nameKey(subjectName)) || subjectByCode.get(nameKey(subjectName));
-      if (!selectedSubject) errors.push(`Subject '${subjectName || 'blank'}' is not available. Only Super Admin can add a new subject from Question Settings.`);
+      if (!selectedSubject) errors.push(`Subject '${subjectName || 'blank'}' is not available in this institution. Add it from Academic Setup, then review this question again.`);
       else payload.subject_id = selectedSubject.id;
 
       const grade = normalizeName(row.raw.grade || row.raw.class_level || payload.class_level);
@@ -338,6 +357,14 @@ export function QuestionBulkImportDialog({
   const imageBlocked = localImageReferences.length > 0 && (!imageZip || missingZipFiles.length > 0);
   const importBlocked = !preflight?.ok || valid.length === 0 || imageBlocked || busy;
   const missingTaxonomyCount = rows.filter((row) => row.missingChapter || row.missingTopic).length;
+  const missingSubjectCount = rawRows.filter((row) => !String(row.subject || '').trim()).length;
+  const missingChapterCount = rawRows.filter((row) => !String(row.chapter || '').trim()).length;
+  const missingTopicCount = rawRows.filter((row) => !String(row.topic || '').trim()).length;
+  const analysisMissing = [
+    missingSubjectCount ? `${missingSubjectCount} subject${missingSubjectCount === 1 ? '' : 's'}` : '',
+    missingChapterCount ? `${missingChapterCount} chapter${missingChapterCount === 1 ? '' : 's'}` : '',
+    missingTopicCount ? `${missingTopicCount} topic${missingTopicCount === 1 ? '' : 's'}` : '',
+  ].filter(Boolean);
 
   useEffect(() => {
     if (summaryRequested && rows.length) {
@@ -349,6 +376,25 @@ export function QuestionBulkImportDialog({
   function clearEditHistory() {
     setUndoStack([]);
     setRedoStack([]);
+  }
+
+  function applyPaperDefaultsToMissing() {
+    if (!paperExam && !paperGrade) {
+      setNotice('Choose the paper exam and/or grade first.');
+      return;
+    }
+    let examApplied = 0;
+    let gradeApplied = 0;
+    setRawRows((existing) => existing.map((row) => {
+      const next = { ...row };
+      const currentExam = String(row.exam_types || row.exam_type || '').trim();
+      const currentGrade = String(row.grade || row.class_level || '').trim();
+      if (!currentExam && paperExam) { next.exam_types = paperExam; examApplied += 1; }
+      if (!currentGrade && paperGrade) { next.grade = paperGrade; gradeApplied += 1; }
+      return next;
+    }));
+    clearEditHistory();
+    setNotice(`Applied paper defaults to ${examApplied} missing exam field${examApplied === 1 ? '' : 's'} and ${gradeApplied} missing grade field${gradeApplied === 1 ? '' : 's'}.`);
   }
 
   function reset() {
@@ -626,8 +672,6 @@ export function QuestionBulkImportDialog({
     if (!imageZip) throw new Error(`${localReferences.length} local image reference${localReferences.length === 1 ? '' : 's'} found. Choose the matching image ZIP before importing.`);
     if (!supabase || !user) throw new Error('Sign in again before uploading question images.');
 
-    const client = supabase;
-    const activeUser = user;
     const zip = await readZip(await imageZip.arrayBuffer());
     const byName = new Map([...zip.values()].map((entry) => [baseName(entry.name), entry]));
     const uploaded = new Map<string, string>();
@@ -638,14 +682,11 @@ export function QuestionBulkImportDialog({
       if (uploaded.has(key)) return uploaded.get(key)!;
       const entry = byName.get(key);
       if (!entry) throw new Error(`Image '${value}' is referenced in Excel but is missing from ${imageZip?.name}.`);
-      const { blob, mime } = normalizeImageBytes(entry.bytes, key);
-      const path = `${activeUser.id}/imports/${crypto.randomUUID()}-${safeImageFileName(key)}`;
-      setStage(`Uploading ${key}…`);
-      const { error: uploadError } = await client.storage.from('question-assets').upload(path, blob, { upsert: false, contentType: mime, cacheControl: '3600' });
-      if (uploadError) throw new Error(friendlyDatabaseError(uploadError.message));
-      const { data } = client.storage.from('question-assets').getPublicUrl(path);
-      uploaded.set(key, data.publicUrl);
-      return data.publicUrl;
+      const { blob } = normalizeImageBytes(entry.bytes, key, 4 * 1024 * 1024);
+      setStage(`Uploading ${key} to Cloudflare R2…`);
+      const result = await uploadQuestionAsset(blob, safeImageFileName(key), 'imports');
+      uploaded.set(key, result.publicUrl);
+      return result.publicUrl;
     }
 
     for (const payload of payloads) {
@@ -696,12 +737,31 @@ export function QuestionBulkImportDialog({
       await prepareImages(payloads);
       setStage('Saving reviewed questions…');
       const rpcFormat = ['csv', 'xlsx', 'xls', 'json', 'tex', 'txt'].includes(format) ? format : 'json';
-      const { data, error: importError } = await supabase.rpc('bulk_import_questions_v71', {
+      const paperPayload = createPaper && kind === 'school' ? {
+        title: paperTitle || questionFile.name.replace(/\.[^.]+$/, ''),
+        exam_type: paperExam || 'Custom',
+        grade_level: paperGrade || 'Grade 11',
+        duration_minutes: Number(paperDuration || 90),
+        set_name: paperSetName || null,
+        test_type: 'full_length_mock',
+      } : null;
+      let response = await supabase.rpc('bulk_import_questions_and_paper_phase1', {
         p_organization_id: kind === 'admin' ? null : organizationId,
         p_filename: questionFile.name,
         p_format: rpcFormat,
         p_rows: payloads,
+        p_paper: paperPayload,
       });
+      if (response.error && /bulk_import_questions_and_paper_phase1|does not exist|not found/i.test(response.error.message)) {
+        if (paperPayload) throw new Error('Apply the Phase 1 Clean database migration before using Import & Create Paper.');
+        response = await supabase.rpc('bulk_import_questions_v71', {
+          p_organization_id: kind === 'admin' ? null : organizationId,
+          p_filename: questionFile.name,
+          p_format: rpcFormat,
+          p_rows: payloads,
+        });
+      }
+      const { data, error: importError } = response;
       if (importError) throw new Error(friendlyDatabaseError(importError.message));
       const summary = data as ImportResult;
       setResult(summary);
@@ -733,20 +793,27 @@ export function QuestionBulkImportDialog({
           <DialogHeader className="border-b border-[#E7ECEB] px-4 py-4 sm:px-6">
             <div className="flex flex-col gap-3 pr-8 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <DialogTitle className="text-xl text-[#14232B]">Bulk Question Import and Review · Final</DialogTitle>
-                <DialogDescription className="mt-1 max-w-3xl">Upload Excel, attach its image ZIP when filenames are used, navigate only the errors, undo changes when needed, and publish only after review.</DialogDescription>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0E5A5A]">Bulk question upload</p>
+                <DialogTitle className="mt-1 text-xl text-[#14232B]">Excel, CSV or LaTeX import</DialogTitle>
+                <DialogDescription className="mt-1 max-w-3xl">Choose the question file, let Evidara validate every row, fix only what needs attention, and import the ready questions into the correct question bank.</DialogDescription>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics, grades: grades.map((item) => item.value), exams: exams.map((item) => item.value) })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel</Button>
-                <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV</Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP Template</Button>
-                <Button type="button" variant="outline" size="sm" onClick={downloadQuestionImportGuide} className="border-[#E7ECEB]"><FileText className="mr-1.5 h-4 w-4" />Guide</Button>
+                <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#0E5A5A] px-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#0A4747]">
+                  <Upload className="mr-1.5 h-4 w-4" />{questionFile ? 'Choose another file' : 'Choose file'}
+                  <input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} />
+                </label>
+                <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics, grades: grades.map((item) => item.value), exams: exams.map((item) => item.value) })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel template</Button>
+                <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV template</Button>
+                <Button type="button" variant="outline" size="sm" onClick={downloadQuestionImportGuide} className="border-[#E7ECEB]"><FileText className="mr-1.5 h-4 w-4" />Import guide</Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowLatexWorkspace((value) => !value)} className="border-[#E7ECEB]"><FileCode2 className="mr-1.5 h-4 w-4" />Paste LaTeX</Button>
               </div>
             </div>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
+            <div className="mb-5 grid gap-3 rounded-2xl border border-[#E7ECEB] bg-white p-4 sm:grid-cols-4">
+              {[['1','Upload source','Add files or content'],['2','AI prepare','Convert difficult source files'],['3','Review & classify','Fix only what needs attention'],['4','Import & create paper','Save to bank and build paper']].map(([step,title,sub], index) => <div key={step} className="flex items-start gap-3"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${index === 0 ? 'bg-[#0E5A5A] text-white' : 'border border-[#D9E1E4] bg-[#F7F9F9] text-[#596A70]'}`}>{step}</span><span><strong className="block text-xs text-[#14232B]">{title}</strong><span className="mt-0.5 block text-[11px] leading-4 text-[#7B8A90]">{sub}</span></span></div>)}
+            </div>
             <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${preflight?.ok ? 'border-[#0E5A5A]/20 bg-[#DCE9E7]/50 text-[#0E5A5A]' : 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]'}`}>
               <div className="flex items-start justify-between gap-3"><div className="flex items-start gap-2">{preflight?.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}<span>{preflight?.message || 'Checking database role, import function and image storage…'}</span></div><Button type="button" variant="ghost" size="sm" onClick={() => void runPreflight()} className="h-7 shrink-0 px-2"><RefreshCw className="mr-1 h-3.5 w-3.5" />Check again</Button></div>
             </div>
@@ -754,9 +821,30 @@ export function QuestionBulkImportDialog({
             {(error || settingsError) && <div className="mb-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]">{error || settingsError}</div>}
             {notice && !error && <div className="mb-4 rounded-xl border border-[#DCE9E7] bg-white px-4 py-3 text-sm text-[#0E5A5A]">{notice}</div>}
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#DCE9E7] bg-white p-5 text-center transition hover:border-[#0E5A5A]/50"><FileSpreadsheet className="h-9 w-9 text-[#0E5A5A]" /><strong className="mt-3 text-[#14232B]">1. Excel or question source</strong><p className="mt-1 max-w-md text-xs text-[#6B7980]">{questionFile ? questionFile.name : 'XLSX recommended. CSV, XLS, DOCX, text PDF, TEX, TXT and JSON are also supported.'}</p><span className="mt-3 rounded-lg bg-[#0E5A5A] px-3 py-2 text-xs font-semibold text-white">{questionFile ? 'Replace source file' : 'Choose source file'}</span><input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} /></label>
-              <label className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center transition ${localImageReferences.length && !imageZip ? 'border-[#B54747]/50 bg-[#FFF8F8]' : 'border-[#F2B84B]/50 bg-white hover:border-[#F2B84B]'}`}><ImagePlus className="h-9 w-9 text-[#8A5F00]" /><strong className="mt-3 text-[#14232B]">2. Matching image ZIP</strong><p className="mt-1 max-w-md text-xs leading-relaxed text-[#6B7980]">{imageZip ? `${imageZip.name}${zipNames ? ` · ${zipNames.size} files detected` : ''}` : localImageReferences.length ? `${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'} found. Choose the ZIP now.` : 'Optional when every image cell contains a real public HTTPS URL.'}</p><span className="mt-3 rounded-lg border border-[#E7ECEB] bg-white px-3 py-2 text-xs font-semibold text-[#14232B]">{imageZip ? 'Replace image ZIP' : 'Choose image ZIP'}</span><input hidden type="file" accept=".zip" onChange={(event) => event.target.files?.[0] && void attachImageZip(event.target.files[0])} /></label>
+            <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4 sm:p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#DCE9E7] text-[#0E5A5A]"><FileSpreadsheet className="h-5 w-5" /></div>
+                  <div className="min-w-0"><strong className="text-sm text-[#14232B]">{questionFile ? questionFile.name : 'Choose an Excel, CSV or LaTeX question file'}</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">XLSX is recommended. Evidara also supports CSV, XLS, DOCX, text PDF, TEX, TXT and JSON, then shows a validation review before saving anything.</p></div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP template</Button>
+                  {(localImageReferences.length > 0 || imageZip) && <label className={`inline-flex h-9 cursor-pointer items-center justify-center rounded-md border px-3 text-sm font-medium transition ${localImageReferences.length && !imageZip ? 'border-[#B54747]/40 bg-[#FFF8F8] text-[#B54747]' : 'border-[#E7ECEB] bg-white text-[#14232B] hover:bg-[#F7F9F7]'}`}><ImagePlus className="mr-1.5 h-4 w-4" />{imageZip ? 'Replace image ZIP' : `Attach image ZIP (${localImageReferences.length})`}<input hidden type="file" accept=".zip" onChange={(event) => event.target.files?.[0] && void attachImageZip(event.target.files[0])} /></label>}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 border-t border-[#EEF2F1] pt-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-[#F7F9F7] px-4 py-3"><strong className="text-xs text-[#14232B]">Academic Setup assistance</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">Missing chapters and topics are detected automatically. Use “Create all missing taxonomy” after validation to add the unique entries safely.</p></div>
+                <div className="rounded-xl bg-[#F7F9F7] px-4 py-3"><strong className="text-xs text-[#14232B]">LaTeX + images</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">Use a TEX question source and attach the matching image ZIP only when the imported rows refer to local image filenames.</p></div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_420px]">
+              <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4">
+                <strong className="text-sm text-[#14232B]">Teacher-friendly import</strong>
+                <p className="mt-1 text-xs leading-5 text-[#6B7980]">Upload whatever you already have. Evidara validates the content before saving, and only the questions that are ready can be imported.</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium text-[#31505A]"><span className="rounded-full bg-[#F1F6F5] px-2.5 py-1">Excel / CSV</span><span className="rounded-full bg-[#F1F6F5] px-2.5 py-1">LaTeX</span><span className="rounded-full bg-[#F1F6F5] px-2.5 py-1">Word / text PDF</span><span className="rounded-full bg-[#F1F6F5] px-2.5 py-1">Images ZIP</span></div>
+              </div>
+              <AiImportHelper />
             </div>
 
             {missingZipFiles.length > 0 && <div className="mt-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]"><strong>The ZIP does not contain {missingZipFiles.length} referenced image file{missingZipFiles.length === 1 ? '' : 's'}.</strong><p className="mt-1 text-xs">Missing: {missingZipFiles.slice(0, 12).join(', ')}{missingZipFiles.length > 12 ? '…' : ''}</p></div>}
@@ -768,9 +856,13 @@ export function QuestionBulkImportDialog({
             {!!rows.length && <>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{statCards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-xl border border-[#E7ECEB] bg-white p-4"><div className="flex items-center justify-between"><span className="text-xs text-[#6B7980]">{label}</span><Icon className="h-4 w-4" style={{ color: tone }} /></div><strong className="mt-2 block text-2xl" style={{ color: tone }}>{value}</strong></div>)}</div>
 
+              {analysisMissing.length > 0 && <div className="mt-4 rounded-xl border border-[#BFD5FF] bg-[#F7FAFF] px-4 py-3 text-sm text-[#31566B]"><div className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#4267D5]" /><div><strong>Complete classification for stronger analysis.</strong><p className="mt-1 text-xs leading-5 text-[#5E7380]">This import is missing {analysisMissing.join(', ')}. Questions can still be reviewed, but the corresponding subject-, chapter- or topic-wise reports will be incomplete until those fields are classified.</p></div></div></div>}
+
               {missingTaxonomyCount > 0 && <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-4 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#8A5F00]">{missingTaxonomyCount} question{missingTaxonomyCount === 1 ? '' : 's'} refer to a chapter or topic that is not in Evidara.</strong><p className="mt-1 text-xs text-[#6B7980]">Add each item while reviewing, or create all unique missing chapters and topics now.</p></div><Button type="button" onClick={() => void createAllMissingTaxonomy()} disabled={busy} className="shrink-0 bg-[#8A5F00] text-white hover:bg-[#704D00]"><Plus className="mr-2 h-4 w-4" />Create all missing taxonomy</Button></div>}
 
               {platformImport && <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-[#DCE9E7] bg-white p-4"><input type="checkbox" checked={publishMaster} onChange={(event) => setPublishMaster(event.target.checked)} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-[#14232B]">Publish Evidara master questions immediately</strong><span className="mt-1 block text-xs text-[#6B7980]">Enabled by default for Super Admin and Evidara Admin so approved master questions appear to School Admins and Teachers.</span></span></label>}
+
+              {kind === 'school' && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><strong className="text-sm text-[#14232B]">Create a paper from this import</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">When enabled, Evidara reuses questions already in your bank, adds new questions, and creates one draft paper in the same order.</p></div><label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0E5A5A]"><input type="checkbox" checked={createPaper} onChange={(event) => setCreatePaper(event.target.checked)} className="h-4 w-4 accent-[#0E5A5A]" />Create paper</label></div>{createPaper && <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5"><label className="text-xs font-semibold text-[#596A70] xl:col-span-2">Paper title<Input value={paperTitle} onChange={(event) => setPaperTitle(event.target.value)} className="mt-1" placeholder="NEET Practice Paper - Set A" /></label><label className="text-xs font-semibold text-[#596A70]">Exam<Select value={paperExam || undefined} onValueChange={setPaperExam}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose exam" /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Grade<Select value={paperGrade || undefined} onValueChange={setPaperGrade}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose grade" /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Duration (min)<Input type="number" min={1} max={1440} value={paperDuration} onChange={(event) => setPaperDuration(event.target.value)} className="mt-1" /></label><label className="text-xs font-semibold text-[#596A70]">Set name<Input value={paperSetName} onChange={(event) => setPaperSetName(event.target.value)} className="mt-1" placeholder="Set A" /></label><div className="md:col-span-2 xl:col-span-5 flex flex-col gap-2 rounded-xl border border-[#DCE9E7] bg-[#F8FBFA] p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-[#596A70]">If imported questions do not contain an exam or grade, Evidara can fill those missing fields from the paper settings above.</p><Button type="button" variant="outline" size="sm" onClick={applyPaperDefaultsToMissing} className="shrink-0 border-[#9FC9C1] text-[#0E5A5A]">Apply exam & grade to missing questions</Button></div></div>}</div>}
 
               <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#E7ECEB] bg-white p-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
@@ -796,7 +888,7 @@ export function QuestionBulkImportDialog({
                   {!!current.warnings?.length && <div className="rounded-xl border border-[#F2B84B]/50 bg-[#FFFDF7] p-3 text-xs text-[#8A5F00]">{current.warnings.join(' ')}</div>}
 
                   <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Classification</strong><p className="text-xs text-[#6B7980]">Search existing taxonomy or add a missing chapter/topic from this question.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <div className="space-y-2"><GuidedLabel required help="Subjects are universal. Only Super Admin can create a missing subject from Question Settings.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>{ /biology|botany|zoology/i.test(`${orderedSubjects.find((item) => item.id === currentSubjectId)?.name || ''} ${orderedSubjects.find((item) => item.id === currentSubjectId)?.code || ''}`) && <div className="space-y-2"><GuidedLabel help="Classify Biology questions for combined, Botany or Zoology sections.">Biology division</GuidedLabel><Select value={rawText(current.raw, 'biology_division') || 'combined'} onValueChange={(biology_division) => updateRaw('biology_division', biology_division)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="combined">Combined Biology</SelectItem><SelectItem value="botany">Botany</SelectItem><SelectItem value="zoology">Zoology</SelectItem></SelectContent></Select></div>}
+                    <div className="space-y-2"><GuidedLabel required help="Choose a subject from your institution Academic Setup. School Admins can add or bulk-import subjects, chapters and topics.">Subject</GuidedLabel><SearchableTaxonomySelect value={currentSubjectId} onValueChange={(subjectId) => { const subject = orderedSubjects.find((item) => item.id === subjectId); updateRaw('subject', subject?.name || ''); updateRaw('chapter', ''); updateRaw('topic', ''); }} options={orderedSubjects.map((subject) => ({ value: subject.id, label: subject.name, description: subject.code }))} placeholder="Search subject" /></div>{ /biology|botany|zoology/i.test(`${orderedSubjects.find((item) => item.id === currentSubjectId)?.name || ''} ${orderedSubjects.find((item) => item.id === currentSubjectId)?.code || ''}`) && <div className="space-y-2"><GuidedLabel help="Classify Biology questions for combined, Botany or Zoology sections.">Biology division</GuidedLabel><Select value={rawText(current.raw, 'biology_division') || 'combined'} onValueChange={(biology_division) => updateRaw('biology_division', biology_division)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="combined">Combined Biology</SelectItem><SelectItem value="botany">Botany</SelectItem><SelectItem value="zoology">Zoology</SelectItem></SelectContent></Select></div>}
                     <div className="space-y-2"><GuidedLabel help="Choose an existing chapter or use the Excel chapter name.">Chapter</GuidedLabel><SearchableTaxonomySelect value={currentChapterId} onValueChange={(chapterId) => { const chapter = orderedChapters.find((item) => item.id === chapterId); updateRaw('chapter', chapter?.name || ''); updateRaw('topic', ''); }} options={currentChapters.map((chapter) => ({ value: chapter.id, label: chapter.name }))} placeholder="Search chapter" disabled={!currentSubjectId} allowClear clearLabel="No chapter" /><Input value={rawText(current.raw, 'chapter')} onChange={(event) => { updateRaw('chapter', event.target.value); updateRaw('topic', ''); }} placeholder="Chapter name from Excel" className="border-[#E7ECEB]" />{current.missingChapter && <Button type="button" size="sm" onClick={() => void createCurrentChapter()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add chapter “{current.missingChapter.name}”</Button>}</div>
                     <div className="space-y-2"><GuidedLabel help="Topic is optional but recommended.">Topic</GuidedLabel><SearchableTaxonomySelect value={currentPayload.topic_id || ''} onValueChange={(topicId) => { const topic = orderedTopics.find((item) => item.id === topicId); updateRaw('topic', topic?.name || ''); }} options={currentTopics.map((topic) => ({ value: topic.id, label: topic.name }))} placeholder="Search topic" disabled={!currentChapterId} allowClear clearLabel="No topic" /><Input value={rawText(current.raw, 'topic')} onChange={(event) => updateRaw('topic', event.target.value)} placeholder="Optional topic name" className="border-[#E7ECEB]" />{current.missingTopic && <Button type="button" size="sm" onClick={() => void createCurrentTopic()} disabled={busy} className="w-full bg-[#8A5F00] text-white"><Plus className="mr-1.5 h-4 w-4" />Add topic “{current.missingTopic.name}”</Button>}</div>
                     <div className="space-y-2"><GuidedLabel required help="Choose the way a learner answers this question.">Question type</GuidedLabel><Select value={currentPayload.question_type} onValueChange={(value) => updateRaw('question_type', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{simpleQuestionTypes.map((value) => <SelectItem key={value} value={value}>{value.replaceAll('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
@@ -819,9 +911,9 @@ export function QuestionBulkImportDialog({
           </div>
 
           <DialogFooter className="border-t border-[#E7ECEB] bg-white px-4 py-3 sm:px-6 sm:py-4">
-            <div className="mr-auto hidden max-w-2xl text-xs text-[#6B7980] md:block">{rows.length ? `${valid.length} ready · ${invalid.length} need correction${localImageReferences.length ? ` · ${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'}` : ''}. Ctrl+Z undoes your latest review edit.` : 'Choose an Excel file or paste structured LaTeX questions.'}</div>
+            <div className="mr-auto hidden max-w-2xl text-xs text-[#6B7980] md:block">{rows.length ? `${valid.length} ready · ${invalid.length} need correction${localImageReferences.length ? ` · ${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'}` : ''}. Ctrl+Z undoes your latest review edit.` : 'Choose a question file. Evidara will validate it before anything is saved.'}</div>
             <Button variant="outline" onClick={requestClose} className="border-[#E7ECEB]">{result ? 'Close' : 'Cancel'}</Button>
-            {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
+            {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{createPaper && kind === 'school' ? `Import ${valid.length} & Create Paper` : canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -845,8 +937,8 @@ export function QuestionBulkImportDialog({
 
       <AlertDialog open={resultOpen} onOpenChange={setResultOpen}>
         <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-xl">
-          <div className="bg-[#14232B] px-6 py-5 text-white"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${result?.failed ? 'bg-[#F2B84B] text-[#14232B]' : 'bg-[#0E5A5A]'}`}>{result?.failed ? <AlertCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Import completed</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">{result?.imported || 0} added · {result?.failed || 0} not added</AlertDialogDescription></AlertDialogHeader></div>
-          <div className="px-6 py-5">{!!result?.errors?.length ? <div className="max-h-64 overflow-y-auto rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 p-4"><strong className="text-sm text-[#B54747]">Questions not added</strong><ol className="mt-3 list-decimal space-y-2 pl-5 text-xs text-[#B54747]">{result.errors.slice(0, 100).map((item, index) => <li key={index}>{displayError(item)}</li>)}</ol></div> : <p className="text-sm text-[#0E5A5A]">Every reviewed question was added successfully.</p>}</div>
+          <div className="bg-[#14232B] px-6 py-5 text-white"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${result?.failed ? 'bg-[#F2B84B] text-[#14232B]' : 'bg-[#0E5A5A]'}`}>{result?.failed ? <AlertCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}</div><AlertDialogHeader className="mt-4 text-left"><AlertDialogTitle className="text-xl text-white">Import completed</AlertDialogTitle><AlertDialogDescription className="text-[#DCE9E7]">{result?.imported || 0} added · {result?.reused || 0} already in bank · {result?.failed || 0} not added</AlertDialogDescription></AlertDialogHeader></div>
+          <div className="px-6 py-5">{!!result?.errors?.length ? <div className="max-h-64 overflow-y-auto rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 p-4"><strong className="text-sm text-[#B54747]">Questions not added</strong><ol className="mt-3 list-decimal space-y-2 pl-5 text-xs text-[#B54747]">{result.errors.slice(0, 100).map((item, index) => <li key={index}>{displayError(item)}</li>)}</ol></div> : <p className="text-sm text-[#0E5A5A]">Every reviewed question is now available to the institution question bank.{result?.paper_id ? ' A draft paper was created from this import.' : ''}</p>}</div>
           <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4"><Button type="button" onClick={() => setResultOpen(false)} className="bg-[#0E5A5A] text-white">Return to review</Button></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

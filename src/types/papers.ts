@@ -105,6 +105,12 @@ export type PaperListRow = {
   attempt_limit: number;
   result_mode: ResultMode;
   settings?: Record<string, unknown> | null;
+  is_previous_year_paper?: boolean;
+  source_year?: number | null;
+  source_variant?: string | null;
+  source_paper_code?: string | null;
+  paper_origin?: "manual" | "pyq_generated" | "file_import";
+  pyq_source_paper_id?: string | null;
   rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
@@ -122,6 +128,7 @@ export type PaperQuestionSnapshot = {
   negative_marks: number;
   subject_name?: string | null;
   chapter_name?: string | null;
+  metadata?: Record<string, unknown> | null;
   options: QuestionOptionInput[];
 };
 

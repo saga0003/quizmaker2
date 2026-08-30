@@ -18,6 +18,7 @@ import type {
   QuestionDifficulty,
   QuestionOptionInput,
   QuestionPayload,
+  QuestionPyqOccurrenceInput,
   QuestionRow,
   QuestionStatus,
   QuestionType,
@@ -135,6 +136,7 @@ type EditorState = {
   numericAnswer: string;
   options: QuestionOptionInput[];
   matchPairs: MatchFollowingPair[];
+  pyqOccurrences: QuestionPyqOccurrenceInput[];
 };
 
 function emptyEditor(kind: 'admin' | 'school', canPublish: boolean): EditorState {
@@ -165,6 +167,7 @@ function emptyEditor(kind: 'admin' | 'school', canPublish: boolean): EditorState
     numericAnswer: '',
     options: seedOptions(),
     matchPairs: seedMatchPairs(),
+    pyqOccurrences: [],
   };
 }
 
@@ -184,6 +187,24 @@ function metadataMatchPairs(question?: QuestionRow | null): MatchFollowingPair[]
     }));
   }
   return seedMatchPairs();
+}
+
+function pyqOccurrencesFromQuestion(question?: QuestionRow | null): QuestionPyqOccurrenceInput[] {
+  return (question?.question_pyq_occurrences || []).map((occurrence) => {
+    const source = occurrence.pyq_source_papers;
+    return {
+      exam_type: source?.exam_type || 'NEET',
+      year: Number(source?.source_year || question?.source_year || new Date().getFullYear()),
+      variant: source?.variant || 'Main',
+      paper_code: source?.paper_code || '',
+      paper_key: source?.paper_key || '',
+      display_name: source?.display_name || '',
+      source_key: source?.source_key || '',
+      question_number: Number(occurrence.source_question_number || 0) || undefined,
+      subject_label: occurrence.subject_label || '',
+      expected_question_count: Number(source?.expected_question_count || 0) || undefined,
+    };
+  });
 }
 
 function editorFromQuestion(kind: 'admin' | 'school', canPublish: boolean, question?: QuestionRow | null): EditorState {
@@ -218,6 +239,7 @@ function editorFromQuestion(kind: 'admin' | 'school', canPublish: boolean, quest
     numericAnswer: answer,
     options: options.length ? options : seedOptions(),
     matchPairs: metadataMatchPairs(question),
+    pyqOccurrences: pyqOccurrencesFromQuestion(question),
   };
 }
 
@@ -322,8 +344,39 @@ export function QuestionEditorDialog({
     if (isMatch && usablePairs.length < 2) problems.push('Add at least two complete match pairs.');
     if (isMatch && usablePairs.some((pair) => (!pair.left_text.trim() && !pair.left_latex?.trim() && !pair.left_image_url?.trim()) || (!pair.right_text.trim() && !pair.right_latex?.trim() && !pair.right_image_url?.trim()))) problems.push('Every match row needs content on both sides.');
     if (lockedDecision) problems.push('Teachers cannot modify a question after an administrator has approved, rejected or archived it.');
+    if (kind === 'admin' && role === 'super_admin' && editor.pyqOccurrences.some((item) => !item.year || item.year < 1990 || item.year > 2100 || !item.exam_type.trim() || !item.variant.trim())) {
+      problems.push('Complete the exam, year and paper variant for every PYQ occurrence.');
+    }
     return problems;
   }, [correctOptions.length, editor, isChoice, isMatch, isNumeric, kind, lockedDecision, organizationId, teacher, usableOptions.length, usablePairs]);
+
+  function addPyqOccurrence() {
+    const subjectLabel = selectedSubject?.name || '';
+    setEditor((current) => ({
+      ...current,
+      pyqOccurrences: [...current.pyqOccurrences, {
+        exam_type: current.examTypes.includes('NEET') ? 'NEET' : current.examTypes[0] || 'NEET',
+        year: new Date().getFullYear(),
+        variant: 'Main',
+        paper_code: '',
+        display_name: '',
+        question_number: undefined,
+        subject_label: subjectLabel,
+        expected_question_count: 180,
+      }],
+    }));
+  }
+
+  function updatePyqOccurrence(index: number, patch: Partial<QuestionPyqOccurrenceInput>) {
+    setEditor((current) => ({
+      ...current,
+      pyqOccurrences: current.pyqOccurrences.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+    }));
+  }
+
+  function removePyqOccurrence(index: number) {
+    setEditor((current) => ({ ...current, pyqOccurrences: current.pyqOccurrences.filter((_item, itemIndex) => itemIndex !== index) }));
+  }
 
   function updateOption(index: number, patch: Partial<QuestionOptionInput>) {
     setEditor((current) => ({ ...current, options: current.options.map((option, optionIndex) => optionIndex === index ? { ...option, ...patch } : option) }));
@@ -461,16 +514,40 @@ export function QuestionEditorDialog({
         published_at: editor.status === 'approved' ? existingPublishedAt || new Date().toISOString() : existingPublishedAt,
       },
       options: isMatch ? matchOptions : isChoice ? usableOptions : [],
-      change_note: editor.id ? 'Updated from Evidara V7 one-page question editor' : 'Created from Evidara V7 one-page question editor',
+      change_note: editor.id ? 'Updated from Evidara V12 question editor' : 'Created from Evidara V12 question editor',
     };
 
     setSaving(true);
-    const { error: saveError } = await supabase.rpc('save_question', { p_question_id: editor.id, p_organization_id: kind === 'admin' ? null : organizationId, p_payload: payload });
-    setSaving(false);
+    const { data: savedQuestionId, error: saveError } = await supabase.rpc('save_question', { p_question_id: editor.id, p_organization_id: kind === 'admin' ? null : organizationId, p_payload: {
+      ...payload,
+      source: editor.pyqOccurrences.length ? 'Previous Year Question' : payload.source,
+      source_year: editor.pyqOccurrences.length ? Math.max(...editor.pyqOccurrences.map((item) => Number(item.year || 0))) : payload.source_year,
+      metadata: {
+        ...(payload.metadata || {}),
+        has_pyq_occurrences: editor.pyqOccurrences.length > 0,
+        pyq_occurrence_labels: editor.pyqOccurrences.map((item) => item.display_name || `${item.exam_type} ${item.year} ${item.variant}`),
+      },
+    } });
     if (saveError) {
+      setSaving(false);
       setError(saveError.message);
       return;
     }
+    const questionId = String(savedQuestionId || editor.id || '');
+    if (kind === 'admin' && role === 'super_admin' && questionId && session?.access_token) {
+      const response = await fetch('/api/admin/pyq-paper-sources/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'syncQuestionOccurrences', questionId, occurrences: editor.pyqOccurrences }),
+      });
+      const responsePayload = await response.json();
+      if (!response.ok) {
+        setSaving(false);
+        setError(responsePayload.error || 'Question saved, but PYQ occurrences could not be synchronized.');
+        return;
+      }
+    }
+    setSaving(false);
     onOpenChange(false);
     await onSaved();
   }
@@ -577,6 +654,28 @@ export function QuestionEditorDialog({
                   <div className="space-y-2"><GuidedLabel required help="Select every examination where this question is academically appropriate. Super Admin manages this list in Question Settings.">Applicable examinations</GuidedLabel><div className="flex flex-wrap gap-2">{exams.map((item) => <button type="button" key={item.id} onClick={() => toggleExam(item.value)} className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${editor.examTypes.includes(item.value) ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB] text-[#6B7980] hover:border-[#0E5A5A]/40'}`}>{editor.examTypes.includes(item.value) && <CheckCircle2 className="mr-1 inline h-3 w-3" />}{item.label}</button>)}</div></div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks awarded for a correct answer.">Marks</GuidedLabel><Input type="number" step="0.25" value={editor.marks} onChange={(event) => setEditor((current) => ({ ...current, marks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Marks deducted for an incorrect answer.">Negative marks</GuidedLabel><Input type="number" step="0.25" min="0" value={editor.negativeMarks} onChange={(event) => setEditor((current) => ({ ...current, negativeMarks: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected expert-solving time used for speed analytics.">Expected seconds</GuidedLabel><Input type="number" min="1" value={editor.estimatedSeconds} onChange={(event) => setEditor((current) => ({ ...current, estimatedSeconds: Number(event.target.value) }))} className="border-[#E7ECEB]" /></div></div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Learner-facing language.">Language</GuidedLabel><Select value={editor.language} onValueChange={(value) => setEditor((current) => ({ ...current, language: value }))}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="English">English</SelectItem><SelectItem value="Kannada">Kannada</SelectItem><SelectItem value="Hindi">Hindi</SelectItem><SelectItem value="Bilingual">Bilingual</SelectItem></SelectContent></Select></div><div className="space-y-2"><GuidedLabel help="Record NCERT, worksheet or previous-year paper source.">Source</GuidedLabel><Input value={editor.source} onChange={(event) => setEditor((current) => ({ ...current, source: event.target.value }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Optional source or examination year.">Source year</GuidedLabel><Input type="number" value={editor.sourceYear} onChange={(event) => setEditor((current) => ({ ...current, sourceYear: event.target.value }))} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Comma-separated keywords improve search.">Tags</GuidedLabel><Input value={editor.tags} onChange={(event) => setEditor((current) => ({ ...current, tags: event.target.value }))} placeholder="mechanics, vectors, PYQ" className="border-[#E7ECEB]" /></div></div>
+                  {kind === 'admin' && role === 'super_admin' && <div className="space-y-3 rounded-2xl border border-[#DCE9E7] bg-[#F7F9F7] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div><div className="flex items-center gap-2"><h4 className="font-semibold text-[#14232B]">Previous-year paper occurrences</h4><HelpIcon text="Use this when the same question appeared in one or more official papers. These occurrences let Evidara rebuild an exact PYQ paper without storing duplicate questions." /></div><p className="mt-1 text-xs text-[#6B7980]">Examples: NEET 2026 · Main · Code 11, Re-NEET 2026 · Code 50, AIPMT 2016 · Phase I.</p></div>
+                      <Button type="button" variant="outline" onClick={addPyqOccurrence} className="border-[#DCE9E7] bg-white"><Plus className="mr-2 h-4 w-4" />Add PYQ occurrence</Button>
+                    </div>
+                    {!editor.pyqOccurrences.length && <div className="rounded-xl border border-dashed border-[#D0D5DD] bg-white px-4 py-5 text-sm text-[#6B7980]">This question is not currently linked to an official PYQ paper.</div>}
+                    {editor.pyqOccurrences.map((occurrence, index) => <div key={`${occurrence.paper_key || occurrence.display_name || 'pyq'}-${index}`} className="rounded-xl border border-[#E7ECEB] bg-white p-3">
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                        <div className="space-y-1.5"><GuidedLabel help="Official examination name.">Exam</GuidedLabel><Input value={occurrence.exam_type} onChange={(event)=>updatePyqOccurrence(index,{exam_type:event.target.value})} placeholder="NEET" /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="The year printed on the official paper.">Year</GuidedLabel><Input type="number" min="1990" max="2100" value={occurrence.year || ''} onChange={(event)=>updatePyqOccurrence(index,{year:Number(event.target.value)})} /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="Main, Re-NEET, Phase I, Phase II, Session 1, etc.">Paper variant</GuidedLabel><Input value={occurrence.variant} onChange={(event)=>updatePyqOccurrence(index,{variant:event.target.value})} placeholder="Main / Re-NEET / Phase I" /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="Optional official set or paper code.">Paper code</GuidedLabel><Input value={occurrence.paper_code || ''} onChange={(event)=>updatePyqOccurrence(index,{paper_code:event.target.value})} placeholder="11 / C1 / AA" /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="Original position in this paper.">Question no.</GuidedLabel><Input type="number" min="1" value={occurrence.question_number || ''} onChange={(event)=>updatePyqOccurrence(index,{question_number:event.target.value ? Number(event.target.value) : undefined})} /></div>
+                        <div className="flex items-end"><Button type="button" variant="outline" onClick={()=>removePyqOccurrence(index)} className="w-full border-[#E7ECEB] text-[#B54747]"><Trash2 className="mr-2 h-4 w-4" />Remove</Button></div>
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        <div className="space-y-1.5"><GuidedLabel help="Optional public label. If blank, Evidara creates one from exam/year/variant/code.">Display label</GuidedLabel><Input value={occurrence.display_name || ''} onChange={(event)=>updatePyqOccurrence(index,{display_name:event.target.value})} placeholder={`Example: ${occurrence.variant === 'Re-NEET' ? 'Re-NEET' : occurrence.exam_type || 'NEET'} ${occurrence.year || ''}`} /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="Optional subject label for preserving the original paper structure.">Original subject</GuidedLabel><Input value={occurrence.subject_label || ''} onChange={(event)=>updatePyqOccurrence(index,{subject_label:event.target.value})} placeholder={selectedSubject?.name || 'Physics'} /></div>
+                        <div className="space-y-1.5"><GuidedLabel help="Total questions in that official paper. This lets Evidara know when the paper is complete enough to recreate.">Paper question count</GuidedLabel><Input type="number" min="1" value={occurrence.expected_question_count || ''} onChange={(event)=>updatePyqOccurrence(index,{expected_question_count:event.target.value?Number(event.target.value):undefined})} placeholder="180" /></div>
+                      </div>
+                    </div>)}
+                  </div>}
                 </CardContent>
               </Card>
             </div>

@@ -1,0 +1,48 @@
+EVIDARA V19.1 — QUESTION PAPER TO LATEX IMPORT PROMPT
+
+Convert exactly ONE examination paper/year/set into the Evidara LaTeX paper format.
+Do not merge multiple years or multiple paper variants into one file.
+Do not invent, shorten, rewrite, or crop question content.
+
+PAPER HEADER — include once at the top:
+\paper{Exact paper title}
+\exam{NEET / JEE Main / JEE Advanced / KCET / Custom}
+\year{YYYY}
+\variant{Main / Re-NEET / Phase 1 / Set A / etc.}
+\code{official paper code if available}
+\duration{minutes}
+\grade{Grade 11-12}
+\pyq{true}
+\sourcekey{stable_unique_source_key}
+
+EVERY QUESTION must be one block:
+\begin{question}
+\id{stable external ID}
+\number{original question number}
+\section{Physics / Chemistry / Botany / Zoology / Mathematics / etc.}
+\subject{subject}
+\chapter{chapter if known}
+\topic{topic if known}
+\questiontype{single_correct / multiple_correct / numerical / integer / assertion_reason / image_based / passage}
+\difficulty{very_easy / easy / moderate / difficult / very_difficult}
+\stem{complete question text; keep inline mathematics inside \(...\) or $...$ and display mathematics inside \[...\] or $$...$$}
+\option{A}{complete option A}
+\option{B}{complete option B}
+\option{C}{complete option C}
+\option{D}{complete option D}
+\answer{A}
+\solution{complete solution, with LaTeX math delimiters where needed}
+\marks{4}{1}
+\end{question}
+
+RULES
+1. Text remains text. Mathematics remains LaTeX/KaTeX syntax.
+2. Do not convert ordinary prose into mathematical mode.
+3. If a question is entirely mathematical, use \latex{...} instead of \stem{...}.
+4. If an option is entirely mathematical, write it as \option{A}{$...$}; Evidara will store it in the option LaTeX field.
+5. For images use \includegraphics{images/filename.png} inside the question or option. Put that image in the same ZIP using the same relative path.
+6. Keep the original question number. Never renumber questions merely because a source page is missing.
+7. Keep each paper/set in a separate .tex or ZIP so Evidara can create that paper immediately and retain a clean source identity.
+8. Do not include answer keys inside the question text. Use \answer{...}.
+9. Do not silently guess missing answers, figures, equations, chapter names, or question text. Leave uncertain taxonomy blank and flag it separately during review.
+10. Output only valid Evidara LaTeX paper content.

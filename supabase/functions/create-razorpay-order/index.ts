@@ -167,8 +167,8 @@ Deno.serve(async (req) => {
           return json(req, { error: "This account has already used or reserved the voucher." }, 400);
         }
 
-        if (Number(voucher.discount_percent) === 100 && purchaseScope !== "school") {
-          return json(req, { error: "A 100% offline-payment voucher can activate only a school purchase." }, 400);
+        if (Number(voucher.discount_percent) === 100 && voucher.purpose === "offline_payment" && purchaseScope !== "school") {
+          return json(req, { error: "This offline-payment voucher can activate only a school purchase." }, 400);
         }
         discountPercent = Number(voucher.discount_percent);
         discountPaise = Math.min(
@@ -217,7 +217,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const amountPaise = version.selling_price_paise - discountPaise;
+    let amountPaise = version.selling_price_paise - discountPaise;
+    let creditAppliedPaise = 0;
+    const useCredit = Boolean(body.use_evidara_credit) && purchaseScope === "student";
     const isZeroValueVoucher = amountPaise === 0 && Boolean(voucherId && discountPercent === 100);
     if (amountPaise < 100 && !isZeroValueVoucher) {
       return json(req, { error: "Final payable amount must be at least ₹1. Use a Super Admin 100% voucher for complimentary or offline-paid access." }, 400);
@@ -257,6 +259,24 @@ Deno.serve(async (req) => {
 
     if (insertError || !internalOrder) {
       return json(req, { error: insertError?.message ?? "Could not create internal order." }, 409);
+    }
+
+    if (useCredit && !isZeroValueVoucher) {
+      const { data: reservedCredit, error: creditError } = await admin.rpc("reserve_evidara_credit_for_order", {
+        p_order_id: internalOrder.id,
+        p_requested_paise: null,
+      });
+      if (creditError) {
+        await admin.from("orders").update({ status: "failed", failure_reason: creditError.message }).eq("id", internalOrder.id);
+        return json(req, { error: `Evidara credit could not be applied: ${creditError.message}` }, 409);
+      }
+      creditAppliedPaise = Number(reservedCredit || 0);
+      if (creditAppliedPaise > 0) {
+        const { data: creditedOrder, error: creditedOrderError } = await admin.from("orders").select("amount_paise,discount_paise").eq("id", internalOrder.id).single();
+        if (creditedOrderError || !creditedOrder) return json(req, { error: "Unable to confirm the credited order amount." }, 409);
+        amountPaise = Number(creditedOrder.amount_paise);
+        discountPaise = Number(creditedOrder.discount_paise);
+      }
     }
 
     if (isZeroValueVoucher) {
@@ -305,6 +325,7 @@ Deno.serve(async (req) => {
 
     const razorpayOrder = await razorpayResponse.json();
     if (!razorpayResponse.ok) {
+      if (creditAppliedPaise > 0) await admin.rpc("release_evidara_credit_reservation", { p_order_id: internalOrder.id });
       await admin
         .from("orders")
         .update({
@@ -331,6 +352,7 @@ Deno.serve(async (req) => {
       discount_paise: discountPaise,
       discount_percent: discountPercent,
       voucher_applied: Boolean(voucherId || legacyCouponId),
+      credit_applied_paise: creditAppliedPaise,
       customer: {
         name: user.user_metadata?.full_name ?? "",
         email: user.email ?? "",

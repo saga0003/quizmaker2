@@ -4,7 +4,7 @@ import { SystemReadinessDashboard } from "@/components/readiness/SystemReadiness
 
 export default function AdminReadinessPage() {
   return (
-    <ProtectedPage allowed="admin">
+    <ProtectedPage allowed="admin" superAdminOnly>
       <DashboardShell kind="admin">
         <SystemReadinessDashboard />
       </DashboardShell>

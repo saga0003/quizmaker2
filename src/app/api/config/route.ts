@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  EVIDARA_ACTIVE_MODULES,
+  EVIDARA_DEPLOYMENT_TARGET,
+  EVIDARA_INTERFACE,
+  EVIDARA_RELEASE,
+  EVIDARA_RETIRED_MODULES,
+} from "@/lib/release";
 
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -6,44 +13,26 @@ export async function GET() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const configured = Boolean(supabaseUrl && supabasePublicKey);
-  const serverReady = Boolean(configured && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const serverSecret = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serverReady = Boolean(configured && serverSecret);
 
   return NextResponse.json(
     {
-      release: "7.1.1",
+      release: EVIDARA_RELEASE,
       configured,
       serverReady,
       mode: !configured ? "interactive-demo" : serverReady ? "supabase" : "supabase-partial",
-      subscriptionModel: "annual-school",
-      deploymentTarget: "cloudflare-workers",
+      subscriptionModel: "annual-institution-unlimited-tests-students",
+      deploymentTarget: EVIDARA_DEPLOYMENT_TARGET,
       qaRelease: true,
-      interface: "v7-1-1-questions-final",
+      interface: EVIDARA_INTERFACE,
       publicKeyType: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
         ? "publishable"
         : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
           ? "anon"
           : null,
-      modules: [
-        "v7-interactive-interface",
-        "supabase-auth",
-        "question-bank",
-        "question-import-preflight",
-        "question-image-zip-import",
-        "question-import-undo-redo",
-        "question-error-navigation",
-        "question-bulk-delete-audit",
-        "protected-assessment-content",
-        "shared-benchmarks",
-        "achievements",
-        "verifiable-certificates",
-        "razorpay-commerce",
-        "percentage-vouchers",
-        "offline-payment-records",
-        "production-readiness-dashboard",
-        "migration-24-diagnostics",
-        "razorpay-test-mode-diagnostics",
-        "protected-route-smoke-checks",
-      ],
+      modules: EVIDARA_ACTIVE_MODULES,
+      retiredModules: EVIDARA_RETIRED_MODULES,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

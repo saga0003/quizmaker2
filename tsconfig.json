@@ -39,6 +39,9 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase/functions",
+    "_analytics_update_payload",
+    "backups",
+    "_institution_analytics_payload"
   ]
 }

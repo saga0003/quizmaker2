@@ -1,0 +1,506 @@
+
+> evidara-school-platform@19.1.0 qa:regression
+> node scripts/phase1-clean-school-ux-smoke.mjs && node scripts/phase1-launch-smoke.mjs && node scripts/institution-analytics-smoke.mjs && node scripts/phase1-increment3-smoke.mjs && node scripts/phase1-increment4-smoke.mjs && node scripts/phase1-increment5-8-smoke.mjs && node scripts/post8-public-student-smoke.mjs && node scripts/profile-authorization-smoke.mjs && node scripts/student-live-dashboard-resources-smoke.mjs && node scripts/v13-2-analytics-smoke.mjs && node scripts/v13-2-vercel-smoke.mjs && node scripts/v14-smoke.mjs && node scripts/v15-seo-smoke.mjs && node scripts/v16-neet-pyq-smoke.mjs && node scripts/v18-pyq-paper-engine-smoke.mjs && node scripts/v19-pyq-source-fidelity-smoke.mjs && node scripts/v19-1-latex-paper-import-smoke.mjs
+
+PASS AI helper exists in importer
+PASS AI helper is provider-independent
+PASS AI helper covers LaTeX
+PASS AI helper covers Excel/CSV
+PASS AI helper covers image ZIP workflow
+PASS import workflow communicates four steps
+PASS import can create a school paper
+PASS import calls atomic phase1 paper RPC
+PASS paper settings capture exam and grade
+PASS paper defaults can fill missing exam and grade
+PASS taxonomy warning is dynamic
+PASS missing institution subject directs to Academic Setup
+PASS atomic RPC reuses organization duplicates
+PASS atomic RPC adds new questions to bank
+PASS atomic RPC creates draft organization paper
+PASS atomic RPC creates paper sections
+PASS atomic RPC preserves paper question order
+PASS atomic RPC is not anonymous
+PASS school admin gets Academic Setup tab
+PASS academic setup supports institution subjects
+PASS academic setup supports bulk create
+PASS academic setup supports subject chapter topic
+PASS school taxonomy archives instead of hard deletes
+PASS school cannot manage other institution taxonomy
+PASS taxonomy parent IDs are school scoped
+PASS student table supports select all and selection
+PASS student bulk promotion requires confirmation
+PASS student edit drawer exists
+PASS student profile fields are editable
+PASS student account supports set password
+PASS student account supports generated temporary password
+PASS student removal is institution-only
+PASS teacher roster is read only
+PASS student writes require school manager
+PASS student writes stay organization scoped
+PASS student command helper returns action data safely
+PASS subscription is clean card UI
+PASS subscription presents unlimited school plan
+PASS subscription retains resource access
+PASS subscription contains no legacy ScholarOS branding
+
+Phase 1 Clean School UX smoke passed: 40/40 checks.
+PASS launch price is 15000
+PASS study resources remain enabled
+PASS student-store hidden for Phase 1
+PASS student-purchases hidden for Phase 1
+PASS student-referrals hidden for Phase 1
+PASS student-self-assessment hidden for Phase 1
+PASS school-store hidden for Phase 1
+PASS school-entitlements hidden for Phase 1
+PASS school-product-seats hidden for Phase 1
+PASS admin-products retained as super-admin-only
+PASS admin-referrals retained as super-admin-only
+PASS admin-self-assessment retained as super-admin-only
+PASS direct workspace URLs use Phase 1 policy
+PASS desktop nav uses Phase 1 policy
+PASS mobile nav uses Phase 1 policy
+PASS student study resources retained on desktop
+PASS school study resources retained on desktop
+PASS landing shows Rs 15,000 annual price
+PASS landing sells unlimited students
+PASS landing sells unlimited tests
+PASS landing keeps study resources in offer
+PASS simple importer title
+PASS simple choose file action
+PASS taxonomy assistance preserved
+PASS image ZIP support preserved
+PASS src/app/products/page.tsx gated
+PASS src/app/products/[slug]/page.tsx gated
+PASS src/app/test-series/page.tsx gated
+PASS src/app/test-series/[slug]/page.tsx gated
+PASS src/app/question-papers/page.tsx gated
+PASS src/app/question-papers/[slug]/page.tsx gated
+PASS src/app/questions/[slug]/page.tsx gated
+PASS src/app/practice/[exam]/[subject]/[chapter]/[topic]/page.tsx gated
+PASS src/app/trial/page.tsx gated
+PASS readiness UI super-admin-only
+PASS PYQ manager super-admin-only
+PASS PYQ occurrence editor super-admin restricted
+PASS anonymous product catalogue RPC is parked
+PASS anonymous SEO question RPC is parked
+PASS future public restore helper is retained
+PASS robots hide parked public engines
+PASS sitemap no longer exposes parked engines
+
+Phase 1 launch smoke: 42 passed, 0 failed.
+✓ package is current Evidara V19
+✓ institution analytics API exists
+✓ institution analytics workspace exists
+✓ report-card generator exists
+✓ hardcoded institution demonstration source is removed
+✓ workspace has no institution demo import
+✓ known fake St Marys section ID is absent
+✓ all drill-down levels are typed
+✓ school rows expose live organization status
+✓ API authenticates every request
+✓ students are denied institution analytics
+✓ platform roles are recognised
+✓ school users are restricted to their organization
+✓ teachers are restricted to assigned sections
+✓ teachers are restricted to assigned subjects
+✓ class IDs are validated before UUID queries
+✓ pending and active schools are live while suspended schools are excluded
+✓ class list uses real academic section UUIDs
+✓ student membership is organization scoped
+✓ attempt evidence uses submitted tests only
+✓ response evidence joins live question taxonomy
+✓ all institution API payloads are live
+✓ zero-attempt schools retain live records
+✓ zero-attempt classes retain live rosters
+✓ workspace shows honest live empty evidence
+✓ workspace never swaps zero evidence for demo schools
+✓ student drill-down embeds full analytics workspace
+✓ embedded student workspace has all seven analytics views
+✓ embedded school analytics starts from empty live evidence
+✓ analytics RPC errors clear stale payloads
+✓ no real-student benchmark fallback remains
+✓ student analytics uses live evidence RPC
+✓ student embedded navigation has isolated styling
+✓ admin school ranking table exists
+✓ school analytics starts at class list
+✓ subject and chapter diagnostics remain present
+✓ search, filter and sortable headers remain present
+✓ class and school downloads remain present
+✓ report downloads do not reveal server secrets
+✓ institution CSS remains isolated
+✓ admin analytics view remains registered
+✓ admin and school sidebars retain analytics routes
+✓ student analytics remains available to students
+✓ question select-all column remains compact
+✓ question serial number column remains fixed
+✓ temporary installer payload is excluded from TypeScript
+✓ old institution installer payload is absent after installation
+✓ live-fix installer payload is absent after installation
+
+Evidara live institution analytics checks passed (48 checks).
+PASS authoritative submit RPC remains the submission boundary
+PASS result is committed before optional reflection renders
+PASS post-test reflection is connected only inside the successful result branch
+PASS result navigation remains available independently of reflection
+PASS student can explicitly pause reflection
+PASS student can skip an individual reflection item
+PASS reflection load failure has retry and finish actions
+PASS reflection explains that scoring is unaffected
+PASS existing reflections resume from the first incomplete item
+PASS results view exposes a safe resume path
+PASS queue RPC verifies attempt ownership
+PASS queue RPC verifies submitted status
+PASS save RPC verifies response ownership through its attempt
+PASS save RPC verifies submitted status
+PASS classification values use the database enum contract
+PASS retry is idempotent through response-id upsert
+PASS reflection save only targets the reflection table
+PASS real student analytics no longer calls benchmark bridge
+PASS real student analytics has no embedded demo payload
+PASS no-evidence analytics are explicit
+PASS question detail does not fabricate unavailable rows
+PASS hard-coded practice counts are removed
+PASS isolated SQL test covers: student classifying another student response
+PASS isolated SQL test covers: student classifying an unsubmitted response
+PASS isolated SQL test covers: unsupported classification value
+PASS isolated SQL test covers: retry created a duplicate reflection row
+PASS isolated SQL test covers: reflection altered the authoritative attempt result
+PASS isolated SQL test covers: reflection altered the authoritative answer/outcome
+PASS isolated SQL test covers: saved reflection cannot be safely resumed
+
+Phase 1 Increment 3 smoke passed (29 checks).
+PASS the active school roster renders the reusable lifecycle manager
+PASS the active school roster no longer references synthetic students
+PASS the lifecycle manager explicitly disables demo fallback
+PASS the lifecycle manager has loading, unavailable, empty, retry, and permission states
+PASS teacher UI explains assigned-section read-only scope
+PASS student invitation and lifecycle statuses are represented honestly
+PASS manager actions retain add, edit, password, promotion, track and revocation behavior
+PASS dangerous lifecycle actions use explicit confirmation dialogs
+PASS desktop roster is responsive and exposes an explicit empty state
+PASS narrow roster view collapses the existing sidebar without redesigning it
+PASS cloud failures retain status for explicit permission handling
+PASS school context derives staff access from active membership role
+PASS school context no longer grants roster scope from profile school role alone
+PASS teacher/admin roster names come from the scoped database DTO
+PASS the client-supplied organization remains platform-admin-only
+PASS staff roster does not use a service-role organization-wide membership read
+PASS lifecycle writes use the checked V13 RPCs
+PASS server-side profile writes remain manager-only and organization scoped
+PASS membership RLS limits teachers through active assignments and active membership
+PASS membership writes use the strict Evidara school-manager helper
+PASS authenticated clients cannot mutate membership rows directly
+PASS roster function uses auth uid and derives an authorized organization
+PASS roster function returns manager or assigned-section scope
+PASS teacher parent data is omitted from the roster DTO
+PASS roster DTO returns no email, profile role, or auth metadata keys
+PASS legacy teacher-permissive lifecycle RPC execution is revoked
+PASS new roster and lifecycle RPCs are authenticated-only
+PASS isolated SQL test covers: School Admin could not access the complete own-organization roster
+PASS isolated SQL test covers: School Admin accessed another organization roster
+PASS isolated SQL test covers: teacher received organization-wide or incorrect roster data
+PASS isolated SQL test covers: student opened the institution roster
+PASS isolated SQL test covers: inactive teacher membership opened the roster
+PASS isolated SQL test covers: teacher used an arbitrary organization identifier
+PASS isolated SQL test covers: School Admin changed a cross-organization student by membership id
+PASS isolated SQL test covers: roster DTO exposed privileged or unrelated profile/security fields
+PASS isolated SQL test covers: authorized roster mutation was not audited
+
+Phase 1 Increment 4 smoke passed (36 checks).
+PASS 1: institution resources use live ResourceLibrary
+PASS 2: institution subscription uses live SubscriptionCenter
+PASS 3: school dashboard fails closed without demo fallback
+PASS 4: resource library uses V14 structured manager
+PASS 5: resource UI delegates ownership rendering to V14 manager
+PASS 6: institution resource API remains organization scoped
+PASS 7: institution resources can only be removed in their own organization
+PASS 8: resource migration adds organization ownership
+PASS 9: historic resources are preserved as platform resources
+PASS 10: student resource predicate enforces scope
+PASS 11: subscription center contains no ScholarOS branding
+PASS 12: admin command center uses authenticated live endpoint
+PASS 13: admin command center no longer imports demo-data
+PASS 14: admin dashboard removed fake operational claims as state
+PASS 15: admin subscription rows come from platform overview
+PASS 16: platform overview is restricted to platform admins
+PASS 17: platform revenue comes from paid orders
+PASS 18: public setup diagnostic pages are absent
+Phase 1 Increment 5-8 smoke passed (18/18).
+PASS Phase 1 landing does not link parked public store
+PASS landing no fake 60+ schools
+PASS landing no fake school pricing
+PASS Phase 1 landing does not market independent-student commerce
+PASS store captures ref parameter
+PASS store claims referral before checkout
+PASS referral center uses server summary
+PASS referral share link uses /products
+PASS student sidebar has referrals
+PASS app routes referral center
+PASS referral self-use blocked
+PASS referral only before first paid purchase
+PASS qualifying threshold is ₹1000
+PASS reward is ₹100 each
+PASS reward trigger waits for paid order
+PASS institution purchase excluded from referral
+PASS staging table hardened
+PASS auth trigger rpc exposure revoked
+
+18/18 passed
+PASS 1: historical broad profile update policy is removed
+PASS 2: replacement update policy is self-row-only
+PASS 3: broad authenticated UPDATE is revoked
+PASS 4: only reviewed personal fields receive UPDATE
+PASS 5: role is not included in the authenticated column grant
+PASS 6: database trigger rejects direct client role changes
+PASS 7: audited server role RPC is service-role-only
+PASS 8: audited server role RPC revalidates the Super Admin actor
+PASS 9: role audit captures API actor and source
+PASS 10: Access Control API uses the audited V14 role RPC
+PASS 11: Access Control API no longer directly updates profiles.role
+PASS 12: school registration remains pending without changing profiles.role
+PASS 13: student invitation does not overwrite an existing profile role
+PASS 14: demo provisioning delegates role changes to role RPCs
+PASS 15: database test covers 'student to school_teacher'
+PASS 16: database test covers 'student to school_admin'
+PASS 17: database test covers 'student to evidara_admin'
+PASS 18: database test covers 'student to super_admin'
+PASS 19: database test covers 'school teacher self-promotion'
+PASS 20: database test covers 'school admin to platform role'
+PASS 21: database test covers expect_other_profile_denied
+PASS 22: database test covers full_name = 'Updated Student'
+PASS 23: database test covers expect_role_rpc_denied
+PASS 24: database test covers school registration changed the student profile role
+PASS 25: database test covers access_control_api
+Profile authorization smoke passed (25/25).
+PASS 1: dashboard does not import the demo-data module
+PASS 2: dashboard reads authorized available papers
+PASS 3: dashboard reads the current student attempt history
+PASS 4: dashboard reads self-scoped entitlements
+PASS 5: dashboard has explicit loading, error, unavailable, and no-attempt states
+PASS 6: dashboard does not render removed synthetic metrics
+PASS 7: dashboard collapses the existing sidebar at narrow widths
+PASS 8: active student resources use the existing ResourceLibrary
+PASS 9: active student resources no longer use demoResources
+PASS 10: student resources collapse the existing sidebar at narrow widths
+PASS 11: student resource mode uses the V14 fail-closed manager
+PASS 12: student resources route through structured V14 resource manager
+PASS 13: school platform hook retains live-only mode
+PASS 14: student organization fallback requires an active membership
+PASS 15: student snapshot requires the current user and active membership
+PASS 16: student resources are filtered server-side before serialization
+PASS 17: student content URLs are serialized only from the filtered resource set
+PASS 18: client organizationId is accepted only for a platform admin
+PASS 19: broad authenticated resource table reads are removed
+PASS 20: direct resource eligibility checks cannot impersonate another student
+PASS 21: clients cannot execute the arbitrary-student eligibility helper
+PASS 22: the student resource RPC remains self-scoped and authenticated-only
+Student live dashboard/resources smoke passed (22/22).
+✓ package is current Evidara V19
+✓ analytics QA targets the V13.2 smoke suite
+✓ central release metadata is V19
+✓ deployment target is Vercel + Supabase
+✓ root workspace loads the evidence analytics application
+✓ student analytics hierarchy is routed
+✓ school analytics hierarchy is routed
+✓ overview analytics exists
+✓ subject analytics exists
+✓ chapter analytics exists
+✓ topic analytics exists
+✓ question intelligence exists
+✓ revision priorities exists
+✓ test history exists
+✓ live evidence analytics RPC is used
+✓ topic confidence/reflection analytics is connected
+✓ unavailable question intelligence is labelled honestly
+✓ fabricated sub-concept mastery is not shown
+✓ real student analytics does not call the benchmark bridge
+✓ real student analytics has no embedded demo payload
+✓ real student analytics has an honest no-evidence state
+✓ workspace view exists: student-analytics-overview
+✓ workspace view exists: student-analytics-subject
+✓ workspace view exists: student-analytics-chapter
+✓ workspace view exists: student-analytics-topic
+✓ workspace view exists: student-analytics-question-intelligence
+✓ workspace view exists: student-analytics-priorities
+✓ workspace view exists: student-analytics-history
+✓ workspace view exists: school-analytics-overview
+✓ workspace view exists: school-analytics-subject
+✓ workspace view exists: school-analytics-chapter
+✓ workspace view exists: school-analytics-topic
+✓ workspace view exists: school-analytics-question-intelligence
+✓ workspace view exists: school-analytics-priorities
+✓ workspace view exists: school-analytics-history
+✓ analytics Overview navigation exists
+✓ Subject Analysis navigation exists
+✓ Chapter Analysis navigation exists
+✓ Topic Analysis navigation exists
+✓ Question Intelligence opens from Topic Analysis
+✓ Revision Priorities navigation exists
+✓ Test History navigation exists
+✓ evidence analytics database migration is included
+✓ topic confidence migration is included
+✓ explicitly labelled isolated benchmark bridge remains available for test mode
+✓ post-test confidence/reflection UI is included
+✓ post-test reflection is connected after live submission
+
+Evidara V14 analytics checks passed (47 checks).
+✓ release version is 19.1.0
+✓ Next.js framework is selected
+✓ Git automatic deployment is not blocked
+✓ Vercel build uses npm run build
+✓ Cloudflare build script is removed
+✓ Vercel production command exists
+✓ local environment validator exists
+✓ environment template exists
+✓ server secret is not public
+✓ V13.2 analytics smoke exists
+✓ obsolete release installer is absent
+✓ Cloudflare configuration is absent
+
+Evidara V19 Vercel checks passed (12 checks).
+PASS 1: current package release is V19
+PASS 2: release metadata is V19
+PASS 3: student sidebar exposes Results
+PASS 4: student sidebar exposes Self Assessment
+PASS 5: student sidebar contains Refer & Earn
+PASS 6: school-enrolled students are excluded from public referral promotion
+PASS 7: teacher question label is My Questions
+PASS 8: teacher dashboard is live scoped
+PASS 9: school student lifecycle exposes bulk CSV mapper
+PASS 10: bulk account API uses V14 scoped account creation
+PASS 11: account directory uses server-safe V14 RPC
+PASS 12: question bank implements teacher own-question scope
+PASS 13: Evidara Admin does not publish platform questions directly
+PASS 14: paper catalogue has Super Admin publication governance
+PASS 15: hierarchical resource manager exists
+PASS 16: resource API uploads to R2
+PASS 17: student/school resource hierarchy is shared
+PASS 18: super admin resource inventory exists
+PASS 19: institutions module exists
+PASS 20: referral settings view exists
+PASS 21: self assessment center uses V14 wallet
+PASS 22: self assessment generation uses V14 server RPC
+PASS 23: self assessment supports multi-select scopes without exposing exam distribution
+PASS 24: self assessment uses focused UI caps
+PASS 25: platform aggregate revenue is Super Admin only
+PASS 26: V14 routes are connected in root workspace
+V14 smoke passed (26/26).
+PASS 1: dynamic product route exists
+PASS 2: public product index exists
+PASS 3: solved question route exists
+PASS 4: question paper hub exists
+PASS 5: question paper detail route exists
+PASS 6: topic hub route exists
+PASS 7: dynamic sitemap exists
+PASS 8: robots metadata exists
+PASS 9: product editor has SEO tab
+PASS 10: product editor saves SEO separately
+PASS 11: question SEO gate requires approval
+PASS 12: question SEO gate requires answer
+PASS 13: question SEO gate requires solution
+PASS 14: public question RPC exposes only SEO-published platform questions
+PASS 15: published product RPC drives public page
+PASS 16: paper library RPC exists
+V15 SEO smoke passed (16/16).
+PASS 1: package release is 19.1.0
+PASS 2: release metadata is Evidara V19
+PASS 3: V15 dynamic SEO remains installed
+PASS 4: NEET importer component exists
+PASS 5: question bank opens the NEET importer
+PASS 6: V19 importer goes directly to Question Bank In Review
+PASS 7: promote flow remains In Review
+PASS 8: route calls V16 staging RPC
+PASS 9: migration creates V16 staging RPC
+PASS 10: staging RPC is service-role only
+V16 smoke passed (10/10).
+PASS exists supabase/migrations/20260810221500_expand_neet_taxonomy_v17.sql
+PASS exists supabase/migrations/20260810222500_add_neet_animal_kingdom_taxonomy_v17.sql
+PASS exists supabase/migrations/20260810223200_neet_pyq_taxonomy_enrichment_v17.sql
+PASS exists supabase/migrations/20260810223400_fix_neet_taxonomy_enrichment_immutable_v17.sql
+PASS exists supabase/migrations/20260814100000_pyq_paper_occurrence_engine_v18.sql
+PASS exists supabase/migrations/20260814103000_paper_file_import_engine_v18.sql
+PASS exists supabase/migrations/20260814104500_pyq_paper_readiness_v18.sql
+PASS exists supabase/migrations/20260814105000_commerce_pyq_paper_metadata_v18.sql
+PASS exists supabase/migrations/20260814105500_pyq_builder_occurrence_source_v18.sql
+PASS exists supabase/migrations/20260814110000_manual_paper_pyq_identity_v18.sql
+PASS exists supabase/migrations/20260814110500_paper_import_section_subject_guard_v18.sql
+PASS exists supabase/migrations/20260814111000_paper_publish_question_gate_v18.sql
+PASS exists templates/paper-import/PAPER_IMPORT_TEMPLATE_V18.json
+PASS exists templates/paper-import/PAPER_IMPORT_TEMPLATE_V18.tex
+PASS exists src/app/api/admin/pyq-paper-sources/route.ts
+PASS exists src/app/api/admin/paper-file-import/route.ts
+PASS exists src/components/evidara/pyq-paper-manager.tsx
+PASS exists src/components/evidara/paper-file-import-dialog.tsx
+PASS Question types expose PYQ occurrences
+PASS Question editor can add multiple PYQ occurrences
+PASS Question occurrence captures variant/code/question number
+PASS Prepared PYQ import registers source paper
+PASS Promotion registers question occurrence
+PASS PYQ promotion reuses exact duplicate questions
+PASS Paper catalogue exposes exact PYQ builder
+PASS Paper catalogue exposes paper import
+PASS Paper list shows PYQ year/variant
+PASS Manual paper builder can assign official PYQ identity
+PASS Paper file import parses JSON and LaTeX
+PASS Exact duplicates automatically reuse
+PASS Near duplicates require manual review
+PASS Duplicate review offers keep both
+PASS Product paper picker filters PYQ
+PASS Product paper picker displays PYQ metadata
+PASS DB has source papers and occurrence tables
+PASS DB exact builder exists
+PASS Atomic paper import service exists
+PASS File import reuses exact hash before insert
+PASS Manual PYQ identity maps selected paper questions to occurrences
+PASS V18 ships JSON and LaTeX paper templates
+PASS Paper publish gate blocks unapproved questions and refreshes snapshots
+
+V18 PYQ/Paper Engine: 41 passed, 0 failed
+PASS package release is 19.1.0
+PASS central release metadata is Evidara V19
+PASS source fidelity renderer exists
+PASS renderer supports physically separated standalone assets
+PASS importer exposes V19 folder workflow
+PASS importer uploads required shared assets
+PASS importer performs direct Question Bank import
+PASS asset upload is Super Admin protected
+PASS asset route requires assets-relative paths
+PASS R2 V19 upload helper exists
+PASS V19 R2 keys are deterministic
+PASS direct importer requires V19 package
+PASS direct importer requires prompt and solution assets
+PASS direct importer creates questions In Review
+PASS direct importer preserves PYQ occurrences
+PASS direct importer resolves chapter and topic taxonomy
+PASS question review renders source-fidelity prompt/solution
+PASS question review retains Edit and filtered navigation
+PASS device preview does not duplicate native content for source-fidelity
+PASS live exam supports source-fidelity questions
+PASS paper preview supports source-fidelity snapshots
+PASS public SEO question page supports source-fidelity visuals
+PASS native math sizing is harmonized with Evidara
+PASS SEO publication gate requires complete V19 assets
+PASS V19 migration returns metadata to public question renderer
+
+V19 Source-Fidelity PYQ Engine: 25 passed, 0 failed
+PASS package release is 19.1.0
+PASS central release metadata is V19.1
+PASS typecheck hotfix from V19.0.1 is merged
+PASS NatSciX-style LaTeX paper package parser exists
+PASS parser supports paper identity headers
+PASS parser supports ZIP image assets
+PASS parser enforces one paper source per package
+PASS question/option LaTeX fields are produced independently
+PASS original question numbering is retained
+PASS paper importer accepts LaTeX ZIP packages
+PASS paper importer creates paper and questions together
+PASS duplicate preview is batched safely
+PASS paper import preview renders text, LaTeX and images
+PASS mixed inline/display KaTeX renderer exists
+PASS learner exam renders text plus dedicated LaTeX
+PASS paper preview renders rich math content
+PASS device preview renders rich math content
+PASS paper template is bundled
+PASS AI conversion prompt is bundled
+
+Evidara V19.1 LaTeX Paper Import: 19 passed, 0 failed

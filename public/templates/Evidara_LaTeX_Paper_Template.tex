@@ -1,0 +1,83 @@
+% Evidara V19.1 — one year / one paper / one set per file (or ZIP)
+% Put any referenced images in the same ZIP, for example images/q001.png.
+
+\paper{NEET 2026 Main Paper}
+\exam{NEET}
+\year{2026}
+\variant{Main}
+\code{NEET-2026-MAIN}
+\duration{180}
+\grade{Grade 11-12}
+\pyq{true}
+\sourcekey{NEET_2026_MAIN}
+\description{NEET 2026 previous-year question paper.}
+\instructions{Attempt the paper according to the original examination pattern.}
+
+\begin{question}
+\id{NEET-2026-Q001}
+\number{1}
+\section{Physics}
+\subject{Physics}
+\chapter{Units and Measurements}
+\topic{Dimensional Analysis}
+\questiontype{single_correct}
+\difficulty{moderate}
+\stem{The dimensions of Planck's constant are the same as the dimensions of $X$. Identify $X$.}
+\option{A}{Force}
+\option{B}{Angular momentum}
+\option{C}{Power}
+\option{D}{Pressure}
+\answer{B}
+\solution{Planck's constant has dimensions $ML^2T^{-1}$, which are the dimensions of angular momentum.}
+\marks{4}{1}
+\end{question}
+
+\begin{question}
+\id{NEET-2026-Q002}
+\number{2}
+\section{Physics}
+\subject{Physics}
+\chapter{Motion in a Straight Line}
+\topic{Kinematics}
+\questiontype{single_correct}
+\difficulty{moderate}
+\stem{A particle starts with velocity $u$ and moves with uniform acceleration $a$ for time $t$. Its final velocity is}
+\option{A}{$v=u-at$}
+\option{B}{$v=u+at$}
+\option{C}{$v=ut+a$}
+\option{D}{$v=u+a/t$}
+\answer{B}
+\solution{For constant acceleration, \(a=\frac{v-u}{t}\), therefore \(v=u+at\).}
+\marks{4}{1}
+\end{question}
+
+\begin{question}
+\id{NEET-2026-Q003}
+\number{3}
+\section{Chemistry}
+\subject{Chemistry}
+\chapter{Chemical Bonding}
+\topic{Molecular Geometry}
+\questiontype{single_correct}
+\difficulty{moderate}
+\stem{Use the molecular diagram below and choose the correct geometry. \includegraphics{images/q003.png}}
+\option{A}{Linear}
+\option{B}{Trigonal planar}
+\option{C}{Tetrahedral}
+\option{D}{Octahedral}
+\answer{C}
+\solution{Count the electron domains around the central atom and apply VSEPR theory.}
+\marks{4}{1}
+\end{question}
+
+% If a question is entirely mathematical, use an explicit LaTeX block:
+% \begin{question}
+% \number{4}
+% \section{Physics}
+% \subject{Physics}
+% \questiontype{numerical}
+% \latex{\frac{1}{R}=\frac{1}{R_1}+\frac{1}{R_2}}
+% \numericalanswer{5}
+% \solution{Use the parallel-resistance relation.}
+% \marks{4}{0}
+% \end{question}

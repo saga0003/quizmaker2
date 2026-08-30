@@ -1,0 +1,11 @@
+import { requirePhase1PublicFeature } from '@/lib/phase1PublicGate';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { PublicSeoShell } from '@/components/seo/PublicSeoShell';
+import { publicRpc, SITE_URL } from '@/lib/seo-public';
+
+export const dynamic='force-dynamic';
+const norm=(v:string)=>decodeURIComponent(v).replaceAll('-',' ').toLowerCase();
+type Q={slug:string;exam_type?:string;subject?:string;chapter?:string;topic?:string;source_year?:number};
+export async function generateMetadata({params}:{params:Promise<{exam:string;subject:string;chapter:string;topic:string}>}):Promise<Metadata>{const p=await params;const title=`${norm(p.topic).replace(/\b\w/g,x=>x.toUpperCase())} Questions for ${norm(p.exam).toUpperCase()} | Evidara`;return{title,description:`Solved ${norm(p.topic)} questions organised by subject and chapter for ${norm(p.exam)} practice.`,alternates:{canonical:`${SITE_URL}/practice/${p.exam}/${p.subject}/${p.chapter}/${p.topic}/`}}}
+export default async function Page({params}:{params:Promise<{exam:string;subject:string;chapter:string;topic:string}>}){requirePhase1PublicFeature('publicPractice');const p=await params;const all=await publicRpc<Q[]>('list_public_seo_questions_v15',{p_limit:5000,p_offset:0})||[];const match=all.filter(q=>norm(q.exam_type||'')===norm(p.exam)&&norm(q.subject||'')===norm(p.subject)&&norm(q.chapter||'')===norm(p.chapter)&&norm(q.topic||'')===norm(p.topic));return <PublicSeoShell><section className="mx-auto max-w-5xl px-5 py-12"><h1 className="text-4xl font-extrabold">{norm(p.topic).replace(/\b\w/g,x=>x.toUpperCase())} solved questions</h1><p className="mt-3 text-[#65757C]">{norm(p.exam).toUpperCase()} · {norm(p.subject)} · {norm(p.chapter)}</p><div className="mt-8 grid gap-3">{match.map((q,i)=><Link key={q.slug} href={`/questions/${q.slug}/`} className="rounded-xl border border-[#DCE5E2] bg-white p-5"><b>Question {i+1}</b>{q.source_year?<span className="ml-3 text-sm text-[#65757C]">{q.source_year}</span>:null}<span className="float-right font-semibold text-[var(--teal)]">Solution →</span></Link>)}</div>{!match.length&&<p className="mt-8 rounded-xl bg-white p-6 text-[#65757C]">Solved questions will appear here automatically once approved and SEO-ready.</p>}</section></PublicSeoShell>}

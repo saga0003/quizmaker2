@@ -1,12 +1,13 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Laptop, Smartphone, Tablet } from 'lucide-react';
-import { BlockMath, InlineMath } from 'react-katex';
+import { RichQuestionContent, RichOptionContent, MixedMathText } from '@/components/evidara/rich-math-content';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { QuestionOptionInput, QuestionType } from '@/types/questions';
+import type { QuestionOptionInput, QuestionType, SourceFidelityRender } from '@/types/questions';
+import { SourceFidelityContent } from '@/components/evidara/source-fidelity-content';
 
 export type QuestionPreviewValue = {
   stemText: string;
@@ -21,10 +22,10 @@ export type QuestionPreviewValue = {
   topic?: string;
   difficulty?: string;
   showCorrectAnswer?: boolean;
+  sourceFidelity?: SourceFidelityRender | null;
 };
 
 type DeviceMode = 'mobile' | 'tablet' | 'laptop';
-type MathToken = { type: 'text' | 'inline' | 'block'; value: string };
 
 const widths: Record<DeviceMode, string> = {
   mobile: 'max-w-[390px]',
@@ -32,137 +33,10 @@ const widths: Record<DeviceMode, string> = {
   laptop: 'max-w-[1080px]',
 };
 
-function isEscaped(source: string, index: number) {
-  let slashCount = 0;
-  for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor -= 1) slashCount += 1;
-  return slashCount % 2 === 1;
-}
-
-function stripSourceImageMarkup(source: string) {
-  return source
-    .replace(/\\par\\begin\{center\}[\s\S]*?\\end\{center\}\\par/g, '')
-    .replace(/\\textit\{Question image:\}\s*\\+url\{[^}]+\}/g, '')
-    .trim();
-}
-
-function tokenizeDelimitedMath(source: string): MathToken[] {
-  const tokens: MathToken[] = [];
-  let textStart = 0;
-  let cursor = 0;
-
-  while (cursor < source.length) {
-    if (source[cursor] !== '$' || isEscaped(source, cursor)) {
-      cursor += 1;
-      continue;
-    }
-
-    const block = source[cursor + 1] === '$' && !isEscaped(source, cursor + 1);
-    const delimiter = block ? '$$' : '$';
-    const contentStart = cursor + delimiter.length;
-    let closing = contentStart;
-
-    while (closing < source.length) {
-      if (source.startsWith(delimiter, closing) && !isEscaped(source, closing)) break;
-      closing += 1;
-    }
-
-    if (closing >= source.length) {
-      cursor += delimiter.length;
-      continue;
-    }
-
-    if (cursor > textStart) tokens.push({ type: 'text', value: source.slice(textStart, cursor) });
-    tokens.push({ type: block ? 'block' : 'inline', value: source.slice(contentStart, closing).trim() });
-    cursor = closing + delimiter.length;
-    textStart = cursor;
-  }
-
-  if (textStart < source.length) tokens.push({ type: 'text', value: source.slice(textStart) });
-  return tokens;
-}
-
-function looksLikePlainSentence(source: string) {
-  const withoutCommands = source.replace(/\\[A-Za-z]+/g, ' ');
-  return /(?:^|\s)[A-Za-z]{3,}(?:\s+[A-Za-z]{3,}){1,}/.test(withoutCommands);
-}
-
-function LooseLatexContent({ source }: { source: string }) {
-  return (
-    <>
-      {source.split(/(\s+)/).map((part, index) => {
-        if (!part) return null;
-        if (/^\s+$/.test(part)) return <Fragment key={`${index}-space`}>{part}</Fragment>;
-        const mathematical = /\\[A-Za-z]+|\\_|[_^{}]/.test(part);
-        return mathematical
-          ? <InlineMath key={`${index}-math`} math={part} />
-          : <Fragment key={`${index}-text`}>{part}</Fragment>;
-      })}
-    </>
-  );
-}
-
-export function RichMathContent({
-  text,
-  latex,
-  mode = 'block',
-  className,
-}: {
-  text?: string | null;
-  latex?: string | null;
-  mode?: 'inline' | 'block';
-  className?: string;
-}) {
-  const latexSource = stripSourceImageMarkup(latex?.trim() || '');
-  const plainSource = stripSourceImageMarkup(text?.trim() || '');
-  const source = latexSource || plainSource;
-  const tokens = useMemo(() => tokenizeDelimitedMath(source), [source]);
-  const hasDelimitedMath = tokens.some((token) => token.type !== 'text');
-
-  if (!source) return null;
-  if (!latexSource) return <div className={cn('whitespace-pre-wrap', className)}>{plainSource}</div>;
-
-  if (hasDelimitedMath) {
-    return (
-      <div className={cn('whitespace-pre-wrap', className)}>
-        {tokens.map((token, index) => {
-          if (token.type === 'text') return <Fragment key={`${index}-text`}>{token.value}</Fragment>;
-          if (token.type === 'block') return <div key={`${index}-block`} className="my-2 overflow-x-auto"><BlockMath math={token.value} /></div>;
-          return <InlineMath key={`${index}-inline`} math={token.value} />;
-        })}
-      </div>
-    );
-  }
-
-  if (mode === 'inline') {
-    return <div className={cn('overflow-x-auto', className)}><InlineMath math={latexSource} /></div>;
-  }
-
-  if (looksLikePlainSentence(latexSource)) {
-    return <div className={cn('whitespace-pre-wrap', className)}><LooseLatexContent source={latexSource} /></div>;
-  }
-
-  return <div className={cn('overflow-x-auto', className)}><BlockMath math={latexSource} /></div>;
-}
-
 function OptionContent({ option }: { option: QuestionOptionInput }) {
-  const text = option.content_text?.trim() || '';
-  const latex = option.content_latex?.trim() || '';
-
-  return (
-    <div className="min-w-0 flex-1">
-      {latex
-        ? <RichMathContent latex={latex} mode="inline" className="text-sm leading-relaxed text-[#14232B]" />
-        : text && <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#14232B]">{text}</p>}
-      {option.image_url && (
-        <img
-          src={option.image_url}
-          alt={`Option ${option.option_key}`}
-          className="mt-2 max-h-40 max-w-full rounded-lg border border-[#E7ECEB] object-contain"
-        />
-      )}
-    </div>
-  );
+  return <RichOptionContent text={option.content_text} latex={option.content_latex} imageUrl={option.image_url} imageAlt={`Option ${option.option_key}`} />;
 }
+
 
 export function QuestionDevicePreview({
   value,
@@ -175,6 +49,8 @@ export function QuestionDevicePreview({
 }) {
   const [device, setDevice] = useState<DeviceMode>(initialDevice);
   const usableOptions = value.options.filter((option) => option.content_text || option.content_latex || option.image_url);
+  const sourceFidelity = value.sourceFidelity?.mode === 'source_fidelity' ? value.sourceFidelity : null;
+  const pageSize = sourceFidelity?.source_pdf_page_size || [612, 792];
 
   return (
     <div className="space-y-3">
@@ -215,50 +91,44 @@ export function QuestionDevicePreview({
               {value.difficulty && <Badge variant="outline" className="border-[#E7ECEB] text-[#6B7980]">{value.difficulty.replaceAll('_', ' ')}</Badge>}
             </div>
 
-            {value.passageText && (
-              <div className="mb-4 rounded-xl border border-[#E7ECEB] bg-[#F7F9F7] p-4 text-sm leading-relaxed text-[#14232B] whitespace-pre-wrap">
-                {value.passageText}
-              </div>
-            )}
-
-            <RichMathContent
-              text={value.stemText || 'Your question will appear here as you type.'}
-              latex={value.stemLatex}
-              className="text-base font-medium leading-relaxed text-[#14232B]"
-            />
-            {value.imageUrl && (
-              <img
-                src={value.imageUrl}
-                alt="Question attachment"
-                className="mx-auto mt-4 max-h-80 max-w-full rounded-xl border border-[#E7ECEB] object-contain"
-              />
-            )}
-
-            {usableOptions.length > 0 && (
-              <div className="mt-5 space-y-2.5">
-                {usableOptions.map((option) => (
-                  <div
-                    key={option.option_key}
-                    className={cn(
-                      'flex items-start gap-3 rounded-xl border p-3.5',
-                      value.showCorrectAnswer && option.is_correct
-                        ? 'border-[#0E5A5A] bg-[#DCE9E7]/45'
-                        : 'border-[#E7ECEB] bg-white',
-                    )}
-                  >
-                    <span className={cn(
-                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-bold',
-                      value.showCorrectAnswer && option.is_correct
-                        ? 'border-[#0E5A5A] bg-[#0E5A5A] text-white'
-                        : 'border-[#D0D8D6] text-[#14232B]',
-                    )}>
-                      {option.option_key}
-                    </span>
-                    <OptionContent option={option} />
-                    {value.showCorrectAnswer && option.is_correct && <CheckCircle2 className="h-5 w-5 shrink-0 text-[#0E5A5A]" />}
+            {sourceFidelity ? (
+              <>
+                <div className="rounded-xl border border-[#E7ECEB] bg-white p-2 sm:p-3">
+                  <SourceFidelityContent segments={sourceFidelity.prompt_segments} pageSize={pageSize} label="Source-faithful question and options" />
+                </div>
+                {usableOptions.length > 0 && (
+                  <div className="mt-4 grid grid-cols-4 gap-2" aria-label="Answer choices">
+                    {usableOptions.map((option, index) => (
+                      <div key={option.option_key} className={cn(
+                        'flex min-h-11 items-center justify-center rounded-xl border text-sm font-bold',
+                        value.showCorrectAnswer && option.is_correct ? 'border-[#0E5A5A] bg-[#DCE9E7]/55 text-[#0E5A5A]' : 'border-[#E7ECEB] bg-white text-[#14232B]',
+                      )}>
+                        {index + 1}{value.showCorrectAnswer && option.is_correct && <CheckCircle2 className="ml-1.5 h-4 w-4" />}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
+            ) : (
+              <>
+                {value.passageText && (
+                  <div className="mb-4 rounded-xl border border-[#E7ECEB] bg-[#F7F9F7] p-4 text-sm leading-relaxed text-[#14232B] whitespace-pre-wrap">
+                    <MixedMathText text={value.passageText} />
+                  </div>
+                )}
+                <RichQuestionContent text={value.stemText || 'Your question will appear here as you type.'} latex={value.stemLatex} imageUrl={value.imageUrl} textClassName="text-base font-medium text-[#14232B]" />
+                {usableOptions.length > 0 && (
+                  <div className="mt-5 space-y-2.5">
+                    {usableOptions.map((option) => (
+                      <div key={option.option_key} className={cn('flex items-start gap-3 rounded-xl border p-3.5', value.showCorrectAnswer && option.is_correct ? 'border-[#0E5A5A] bg-[#DCE9E7]/45' : 'border-[#E7ECEB] bg-white')}>
+                        <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-bold', value.showCorrectAnswer && option.is_correct ? 'border-[#0E5A5A] bg-[#0E5A5A] text-white' : 'border-[#D0D8D6] text-[#14232B]')}>{option.option_key}</span>
+                        <OptionContent option={option} />
+                        {value.showCorrectAnswer && option.is_correct && <CheckCircle2 className="h-5 w-5 shrink-0 text-[#0E5A5A]" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
 
             {!usableOptions.length && value.numericAnswer && value.showCorrectAnswer && (

@@ -4,41 +4,318 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background); --color-foreground: var(--foreground); --font-sans: var(--font-inter);
-  --color-sidebar-ring: var(--sidebar-ring); --color-sidebar-border: var(--sidebar-border); --color-sidebar-accent-foreground: var(--sidebar-accent-foreground); --color-sidebar-accent: var(--sidebar-accent); --color-sidebar-primary-foreground: var(--sidebar-primary-foreground); --color-sidebar-primary: var(--sidebar-primary); --color-sidebar-foreground: var(--sidebar-foreground); --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5); --color-chart-4: var(--chart-4); --color-chart-3: var(--chart-3); --color-chart-2: var(--chart-2); --color-chart-1: var(--chart-1); --color-ring: var(--ring); --color-input: var(--input); --color-border: var(--border); --color-destructive: var(--destructive); --color-accent-foreground: var(--accent-foreground); --color-accent: var(--accent); --color-muted-foreground: var(--muted-foreground); --color-muted: var(--muted); --color-secondary-foreground: var(--secondary-foreground); --color-secondary: var(--secondary); --color-primary-foreground: var(--primary-foreground); --color-primary: var(--primary); --color-popover-foreground: var(--popover-foreground); --color-popover: var(--popover); --color-card-foreground: var(--card-foreground); --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px); --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  --radius: 15px; --background:#FBFCFD; --foreground:#071D34; --card:#FFFFFF; --card-foreground:#071D34; --popover:#FFFFFF; --popover-foreground:#071D34;
-  --primary:#0E5A5A; --primary-foreground:#FFFFFF; --secondary:#DCE9E7; --secondary-foreground:#14232B; --muted:#EEF4F3; --muted-foreground:#6B7980; --accent:#EAF6F4; --accent-foreground:#0E5A5A; --destructive:#B54747; --border:#DFE6EC; --input:#DFE6EC; --ring:#2164D6;
-  --chart-1:#0E5A5A; --chart-2:#2E6D8B; --chart-3:#F2B84B; --chart-4:#B54747; --chart-5:#8998A8;
-  --sidebar:#14232B; --sidebar-foreground:#E7ECEB; --sidebar-primary:#0E5A5A; --sidebar-primary-foreground:#FFFFFF; --sidebar-accent:rgba(255,255,255,.08); --sidebar-accent-foreground:#FFFFFF; --sidebar-border:rgba(255,255,255,.1); --sidebar-ring:#F2B84B;
-  --ev-shadow:0 10px 30px rgba(5,31,50,.055);
+  /* ── Core palette ── */
+  --radius: 12px;
+  --background: #FAFBFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #0C6969;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E8F0EE;
+  --secondary-foreground: #1A2E35;
+  --muted: #F1F5F4;
+  --muted-foreground: #64748B;
+  --accent: #ECF7F5;
+  --accent-foreground: #0C6969;
+  --destructive: #DC2626;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0C6969;
+
+  /* ── Chart palette (professional, colour-blind safe) ── */
+  --chart-1: #0C6969;
+  --chart-2: #2563EB;
+  --chart-3: #D97706;
+  --chart-4: #DC2626;
+  --chart-5: #7C3AED;
+
+  /* ── Sidebar (dark midnight) ── */
+  --sidebar: #0F1A24;
+  --sidebar-foreground: #CBD5E1;
+  --sidebar-primary: #14B8A6;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #F59E0B;
+
+  /* ── Shadows ── */
+  --ev-shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.04);
+  --ev-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --ev-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+  --ev-shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.1);
+  --ev-shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.12);
+
+  /* ── Semantic colours ── */
+  --teal: #0C6969;
+  --midnight: #0F1A24;
+  --canvas: #F8FAFB;
+  --line: #E2E8F0;
+  --success: #16A34A;
+  --amber: #F59E0B;
+
+  --ev-success: #16A34A;
+  --ev-success-bg: #F0FDF4;
+  --ev-warning: #D97706;
+  --ev-warning-bg: #FFFBEB;
+  --ev-error: #DC2626;
+  --ev-error-bg: #FEF2F2;
+  --ev-info: #2563EB;
+  --ev-info-bg: #EFF6FF;
+
+  /* ── Typography scale ── */
+  --ev-text-xs: 0.6875rem;
+  --ev-text-sm: 0.8125rem;
+  --ev-text-base: 0.9375rem;
+  --ev-text-lg: 1.0625rem;
+  --ev-text-xl: 1.25rem;
+  --ev-text-2xl: 1.5rem;
+  --ev-text-3xl: 1.875rem;
+  --ev-text-4xl: 2.25rem;
 }
 
 @layer base {
-  * { @apply border-border outline-ring/50; box-sizing:border-box; }
-  html { scroll-behavior:smooth; }
-  body { @apply bg-background text-foreground; margin:0; font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif; font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased; }
-  button,select,input,textarea { font:inherit; }
-  button,a,input,select,textarea { outline-color:#2164D6; }
-  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:3px solid #2164D6; outline-offset:2px; }
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font-family: var(--font-inter, Inter, system-ui, -apple-system, "Segoe UI", sans-serif);
+    font-size: var(--ev-text-base);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  select,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    color: var(--foreground);
+  }
 }
 
-::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#C6D1D9;border-radius:999px}::-webkit-scrollbar-thumb:hover{background:#9CA8AC}
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
 
-/* Overlay navigation: it never reserves width or compresses the workspace. */
-.so-shell{min-height:100vh}.so-main{margin-left:0!important;width:100%;min-width:0;transition:none!important}.so-content{width:100%;max-width:1600px;margin:0 auto;padding:32px 36px}.so-sidebar{position:fixed!important;inset:0 auto 0 0!important;width:286px!important;z-index:80;transform:translateX(-101%);transition:transform .28s cubic-bezier(.22,.82,.22,1);box-shadow:20px 0 55px rgba(7,29,52,.18);overflow-y:auto}.so-shell.nav-pinned .so-sidebar,.so-sidebar:hover,.so-sidebar-zone:hover~.so-sidebar{transform:translateX(0)}.so-sidebar-zone{position:fixed;left:0;top:0;width:14px;height:100vh;z-index:79}.so-nav-trigger{position:fixed;left:16px;top:16px;z-index:82;width:44px;height:44px;border:1px solid #DFE6EC;border-radius:11px;background:#fff;color:#0E5A5A;display:grid;place-items:center;box-shadow:var(--ev-shadow)}.so-nav-overlay{position:fixed;inset:0;z-index:70;background:rgba(7,29,52,.22);backdrop-filter:blur(1px);opacity:0;pointer-events:none;transition:.25s}.so-shell.nav-pinned .so-nav-overlay{opacity:1;pointer-events:auto}.so-topbar{padding-left:76px!important}.so-sidebar-brand .ev-logo.dark{height:48px;max-width:220px}.so-tree-root,.so-tree-children button,.so-nav a{min-height:47px!important;border-radius:11px!important}.so-tree-children button{font-size:15px}.so-nav a.active,.so-tree-root.active,.so-tree-children button.active{background:linear-gradient(135deg,#087076,#00676D)!important;color:#fff!important;box-shadow:0 7px 16px rgba(0,107,112,.16)}
+/* ── Evidara card base ── */
+.ev-card,
+.rm-card,
+.so-card,
+[data-slot="card"] {
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--ev-shadow-sm) !important;
+  background: var(--card);
+}
 
-/* Reference analytics now uses the primary sidebar tree only. */
-.reference-shell{display:block!important;max-width:1440px!important;margin:0 auto!important}.reference-nav{display:none!important}.reference-content{width:100%!important;min-width:0!important}.reference-analytics{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif!important;color:#071D34;background:#FBFCFD}.reference-card,.reference-panel{border:1px solid #DFE6EC!important;border-radius:15px!important;background:#fff!important;box-shadow:var(--ev-shadow)!important}.reference-title h1{font-size:34px!important;line-height:1.15!important;letter-spacing:-1.15px!important;font-weight:700!important}.reference-title p{font-size:15px!important;color:#66788B!important}.reference-metric{min-height:171px!important;padding:23px 21px!important}.reference-metric-value{font-size:31px!important;color:#07626A!important}.reference-mode{height:43px!important;border-radius:10px!important}.reference-mode button{min-height:35px!important}.reference-mode button.active,.reference-subject-tab.active{background:linear-gradient(135deg,#087076,#00676D)!important;color:#fff!important;box-shadow:0 6px 15px rgba(0,107,112,.15)!important}.reference-panel h3{font-size:16px!important;font-weight:600!important}.reference-selector-strip{padding:13px 18px!important}.reference-subject-tab{min-height:43px!important;border-radius:9px!important;font-size:15px!important}
+/* ── Evidara button variants ── */
+.ev-btn-primary,
+.rm-btn-primary,
+.so-btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  min-height: 40px;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+.ev-btn-primary:hover,
+.rm-btn-primary:hover,
+.so-btn-primary:hover {
+  background: #0A5353;
+}
 
-/* Universal product surfaces from the reference HTML and brand book. */
-.rm-card,.so-card,[data-slot="card"]{border-color:#DFE6EC;border-radius:15px;box-shadow:var(--ev-shadow)}button,[role="button"],a,input,select{min-height:44px}.so-page-head h1,.so-section-head h2{color:#14232B;letter-spacing:-.02em}.so-page-head p{color:#536579;line-height:1.6}.so-stat svg{background:#EAF6F4;color:#0E5A5A;border-radius:50%}.so-btn-primary,.rm-btn-primary,.rm-btn-dark{background:#0E5A5A;color:#fff}.so-btn-primary:hover,.rm-btn-primary:hover{background:#0B4848}
+/* ── Universal product surfaces ── */
+button,
+[role="button"],
+a,
+input,
+select {
+  min-height: 40px;
+}
 
-.secure-exam-content main.rm-card>div:first-child>div:first-child>div{display:none}
+/* ── Secure exam mode: hide unwanted elements ── */
+.secure-exam-content main.rm-card > div:first-child > div:first-child > div {
+  display: none;
+}
 
-@media(max-width:980px){.so-content{padding:82px 18px 28px}.so-topbar{padding-left:68px!important}.reference-title h1{font-size:28px!important}}
-@media(max-width:680px){.so-content{padding-left:12px;padding-right:12px}.reference-metrics{grid-template-columns:1fr!important}.so-sidebar{width:min(286px,88vw)!important}}
+/* ── Page-level responsive padding ── */
+.ev-page-padding {
+  padding: 16px;
+}
+@media (min-width: 640px) {
+  .ev-page-padding {
+    padding: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .ev-page-padding {
+    padding: 32px;
+  }
+}
+
+/* ── Responsive grid helpers ── */
+.ev-grid-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .ev-grid-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.ev-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .ev-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ev-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .ev-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .ev-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── Table responsive wrapper ── */
+.ev-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ev-table-wrap table {
+  min-width: 640px;
+}
+
+/* ── Mobile-first utility ── */
+@media (max-width: 639px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .mobile-full-width {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .mobile-stack {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .mobile-text-center {
+    text-align: center !important;
+  }
+}
+
+/* V19 question typography: prose is never pushed through KaTeX. Genuine math
+   stays mathematically correct while text fragments inherit Evidara's UI font. */
+.evidara-math .katex {
+  font-size: 1em;
+  line-height: inherit;
+}
+.evidara-math .katex .mord.text,
+.evidara-math .katex .mord.text * {
+  font-family: inherit !important;
+  font-style: normal !important;
+}
+.source-fidelity-content {
+  font-family: inherit;
+  color: inherit;
+}
+.source-fidelity-content svg {
+  max-width: 100%;
+  background: #fff;
+}

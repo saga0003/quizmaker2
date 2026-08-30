@@ -1,60 +1,24 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies / Next.js output
+node_modules/
+.next/
+out/
+.vercel/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Local secrets - never commit or upload these
+.env
+.env.local
+.env.*.local
+!.env.example
 
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-/.open-next/
-
-# production
-/build
-
-# local databases and generated template artifacts
-*.db
-*.db-journal
-/tool-results/
-/worklog.md
-/dev.log
-/server.log
-
-# generated sales demo credentials
-/.evidara-demo-access.txt
-/.evidara-demo-access.json
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Build/cache files
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*
-
-# vercel and cloudflare
-.vercel
-.wrangler
-.dev.vars
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Keep safe configuration templates in Git
-!.env.example
-!supabase/.env.functions.example
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { ImageOff, Link2, LoaderCircle, UploadCloud, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthProvider';
-import { imageAcceptValue, normalizeImageFile, safeImageFileName } from '@/lib/imageFiles';
+import { imageAcceptValue, normalizeImageFile } from '@/lib/imageFiles';
+import { uploadQuestionAsset } from '@/lib/questionAssetUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { GuidedLabel } from '@/components/evidara/question-help';
@@ -22,7 +21,6 @@ export function QuestionImageField({
   help: string;
   compact?: boolean;
 }) {
-  const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [previewFailed, setPreviewFailed] = useState(false);
@@ -32,23 +30,13 @@ export function QuestionImageField({
   }, [value]);
 
   async function upload(file: File) {
-    if (!supabase || !user) {
-      setMessage('Sign in to Supabase before uploading an image. A public Cloudflare or other HTTPS URL can still be pasted.');
-      return;
-    }
     setBusy(true);
     setMessage('');
     try {
-      const { blob, mime } = await normalizeImageFile(file);
-      const safeName = safeImageFileName(file.name);
-      const path = `${user.id}/questions/${crypto.randomUUID()}-${safeName}`;
-      const { error } = await supabase.storage
-        .from('question-assets')
-        .upload(path, blob, { upsert: false, contentType: mime, cacheControl: '3600' });
-      if (error) throw error;
-      const { data } = supabase.storage.from('question-assets').getPublicUrl(path);
-      onChange(data.publicUrl);
-      setMessage('Uploaded to the Evidara question-assets bucket.');
+      const { blob } = await normalizeImageFile(file, 4 * 1024 * 1024);
+      const result = await uploadQuestionAsset(blob, file.name, 'questions');
+      onChange(result.publicUrl);
+      setMessage('Uploaded to Cloudflare R2 and linked automatically.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Image upload failed.');
     } finally {

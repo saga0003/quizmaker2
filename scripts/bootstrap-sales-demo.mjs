@@ -102,7 +102,6 @@ async function createOrResetUser({ email, password, fullName, role }) {
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: user.id,
     full_name: fullName,
-    role,
     updated_at: new Date().toISOString(),
   });
 

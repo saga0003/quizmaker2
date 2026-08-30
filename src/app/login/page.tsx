@@ -1,6 +1,7 @@
-import Link from "next/link";
-import { AuthForm } from "@/components/AuthForm";
-import { Logo } from "@/components/Logo";
-import { SetupBanner } from "@/components/SetupBanner";
+import { redirectToWorkspace } from '@/lib/workspaceRedirect';
 
-export default function Login(){return <><SetupBanner/><main style={{minHeight:"100vh",display:"grid",gridTemplateColumns:"1fr 1fr"}} className="login-grid"><section style={{background:"linear-gradient(145deg,#14232B,#0E5A5A)",color:"white",padding:42,display:"grid",alignContent:"space-between"}}><Link href="/" style={{width:"fit-content",display:"inline-flex"}}><Logo variant="dark"/></Link><div><span className="so-kicker light">EVIDENCE-DRIVEN STUDENT DEVELOPMENT</span><h2 style={{fontSize:44,marginBottom:12}}>One account.<br/>A clearer next step.</h2><p style={{color:"#DCE9E7",lineHeight:1.7,maxWidth:500}}>Students, schools and administrators use one secure identity and are directed to the correct Evidara workspace.</p></div><span style={{fontSize:13,color:"#AEB8BC"}}>Evidara · Version 6.2</span></section><section style={{display:"grid",placeItems:"center",padding:24}}><AuthForm/></section></main><style>{`@media(max-width:800px){.login-grid{grid-template-columns:1fr!important}.login-grid>section:first-child{min-height:310px}}`}</style></>}
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function LegacyWorkspaceRedirect({ searchParams }: Props) {
+  return redirectToWorkspace('login', searchParams);
+}

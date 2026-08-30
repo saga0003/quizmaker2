@@ -1,0 +1,25 @@
+EVIDARA V14 CORRECTION PATCH — 2026-08-08
+
+HOW TO APPLY
+1. Stop TEST_EVIDARA.bat / the local Next.js server.
+2. Extract THIS ZIP directly into the ROOT of your current Evidara V14 folder.
+3. Windows will ask whether to replace files. Choose Replace the files in the destination.
+4. You do NOT need to run the SQL manually: the matching migration has already been applied to the confirmed Supabase project xzfozpnzvznqrvcsoail.
+5. The live create-razorpay-order Edge Function has also already been deployed as version 7.
+6. Delete the .next folder if Next.js shows stale output, then start TEST_EVIDARA.bat again.
+
+THIS PATCH FIXES
+- Student Results runtime crash (ArrowLeft/motion stale references).
+- Results continue to use the existing live list_my_attempt_results RPC.
+- Self Assessment supports one, multiple, or all subjects/chapters/topics/difficulties.
+- Internal full-mock subject distribution is no longer disclosed in the student UI.
+- Server/UI caps are now focused by test type: topic, weak-area, chapter, subject, mixed, full mock.
+- Focused tests can return fewer questions when approved inventory is smaller than requested.
+- Super Admin can create product-specific discount vouchers and 100% complimentary vouchers.
+- Complimentary 100% vouchers can directly grant student product entitlement without Razorpay payment.
+- Existing controlled offline-school voucher flow is preserved.
+
+SUPABASE
+Confirmed project only: xzfozpnzvznqrvcsoail
+Applied migration: v14_results_assessment_vouchers_patch
+Edge Function: create-razorpay-order v7

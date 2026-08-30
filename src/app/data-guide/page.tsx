@@ -13,7 +13,7 @@ export default function DataGuidePage(){return <main>
   <header className="public-nav"><div className="rm-container nav-inner"><Link href="/"><Logo/></Link><nav><Link href="/login/">Open Evidara</Link></nav></div></header>
   <section className="public-section alt"><div className="rm-container">
     <Link href="/" className="ev-guide-link"><ArrowLeft size={16}/>Back to Evidara</Link>
-    <div className="so-page-head" style={{marginTop:20}}><div><span className="so-kicker">V6.3 DATA NAVIGATION</span><h1>Search, filter and sort operational records</h1><p>Evidara adds the same understandable controls to operational tables so school and platform teams can locate the right record quickly.</p></div><TableProperties/></div>
+    <div className="so-page-head" style={{marginTop:20}}><div><span className="so-kicker">V12 DATA NAVIGATION</span><h1>Search, filter and sort operational records</h1><p>Evidara adds the same understandable controls to operational tables so school and platform teams can locate the right record quickly.</p></div><TableProperties/></div>
     <div className="so-grid so-grid-2 so-mt">{controls.map((control,index)=><article className="so-card so-pad" key={control.title}><span className="so-kicker">CONTROL {index+1}</span><h2>{control.title}</h2><p style={{color:"#6B7980",lineHeight:1.7}}>{control.text}</p></article>)}</div>
   </div></section>
   <section className="public-section"><div className="rm-container"><div className="so-grid so-grid-3">

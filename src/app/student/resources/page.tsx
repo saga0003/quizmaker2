@@ -1,2 +1,7 @@
-import { DashboardShell } from "@/components/DashboardShell";import { ProtectedPage } from "@/components/ProtectedPage";import { ResourceLibrary } from "@/components/school/ResourceLibrary";
-export default function Page(){return <ProtectedPage allowed="student"><DashboardShell kind="student"><ResourceLibrary studentMode/></DashboardShell></ProtectedPage>}
+import { redirectToWorkspace } from '@/lib/workspaceRedirect';
+
+type Props = { searchParams?: Promise<Record<string, string | string[] | undefined>> };
+
+export default async function LegacyWorkspaceRedirect({ searchParams }: Props) {
+  return redirectToWorkspace('student-resources', searchParams);
+}

@@ -9,7 +9,21 @@ import {
   type SchoolPlatformState,
 } from "@/lib/schoolPlatform";
 
-type CloudPayload = { mode: "cloud"; manager: boolean; state: SchoolPlatformState };
+type CloudPayload = {
+  mode: "cloud";
+  manager: boolean;
+  schoolStaff: boolean;
+  rosterScope?: "organization" | "assigned_sections" | "own";
+  state: SchoolPlatformState;
+};
+type SchoolPlatformOptions = { allowDemo?: boolean; unavailableMessage?: string };
+
+class SchoolPlatformRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "SchoolPlatformRequestError";
+  }
+}
 
 const unavailableCloudState: SchoolPlatformState = {
   school: {
@@ -18,7 +32,7 @@ const unavailableCloudState: SchoolPlatformState = {
     board: "Other",
     city: "",
     subscription: {
-      planName: "ScholarOS Annual School Access",
+      planName: "Founding Institution Plan",
       status: "expired",
       startsAt: new Date().toISOString().slice(0, 10),
       endsAt: new Date().toISOString().slice(0, 10),
@@ -27,17 +41,26 @@ const unavailableCloudState: SchoolPlatformState = {
     },
   },
   students: [],
+  sections: [],
   resources: [],
 };
 
-export function useSchoolPlatform() {
-  const { session, configured } = useAuth();
-  const [state, setState] = useState<SchoolPlatformState>(defaultSchoolPlatformState);
+export function useSchoolPlatform({
+  allowDemo = true,
+  unavailableMessage = "Supabase is not configured. Live student resources are unavailable.",
+}: SchoolPlatformOptions = {}) {
+  const { session, configured, loading: authLoading } = useAuth();
+  const [state, setState] = useState<SchoolPlatformState>(
+    allowDemo ? defaultSchoolPlatformState : unavailableCloudState,
+  );
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<"demo" | "cloud">("demo");
   const [manager, setManager] = useState(false);
+  const [schoolStaff, setSchoolStaff] = useState(false);
+  const [rosterScope, setRosterScope] = useState<"organization" | "assigned_sections" | "own">("own");
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
 
   const requestCloud = useCallback(async (method: "GET" | "POST", body?: Record<string, unknown>) => {
     const token = session?.access_token;
@@ -52,23 +75,53 @@ export function useSchoolPlatform() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Cloud request failed (${response.status}).`);
+    if (!response.ok) {
+      throw new SchoolPlatformRequestError(
+        payload.error || `Cloud request failed (${response.status}).`,
+        response.status,
+      );
+    }
     return payload as CloudPayload;
   }, [session?.access_token]);
 
   const applyCloud = useCallback((payload: CloudPayload) => {
     setState(payload.state);
     setManager(payload.manager);
+    setSchoolStaff(payload.schoolStaff);
+    setRosterScope(payload.rosterScope ?? "own");
     setMode("cloud");
     setError(null);
+    setErrorStatus(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!configured || !session?.access_token) {
+    if (authLoading) {
+      setReady(false);
+      return;
+    }
+
+    if ((!configured || !session?.access_token) && allowDemo) {
       setState(loadSchoolPlatformState());
       setMode("demo");
       setManager(true);
+      setSchoolStaff(true);
+      setRosterScope("organization");
       setError(null);
+      setErrorStatus(null);
+      setReady(true);
+      return;
+    }
+
+    if (!configured || !session?.access_token) {
+      setState(unavailableCloudState);
+      setMode("cloud");
+      setManager(false);
+      setSchoolStaff(false);
+      setRosterScope("own");
+      setError(configured
+        ? "Sign in to load resources authorized for your account."
+        : unavailableMessage);
+      setErrorStatus(configured ? 401 : 503);
       setReady(true);
       return;
     }
@@ -82,12 +135,15 @@ export function useSchoolPlatform() {
       setState(unavailableCloudState);
       setMode("cloud");
       setManager(false);
+      setSchoolStaff(false);
+      setRosterScope("own");
       setError(cloudError instanceof Error ? cloudError.message : "Cloud data is unavailable.");
+      setErrorStatus(cloudError instanceof SchoolPlatformRequestError ? cloudError.status : 500);
     } finally {
       setSyncing(false);
       setReady(true);
     }
-  }, [applyCloud, configured, requestCloud, session?.access_token]);
+  }, [allowDemo, applyCloud, authLoading, configured, requestCloud, session?.access_token, unavailableMessage]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -98,6 +154,22 @@ export function useSchoolPlatform() {
       return value;
     });
   }
+
+  const command = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
+    if (mode !== "cloud") throw new Error("Cloud mode is required for this operation.");
+    if (!manager) throw new Error("School-manager permission is required.");
+    setSyncing(true);
+    try {
+      return await requestCloud("POST", { action, ...payload }) as unknown as Record<string, unknown>;
+    } catch (cloudError) {
+      const message = cloudError instanceof Error ? cloudError.message : "Cloud action failed.";
+      setError(message);
+      setErrorStatus(cloudError instanceof SchoolPlatformRequestError ? cloudError.status : 500);
+      throw cloudError;
+    } finally {
+      setSyncing(false);
+    }
+  }, [manager, mode, requestCloud]);
 
   const execute = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
     if (mode !== "cloud") return null;
@@ -110,6 +182,7 @@ export function useSchoolPlatform() {
     } catch (cloudError) {
       const message = cloudError instanceof Error ? cloudError.message : "Cloud action failed.";
       setError(message);
+      setErrorStatus(cloudError instanceof SchoolPlatformRequestError ? cloudError.status : 500);
       throw cloudError;
     } finally {
       setSyncing(false);
@@ -120,5 +193,20 @@ export function useSchoolPlatform() {
     if (mode === "demo") update(structuredClone(defaultSchoolPlatformState));
   }
 
-  return { state, update, reset, ready, mode, manager, syncing, error, execute, refresh };
+  return {
+    state,
+    update,
+    reset,
+    ready,
+    mode,
+    manager,
+    schoolStaff,
+    rosterScope,
+    syncing,
+    error,
+    errorStatus,
+    execute,
+    command,
+    refresh,
+  };
 }

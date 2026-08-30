@@ -1,0 +1,11 @@
+import { requirePhase1PublicFeature } from '@/lib/phase1PublicGate';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { PublicSeoShell } from '@/components/seo/PublicSeoShell';
+import { publicRpc } from '@/lib/seo-public';
+
+export const dynamic='force-dynamic';
+export const metadata:Metadata={title:'NEET, JEE Main & JEE Advanced Question Papers | Evidara',description:'Browse previous year and model question papers for NEET, JEE Main, JEE Advanced and other entrance exams. Practise online with Evidara.'};
+type P={id:string;slug:string;title:string;exam_type?:string;source_year?:number;test_type?:string;total_questions?:number;duration_minutes?:number};
+export default async function Page(){
+  requirePhase1PublicFeature('publicQuestionPapers');const papers=await publicRpc<P[]>('list_public_papers_v15')||[];const grouped=new Map<string,P[]>();for(const p of papers){const key=`${p.exam_type||'Other'}|${p.source_year||'Model'}`;grouped.set(key,[...(grouped.get(key)||[]),p]);}return <PublicSeoShell><section className="mx-auto max-w-6xl px-5 py-12"><p className="font-bold uppercase tracking-[.16em] text-[#0E7774]">Question Paper Library</p><h1 className="mt-3 text-4xl font-extrabold">Previous year and model question papers</h1><p className="mt-4 max-w-3xl text-[#65757C]">Published papers are listed here automatically by exam and year. New papers appear when they are published in Evidara.</p><div className="mt-9 space-y-8">{[...grouped.entries()].map(([key,items])=>{const[exam,year]=key.split('|');return <section key={key}><h2 className="text-2xl font-bold">{exam} · {year}</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{items.map(p=><Link href={`/question-papers/${p.slug}/`} key={p.id} className="rounded-2xl border border-[#DCE5E2] bg-white p-5 shadow-sm"><h3 className="font-bold">{p.title}</h3><p className="mt-2 text-sm text-[#65757C]">{[p.test_type,p.total_questions?`${p.total_questions} questions`:null,p.duration_minutes?`${p.duration_minutes} min`:null].filter(Boolean).join(' · ')}</p><span className="mt-4 inline-block font-semibold text-[var(--teal)]">View paper →</span></Link>)}</div></section>})}</div>{!papers.length&&<p className="mt-8 rounded-xl bg-white p-6 text-[#65757C]">Published previous-year and model papers will appear here automatically.</p>}</section></PublicSeoShell>}

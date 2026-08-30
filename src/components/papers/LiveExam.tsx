@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BlockMath, InlineMath } from 'react-katex';
+import { RichQuestionContent, RichOptionContent, MixedMathText } from '@/components/evidara/rich-math-content';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -21,6 +21,8 @@ import { useAuth } from '@/context/AuthProvider';
 import { normalizeEvidaraRole } from '@/lib/roles';
 import type { AttemptPayload, AttemptResult } from '@/types/papers';
 import { Button } from '@/components/ui/button';
+import { PostTestErrorClassification } from '@/components/evidara/post-test-error-classification';
+import { SourceFidelityContent, sourceFidelityFromMetadata } from '@/components/evidara/source-fidelity-content';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -62,6 +64,8 @@ export function LiveExam() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AttemptResult | null>(null);
+  const [reflectionOpen, setReflectionOpen] = useState(false);
+  const [reflectionNotice, setReflectionNotice] = useState('');
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [securityNotice, setSecurityNotice] = useState('');
   const enteredFullscreen = useRef(false);
@@ -211,6 +215,8 @@ export function LiveExam() {
   }, [payload, result, superAdminInspection]);
 
   const question = payload?.questions[current];
+  const sourceFidelity = sourceFidelityFromMetadata(question?.metadata);
+  const sourcePageSize = sourceFidelity?.source_pdf_page_size || [612, 792];
 
   useEffect(() => {
     questionOpenedAt.current = Date.now();
@@ -317,6 +323,7 @@ export function LiveExam() {
       return;
     }
     setResult(data as AttemptResult);
+    setReflectionOpen(true);
     setSubmitting(false);
     if (automatic) setSaveText('Time completed');
   }
@@ -347,24 +354,56 @@ export function LiveExam() {
   }
   if (result) {
     return (
-      <div className="rm-card" style={{ padding: 32, maxWidth: 720, margin: '35px auto', textAlign: 'center' }}>
-        <CheckCircle2 size={52} color="#137a3a" />
-        <h1>Test submitted</h1>
-        <p style={{ color: '#667085' }}>Your answers and result have been stored.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginTop: 20 }}>
-          {[
-            ['Score', `${result.score}/${result.maximum_marks}`],
-            ['Percentage', `${result.percentage}%`],
-            ['Correct', result.correct_count],
-            ['Incorrect', result.incorrect_count],
-          ].map(([label, value]) => (
-            <div key={String(label)} style={{ padding: 14, background: '#f8fafc', borderRadius: 12 }}>
-              <strong style={{ fontSize: 22 }}>{String(value)}</strong>
-              <div style={{ fontSize: 12, color: '#667085' }}>{String(label)}</div>
-            </div>
-          ))}
+      <div className="post-test-result-shell">
+        <div className="rm-card post-test-result-summary">
+          <CheckCircle2 size={52} color="#137a3a" />
+          <h1>Test submitted</h1>
+          <p>Your answers and authoritative result have been stored.</p>
+          <div className="post-test-result-grid">
+            {[
+              ['Score', `${result.score}/${result.maximum_marks}`],
+              ['Percentage', `${result.percentage}%`],
+              ['Correct', result.correct_count],
+              ['Incorrect', result.incorrect_count],
+              ['Unanswered', result.unanswered_count],
+            ].map(([label, value]) => (
+              <div key={String(label)}>
+                <strong>{String(value)}</strong>
+                <span>{String(label)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="post-test-result-actions">
+            <a className="rm-btn-primary" href="/student/results/">View my results</a>
+            {!reflectionOpen && (
+              <button
+                type="button"
+                className="rm-btn-secondary"
+                onClick={() => {
+                  setReflectionNotice('');
+                  setReflectionOpen(true);
+                }}
+              >
+                Continue optional reflection
+              </button>
+            )}
+          </div>
+          {reflectionNotice && <p className="post-test-result-notice" role="status">{reflectionNotice}</p>}
         </div>
-        <a className="rm-btn-primary" href="/student/results/" style={{ marginTop: 22 }}>View my results</a>
+
+        {reflectionOpen && (
+          <PostTestErrorClassification
+            attemptId={result.attempt_id}
+            onComplete={({ completed, total }) => {
+              setReflectionOpen(false);
+              setReflectionNotice(
+                completed === total && total > 0
+                  ? 'Your optional learning reflection is complete.'
+                  : `Reflection paused after ${completed} of ${total} available response${total === 1 ? '' : 's'}. You can safely resume it from Results.`,
+              );
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -411,14 +450,21 @@ export function LiveExam() {
             <strong style={{ color: '#775600' }}>+{question.marks} / −{question.negative_marks}</strong>
           </div>
 
-          {question.passage_text && <div style={{ marginTop: 16, padding: 15, borderLeft: '4px solid #f6b100', background: '#fffaf0', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{question.passage_text}</div>}
-          <h2 style={{ fontSize: 20, lineHeight: 1.6, marginTop: 18 }}>{question.stem_text}</h2>
-          {question.stem_latex && <div style={{ overflowX: 'auto' }}><BlockMath math={question.stem_latex} /></div>}
-          {question.question_image_url && (
-            <div style={{ position: 'relative', margin: '14px auto', maxWidth: '100%', width: 'fit-content' }}>
-              <img src={question.question_image_url} alt="Question diagram" draggable={false} style={{ display: 'block', maxWidth: '100%', maxHeight: 380, objectFit: 'contain', borderRadius: 12, pointerEvents: 'none', userSelect: 'none' }} />
-              <span aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />
+          {sourceFidelity ? (
+            <div style={{ marginTop: 18, border: '1px solid #e4e7ec', borderRadius: 14, background: 'white', padding: 10 }}>
+              <SourceFidelityContent segments={sourceFidelity.prompt_segments} pageSize={sourcePageSize} label="Previous-year question and options" />
             </div>
+          ) : (
+            <>
+              {question.passage_text && <div style={{ marginTop: 16, padding: 15, borderLeft: '4px solid #f6b100', background: '#fffaf0', whiteSpace: 'pre-wrap', lineHeight: 1.65 }}><MixedMathText text={question.passage_text} /></div>}
+              <div style={{ marginTop: 18 }}><RichQuestionContent text={question.stem_text} latex={question.stem_latex || undefined} textClassName="text-[20px] font-semibold" /></div>
+              {question.question_image_url && (
+                <div style={{ position: 'relative', margin: '14px auto', maxWidth: '100%', width: 'fit-content' }}>
+                  <img src={question.question_image_url} alt="Question diagram" draggable={false} style={{ display: 'block', maxWidth: '100%', maxHeight: 380, objectFit: 'contain', borderRadius: 12, pointerEvents: 'none', userSelect: 'none' }} />
+                  <span aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />
+                </div>
+              )}
+            </>
           )}
 
           {question.question_type === 'numerical' || question.question_type === 'integer' ? (
@@ -432,15 +478,14 @@ export function LiveExam() {
                 const checked = answerKeys.includes(option.option_key);
                 return (
                   <button key={option.option_key} onClick={() => void selectOption(option.option_key)} style={{ display: 'grid', gridTemplateColumns: '38px 1fr', gap: 10, alignItems: 'center', textAlign: 'left', padding: 13, borderRadius: 12, border: checked ? '2px solid #f6b100' : '1px solid #dfe4ec', background: checked ? '#fff8e6' : 'white' }}>
-                    <span style={{ width: 32, height: 32, borderRadius: question.question_type === 'multiple_correct' ? 8 : 999, display: 'grid', placeItems: 'center', background: checked ? '#f6b100' : '#f2f4f7', fontWeight: 800 }}>{option.option_key}</span>
+                    <span style={{ width: 32, height: 32, borderRadius: question.question_type === 'multiple_correct' ? 8 : 999, display: 'grid', placeItems: 'center', background: checked ? '#f6b100' : '#f2f4f7', fontWeight: 800 }}>{sourceFidelity ? orderedOptions.findIndex((item) => item.option_key === option.option_key) + 1 : option.option_key}</span>
                     <span>
-                      {option.content_text}
-                      {option.content_latex && <span style={{ marginLeft: 6 }}><InlineMath math={option.content_latex} /></span>}
-                      {option.image_url && (
-                        <span style={{ position: 'relative', display: 'block', width: 'fit-content', marginTop: 8 }}>
-                          <img src={option.image_url} alt={`Option ${option.option_key}`} draggable={false} style={{ display: 'block', maxWidth: 260, maxHeight: 150, objectFit: 'contain', pointerEvents: 'none', userSelect: 'none' }} />
-                          <span aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />
-                        </span>
+                      {sourceFidelity ? (
+                        <strong>Option {orderedOptions.findIndex((item) => item.option_key === option.option_key) + 1}</strong>
+                      ) : (
+                        <>
+                          <RichOptionContent text={option.content_text} latex={option.content_latex || undefined} imageUrl={option.image_url || undefined} imageAlt={`Option ${option.option_key}`} />
+                        </>
                       )}
                     </span>
                   </button>
@@ -477,23 +522,23 @@ export function LiveExam() {
       </div>
 
       <AlertDialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
-        <AlertDialogContent className="overflow-hidden border-[#E7ECEB] p-0 sm:max-w-lg">
+        <AlertDialogContent className="overflow-hidden border-[var(--line)] p-0 sm:max-w-lg">
           <div className="bg-[#131E35] px-6 py-5 text-white">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F6B100] text-[#131E35]"><Send className="h-5 w-5" /></div>
             <AlertDialogHeader className="mt-4 text-left">
               <AlertDialogTitle className="text-xl text-white">Submit this test now?</AlertDialogTitle>
-              <AlertDialogDescription className="text-[#DCE9E7]">You have answered {answeredCount} of {payload.questions.length} questions. Answers cannot be changed after final submission.</AlertDialogDescription>
+              <AlertDialogDescription className="text-[var(--secondary)]">You have answered {answeredCount} of {payload.questions.length} questions. Answers cannot be changed after final submission.</AlertDialogDescription>
             </AlertDialogHeader>
           </div>
           <div className="px-6 py-5">
-            <div className="rounded-xl border border-[#E7ECEB] bg-[#F7F9F7] p-4 text-sm text-[#475467]">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4 text-sm text-[#475467]">
               Marked for review: <strong className="text-[#6941C6]">{Object.values(review).filter(Boolean).length}</strong><br />
-              Unanswered: <strong className="text-[#B54747]">{payload.questions.length - answeredCount}</strong>
+              Unanswered: <strong className="text-[var(--destructive)]">{payload.questions.length - answeredCount}</strong>
             </div>
           </div>
-          <AlertDialogFooter className="border-t border-[#E7ECEB] px-6 py-4">
+          <AlertDialogFooter className="border-t border-[var(--line)] px-6 py-4">
             <AlertDialogCancel>Continue test</AlertDialogCancel>
-            <Button type="button" onClick={() => void submit(false)} disabled={submitting} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">
+            <Button type="button" onClick={() => void submit(false)} disabled={submitting} className="bg-[var(--teal)] text-white hover:bg-[#0A4747]">
               {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit final answers
             </Button>
           </AlertDialogFooter>

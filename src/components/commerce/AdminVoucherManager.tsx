@@ -82,7 +82,7 @@ type VoucherRow = {
 
 type Organization = { id: string; name: string };
 type FormState = typeof emptyForm;
-type VoucherFilter = 'all' | 'active' | 'inactive' | 'promotion' | 'offline';
+type VoucherFilter = 'all' | 'active' | 'inactive' | 'promotion' | 'free' | 'offline';
 
 const localDateTime = (value: string | null) => {
   if (!value) return '';
@@ -143,7 +143,9 @@ export function AdminVoucherManager() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const offline = form.discountPercent === '100';
+  const fullDiscount = form.discountPercent === '100';
+  const offline = fullDiscount && form.purpose === 'offline_payment';
+  const complimentary = fullDiscount && form.purpose === 'manual_access';
   const selectedProduct = useMemo(() => products.find((product) => product.id === form.productId), [form.productId, products]);
   const selectedOrganization = useMemo(() => organizations.find((organization) => organization.id === form.organizationId), [form.organizationId, organizations]);
   const filteredVouchers = useMemo(() => vouchers.filter((voucher) => {
@@ -152,7 +154,8 @@ export function AdminVoucherManager() {
       || (filter === 'active' && state === 'active')
       || (filter === 'inactive' && state !== 'active')
       || (filter === 'promotion' && voucher.discount_percent !== 100)
-      || (filter === 'offline' && voucher.discount_percent === 100);
+      || (filter === 'free' && voucher.discount_percent === 100 && voucher.purpose !== 'offline_payment')
+      || (filter === 'offline' && voucher.purpose === 'offline_payment');
     const haystack = `${voucher.code} ${voucher.description || ''} ${relationName(voucher.products)} ${relationName(voucher.organizations)} ${voucher.allowed_email || ''}`.toLowerCase();
     return matchesFilter && (!search || haystack.includes(search.toLowerCase()));
   }), [filter, search, vouchers]);
@@ -161,7 +164,7 @@ export function AdminVoucherManager() {
     total: vouchers.length,
     active: vouchers.filter((voucher) => voucherState(voucher) === 'Active').length,
     redemptions: vouchers.reduce((sum, voucher) => sum + voucher.used_count, 0),
-    offline: vouchers.filter((voucher) => voucher.discount_percent === 100).length,
+    offline: vouchers.filter((voucher) => voucher.purpose === 'offline_payment').length,
   };
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -185,7 +188,7 @@ export function AdminVoucherManager() {
       code: row.code,
       description: row.description || '',
       discountPercent: String(row.discount_percent),
-      purpose: row.purpose,
+      purpose: row.purpose || (row.discount_percent === 100 ? 'manual_access' : 'promotion'),
       productId: row.product_id || 'all',
       organizationId: row.organization_id || 'none',
       allowedEmail: row.allowed_email || '',
@@ -209,7 +212,8 @@ export function AdminVoucherManager() {
     setError('');
     setMessage('');
     if (!supabase) return setError('Supabase is not configured.');
-    if (offline && !superAdmin) return setError('Only Super Admin can create a 100% offline school activation voucher.');
+    if (fullDiscount && !superAdmin) return setError('Only Super Admin can create a 100% voucher.');
+    if (complimentary && form.productId === 'all') return setError('Choose one product for complimentary access.');
     if (offline && (form.productId === 'all' || form.organizationId === 'none' || !form.seatCount || !form.offlineReference || !form.offlineAmountRupees)) {
       return setError('A 100% voucher requires one product, one school, seat count, offline amount and payment reference.');
     }
@@ -221,7 +225,7 @@ export function AdminVoucherManager() {
       p_code: form.code.toUpperCase(),
       p_description: form.description || null,
       p_discount_percent: Number(form.discountPercent),
-      p_purpose: offline ? 'offline_payment' : 'promotion',
+      p_purpose: fullDiscount ? form.purpose : 'promotion',
       p_product_id: form.productId === 'all' ? null : form.productId,
       p_allowed_email: form.allowedEmail || null,
       p_organization_id: form.organizationId === 'none' ? null : form.organizationId,
@@ -237,7 +241,7 @@ export function AdminVoucherManager() {
     });
     setBusy(false);
     if (saveError) return setError(saveError.message);
-    setMessage(form.id ? 'Voucher updated. Existing redemption history remains unchanged.' : offline ? 'Offline school activation voucher created.' : 'Promotional voucher created.');
+    setMessage(form.id ? 'Voucher updated. Existing redemption history remains unchanged.' : offline ? 'Offline school activation voucher created.' : complimentary ? 'Complimentary product voucher created.' : 'Promotional voucher created.');
     setFormOpen(false);
     reset();
     await load();
@@ -253,38 +257,38 @@ export function AdminVoucherManager() {
   return (
     <div className={`${styles.workspace} space-y-6`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div><h2 className="text-2xl font-extrabold tracking-tight text-[#14232B]">Vouchers</h2><p className="mt-1 text-sm text-[#6B7980]">Manage promotional discounts and auditable offline school activations.</p></div>
-        <Button onClick={openCreate} className="h-11 bg-[#0E5A5A] hover:bg-[#0A4A4A]"><Plus className="mr-2 h-4 w-4" />Create Voucher</Button>
+        <div><h2 className="text-2xl font-extrabold tracking-tight text-[var(--foreground)]">Vouchers</h2><p className="mt-1 text-sm text-[var(--muted-foreground)]">Manage promotional discounts and auditable offline school activations.</p></div>
+        <Button onClick={openCreate} className="h-11 bg-[var(--teal)] hover:bg-[#0A4A4A]"><Plus className="mr-2 h-4 w-4" />Create Voucher</Button>
       </div>
 
-      {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]' : 'border-[#237A57]/20 bg-[#237A57]/5 text-[#237A57]'}`}>{error || message}</div>}
+      {(error || message) && <div className={`rounded-xl border px-4 py-3 text-sm ${error ? 'border-[var(--destructive)]/20 bg-[var(--destructive)]/5 text-[var(--destructive)]' : 'border-[#237A57]/20 bg-[#237A57]/5 text-[#237A57]'}`}>{error || message}</div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metricCards.map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[#6B7980]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[#14232B]">{value}</p></div><div className="rounded-xl bg-[#DCE9E7] p-3 text-[#0E5A5A]"><Icon className="h-5 w-5" /></div></div></div>)}</div>
+      <div className="grid gap-3 sm:gap-4 lg:gap-5 sm:grid-cols-2 xl:grid-cols-4">{metricCards.map(({ label, value, icon: Icon }) => <div key={label} className={styles.metricCard}><div className="flex items-center justify-between"><div><p className="text-xs font-medium text-[var(--muted-foreground)]">{label}</p><p className="mt-1 text-2xl font-extrabold text-[var(--foreground)]">{value}</p></div><div className="rounded-xl bg-[var(--secondary)] p-3 text-[var(--teal)]"><Icon className="h-5 w-5" /></div></div></div>)}</div>
 
-      <Card className="gap-0 border-[#E7ECEB] shadow-none">
+      <Card className="gap-0 border-[var(--line)] shadow-sm rounded-xl">
         <CardContent className="p-0">
-          <div className="flex flex-col gap-3 border-b border-[#E7ECEB] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-[var(--line)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-sm"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#AEB8BC]" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search code, product, school or email" className="pl-9" /></div>
-            <div className="flex flex-wrap gap-2">{(['all', 'active', 'inactive', 'promotion', 'offline'] as VoucherFilter[]).map((item) => <Button key={item} type="button" size="sm" variant="outline" onClick={() => setFilter(item)} className={filter === item ? 'border-[#0E5A5A] bg-[#DCE9E7] text-[#0E5A5A]' : 'border-[#E7ECEB]'}>{item === 'all' ? 'All' : item === 'offline' ? 'Offline 100%' : item[0].toUpperCase() + item.slice(1)}</Button>)}<Button variant="outline" size="icon" onClick={() => void load()} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button></div>
+            <div className="flex flex-wrap gap-2">{(['all', 'active', 'inactive', 'promotion', 'free', 'offline'] as VoucherFilter[]).map((item) => <Button key={item} type="button" size="sm" variant="outline" onClick={() => setFilter(item)} className={filter === item ? 'border-[var(--teal)] bg-[var(--secondary)] text-[var(--teal)]' : 'border-[var(--line)]'}>{item === 'all' ? 'All' : item === 'offline' ? 'Offline payment' : item === 'free' ? '100% free' : item[0].toUpperCase() + item.slice(1)}</Button>)}<Button variant="outline" size="icon" onClick={() => void load()} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button></div>
           </div>
           <div className={`${styles.scrollArea} overflow-x-auto`}>
             <table className="min-w-[1050px] w-full border-collapse">
-              <thead><tr className="border-b border-[#E7ECEB] bg-[#F7F9F7] text-left text-xs font-semibold text-[#6B7980]"><th className="px-5 py-3">Voucher</th><th>Type</th><th>Product / recipient</th><th>Usage</th><th>Validity</th><th>Evidence</th><th>Status</th><th className="pr-5 text-right">Action</th></tr></thead>
-              <tbody>{filteredVouchers.map((voucher) => { const state = voucherState(voucher); const productName = relationName(voucher.products); const organizationName = relationName(voucher.organizations); return <tr key={voucher.id} className={`${styles.tableRow} border-b border-[#E7ECEB] text-sm`}><td className="px-5 py-4"><strong className="text-[#14232B]">{voucher.code}</strong><p className="mt-1 max-w-[220px] truncate text-xs text-[#6B7980]">{voucher.description || 'No description'}</p></td><td><Badge className={voucher.discount_percent === 100 ? 'bg-[#FCF1DB] text-[#9A6508]' : 'bg-[#DCE9E7] text-[#0E5A5A]'}>{voucher.discount_percent === 100 ? 'Offline 100%' : `${voucher.discount_percent}% off`}</Badge></td><td><p className="font-medium text-[#14232B]">{productName || 'All products'}</p><p className="mt-1 text-xs text-[#6B7980]">{organizationName || voucher.allowed_email || 'Any eligible customer'}{voucher.seat_count ? ` · ${voucher.seat_count} seats` : ''}</p></td><td><strong className="text-[#14232B]">{voucher.used_count}/{voucher.usage_limit || '∞'}</strong><p className="mt-1 text-xs text-[#6B7980]">{voucher.per_user_limit} per account</p></td><td className="text-xs text-[#6B7980]"><p>{voucher.starts_at ? new Date(voucher.starts_at).toLocaleDateString('en-IN') : 'Immediately'}</p><p>to {voucher.ends_at ? new Date(voucher.ends_at).toLocaleDateString('en-IN') : 'No expiry'}</p></td><td>{voucher.offline_payment_reference ? <><p className="font-medium text-[#14232B]">{voucher.offline_payment_reference}</p><p className="mt-1 text-xs text-[#6B7980]">{rupees(voucher.offline_amount_paise || 0)}</p></> : <span className="text-[#AEB8BC]">—</span>}</td><td><Badge variant="outline" className={state === 'Active' ? 'border-[#237A57]/20 bg-[#237A57]/10 text-[#237A57]' : state === 'Scheduled' ? 'border-[#2E6D8B]/20 bg-[#2E6D8B]/10 text-[#2E6D8B]' : 'border-[#B54747]/20 bg-[#B54747]/5 text-[#B54747]'}>{state}</Badge></td><td className="pr-5 text-right"><Button variant="ghost" size="sm" onClick={() => edit(voucher)}><Edit3 className="mr-1 h-4 w-4" />Edit</Button></td></tr>; })}{!filteredVouchers.length && <tr><td colSpan={8} className={styles.emptyState}><TicketPercent className="mx-auto mb-3 h-10 w-10 text-[#AEB8BC]" />No vouchers match the current search and filter.</td></tr>}</tbody>
+              <thead><tr className="border-b border-[var(--line)] bg-[var(--canvas)] text-left text-xs font-semibold text-[var(--muted-foreground)]"><th className="px-5 py-3">Voucher</th><th>Type</th><th>Product / recipient</th><th>Usage</th><th>Validity</th><th>Evidence</th><th>Status</th><th className="pr-5 text-right">Action</th></tr></thead>
+              <tbody>{filteredVouchers.map((voucher) => { const state = voucherState(voucher); const productName = relationName(voucher.products); const organizationName = relationName(voucher.organizations); return <tr key={voucher.id} className={`${styles.tableRow} border-b border-[var(--line)] text-sm`}><td className="px-5 py-4"><strong className="text-[var(--foreground)]">{voucher.code}</strong><p className="mt-1 max-w-[220px] truncate text-xs text-[var(--muted-foreground)]">{voucher.description || 'No description'}</p></td><td><Badge className={voucher.discount_percent === 100 ? 'bg-[#FCF1DB] text-[#9A6508]' : 'bg-[var(--secondary)] text-[var(--teal)]'}>{voucher.discount_percent === 100 ? (voucher.purpose === 'offline_payment' ? 'Offline 100%' : 'Free access') : `${voucher.discount_percent}% off`}</Badge></td><td><p className="font-medium text-[var(--foreground)]">{productName || 'All products'}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{organizationName || voucher.allowed_email || 'Any eligible customer'}{voucher.seat_count ? ` · ${voucher.seat_count} seats` : ''}</p></td><td><strong className="text-[var(--foreground)]">{voucher.used_count}/{voucher.usage_limit || '∞'}</strong><p className="mt-1 text-xs text-[var(--muted-foreground)]">{voucher.per_user_limit} per account</p></td><td className="text-xs text-[var(--muted-foreground)]"><p>{voucher.starts_at ? new Date(voucher.starts_at).toLocaleDateString('en-IN') : 'Immediately'}</p><p>to {voucher.ends_at ? new Date(voucher.ends_at).toLocaleDateString('en-IN') : 'No expiry'}</p></td><td>{voucher.offline_payment_reference ? <><p className="font-medium text-[var(--foreground)]">{voucher.offline_payment_reference}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{rupees(voucher.offline_amount_paise || 0)}</p></> : <span className="text-[#AEB8BC]">—</span>}</td><td><Badge variant="outline" className={state === 'Active' ? 'border-[#237A57]/20 bg-[#237A57]/10 text-[#237A57]' : state === 'Scheduled' ? 'border-[var(--info)]/20 bg-[var(--info)]/10 text-[var(--info)]' : 'border-[var(--destructive)]/20 bg-[var(--destructive)]/5 text-[var(--destructive)]'}>{state}</Badge></td><td className="pr-5 text-right"><Button variant="ghost" size="sm" onClick={() => edit(voucher)}><Edit3 className="mr-1 h-4 w-4" />Edit</Button></td></tr>; })}{!filteredVouchers.length && <tr><td colSpan={8} className={styles.emptyState}><TicketPercent className="mx-auto mb-3 h-10 w-10 text-[#AEB8BC]" />No vouchers match the current search and filter.</td></tr>}</tbody>
             </table>
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={formOpen} onOpenChange={(open) => { if (!busy) setFormOpen(open); }}>
-        <DialogContent className="max-h-[94vh] w-[96vw] max-w-4xl overflow-y-auto border-[#DCE9E7] p-0">
+        <DialogContent className="max-h-[94vh] w-[96vw] max-w-4xl overflow-y-auto border-[var(--secondary)] p-0">
           <form onSubmit={save}>
-            <DialogHeader className="border-b border-[#E7ECEB] px-5 py-4 text-left sm:px-6"><DialogTitle className="text-xl text-[#14232B]">{form.id ? 'Edit voucher' : 'Create voucher'}</DialogTitle><DialogDescription>Promotions are limited to 1–10%. Super Admin may record a controlled 100% offline school activation.</DialogDescription></DialogHeader>
-            <div className="space-y-5 p-5 sm:p-6">
+            <DialogHeader className="border-b border-[var(--line)] px-5 py-4 text-left sm:px-6"><DialogTitle className="text-xl text-[var(--foreground)]">{form.id ? 'Edit voucher' : 'Create voucher'}</DialogTitle><DialogDescription>Create product discounts or one-time complimentary access. Only Super Admin can create 100% free vouchers.</DialogDescription></DialogHeader>
+            <div className="space-y-5 p-4 sm:p-5 lg:p-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2"><Label>Voucher code</Label><Input required minLength={4} maxLength={32} value={form.code} onChange={(event) => update('code', event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="EVIDARA10" /></div>
-                <div className="space-y-2"><Label>Discount</Label><Select value={form.discountPercent} onValueChange={(value) => { update('discountPercent', value); update('purpose', value === '100' ? 'offline_payment' : 'promotion'); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 10 }, (_item, index) => String(index + 1)).map((value) => <SelectItem key={value} value={value}>{value}% promotional discount</SelectItem>)}{superAdmin && <SelectItem value="100">100% offline school activation</SelectItem>}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>Product</Label><Select value={form.productId} onValueChange={(value) => update('productId', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!offline && <SelectItem value="all">All products</SelectItem>}{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Discount</Label><Select value={form.discountPercent} onValueChange={(value) => { update('discountPercent', value); if (value !== '100') update('purpose', 'promotion'); else if (form.purpose === 'promotion') update('purpose', 'manual_access'); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{['5','10','15','20','25','30','40','50','75'].map((value) => <SelectItem key={value} value={value}>{value}% discount</SelectItem>)}{superAdmin && <SelectItem value="100">100% free access</SelectItem>}</SelectContent></Select></div>{fullDiscount && superAdmin && <div className="space-y-2"><Label>100% voucher type</Label><Select value={form.purpose} onValueChange={(value) => update('purpose', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual_access">Complimentary student/product access</SelectItem><SelectItem value="offline_payment">Recorded offline school payment</SelectItem></SelectContent></Select></div>}
+                <div className="space-y-2"><Label>Product</Label><Select value={form.productId} onValueChange={(value) => update('productId', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!fullDiscount && <SelectItem value="all">All products</SelectItem>}{products.map((product) => <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>School</Label><Select value={form.organizationId} onValueChange={(value) => update('organizationId', value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{!offline && <SelectItem value="none">Any eligible customer</SelectItem>}{organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2 md:col-span-2"><Label>Description</Label><Input value={form.description} onChange={(event) => update('description', event.target.value)} placeholder="Campaign or payment context" /></div>
                 {!offline && <div className="space-y-2 md:col-span-2"><Label>Optional account email restriction</Label><Input type="email" value={form.allowedEmail} onChange={(event) => update('allowedEmail', event.target.value.toLowerCase())} placeholder="student@example.com" /></div>}
@@ -294,12 +298,12 @@ export function AdminVoucherManager() {
                 <div className="space-y-2"><Label>Ends at</Label><Input type="datetime-local" value={form.endsAt} onChange={(event) => update('endsAt', event.target.value)} /></div>
               </div>
 
-              {offline && <div className="space-y-4 rounded-2xl border border-[#F2B84B]/40 bg-[#FCF1DB] p-4"><div className="flex items-start gap-3"><School className="mt-0.5 h-5 w-5 text-[#9A6508]" /><div><strong className="text-sm text-[#14232B]">Offline school activation</strong><p className="mt-1 text-xs leading-relaxed text-[#6B7980]">The school paid outside Razorpay. Redemption creates a paid order and grants exactly the recorded seat count.</p></div></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>Seats to activate</Label><Input required type="number" min="1" value={form.seatCount} onChange={(event) => update('seatCount', event.target.value)} /></div><div className="space-y-2"><Label>Offline amount received ₹</Label><Input required type="number" min="1" value={form.offlineAmountRupees} onChange={(event) => update('offlineAmountRupees', event.target.value)} /></div><div className="space-y-2 md:col-span-2"><Label>Receipt / invoice / transaction reference</Label><Input required value={form.offlineReference} onChange={(event) => update('offlineReference', event.target.value)} placeholder="INV-2026-104 / UTR number" /></div></div><div className="rounded-xl bg-white/70 px-4 py-3 text-xs text-[#44545C]"><strong>{selectedProduct?.name || 'Select one product'}</strong> · {selectedOrganization?.name || 'Select one school'}</div></div>}
+              {offline && <div className="space-y-4 rounded-2xl border border-[var(--amber)]/40 bg-[#FCF1DB] p-4"><div className="flex items-start gap-3"><School className="mt-0.5 h-5 w-5 text-[#9A6508]" /><div><strong className="text-sm text-[var(--foreground)]">Offline school activation</strong><p className="mt-1 text-xs leading-relaxed text-[var(--muted-foreground)]">The school paid outside Razorpay. Redemption creates a paid order and grants exactly the recorded seat count.</p></div></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>Seats to activate</Label><Input required type="number" min="1" value={form.seatCount} onChange={(event) => update('seatCount', event.target.value)} /></div><div className="space-y-2"><Label>Offline amount received ₹</Label><Input required type="number" min="1" value={form.offlineAmountRupees} onChange={(event) => update('offlineAmountRupees', event.target.value)} /></div><div className="space-y-2 md:col-span-2"><Label>Receipt / invoice / transaction reference</Label><Input required value={form.offlineReference} onChange={(event) => update('offlineReference', event.target.value)} placeholder="INV-2026-104 / UTR number" /></div></div><div className="rounded-xl bg-white/70 px-4 py-3 text-xs text-[#44545C]"><strong>{selectedProduct?.name || 'Select one product'}</strong> · {selectedOrganization?.name || 'Select one school'}</div></div>}
 
               <div className="space-y-2"><Label>Internal note</Label><Textarea rows={4} value={form.internalNote} onChange={(event) => update('internalNote', event.target.value)} placeholder="Approval context, sales owner or payment evidence note" /></div>
-              <label className="flex items-center gap-3 rounded-xl border border-[#E7ECEB] px-4 py-3"><Checkbox checked={form.active} onCheckedChange={(checked) => update('active', checked === true)} /><div><p className="text-sm font-medium text-[#14232B]">Voucher active</p><p className="text-xs text-[#6B7980]">Inactive vouchers cannot be reserved or redeemed.</p></div></label>
+              <label className="flex items-center gap-3 rounded-xl border border-[var(--line)] px-4 py-3"><Checkbox checked={form.active} onCheckedChange={(checked) => update('active', checked === true)} /><div><p className="text-sm font-medium text-[var(--foreground)]">Voucher active</p><p className="text-xs text-[var(--muted-foreground)]">Inactive vouchers cannot be reserved or redeemed.</p></div></label>
             </div>
-            <DialogFooter className="border-t border-[#E7ECEB] px-5 py-4 sm:px-6"><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={busy}>Cancel</Button><Button disabled={busy} className="bg-[#0E5A5A] hover:bg-[#0A4A4A]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : offline ? <School className="mr-2 h-4 w-4" /> : <TicketPercent className="mr-2 h-4 w-4" />}{form.id ? 'Save changes' : 'Create voucher'}</Button></DialogFooter>
+            <DialogFooter className="border-t border-[var(--line)] px-5 py-4 sm:px-6"><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={busy}>Cancel</Button><Button disabled={busy} className="bg-[var(--teal)] hover:bg-[#0A4A4A]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : offline ? <School className="mr-2 h-4 w-4" /> : <TicketPercent className="mr-2 h-4 w-4" />}{form.id ? 'Save changes' : complimentary ? 'Create free voucher' : 'Create voucher'}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

@@ -1,0 +1,67 @@
+{
+  "paper": {
+    "title": "NEET 2026 Sample Previous-Year Paper",
+    "code": "NEET-2026-SAMPLE",
+    "exam_type": "NEET",
+    "grade_level": "Grade 11-12",
+    "test_type": "previous_year_paper",
+    "duration_minutes": 180,
+    "description": "Sample V18 paper import template.",
+    "instructions": "Attempt all questions.",
+    "is_previous_year_paper": true,
+    "source_year": 2026,
+    "source_variant": "Main",
+    "source_paper_code": "11",
+    "pyq_source": {
+      "exam_type": "NEET",
+      "year": 2026,
+      "variant": "Main",
+      "paper_code": "11",
+      "paper_key": "neet-2026-main-code-11",
+      "display_name": "NEET 2026"
+    }
+  },
+  "questions": [
+    {
+      "client_id": "q-1",
+      "question_number": 1,
+      "section_key": "Physics",
+      "section_title": "Physics",
+      "subject_label": "Physics",
+      "stem_text": "Replace this with the complete question.",
+      "question_type": "single_correct",
+      "difficulty": "moderate",
+      "subject_name": "Physics",
+      "chapter_name": "Units and Measurements",
+      "topic_name": "Dimensions and dimensional analysis",
+      "correct_answer": [
+        "A"
+      ],
+      "solution_text": "Replace this with the reviewed solution.",
+      "marks": 4,
+      "negative_marks": 1,
+      "options": [
+        {
+          "option_key": "A",
+          "content_text": "Option A",
+          "display_order": 0
+        },
+        {
+          "option_key": "B",
+          "content_text": "Option B",
+          "display_order": 1
+        },
+        {
+          "option_key": "C",
+          "content_text": "Option C",
+          "display_order": 2
+        },
+        {
+          "option_key": "D",
+          "content_text": "Option D",
+          "display_order": 3
+        }
+      ]
+    }
+  ]
+}
