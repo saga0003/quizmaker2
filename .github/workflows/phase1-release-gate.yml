@@ -33,6 +33,9 @@ jobs:
       - name: Phase 1 hardening checks
         run: node scripts/phase1-hardening-smoke.mjs
 
+      - name: P0.6 historical snapshot checks
+        run: node scripts/p06-historical-snapshot-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
