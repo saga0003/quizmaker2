@@ -39,8 +39,40 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Regression suite
-        run: npm run qa:regression
+      - name: Regression — clean school UX
+        run: node scripts/phase1-clean-school-ux-smoke.mjs
+      - name: Regression — launch
+        run: node scripts/phase1-launch-smoke.mjs
+      - name: Regression — institution analytics
+        run: node scripts/institution-analytics-smoke.mjs
+      - name: Regression — increment 3
+        run: node scripts/phase1-increment3-smoke.mjs
+      - name: Regression — increment 4
+        run: node scripts/phase1-increment4-smoke.mjs
+      - name: Regression — increment 5-8
+        run: node scripts/phase1-increment5-8-smoke.mjs
+      - name: Regression — public student
+        run: node scripts/post8-public-student-smoke.mjs
+      - name: Regression — profile authorization
+        run: node scripts/profile-authorization-smoke.mjs
+      - name: Regression — student live dashboard
+        run: node scripts/student-live-dashboard-resources-smoke.mjs
+      - name: Regression — analytics
+        run: node scripts/v13-2-analytics-smoke.mjs
+      - name: Regression — Vercel smoke
+        run: node scripts/v13-2-vercel-smoke.mjs
+      - name: Regression — v14
+        run: node scripts/v14-smoke.mjs
+      - name: Regression — v15 SEO
+        run: node scripts/v15-seo-smoke.mjs
+      - name: Regression — v16 PYQ
+        run: node scripts/v16-neet-pyq-smoke.mjs
+      - name: Regression — v18 paper engine
+        run: node scripts/v18-pyq-paper-engine-smoke.mjs
+      - name: Regression — v19 fidelity
+        run: node scripts/v19-pyq-source-fidelity-smoke.mjs
+      - name: Regression — v19.1 import
+        run: node scripts/v19-1-latex-paper-import-smoke.mjs
 
       - name: Production build
         run: npm run build
