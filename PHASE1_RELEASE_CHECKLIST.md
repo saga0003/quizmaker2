@@ -39,7 +39,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 - [x] A1 Automated preview QA before production promotion. GitHub release gate is bound to `phase1-hardening`/`main`; exact release candidate must pass TypeScript, lint, hardening/regression suites and production build, with a matching READY Vercel preview before promotion.
 - [x] A2 Tenant-isolation regression suite for School A vs School B — verified 31 Aug 2026. A production-safe SQL policy audit covers student memberships, organization questions, papers, assignments, attempts/answers and analytics authorization boundaries; the automated `a2-tenant-isolation-smoke.mjs` is wired into every Phase-1 release gate. Hardening commit `7fffbd46cd226db2c6f01e76b2c8b41433bfbd13` passed the complete release gate in run `33337647257`, and the matching Vercel preview is READY. The real two-school end-to-end proof remains independently required under R16.
-- [ ] A3 Audit every privileged change: institution/subscription/account/password/question/paper/result/view-as/resource.
+- [x] A3 Audit every privileged change: institution/subscription/account/password/question/paper/result/view-as/resource — verified 31 Aug 2026. Live Supabase migration `phase1_privileged_audit_coverage` installs metadata-only audit triggers across institution, subscription, account/membership, credential state, question/options, paper/sections/questions/assignments and protected-resource mutations, plus privileged result mutations. Student-owned attempt updates are excluded from privileged audit noise. Super Admin read-only View As now records guarded `view_as.started`/`view_as.ended` events; anonymous execution is denied. The dedicated 18-point `a3-privileged-audit-smoke.mjs`, TypeScript, lint, all regression suites and production build passed release gate run `33342107192` on commit `99b00ec070e9457d1a38bd2c74c1a3ee77110113`.
 - [ ] A4 RLS cleanup for legacy staging/recovery tables and documented grants.
 - [ ] A5 Protected resources use authenticated/signed URLs where content is private.
 - [ ] A6 Upload hardening: file signatures/magic bytes; sanitize or restrict SVG.
@@ -135,7 +135,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [ ] I1 `Audit & Health` workspace.
 - [ ] I2 Health status: deployment, database, storage, failed imports, failed test starts/saves/submissions.
 - [ ] I3 Usage counts computed in PostgreSQL, not by downloading entire tables into application memory.
-- [ ] I4 Support-safe View As actions are audited.
+- [x] I4 Support-safe View As actions are audited — verified as part of A3; read-only Super Admin View As records guarded start/end events in `audit_logs` and refuses to enter preview if the start event cannot be recorded.
 - [ ] I5 Monitoring/alerts for build failures, 5xx, auth/test/import failures and core dependency outages.
 - [ ] I6 Backup/PITR strategy, R2 recovery, Vercel rollback and documented incident runbook.
 - [ ] I7 Targeted database indexes for exam, student, question, paper and paper-question hot paths.
