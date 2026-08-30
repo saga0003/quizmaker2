@@ -51,6 +51,9 @@ jobs:
       - name: P0.12 credential security checks
         run: node scripts/p012-credential-security-smoke.mjs
 
+      - name: A2 tenant isolation checks
+        run: node scripts/a2-tenant-isolation-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
