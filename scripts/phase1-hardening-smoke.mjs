@@ -21,6 +21,7 @@ const assignmentPublishGuard = read('supabase/migrations/20260830231500_phase1_a
 const resultReleaseMigration = read('supabase/migrations/20260830235800_phase1_result_release_security.sql');
 const resultLegacyLockdown = read('supabase/migrations/20260830235900_phase1_result_release_legacy_rpc_lockdown.sql');
 const crossSchoolMigration = read('supabase/migrations/20260831001200_phase1_cross_school_analytics_isolation.sql');
+const supportScopeMigration = read('supabase/migrations/20260831005500_phase1_platform_support_analytics_scope.sql');
 const assignmentCenter = read('src/components/evidara/paper-assignment-center.tsx');
 const responseAudit = read('src/components/analytics-v12/question-response-audit.tsx');
 const studentResults = read('src/components/papers/StudentResults.tsx');
@@ -77,6 +78,12 @@ check('live analytics attempts are institution-scoped', /attempt\.organization_i
 check('live analytics comparison cohort is institution-scoped', /cohort_attempt\.organization_id = v_scope_org/i.test(crossSchoolMigration));
 check('cross-school answer review is rejected', /This assessment belongs to another institution/i.test(crossSchoolMigration));
 check('scoped helper RPCs are internal-only', /revoke all on function public\.analytics_scope_organization_v20\(uuid\) from public, anon, authenticated/i.test(crossSchoolMigration));
+check('platform support has an explicit institution-scoped analytics RPC', /create or replace function public\.get_student_analytics_scoped_v20/i.test(supportScopeMigration) && /p_organization_id uuid/i.test(supportScopeMigration));
+check('platform support analytics writes an audit record', /support\.analytics\.view/.test(supportScopeMigration) && /insert into public\.audit_logs/i.test(supportScopeMigration));
+check('platform support raw scope cannot be implicit', /Platform support analytics requires an explicit institution scope/.test(supportScopeMigration));
+check('transferred student compatibility path refuses multi-school aggregation', /history in multiple institutions\. Choose one institution/i.test(supportScopeMigration));
+check('explicit support scope is propagated into live analytics', /set_config\('evidara\.analytics_scope_org',\s*p_organization_id::text,\s*true\)/i.test(supportScopeMigration));
+check('explicit support RPC is not anonymous', /revoke all on function public\.get_student_analytics_scoped_v20[\s\S]*from public, anon/i.test(supportScopeMigration));
 
 check('question evidence code no longer uses PromiseLike.finally', !/\.finally\s*\(/.test(responseAudit));
 check('school licence UI states ₹199 per licensed student', /₹199\s*\/\s*licensed student\s*\/\s*year/i.test(subscriptionCenter));
