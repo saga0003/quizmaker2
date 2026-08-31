@@ -279,3 +279,21 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
 - **Why the run stopped:** C9 is fully verified. C10 implementation/regression is staged, but permanent release-gate wiring and a clean exact-candidate gate are still required before C10 can receive a checkmark.
 - **Exact next action:** wire `c10-simplified-import-flow-smoke.mjs` into the permanent release gate through the authorized GitHub connector; run the complete gate on the staged C10 candidate, fix any regressions, verify matching Vercel preview, then mark C10 complete and immediately begin C11 server-authoritative duplicate detection.
+
+## 2026-09-01 01:59:31 IST — C10 verified; C11 duplicate-scope audit started / final heartbeat
+
+- **Run start/end:** 2026-09-01 01:59:31 IST → approximately 02:16 IST.
+- **Active engineering/review span:** approximately **16 minutes** in the available automation execution window; the requested 45–50 minute target was not reached because the runtime window ended earlier. No idle padding was added.
+- **Section worked:** C — Question bank.
+- **Checklist items completed this run:** C9 and C10.
+- **Items still pending in active section:** C11 only.
+- **Branch head used for C10 verification:** `c28151dc27ea11100e636328de0c9e9abc916588`.
+- **Commits created:** `a69fb6ffae01aab22cf615f0796c7aab252a9a77`, `b7b864259adaccf0f0ebcd46fadf3a18830b294b`, `a3d129f1f302464578e8ace3cd5af54d421c08e5`, `368305bedc76aff8e2ebb7dfc5e9e69d8f522cf3`, `38c171bfc56c6bb4ccfc24e20933f0114d9104be`, `c28151dc27ea11100e636328de0c9e9abc916588`.
+- **CI:** C9 exact gate `33436500099` PASS in 2m55s. First C10 gate `33437157013` failed only the obsolete clean-school wording assertion; after rework, exact C10 gate `33437505965` PASS in **2m21s**, with C10 12/12, clean-school 40/40, TypeScript, lint, every regression, production build and final enforcement green.
+- **Vercel:** C10 product preview for `368305bedc76aff8e2ebb7dfc5e9e69d8f522cf3` is READY. Permanent production remained on the known-good `main` deployment and had no runtime errors during the run; it was not promoted.
+- **Supabase:** project remained ACTIVE_HEALTHY. C9 live bank remained 2,840 questions and the search RPC authenticated-only. C11 discovery found the current `duplicate_hash` is populated on only 220/2,840 questions; a naive backfill with the old stem-text/options hash produces four false duplicate groups because many source-fidelity questions store their actual stem in `stem_latex`. A v2 fingerprint including text/LaTeX/image/passage/type yields **zero** duplicate groups across the current bank. No destructive duplicate cleanup was performed.
+- **Rework/failures/blockers:** C10 required one legitimate regression rework after gate `33437157013`. C11 is not blocked by user input, but requires a coordinated server migration so `save_question`, bulk import duplicate reuse and a scoped uniqueness constraint all use the same v2 fingerprint atomically.
+- **Section progress:** C has {cd}/{len(ci)} verified items (**{(100*cd/len(ci) if ci else 0):.1f}%**).
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Why the run stopped:** the automation execution window ended after C10 verification and C11 data-model discovery; implementing the coordinated C11 hash migration without enough verification time would be unsafe.
+- **Exact next action:** implement C11 with one authoritative v2 duplicate fingerprint covering text, LaTeX, image, passage, question type and canonical options; backfill safely, enforce per-institution/platform uniqueness at the database layer, make both `save_question` and atomic bulk import reuse/check the same fingerprint, add a permanent C11 concurrency/scope regression, live-verify Supabase, run the complete release gate and then close Section C before starting D1.
