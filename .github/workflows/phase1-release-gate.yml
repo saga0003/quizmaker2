@@ -88,6 +88,8 @@ jobs:
         run: node scripts/c9-question-bank-pagination-smoke.mjs
       - name: C10 simplified import-flow checks
         run: node scripts/c10-simplified-import-flow-smoke.mjs
+      - name: C11 exact duplicate prevention checks
+        run: node scripts/c11-question-duplicate-prevention-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
