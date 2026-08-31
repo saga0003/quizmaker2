@@ -154,7 +154,6 @@ This log records each production-hardening run with observable implementation an
 - **Deployment/health:** Production remained healthy and permanent production was not promoted or altered. The final real-school acceptance criteria and remaining Phase 1 checklist are still incomplete.
 - **Next action:** C5 — enforce server-side analytics-ready validation before a question can become approved, then add a permanent regression and only mark C5 complete after the full release gate passes.
 
-
 ## 2026-08-31 16:57:54 IST — C5 Analytics-ready question approval
 
 - **Checklist item:** C5 — Server-side analytics-ready approval validation.
@@ -167,3 +166,18 @@ This log records each production-hardening run with observable implementation an
 - **Rework/failures:** Pre-apply schema inspection caught that `difficulty` is the `question_difficulty` enum, so the initial numeric comparison was corrected before the migration was applied; no invalid live migration was executed. One temporary helper workflow run (`33388234507`) failed because GitHub's workflow token cannot push workflow-file changes without workflow-write permission; the canonical release workflow was then updated through the authorized GitHub connector. Run `33388290956` was subsequently cancelled by normal concurrency after the cleanup commit. The exact final candidate passed cleanly.
 - **Deployment/health:** Production runtime error/fatal logs were clean at run start. The safe database approval guard is live; the permanent Vercel production web deployment was not promoted or altered, and final real-school acceptance remains incomplete.
 - **Next action:** C6 — establish one authoritative correct-answer model and server-enforce consistency between `questions.correct_answer` and option correctness before approval/scoring.
+
+## 2026-08-31 19:33:22 IST — C6 Canonical correct-answer authority (verified)
+
+- **Checklist item:** C6 — One authoritative correct-answer model; enforce consistency with option correctness.
+- **Run start:** 2026-08-31 19:33:22 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening`, the Phase 1 checklist/progress log, current release-gate state and Vercel production were inspected before implementation. Production runtime error/fatal checks for the preceding 24 hours were clean, so no production incident remediation was required. Permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 19:41:48 IST — `2e12c54fa4c2ee10c20087cd53daf3ead6336832` (`feat(c6): enforce canonical correct-answer authority`).
+- **Implementation end (final functional/release-gate commit):** 2026-08-31 19:42:29 IST — `9a5eba2f5320d297a067ee1bca86a759a5c89080` (`ci(c6): enforce correct-answer regression in release gate`).
+- **Observable elapsed engineering span:** **0m 41s** from first C6 implementation commit to the final exact functional/gate candidate.
+- **Verification:** GitHub Actions release-gate run `33401288267`, 2026-08-31 19:42:32–19:44:27 IST, duration **1m 55s — PASS**. Dedicated 16-point C6 regression, all prior hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed. Matching Vercel preview for the exact candidate is READY.
+- **Live database evidence:** `phase1_correct_answer_authority` is applied. `questions.correct_answer` is confirmed as the scoring authority because `submit_exam_attempt` grades against the frozen paper snapshot `correct_answer`. Deferred constraint triggers are installed on both `questions` and `question_options`; the validator is unavailable to `anon`/`authenticated` and available only to `service_role`. Pre-cutover audit found 46/46 multiple-correct rows consistent and 2,787/2,791 single-correct rows consistent; the four inconsistent rows are all `in_review` and were intentionally left unmodified rather than fabricating answer data.
+- **Implementation result:** Approved questions now fail closed unless canonical `correct_answer` is a non-empty, normalized key set with valid cardinality, referenced option keys exist, and the redundant `question_options.is_correct` flags exactly match it. Validation is deferred until transaction end so the existing `save_question` transaction can replace option rows without transient false failures. Draft/in-review authoring remains flexible, while approved-state drift through later option edits is prevented.
+- **Rework/failures:** No functional or final CI verification failure occurred. Two intermediate workflow runs from the migration and regression-only commits were superseded/cancelled by the final release-gate wiring commit through normal concurrency. Live discovery found four inconsistent legacy draft/in-review rows; because production had zero approved questions, no production data rewrite was necessary.
+- **Deployment/health:** Exact branch preview is READY. Permanent production remained healthy and was not promoted or altered because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** C7 — verify and harden institutional question-bank collaboration so teachers can see approved questions in assigned subjects, create/edit only their own drafts and submit them for review, while School Admin can review all questions belonging to the institution.
