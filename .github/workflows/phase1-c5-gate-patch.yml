@@ -1,0 +1,38 @@
+name: Wire C5 Into Phase 1 Gate
+
+on:
+  push:
+    branches: [phase1-hardening]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Add C5 release-gate step
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('.github/workflows/phase1-release-gate.yml')
+          s = p.read_text()
+          marker = "      - name: B7 academic-year rollover checks\n        run: node scripts/b7-academic-year-rollover-smoke.mjs\n"
+          addition = marker + "      - name: C5 analytics-ready approval checks\n        run: node scripts/c5-analytics-ready-approval-smoke.mjs\n"
+          if 'c5-analytics-ready-approval-smoke.mjs' not in s:
+              if marker not in s:
+                  raise SystemExit('B7 gate marker not found')
+              p.write_text(s.replace(marker, addition, 1))
+      - name: Commit gate wiring
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/phase1-release-gate.yml
+          git commit -m "ci(c5): enforce analytics-ready approval regression"
+          git push origin HEAD:phase1-hardening
