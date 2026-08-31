@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
 const migration = fs.readFileSync('supabase/migrations/20260901053000_phase1_question_duplicate_prevention.sql', 'utf8');
+const privilegeMigration = fs.readFileSync('supabase/migrations/20260901054500_phase1_question_duplicate_trigger_privileges.sql', 'utf8');
 const checks = [];
 const check = (name, fn) => { fn(); checks.push(name); };
 
@@ -64,6 +65,10 @@ check('blank text does not invoke fuzzy blank-vs-blank matching', () => {
 check('internal row hash helper is not browser executable', () => {
   assert.match(migration, /revoke all on function public\.question_duplicate_hash_v2\(uuid\) from public, anon, authenticated/);
   assert.match(migration, /grant execute on function public\.question_duplicate_hash_v2\(uuid\) to service_role/);
+});
+check('trigger helpers are not exposed as browser-callable SECURITY DEFINER RPCs', () => {
+  assert.match(privilegeMigration, /revoke all on function public\.prepare_question_duplicate_hash_v2\(\) from public, anon, authenticated/);
+  assert.match(privilegeMigration, /revoke all on function public\.finalize_question_duplicate_hash_v2\(\) from public, anon, authenticated/);
 });
 
 console.log(`C11 question duplicate prevention smoke: ${checks.length}/${checks.length} checks passed`);
