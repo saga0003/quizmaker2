@@ -29,18 +29,11 @@ jobs:
               raise SystemExit('bulkCreateAccounts marker not found')
           block = base64.b64decode(os.environ['B3_BLOCK']).decode()
           path.write_text(text.replace(marker, block + marker, 1))
-          workflow = Path('.github/workflows/phase1-release-gate.yml')
-          gate = workflow.read_text()
-          anchor = "      - name: B2 institution onboarding wizard checks\n        run: node scripts/b2-institution-onboarding-wizard-smoke.mjs\n"
-          addition = anchor + "      - name: B3 bulk student import checks\n        run: node scripts/b3-bulk-student-import-smoke.mjs\n"
-          if anchor not in gate:
-              raise SystemExit('B2 gate anchor not found')
-          workflow.write_text(gate.replace(anchor, addition, 1))
           PY
-      - name: Commit B3 server and release gate
+      - name: Commit B3 server
         run: |
           git config user.name "saga0003"
           git config user.email "sagar@smis.edu.in"
-          git add src/app/api/access-control/route.ts .github/workflows/phase1-release-gate.yml
+          git add src/app/api/access-control/route.ts
           git commit -m "feat(b3): enforce validated student roster imports"
           git push origin phase1-hardening
