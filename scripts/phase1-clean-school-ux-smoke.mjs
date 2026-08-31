@@ -22,7 +22,7 @@ check('AI helper is provider-independent', /ChatGPT|Gemini|Claude/.test(ai) && a
 check('AI helper covers LaTeX', ai.includes('LaTeX'));
 check('AI helper covers Excel/CSV', /Excel|CSV/.test(ai));
 check('AI helper covers image ZIP workflow', /ZIP/.test(ai) && /image/i.test(ai));
-check('import workflow communicates four steps', ['Upload source','AI prepare','Review & classify','Import & create paper'].every((text) => importer.includes(text)));
+check('import workflow communicates four steps', ['Upload','Map','Review','Import'].every((text) => importer.includes(`'${text}'`)));
 check('import can create a school paper', importer.includes('Create a paper from this import') && importer.includes('Import ${valid.length} & Create Paper'));
 check('import calls atomic phase1 paper RPC', importer.includes("bulk_import_questions_and_paper_phase1"));
 check('paper settings capture exam and grade', importer.includes('paperExam') && importer.includes('paperGrade'));
