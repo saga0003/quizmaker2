@@ -75,6 +75,9 @@ jobs:
       - name: A9 active institution checks
         run: node scripts/a9-active-institution-smoke.mjs
 
+      - name: A10 local autosave isolation checks
+        run: node scripts/a10-local-autosave-scope-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
