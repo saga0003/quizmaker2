@@ -66,3 +66,18 @@ This log records each production-hardening run with observable implementation an
 - **Rework/failures:** No functional or CI failure. The first implementation candidate passed its dedicated B1 regression and complete release gate.
 - **Deployment/health:** Production runtime remained clean and the permanent production deployment was not promoted. Only the live backward-compatible B1 database function was added; final real-school acceptance remains incomplete.
 - **Next action:** B2 — consolidate institution details, licence configuration and first School Admin selection into one guided Super Admin onboarding wizard that calls the verified B1 transactional endpoint.
+
+## 2026-08-31 14:57:29 IST — B2 Institution onboarding wizard (verified)
+
+- **Checklist item:** B2 — One institution onboarding wizard.
+- **Run start:** 2026-08-31 14:57:29 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` was inspected at the verified B1 checkpoint before implementation. Vercel production reported no runtime errors in the preceding 24 hours, so no production incident remediation was required. Permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 15:01:34 IST — `87907b9c7e6afbb97daab0801c7bf0967d055fbc` (`feat(b2): add institution onboarding wizard`).
+- **Implementation end (final functional candidate commit):** 2026-08-31 15:01:34 IST — the same atomic functional commit `87907b9c7e6afbb97daab0801c7bf0967d055fbc`.
+- **Observable elapsed engineering span:** 0m 00s between first and final relevant commits because B2 was delivered as one atomic functional commit; inspection/design and verification occurred within this run.
+- **Verification:** GitHub Actions release-gate run `33378118824`, 2026-08-31 15:01:42–15:03:56 IST, duration **2m 14s — PASS**. The dedicated 19-point B2 wizard regression, all prior P0/A/B1 hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed.
+- **Implementation result:** Super Admin institution creation is now one guided four-step flow: Institution → First admin → Licence → Review. Core institution fields, explicit first School Admin, positive licence count and valid annual dates are checked before advancing. The review shows the ₹199/student/year licence and explains the all-or-rollback transaction. Creation calls the verified B1 `/api/admin/institution-onboarding/` endpoint; existing-school editing remains available through School & Licence Control.
+- **Rework/failures:** No functional or CI verification failure occurred on the B2 candidate.
+- **Deployment/health:** The matching Vercel preview for `87907b9c7e6afbb97daab0801c7bf0967d055fbc` is READY. Production runtime remained clean and permanent production was not promoted because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** B3 — provide a first-class bulk student import with row validation, safe creation/update semantics and an exportable failed-row report.
+
