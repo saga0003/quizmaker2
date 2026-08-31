@@ -1,0 +1,44 @@
+name: Record Phase 1 B7 Progress
+
+on:
+  push:
+    branches: [phase1-hardening]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Append verified B7 progress entry
+        shell: bash
+        run: |
+          if grep -q "16:57:54 IST — B7 Academic-year rollover" PHASE1_PROGRESS_LOG.md; then
+            exit 0
+          fi
+          cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
+
+          ## 2026-08-31 16:57:54 IST — B7 Academic-year rollover / release-gate coverage (verified)
+
+          - **Checklist item:** B7 — Academic-year rollover/promotion flow preserves historic data.
+          - **Run start:** 2026-08-31 16:57:54 IST.
+          - **Repository/CI/deployment inspection:** `phase1-hardening` already contained the B7 functional migration shortly before this run began, while B4–B6 were verified. Production Vercel runtime error/fatal logs for the preceding 24 hours were clean and the permanent production deployment remained READY and unchanged. Workflow inspection found a release-gate coverage gap: the dedicated B4/B5/B6 regressions existed but were not explicitly invoked by the release workflow, and B7 had no permanent dedicated regression yet.
+          - **Implementation start (first relevant commit):** 2026-08-31 16:52:37 IST — `74f51ef62f3735af3500a8441e07b4a7892b84f3` (`feat(b7): preserve history during academic-year rollover`). This functional commit landed approximately five minutes before the hourly run start and was treated as unverified until the gate coverage audit completed.
+          - **Implementation end (final functional/release-gate commit):** 2026-08-31 17:02:03 IST — `1d9661d31021339e40e23301c27dc6f976d48d4a` (`ci(b4-b7): enforce student lifecycle regressions`), following dedicated B7 regression commit `2da5bd21210a120cf94811f4bbb521c4610efd74` at 17:01:28 IST.
+          - **Observable elapsed engineering span:** **9m 26s** from the first relevant B7 functional commit to the final release-gate coverage commit.
+          - **Verification:** GitHub Actions release-gate run `33387409580`, 2026-08-31 17:02:06–17:04:39 IST, duration **2m 33s — PASS**. The permanent 15-point B7 regression, B4/B5/B6 dedicated checks, all prior P0/A/B checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement all passed on exact candidate `1d9661d31021339e40e23301c27dc6f976d48d4a`.
+          - **Implementation result:** `promote_school_student` now locks and validates the source membership, requires School Manager scope, rejects inactive/locked/blocked promotions and protected historical target rows, marks the prior enrollment Completed, creates a separate active next-year membership for Grades below 12, completes Grade 12 without inventing a synthetic next-year enrollment, records rollover provenance/promotion events, and is retry-safe. The release gate permanently executes B4–B7 lifecycle regressions so these protections cannot silently fall out of CI coverage.
+          - **Rework/failures:** Initial B7 implementation run `33386668727` was green, but it was not accepted as final evidence because the workflow audit exposed the missing dedicated B4–B7 release-gate steps. A 15-point B7 regression was added and the workflow was wired to run B4/B5/B6/B7 explicitly. Intermediate run `33387361298` was cancelled by normal concurrency after the follow-up workflow commit; there was no functional verification failure on the final candidate.
+          - **Deployment/health:** Production remained healthy and permanent production was not promoted or altered. The final real-school acceptance criteria and remaining Phase 1 checklist are still incomplete.
+          - **Next action:** C5 — enforce server-side analytics-ready validation before a question can become approved, then add a permanent regression and only mark C5 complete after the full release gate passes.
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PHASE1_PROGRESS_LOG.md
+          git commit -m "docs(b7): append verified progress evidence"
+          git push origin HEAD:phase1-hardening
