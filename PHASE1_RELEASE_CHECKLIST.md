@@ -50,7 +50,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # B — Institution, staff and student lifecycle
 
-- [ ] B1 Transactional institution onboarding: institution + licence + first School Admin + membership + defaults + audit.
+- [x] B1 Transactional institution onboarding: institution + licence + first School Admin + membership + defaults + audit — verified 31 Aug 2026. Live migration `phase1_transactional_institution_onboarding` installs service-role-only `onboard_institution_v1`, which creates the institution, ₹199/student annual licence, active first School Admin membership/profile state, onboarding defaults and audit event in one PostgreSQL transaction. A deliberate incompatibility failure after tenant rows had begun proved rollback with zero residual institution rows; `anon` and `authenticated` cannot execute the RPC. Exact candidate `e4e6fb64d429f561018f3bb612585475d55bc20c` passed the complete release gate in run `33373586495` and its matching Vercel preview is READY.
 - [ ] B2 One institution onboarding wizard.
 - [ ] B3 First-class bulk student import with validation and failed-row export.
 - [ ] B4 Student lifecycle uses Active / Withdrawn / Completed / Suspended; no destructive delete after attempts exist.
