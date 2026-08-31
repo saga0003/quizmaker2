@@ -1,33 +1,31 @@
 "use client";
 
 import { Fragment, useMemo } from "react";
-import katex from "katex";
+import { BlockMath, InlineMath } from "react-katex";
 
 function safeFallback(latex: string) {
   return latex.replace(/[<>&]/g, "");
 }
 
 export function MathBlock({ latex, inline = false }: { latex?: string; inline?: boolean }) {
-  const html = useMemo(() => {
-    if (!latex?.trim()) return "";
-    try {
-      return katex.renderToString(latex.trim(), {
-        throwOnError: false,
-        displayMode: !inline,
-        strict: "warn",
-        trust: false,
-      });
-    } catch {
-      return `<code>${safeFallback(latex)}</code>`;
-    }
-  }, [latex, inline]);
+  const normalized = useMemo(() => latex?.trim() ?? "", [latex]);
+  if (!normalized) return null;
 
-  if (!latex?.trim()) return null;
+  const renderError = () => <code>{safeFallback(normalized)}</code>;
+  const options = {
+    throwOnError: false,
+    strict: "warn" as const,
+    trust: false,
+  };
+
   return (
-    <span
-      className={inline ? "evidara-math math-inline" : "evidara-math math-block block overflow-x-auto"}
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <span className={inline ? "evidara-math math-inline" : "evidara-math math-block block overflow-x-auto"}>
+      {inline ? (
+        <InlineMath math={normalized} renderError={renderError} settings={options} />
+      ) : (
+        <BlockMath math={normalized} renderError={renderError} settings={options} />
+      )}
+    </span>
   );
 }
 
