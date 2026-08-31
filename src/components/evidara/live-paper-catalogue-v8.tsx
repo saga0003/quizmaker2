@@ -339,7 +339,8 @@ const [deleteTarget, setDeleteTarget] = useState<PaperListRow | null>(null);
 const [rejectTarget, setRejectTarget] = useState<PaperListRow | null>(null);
 const [rejectionReason, setRejectionReason] = useState('');
 const routeHandled = useRef(false);
-const draftBase = useMemo(() => `evidara-v8-paper:${user?.id || 'anonymous'}:${kind}`, [kind, user?.id]);
+const draftScope = kind === 'admin' ? 'platform' : organizationId || 'no-institution';
+const draftBase = useMemo(() => `evidara-v8-paper:${user?.id || 'anonymous'}:${kind}:${draftScope}`, [draftScope, kind, user?.id]);
 const draftKey = `${draftBase}:${builder.id || 'new'}`;
 const load = useCallback(async () => {
 if (!supabase || !configured) {
