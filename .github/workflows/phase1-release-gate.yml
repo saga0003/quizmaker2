@@ -32,51 +32,38 @@ jobs:
 
       - name: Phase 1 hardening checks
         run: node scripts/phase1-hardening-smoke.mjs
-
       - name: P0.6 historical snapshot checks
         run: node scripts/p06-historical-snapshot-smoke.mjs
-
       - name: P0.7 annual student licence checks
         run: node scripts/p07-licence-model-smoke.mjs
-
       - name: P0.8 subscription enforcement checks
         run: node scripts/p08-subscription-enforcement-smoke.mjs
-
       - name: P0.10 exam network reliability checks
         run: node scripts/p010-exam-network-reliability-smoke.mjs
-
       - name: P0.11 RPC permission allowlist checks
         run: node scripts/p011-rpc-permission-smoke.mjs
-
       - name: P0.12 credential security checks
         run: node scripts/p012-credential-security-smoke.mjs
-
       - name: A2 tenant isolation checks
         run: node scripts/a2-tenant-isolation-smoke.mjs
-
       - name: A3 privileged audit checks
         run: node scripts/a3-privileged-audit-smoke.mjs
-
       - name: A4 legacy RLS checks
         run: node scripts/a4-legacy-rls-smoke.mjs
-
       - name: A5 protected resource checks
         run: node scripts/a5-protected-resource-smoke.mjs
-
       - name: A6 upload signature checks
         run: node scripts/a6-upload-hardening-smoke.mjs
-
       - name: A7 ZIP safety checks
         run: node scripts/a7-zip-safety-smoke.mjs
-
       - name: A8 rich-content safety checks
         run: node scripts/a8-rich-content-safety-smoke.mjs
-
       - name: A9 active institution checks
         run: node scripts/a9-active-institution-smoke.mjs
-
       - name: A10 local autosave isolation checks
         run: node scripts/a10-local-autosave-scope-smoke.mjs
+      - name: B1 transactional institution onboarding checks
+        run: node scripts/b1-transactional-onboarding-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
