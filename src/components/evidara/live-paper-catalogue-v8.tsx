@@ -321,6 +321,7 @@ const [message, setMessage] = useState('');
 const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] = useState('all');
 const [builderOpen, setBuilderOpen] = useState(false);
+const [builderStep, setBuilderStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 const [previewOpen, setPreviewOpen] = useState(false);
 const [importOpen, setImportOpen] = useState(false);
 const [paperFileImportOpen, setPaperFileImportOpen] = useState(false);
@@ -454,6 +455,7 @@ const distributionTotal = active
 ? DIFFICULTIES.reduce((sum, difficulty) => sum + Number(active.difficulty_distribution?.[difficulty] || 0), 0)
 : 0;
 function resetBuilder() {
+setBuilderStep(1);
 const section = emptySection(0, 'manual', subjectNames);
 setBuilder(emptyBuilder());
 setSections([section]);
@@ -490,6 +492,7 @@ setBuilderOpen(true);
 }
 async function openEdit(paper: PaperListRow) {
 if (!supabase) return;
+setBuilderStep(1);
 setBuilderOpen(true);
 setSaving(true);
 setError('');
@@ -981,7 +984,24 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 ))}
 </div>
+<div className="mb-5 overflow-x-auto rounded-xl border border-[var(--line)] bg-white p-2">
+<div className="grid min-w-[620px] grid-cols-5 gap-2">
+{([
+{ step: 1 as const, label: 'Basics' },
+{ step: 2 as const, label: 'Questions' },
+{ step: 3 as const, label: 'Settings' },
+{ step: 4 as const, label: 'Preview' },
+{ step: 5 as const, label: 'Publish' },
+]).map((item) => (
+<button key={item.step} type="button" onClick={() => setBuilderStep(item.step)} className={`rounded-lg px-3 py-2 text-left transition ${builderStep === item.step ? 'bg-[var(--teal)] text-white' : 'text-[var(--muted-foreground)] hover:bg-[var(--canvas)]'}`}>
+<span className="block text-[10px] font-semibold uppercase tracking-[0.12em] opacity-75">Step {item.step}</span>
+<span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
+</button>
+))}
+</div>
+</div>
 <div className="space-y-5">
+{builderStep === 1 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading number="1" title="Paper identity" description="Define the paper once so question filtering, approval and future product bundling remain accurate." />
@@ -1009,9 +1029,11 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 </CardContent>
 </Card>
+)}
+{builderStep === 3 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts and result visibility. Institution assignment and publishing rules control access outside this builder." />
+<SectionHeading number="3" title="Delivery and student experience" description="Set time, attempts and result visibility. Institution assignment and publishing rules control access outside this builder." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 <div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
 <div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
@@ -1024,10 +1046,12 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 </CardContent>
 </Card>
+)}
+{builderStep === 2 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading
-number="3"
+number="2A"
 title="Sections and selection strategy"
 description="Use one paper-wide default or choose Manual, Automatic or Hybrid independently for every section."
 action={<Button type="button" variant="outline" onClick={addSection} className="h-10 border-[var(--line)]"><Plus className="mr-2 h-4 w-4" />Add Section</Button>}
@@ -1102,11 +1126,13 @@ return (
 )}
 </CardContent>
 </Card>
+)}
+{builderStep === 2 && (
 <div className="grid min-w-0 gap-5 xl:grid-cols-2">
 <Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
-number="4"
+number="2B"
 title="Matching question bank"
 description="Only approved questions matching the paper exam, grade and active-section classification are shown."
 action={<div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => { setImportBefore(new Set(questions.map((question) => question.id))); setImportSection(activeSection); setImportOpen(true); }} className="border-[var(--line)]"><Upload className="mr-2 h-4 w-4" />Upload questions here</Button><Button type="button" variant="outline" size="sm" onClick={() => filteredQuestions.forEach((question) => addQuestion(question))} disabled={!filteredQuestions.length} className="border-[var(--line)]">Select all</Button></div>}
@@ -1133,7 +1159,7 @@ action={<div className="flex flex-wrap gap-2"><Button type="button" variant="out
 <Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
-number="5"
+number="2C"
 title="Paper questions"
 description="Review order, section assignment and marks before saving or submitting the paper."
 action={<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="border-[var(--line)]"><Eye className="mr-2 h-4 w-4" />Test Preview</Button>}
@@ -1163,13 +1189,40 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 </CardContent>
 </Card>
 </div>
+)}
+{builderStep === 4 && (
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
+<CardContent className="space-y-5 p-4 sm:p-5">
+<SectionHeading number="4" title="Preview" description="Review the learner-facing paper before moving to the final publish step." />
+<div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-5">
+<div className="grid gap-3 sm:grid-cols-3"><div><p className="text-xs text-[var(--muted-foreground)]">Questions</p><p className="mt-1 text-xl font-bold">{selected.length}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Marks</p><p className="mt-1 text-xl font-bold">{totalMarks}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Duration</p><p className="mt-1 text-xl font-bold">{builder.duration} min</p></div></div>
+<Button type="button" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="mt-5 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Eye className="mr-2 h-4 w-4" />Open learner preview</Button>
+</div>
+</CardContent>
+</Card>
+)}
+{builderStep === 5 && (
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
+<CardContent className="space-y-5 p-4 sm:p-5">
+<SectionHeading number="5" title="Publish" description="Ready to publish or submit? Review the paper summary, then use the final action below." />
+<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Title</p><p className="mt-1 font-semibold">{builder.title || 'Not set'}</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Paper code</p><p className="mt-1 font-semibold">{builder.code || 'Not set'}</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Questions</p><p className="mt-1 font-semibold">{selected.length} · {totalMarks} marks</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Delivery</p><p className="mt-1 font-semibold">{builder.duration} min · {builder.openForever ? 'Always open' : 'Scheduled'}</p></div>
+</div>
+</CardContent>
+</Card>
+)}
 </div>
 </div>
 <DialogFooter className="border-t border-[var(--line)] bg-white px-4 py-4 sm:px-6">
-<div className="mr-auto text-sm text-[var(--muted-foreground)]">{selected.length} questions · {totalMarks} marks · {builder.duration} minutes</div>
+<div className="mr-auto text-sm text-[var(--muted-foreground)]">Step {builderStep} of 5 · {selected.length} questions · {totalMarks} marks</div>
 <Button type="button" variant="outline" onClick={() => setBuilderOpen(false)} disabled={saving} className="h-11 border-[var(--line)]">Close</Button>
+{builderStep > 1 && <Button type="button" variant="outline" disabled={saving} onClick={() => setBuilderStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 border-[var(--line)]">Back</Button>}
 <Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
-<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>
+{builderStep < 5 && <Button type="button" disabled={saving} onClick={() => setBuilderStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">Next</Button>}
+{builderStep === 5 && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>)}
 </DialogFooter>
 </DialogContent>
 </Dialog>
