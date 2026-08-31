@@ -16,79 +16,19 @@ jobs:
         with:
           ref: phase1-hardening
       - name: Add server-authoritative student import
-        shell: python
+        env:
+          B3_BLOCK: "ICAgIH0gZWxzZSBpZiAoYWN0aW9uID09PSAnYnVsa0ltcG9ydFN0dWRlbnRzJykgewogICAgICBjb25zdCByb3dzID0gQXJyYXkuaXNBcnJheShib2R5LnJvd3MpID8gYm9keS5yb3dzIGFzIEFycmF5PFJlY29yZDxzdHJpbmcsIHVua25vd24+PiA6IFtdOwogICAgICBpZiAoIXJvd3MubGVuZ3RoKSB0aHJvdyBPYmplY3QuYXNzaWduKG5ldyBFcnJvcignTm8gc3R1ZGVudCByb3dzIHdlcmUgc3VwcGxpZWQuJyksIHsgc3RhdHVzOiA0MDAgfSk7CiAgICAgIGlmIChyb3dzLmxlbmd0aCA+IDEwMDApIHRocm93IE9iamVjdC5hc3NpZ24obmV3IEVycm9yKCdTdHVkZW50IGltcG9ydHMgYXJlIGxpbWl0ZWQgdG8gMSwwMDAgcm93cyBwZXIgZmlsZS4gU3BsaXQgdGhlIHJvc3RlciBhbmQgcmV0cnkuJyksIHsgc3RhdHVzOiA0MDAgfSk7CiAgICAgIGNvbnN0IHJlcXVlc3RlZE9yZyA9IGJvZHkub3JnYW5pemF0aW9uSWQgPyBTdHJpbmcoYm9keS5vcmdhbml6YXRpb25JZCkgOiBudWxsOwogICAgICBjb25zdCBvcmdhbml6YXRpb25JZCA9IGN0eC5yb2xlID09PSAnc2Nob29sX2FkbWluJyA/IGN0eC5vcmdhbml6YXRpb25JZCA6IHJlcXVlc3RlZE9yZzsKICAgICAgaWYgKCFvcmdhbml6YXRpb25JZCkgdGhyb3cgT2JqZWN0LmFzc2lnbihuZXcgRXJyb3IoJ0Nob29zZSBhbiBpbnN0aXR1dGlvbiBmb3IgdGhpcyBzdHVkZW50IGltcG9ydC4nKSwgeyBzdGF0dXM6IDQwMCB9KTsKICAgICAgaWYgKGN0eC5yb2xlID09PSAnc2Nob29sX2FkbWluJyAmJiBvcmdhbml6YXRpb25JZCAhPT0gY3R4Lm9yZ2FuaXphdGlvbklkKSB0aHJvdyBPYmplY3QuYXNzaWduKG5ldyBFcnJvcignU2Nob29sIEFkbWluIGNhbiBpbXBvcnQgc3R1ZGVudHMgb25seSBpbnRvIHRoZWlyIG93biBzY2hvb2wuJyksIHsgc3RhdHVzOiA0MDMgfSk7CiAgICAgIGNvbnN0IHsgZGF0YTogb3JnYW5pemF0aW9uIH0gPSBhd2FpdCBjdHguYWRtaW4uZnJvbSgnb3JnYW5pemF0aW9ucycpLnNlbGVjdCgnaWQsc3RhdHVzJykuZXEoJ2lkJywgb3JnYW5pemF0aW9uSWQpLm1heWJlU2luZ2xlKCk7CiAgICAgIGlmICghb3JnYW5pemF0aW9uKSB0aHJvdyBPYmplY3QuYXNzaWduKG5ldyBFcnJvcignVGhlIHNlbGVjdGVkIGluc3RpdHV0aW9uIGRvZXMgbm90IGV4aXN0LicpLCB7IHN0YXR1czogNDAwIH0pOwogICAgICBpZiAoY3R4LnJvbGUgPT09ICdldmlkYXJhX2FkbWluJykgewogICAgICAgIGNvbnN0IHRvZGF5ID0gbmV3IERhdGUoKS50b0lTT1N0cmluZygpLnNsaWNlKDAsIDEwKTsKICAgICAgICBjb25zdCB7IGRhdGE6IHN1YnNjcmlwdGlvbiB9ID0gYXdhaXQgY3R4LmFkbWluLmZyb20oJ3NjaG9vbF9zdWJzY3JpcHRpb25zJykuc2VsZWN0KCdpZCcpLmVxKCdvcmdhbml6YXRpb25faWQnLCBvcmdhbml6YXRpb25JZCkuZXEoJ3N0YXR1cycsICdhY3RpdmUnKS5sdGUoJ3N0YXJ0c19hdCcsIHRvZGF5KS5ndGUoJ2VuZHNfYXQnLCB0b2RheSkubGltaXQoMSkubWF5YmVTaW5nbGUoKTsKICAgICAgICBpZiAoIXN1YnNjcmlwdGlvbikgdGhyb3cgT2JqZWN0LmFzc2lnbihuZXcgRXJyb3IoJ0V2aWRhcmEgQWRtaW4gY2FuIHByb3Zpc2lvbiBhbiBpbnN0aXR1dGlvbiBvbmx5IGFmdGVyIGFuIGFjdGl2ZSBwYWlkIHN1YnNjcmlwdGlvbiBpcyBjb25maXJtZWQuJyksIHsgc3RhdHVzOiA0MDMgfSk7CiAgICAgIH0KICAgICAgY29uc3QgcmVzdWx0czogQXJyYXk8UmVjb3JkPHN0cmluZywgdW5rbm93bj4+ID0gW107CiAgICAgIGNvbnN0IHNlZW5FbWFpbHMgPSBuZXcgU2V0PHN0cmluZz4oKTsKICAgICAgY29uc3QgdmFsaWRFbWFpbCA9IC9eW15cc0BdK0BbXlxzQF0rXC5bXlxzQF0rJC87CiAgICAgIGNvbnN0IHZhbGlkQWNhZGVtaWNZZWFyID0gL15cZHs0fSg/Oi1cZHsyLDR9KT8kLzsKICAgICAgZm9yIChsZXQgaW5kZXggPSAwOyBpbmRleCA8IHJvd3MubGVuZ3RoOyBpbmRleCArPSAxKSB7CiAgICAgICAgY29uc3Qgcm93ID0gcm93c1tpbmRleF07CiAgICAgICAgY29uc3Qgcm93TnVtYmVyID0gTnVtYmVyKHJvdy5yb3dOdW1iZXIgfHwgaW5kZXggKyAyKTsKICAgICAgICBjb25zdCBmdWxsTmFtZSA9IFN0cmluZyhyb3cuZnVsbE5hbWUgfHwgcm93Lm5hbWUgfHwgJycpLnRyaW0oKTsKICAgICAgICBjb25zdCBlbWFpbCA9IFN0cmluZyhyb3cuZW1haWwgfHwgJycpLnRyaW0oKS50b0xvd2VyQ2FzZSgpOwogICAgICAgIGNvbnN0IHBob25lID0gU3RyaW5nKHJvdy5waG9uZSB8fCAnJykudHJpbSgpOwogICAgICAgIGNvbnN0IGdyYWRlID0gTnVtYmVyKHJvdy5ncmFkZSk7CiAgICAgICAgY29uc3Qgc2VjdGlvbiA9IFN0cmluZyhyb3cuc2VjdGlvbiB8fCAnJykudHJpbSgpOwogICAgICAgIGNvbnN0IGFjYWRlbWljWWVhciA9IFN0cmluZyhyb3cuYWNhZGVtaWNZZWFyIHx8ICcnKS50cmltKCk7CiAgICAgICAgY29uc3QgYm9hcmQgPSBTdHJpbmcocm93LmJvYXJkIHx8ICdPdGhlcicpLnRyaW0oKSB8fCAnT3RoZXInOwogICAgICAgIGNvbnN0IHBhcmVudE5hbWUgPSBTdHJpbmcocm93LnBhcmVudE5hbWUgfHwgJycpLnRyaW0oKTsKICAgICAgICBjb25zdCBwYXJlbnRQaG9uZSA9IFN0cmluZyhyb3cucGFyZW50UGhvbmUgfHwgJycpLnRyaW0oKTsKICAgICAgICBjb25zdCBzb3VyY2UgPSB7IHJvd051bWJlciwgZnVsbE5hbWUsIGVtYWlsLCBwaG9uZSwgZ3JhZGU6IFN0cmluZyhyb3cuZ3JhZGUgfHwgJycpLCBzZWN0aW9uLCBhY2FkZW1pY1llYXIsIGJvYXJkLCBwYXJlbnROYW1lLCBwYXJlbnRQaG9uZSB9OwogICAgICAgIGlmIChmdWxsTmFtZS5sZW5ndGggPCAyKSB7IHJlc3VsdHMucHVzaCh7IC4uLnNvdXJjZSwgc3RhdHVzOiAnZmFpbGVkJywgZXJyb3I6ICdTdHVkZW50IG5hbWUgaXMgcmVxdWlyZWQuJyB9KTsgY29udGludWU7IH0KICAgICAgICBpZiAoIXZhbGlkRW1haWwudGVzdChlbWFpbCkpIHsgcmVzdWx0cy5wdXNoKHsgLi4uc291cmNlLCBzdGF0dXM6ICdmYWlsZWQnLCBlcnJvcjogJ0EgdmFsaWQgZW1haWwgaXMgcmVxdWlyZWQuJyB9KTsgY29udGludWU7IH0KICAgICAgICBpZiAoIU51bWJlci5pc0ludGVnZXIoZ3JhZGUpIHx8IGdyYWRlIDwgMSB8fCBncmFkZSA+IDEyKSB7IHJlc3VsdHMucHVzaCh7IC4uLnNvdXJjZSwgc3RhdHVzOiAnZmFpbGVkJywgZXJyb3I6ICdHcmFkZSBtdXN0IGJlIGFuIGludGVnZXIgZnJvbSAxIHRvIDEyLicgfSk7IGNvbnRpbnVlOyB9CiAgICAgICAgaWYgKCF2YWxpZEFjYWRlbWljWWVhci50ZXN0KGFjYWRlbWljWWVhcikpIHsgcmVzdWx0cy5wdXNoKHsgLi4uc291cmNlLCBzdGF0dXM6ICdmYWlsZWQnLCBlcnJvcjogJ0FjYWRlbWljIHllYXIgbXVzdCBsb29rIGxpa2UgMjAyNiBvciAyMDI2LTI3LicgfSk7IGNvbnRpbnVlOyB9CiAgICAgICAgaWYgKHNlZW5FbWFpbHMuaGFzKGVtYWlsKSkgeyByZXN1bHRzLnB1c2goeyAuLi5zb3VyY2UsIHN0YXR1czogJ2ZhaWxlZCcsIGVycm9yOiAnRHVwbGljYXRlIGVtYWlsIGluIHRoaXMgQ1NWLicgfSk7IGNvbnRpbnVlOyB9CiAgICAgICAgc2VlbkVtYWlscy5hZGQoZW1haWwpOwoKICAgICAgICBjb25zdCBwYXNzd29yZCA9IGdlbmVyYXRlUGFzc3dvcmQoKTsKICAgICAgICBjb25zdCBjcmVhdGVkID0gYXdhaXQgY3R4LmFkbWluLmF1dGguYWRtaW4uY3JlYXRlVXNlcih7IGVtYWlsLCBwYXNzd29yZCwgZW1haWxfY29uZmlybTogdHJ1ZSwgdXNlcl9tZXRhZGF0YTogeyBmdWxsX25hbWU6IGZ1bGxOYW1lIH0gfSk7CiAgICAgICAgaWYgKGNyZWF0ZWQuZXJyb3IgfHwgIWNyZWF0ZWQuZGF0YS51c2VyKSB7IHJlc3VsdHMucHVzaCh7IC4uLnNvdXJjZSwgc3RhdHVzOiAnZmFpbGVkJywgZXJyb3I6IGNyZWF0ZWQuZXJyb3I/Lm1lc3NhZ2UgfHwgJ1VuYWJsZSB0byBjcmVhdGUgc3R1ZGVudCBhY2NvdW50LicgfSk7IGNvbnRpbnVlOyB9CiAgICAgICAgY29uc3QgdXNlcklkID0gY3JlYXRlZC5kYXRhLnVzZXIuaWQ7CiAgICAgICAgY29uc3QgeyBlcnJvcjogcHJvZmlsZUVycm9yIH0gPSBhd2FpdCBjdHguYWRtaW4uZnJvbSgncHJvZmlsZXMnKS51cGRhdGUoeyBmdWxsX25hbWU6IGZ1bGxOYW1lLCBwaG9uZTogcGhvbmUgfHwgbnVsbCwgcm9sZTogJ3N0dWRlbnQnIH0pLmVxKCdpZCcsIHVzZXJJZCk7CiAgICAgICAgaWYgKHByb2ZpbGVFcnJvcikgewogICAgICAgICAgYXdhaXQgY3R4LmFkbWluLmF1dGguYWRtaW4uZGVsZXRlVXNlcih1c2VySWQpOwogICAgICAgICAgcmVzdWx0cy5wdXNoKHsgLi4uc291cmNlLCBzdGF0dXM6ICdmYWlsZWQnLCBlcnJvcjogYFByb2ZpbGUgc2V0dXAgZmFpbGVkOiAke3Byb2ZpbGVFcnJvci5tZXNzYWdlfWAgfSk7CiAgICAgICAgICBjb250aW51ZTsKICAgICAgICB9CiAgICAgICAgY29uc3QgeyBlcnJvcjogbWVtYmVyc2hpcEVycm9yIH0gPSBhd2FpdCBjdHguYWRtaW4uZnJvbSgnc3R1ZGVudF9zY2hvb2xfbWVtYmVyc2hpcHMnKS5pbnNlcnQoewogICAgICAgICAgb3JnYW5pemF0aW9uX2lkOiBvcmdhbml6YXRpb25JZCwgc3R1ZGVudF9pZDogdXNlcklkLCBhY2FkZW1pY195ZWFyOiBhY2FkZW1pY1llYXIsIGdyYWRlLAogICAgICAgICAgc2VjdGlvbjogc2VjdGlvbiB8fCBudWxsLCBib2FyZCwgdHJhY2tzOiBbXSwgc3RhdHVzOiAnYWN0aXZlJywKICAgICAgICAgIHBhcmVudF9uYW1lOiBwYXJlbnROYW1lIHx8IG51bGwsIHBhcmVudF9waG9uZTogcGFyZW50UGhvbmUgfHwgbnVsbCwKICAgICAgICB9KTsKICAgICAgICBpZiAobWVtYmVyc2hpcEVycm9yKSB7CiAgICAgICAgICBhd2FpdCBjdHguYWRtaW4uYXV0aC5hZG1pbi5kZWxldGVVc2VyKHVzZXJJZCk7CiAgICAgICAgICByZXN1bHRzLnB1c2goeyAuLi5zb3VyY2UsIHN0YXR1czogJ2ZhaWxlZCcsIGVycm9yOiBtZW1iZXJzaGlwRXJyb3IubWVzc2FnZSB9KTsKICAgICAgICAgIGNvbnRpbnVlOwogICAgICAgIH0KICAgICAgICByZXN1bHRzLnB1c2goeyAuLi5zb3VyY2UsIHJvbGU6ICdzdHVkZW50Jywgc3RhdHVzOiAnY3JlYXRlZCcsIHVzZXJJZCwgdGVtcG9yYXJ5UGFzc3dvcmQ6IHBhc3N3b3JkIH0pOwogICAgICB9CiAgICAgIHJldHVybiBOZXh0UmVzcG9uc2UuanNvbih7IHJlc3VsdHMsIGNyZWF0ZWQ6IHJlc3VsdHMuZmlsdGVyKChyKSA9PiByLnN0YXR1cyA9PT0gJ2NyZWF0ZWQnKS5sZW5ndGgsIGZhaWxlZDogcmVzdWx0cy5maWx0ZXIoKHIpID0+IHIuc3RhdHVzID09PSAnZmFpbGVkJykubGVuZ3RoIH0sIHsgaGVhZGVyczogeyAnQ2FjaGUtQ29udHJvbCc6ICduby1zdG9yZScgfSB9KTsK"
         run: |
+          python - <<'PY'
+          import base64, os
           from pathlib import Path
           path = Path('src/app/api/access-control/route.ts')
           text = path.read_text()
           marker = "    } else if (action === 'bulkCreateAccounts') {"
           if marker not in text:
               raise SystemExit('bulkCreateAccounts marker not found')
-          block = r'''    } else if (action === 'bulkImportStudents') {
-      const rows = Array.isArray(body.rows) ? body.rows as Array<Record<string, unknown>> : [];
-      if (!rows.length) throw Object.assign(new Error('No student rows were supplied.'), { status: 400 });
-      if (rows.length > 1000) throw Object.assign(new Error('Student imports are limited to 1,000 rows per file. Split the roster and retry.'), { status: 400 });
-      const requestedOrg = body.organizationId ? String(body.organizationId) : null;
-      const organizationId = ctx.role === 'school_admin' ? ctx.organizationId : requestedOrg;
-      if (!organizationId) throw Object.assign(new Error('Choose an institution for this student import.'), { status: 400 });
-      if (ctx.role === 'school_admin' && organizationId !== ctx.organizationId) throw Object.assign(new Error('School Admin can import students only into their own school.'), { status: 403 });
-      const { data: organization } = await ctx.admin.from('organizations').select('id,status').eq('id', organizationId).maybeSingle();
-      if (!organization) throw Object.assign(new Error('The selected institution does not exist.'), { status: 400 });
-      if (ctx.role === 'evidara_admin') {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: subscription } = await ctx.admin.from('school_subscriptions').select('id').eq('organization_id', organizationId).eq('status', 'active').lte('starts_at', today).gte('ends_at', today).limit(1).maybeSingle();
-        if (!subscription) throw Object.assign(new Error('Evidara Admin can provision an institution only after an active paid subscription is confirmed.'), { status: 403 });
-      }
-      const results: Array<Record<string, unknown>> = [];
-      const seenEmails = new Set<string>();
-      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const validAcademicYear = /^\d{4}(?:-\d{2,4})?$/;
-      for (let index = 0; index < rows.length; index += 1) {
-        const row = rows[index];
-        const rowNumber = Number(row.rowNumber || index + 2);
-        const fullName = String(row.fullName || row.name || '').trim();
-        const email = String(row.email || '').trim().toLowerCase();
-        const phone = String(row.phone || '').trim();
-        const grade = Number(row.grade);
-        const section = String(row.section || '').trim();
-        const academicYear = String(row.academicYear || '').trim();
-        const board = String(row.board || 'Other').trim() || 'Other';
-        const parentName = String(row.parentName || '').trim();
-        const parentPhone = String(row.parentPhone || '').trim();
-        const source = { rowNumber, fullName, email, phone, grade: String(row.grade || ''), section, academicYear, board, parentName, parentPhone };
-        if (fullName.length < 2) { results.push({ ...source, status: 'failed', error: 'Student name is required.' }); continue; }
-        if (!validEmail.test(email)) { results.push({ ...source, status: 'failed', error: 'A valid email is required.' }); continue; }
-        if (!Number.isInteger(grade) || grade < 1 || grade > 12) { results.push({ ...source, status: 'failed', error: 'Grade must be an integer from 1 to 12.' }); continue; }
-        if (!validAcademicYear.test(academicYear)) { results.push({ ...source, status: 'failed', error: 'Academic year must look like 2026 or 2026-27.' }); continue; }
-        if (seenEmails.has(email)) { results.push({ ...source, status: 'failed', error: 'Duplicate email in this CSV.' }); continue; }
-        seenEmails.add(email);
-
-        const password = generatePassword();
-        const created = await ctx.admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName } });
-        if (created.error || !created.data.user) { results.push({ ...source, status: 'failed', error: created.error?.message || 'Unable to create student account.' }); continue; }
-        const userId = created.data.user.id;
-        const { error: profileError } = await ctx.admin.from('profiles').update({ full_name: fullName, phone: phone || null, role: 'student' }).eq('id', userId);
-        if (profileError) {
-          await ctx.admin.auth.admin.deleteUser(userId);
-          results.push({ ...source, status: 'failed', error: `Profile setup failed: ${profileError.message}` });
-          continue;
-        }
-        const { error: membershipError } = await ctx.admin.from('student_school_memberships').insert({
-          organization_id: organizationId, student_id: userId, academic_year: academicYear, grade,
-          section: section || null, board, tracks: [], status: 'active',
-          parent_name: parentName || null, parent_phone: parentPhone || null,
-        });
-        if (membershipError) {
-          await ctx.admin.auth.admin.deleteUser(userId);
-          results.push({ ...source, status: 'failed', error: membershipError.message });
-          continue;
-        }
-        results.push({ ...source, role: 'student', status: 'created', userId, temporaryPassword: password });
-      }
-      return NextResponse.json({ results, created: results.filter((r) => r.status === 'created').length, failed: results.filter((r) => r.status === 'failed').length }, { headers: { 'Cache-Control': 'no-store' } });
-''' + marker
-          path.write_text(text.replace(marker, block, 1))
-
+          block = base64.b64decode(os.environ['B3_BLOCK']).decode()
+          path.write_text(text.replace(marker, block + marker, 1))
           workflow = Path('.github/workflows/phase1-release-gate.yml')
           gate = workflow.read_text()
           anchor = "      - name: B2 institution onboarding wizard checks\n        run: node scripts/b2-institution-onboarding-wizard-smoke.mjs\n"
@@ -96,6 +36,7 @@ jobs:
           if anchor not in gate:
               raise SystemExit('B2 gate anchor not found')
           workflow.write_text(gate.replace(anchor, addition, 1))
+          PY
       - name: Commit B3 server and release gate
         run: |
           git config user.name "saga0003"
