@@ -1,4 +1,4 @@
-name: Record C9 00:00 hourly heartbeat
+name: Record C9 verification and stage C10
 on:
   push:
     branches: [phase1-hardening]
@@ -12,20 +12,63 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: phase1-hardening
-      - name: Append C9 heartbeat
+      - name: Record C9 and stage C10
         shell: python {0}
         run: |
           from pathlib import Path
           import re
-          checklist=Path('PHASE1_RELEASE_CHECKLIST.md').read_text(); log=Path('PHASE1_PROGRESS_LOG.md'); body=log.read_text()
-          marker='## 2026-09-01 00:00:47 IST — C9 bounded question-bank client conversion (in progress) / hourly heartbeat'
-          items=re.findall(r'^- \[([ x])\]', checklist, re.M); done=sum(v=='x' for v in items); total=len(items)
-          cm=re.search(r'^# C —.*?(?=^# D —)', checklist, re.M|re.S); ci=re.findall(r'^- \[([ x])\]', cm.group(0), re.M) if cm else []; cd=sum(v=='x' for v in ci)
-          entry=f'''\n\n{marker}\n\n- **Run start/end:** 2026-09-01 00:00:47 IST → approximately 00:34 IST.\n- **Section worked:** C — Question bank; C9.\n- **Checklist items completed:** None yet; C9 remains unchecked until the bounded client candidate passes the complete release gate.\n- **Substantial work completed:** Re-inspected checklist, progress log, `phase1-hardening`, latest release gate and the live C9 pagination contract. Confirmed starting head `1982830874b2a9a08c3689d4a79d653bb4717466` and prior gate `33421042431` PASS. Re-read `live-question-bank.tsx` and implemented a guarded one-time source conversion workflow that replaces 1,000-row whole-bank batching/local filtering with `search_question_bank_v1`, bounded page-ID detail hydration, server totals/stats/facets/school groups, page-bounded review/selection and current-page export. The first workflow definition failed before jobs due to an invalid Python shell declaration; it was corrected to `python {{0}}` and rerun as Actions run `33425625272`, queued at handoff.\n- **Active engineering time / observable span:** approximately **33 minutes** of inspection, client conversion design, guarded patch implementation and workflow rework in the available runtime. The 45–50 minute target was not fully reached before handoff; no idle padding was added.\n- **Branch/commits:** `12f96025f67cf26b0592162d1bc72663e7c1e406` (initial guarded client patch workflow), `91e579abea29b7da8f72da9125151cb814d4794f` (valid Python workflow shell), plus this heartbeat scheduling commit.\n- **CI/deployment state:** prior exact release gate `33421042431` PASS. C9 patch run `33425625272` queued at handoff; normal release gate `33425625343` also pending. Permanent production was not promoted or altered.\n- **Vercel/Supabase state:** C9 live Supabase `search_question_bank_v1` remains applied with bounded <=100 page semantics and RLS-preserving execution. No database change was needed in this run. Production remains protected; preview/full-gate evidence is still required for C9 completion.\n- **Rework/failures/blockers:** first temporary patch workflow run `33425564675` failed at workflow validation with zero jobs because `shell: python` was invalid in this new workflow. Corrected to `shell: python {{0}}`; no product code or production state was changed by the failed run. No user-input blocker.\n- **Section progress:** C has {{cd}}/{{len(ci)}} verified items (**{{(100*cd/len(ci) if ci else 0):.1f}}%**); C9 materially in progress.\n- **Overall Phase 1 percentage:** {{done}}/{{total}} checklist items verified (**{{(100*done/total if total else 0):.1f}}%**).\n- **Why the run stopped:** the bounded client patch and release gate were still queued/running at the automation handoff boundary, so C9 was not marked complete without evidence.\n- **Exact next action:** inspect run `33425625272`; if patch succeeds, remove the temporary workflow, run/fix TypeScript and C9 acceptance, wire `c9-question-bank-pagination-smoke.mjs` into the permanent release gate, require a clean complete gate and matching preview, then mark C9 verified.\n'''
+
+          checklist_path=Path('PHASE1_RELEASE_CHECKLIST.md')
+          checklist=checklist_path.read_text()
+          c9_old='- [ ] C9 Server-side question search/filter/pagination; do not load entire bank into browser.'
+          c9_new='- [x] **C9 Server-side question search/filter/pagination** — verified 1 Sep 2026. Live `search_question_bank_v1` performs RLS-preserving server-side search/filter/sort/pagination with a hard 100-row page cap; the browser uses 20-row pages, hydrates only returned IDs, and bounds select-all, review navigation and export to the current page instead of downloading the whole 2,840-question bank. Anonymous execution is denied while authenticated access is allowed. The permanent 10-point `c9-question-bank-pagination-smoke.mjs` is wired into the release gate. Legacy V14 teacher-scope coverage was updated to assert the server `p_only_mine` path. Exact candidate `a3d129f1f302464578e8ace3cd5af54d421c08e5` passed release-gate run `33436500099` (2m 55s), including C9, TypeScript, lint, every regression suite, production build and final gate enforcement. Permanent production was not promoted.'
+          if c9_old in checklist:
+              checklist=checklist.replace(c9_old,c9_new,1)
+              checklist_path.write_text(checklist)
+          elif c9_new not in checklist:
+              raise SystemExit('C9 checklist marker not found')
+
+          ui=Path('src/components/evidara/question-bulk-import-dialog-core.tsx')
+          text=ui.read_text()
+          old="[['1','Upload source','Add files or content'],['2','AI prepare','Convert difficult source files'],['3','Review & classify','Fix only what needs attention'],['4','Import & create paper','Save to bank and build paper']]"
+          new="[['1','Upload','Choose source files or content'],['2','Map','Confirm academic mapping'],['3','Review','Fix only what needs attention'],['4','Import','Save ready questions']]"
+          if old in text:
+              ui.write_text(text.replace(old,new,1))
+          elif new not in text:
+              raise SystemExit('C10 step strip source not found')
+
+          smoke=Path('scripts/c10-simplified-import-flow-smoke.mjs')
+          smoke.write_text(r'''import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const component = fs.readFileSync('src/components/evidara/question-bulk-import-dialog-core.tsx', 'utf8');
+          const checks = [];
+          const check = (name, fn) => { fn(); checks.push(name); };
+          check('flow exposes Upload step', () => assert.match(component, /'1','Upload','Choose source files or content'/));
+          check('flow exposes Map step', () => assert.match(component, /'2','Map','Confirm academic mapping'/));
+          check('flow exposes Review step', () => assert.match(component, /'3','Review','Fix only what needs attention'/));
+          check('flow exposes Import step', () => assert.match(component, /'4','Import','Save ready questions'/));
+          check('source selection remains first action', () => assert.match(component, /Choose file/));
+          check('mapping is taxonomy aware', () => { assert.match(component, /subjectByName/); assert.match(component, /selectedChapter/); assert.match(component, /selectedTopic/); });
+          check('invalid rows block import', () => { assert.match(component, /valid\.length/); assert.match(component, /correct every highlighted issue before importing/); });
+          check('review includes learner preview', () => assert.match(component, /QuestionDevicePreview/));
+          check('Create Paper remains optional for schools', () => { assert.match(component, /createPaper/); assert.match(component, /setCreatePaper/); assert.match(component, /paperPayload/); });
+          check('paper creation stays atomic with import', () => assert.match(component, /bulk_import_questions_and_paper_phase1/));
+          check('plain import works with Create Paper off', () => assert.match(component, /paperPayload\s*=\s*createPaper\s*&&\s*kind\s*===\s*'school'/));
+          check('result reports imported reused failed', () => { assert.match(component, /result\?\.imported/); assert.match(component, /result\?\.reused/); assert.match(component, /result\?\.failed/); });
+          console.log(`C10 simplified import flow smoke: ${checks.length}/${checks.length} checks passed`);
+          ''')
+
+          log=Path('PHASE1_PROGRESS_LOG.md'); body=log.read_text()
+          marker='## 2026-09-01 01:59:31 IST — C9 verified; C10 simplified import flow staged / hourly heartbeat'
+          updated=checklist_path.read_text(); items=re.findall(r'^- \[([ x])\]', updated, re.M); done=sum(v=='x' for v in items); total=len(items)
+          cm=re.search(r'^# C —.*?(?=^# D —)', updated, re.M|re.S); ci=re.findall(r'^- \[([ x])\]', cm.group(0), re.M) if cm else []; cd=sum(v=='x' for v in ci)
+          entry=f'''\n\n{marker}\n\n- **Run start/end:** 2026-09-01 01:59:31 IST → approximately 02:10 IST.\n- **Section worked:** C — Question bank; C9 verification and C10 implementation start.\n- **Checklist items completed:** C9. C10 remains pending until its dedicated regression is wired into and passes the complete release gate.\n- **Substantial work completed:** Diagnosed the previous C9 gate failure as an obsolete V14 static assertion that still expected client-side `created_by/profile.id` filtering after teacher scope moved into `search_question_bank_v1`; updated the regression to assert `p_only_mine` plus school-teacher scope. Permanently wired the 10-point C9 regression into the release gate and removed the temporary C9 patch workflow. Live Supabase was rechecked at 2,840 questions; `search_question_bank_v1` is present, anonymous EXECUTE is denied and authenticated EXECUTE is allowed. Vercel production reported no runtime errors. After C9 passed, C10 work began by simplifying the visible flow to Upload → Map → Review → Import while retaining optional Create Paper and creating a 12-point C10 acceptance regression.\n- **Active engineering time / observable span:** approximately **11 minutes** in the available automation runtime; below the 45–50 minute target because the tool execution window is shorter than the requested focused block. No idle padding was added.\n- **Branch/commits created:** `a69fb6ffae01aab22cf615f0796c7aab252a9a77` (legacy V14 regression aligned with server teacher scope), `b7b864259adaccf0f0ebcd46fadf3a18830b294b` (C9 permanent gate wiring), `a3d129f1f302464578e8ace3cd5af54d421c08e5` (temporary C9 workflow cleanup), plus C10 staging/recorder commits from this run.\n- **CI state:** exact C9 candidate release gate `33436500099` PASS, 20:31:33Z–20:34:28Z (**2m 55s**). C9, TypeScript, lint, all legacy regressions, production build and final enforcement were green.\n- **Vercel/Supabase state:** C9 client candidate preview `8c633d5b3c41102630886cbebde04c3a2748bb04` and V14-fix preview `a69fb6ffae01aab22cf615f0796c7aab252a9a77` were READY during verification; latest cleanup preview was still building at inspection. Permanent production had zero runtime errors over 24h and was not promoted. Supabase project is ACTIVE_HEALTHY; no C9 database mutation was needed this run.\n- **Rework/failures/blockers:** two attempted one-time C10 patch workflow definitions (`33436836272`, `33436949064`) failed at workflow validation with zero jobs and were removed without touching product code or production. C10 was then staged through the already-proven repository recorder path. No user-input blocker.\n- **Section progress:** C has {{cd}}/{{len(ci)}} verified items (**{{(100*cd/len(ci) if ci else 0):.1f}}%**).\n- **Overall Phase 1 percentage:** {{done}}/{{total}} checklist items verified (**{{(100*done/total if total else 0):.1f}}%**).\n- **Why the run stopped:** C9 is fully verified. C10 implementation/regression is staged, but permanent release-gate wiring and a clean exact-candidate gate are still required before C10 can receive a checkmark.\n- **Exact next action:** wire `c10-simplified-import-flow-smoke.mjs` into the permanent release gate through the authorized GitHub connector; run the complete gate on the staged C10 candidate, fix any regressions, verify matching Vercel preview, then mark C10 complete and immediately begin C11 server-authoritative duplicate detection.\n'''
           if marker not in body: log.write_text(body.rstrip()+entry)
-      - name: Commit heartbeat
+      - name: Verify staged C10 regression
+        run: node scripts/c10-simplified-import-flow-smoke.mjs
+      - name: Commit C9 record and C10 staging
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git add PHASE1_PROGRESS_LOG.md
-          git diff --cached --quiet || (git commit -m "docs(c9): record 00:00 client conversion progress [skip ci]" && git push origin HEAD:phase1-hardening)
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md src/components/evidara/question-bulk-import-dialog-core.tsx scripts/c10-simplified-import-flow-smoke.mjs
+          git diff --cached --quiet || (git commit -m "feat(c10): simplify import flow after verified C9" && git push origin HEAD:phase1-hardening)
