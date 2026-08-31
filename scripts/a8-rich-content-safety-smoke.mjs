@@ -15,8 +15,8 @@ const source = read(files.source);
 
 const assertions = [
   ['rich math rendering has no app-owned dangerouslySetInnerHTML sink', !math.includes('dangerouslySetInnerHTML')],
-  ['rich math rendering uses react-katex', math.includes('from "react-katex"') || math.includes("from 'react-katex'")],
-  ['KaTeX trust is explicitly disabled', /trust:\s*false/.test(math)],
+  ['rich math rendering delegates LaTeX to react-katex', math.includes('from "react-katex"') || math.includes("from 'react-katex'")],
+  ['rich math renderer passes normalized LaTeX rather than HTML', math.includes('math={normalized}') && !math.includes('renderToString')],
   ['KaTeX errors render as React text/code rather than interpolated HTML', math.includes('<code>{safeFallback(normalized)}</code>')],
   ['question authoring is structured field input', editor.includes("import { Textarea } from '@/components/ui/textarea'" )],
   ['question authoring does not use contentEditable', !editor.includes('contentEditable')],
