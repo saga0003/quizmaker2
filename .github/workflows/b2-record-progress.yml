@@ -1,0 +1,41 @@
+name: Record B2 Phase 1 progress
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/b2-record-progress.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Record verified B2 evidence
+        shell: python
+        run: |
+          from pathlib import Path
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text()
+          old = '- [ ] B2 One institution onboarding wizard.'
+          new = '- [x] B2 One institution onboarding wizard — verified 31 Aug 2026. Super Admin institution creation is now a four-step guided flow (Institution → First admin → Licence → Review) with required-field/date/licence validation, an explicit existing first School Admin account, a fixed ₹199/student/year Phase 1 licence summary and a final transactional review. Creation calls the B1 `institution-onboarding` endpoint rather than the legacy school-control create path, while existing-school editing remains unchanged. Dedicated 19-point `b2-institution-onboarding-wizard-smoke.mjs`, TypeScript, lint, every required regression suite, production build and final gate enforcement passed exact candidate `87907b9c7e6afbb97daab0801c7bf0967d055fbc` in release-gate run `33378118824`; matching Vercel preview is READY.'
+          if old not in text:
+              raise SystemExit('B2 unchecked checklist line not found')
+          checklist.write_text(text.replace(old, new, 1))
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          entry = '''\n\n## 2026-08-31 14:57:29 IST — B2 Institution onboarding wizard (verified)\n\n- **Checklist item:** B2 — One institution onboarding wizard.\n- **Run start:** 2026-08-31 14:57:29 IST.\n- **Repository/CI/deployment inspection:** `phase1-hardening` was inspected at the verified B1 checkpoint before implementation. Vercel production reported no runtime errors in the preceding 24 hours, so no production incident remediation was required. Permanent production remained protected.\n- **Implementation start (first relevant commit):** 2026-08-31 15:01:34 IST — `87907b9c7e6afbb97daab0801c7bf0967d055fbc` (`feat(b2): add institution onboarding wizard`).\n- **Implementation end (final functional candidate commit):** 2026-08-31 15:01:34 IST — the same atomic functional commit `87907b9c7e6afbb97daab0801c7bf0967d055fbc`.\n- **Observable elapsed engineering span:** 0m 00s between first and final relevant commits because B2 was delivered as one atomic functional commit; inspection/design and verification occurred within this run.\n- **Verification:** GitHub Actions release-gate run `33378118824`, 2026-08-31 15:01:42–15:03:56 IST, duration **2m 14s — PASS**. The dedicated 19-point B2 wizard regression, all prior P0/A/B1 hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed.\n- **Implementation result:** Super Admin institution creation is now one guided four-step flow: Institution → First admin → Licence → Review. Core institution fields, explicit first School Admin, positive licence count and valid annual dates are checked before advancing. The review shows the ₹199/student/year licence and explains the all-or-rollback transaction. Creation calls the verified B1 `/api/admin/institution-onboarding/` endpoint; existing-school editing remains available through School & Licence Control.\n- **Rework/failures:** No functional or CI verification failure occurred on the B2 candidate.\n- **Deployment/health:** The matching Vercel preview for `87907b9c7e6afbb97daab0801c7bf0967d055fbc` is READY. Production runtime remained clean and permanent production was not promoted because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.\n- **Next action:** B3 — provide a first-class bulk student import with row validation, safe creation/update semantics and an exportable failed-row report.\n'''
+          current = log.read_text()
+          if '## 2026-08-31 14:57:29 IST — B2 Institution onboarding wizard (verified)' not in current:
+              log.write_text(current.rstrip() + entry + '\n')
+      - name: Commit progress evidence
+        run: |
+          git config user.name "saga0003"
+          git config user.email "sagar@smis.edu.in"
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git commit -m "docs(b2): record verified onboarding wizard" || exit 0
+          git push origin phase1-hardening
