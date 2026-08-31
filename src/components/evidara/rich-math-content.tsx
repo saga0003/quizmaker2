@@ -12,18 +12,13 @@ export function MathBlock({ latex, inline = false }: { latex?: string; inline?: 
   if (!normalized) return null;
 
   const renderError = () => <code>{safeFallback(normalized)}</code>;
-  const options = {
-    throwOnError: false,
-    strict: "warn" as const,
-    trust: false,
-  };
 
   return (
     <span className={inline ? "evidara-math math-inline" : "evidara-math math-block block overflow-x-auto"}>
       {inline ? (
-        <InlineMath math={normalized} renderError={renderError} settings={options} />
+        <InlineMath math={normalized} renderError={renderError} settings={{ trust: false }} />
       ) : (
-        <BlockMath math={normalized} renderError={renderError} settings={options} />
+        <BlockMath math={normalized} renderError={renderError} settings={{ trust: false }} />
       )}
     </span>
   );
