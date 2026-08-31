@@ -150,7 +150,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   }), [session, profile, institutionMemberships, activeOrganizationId, activeInstitution, requiresInstitutionSelection, membershipsLoading, loading]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const institutionSelector = session && institutionMemberships.length > 1 ? (
+    <div className={requiresInstitutionSelection
+      ? "fixed inset-0 z-[100] grid place-items-center bg-[#14232B]/70 px-4 backdrop-blur-sm"
+      : "fixed right-4 top-3 z-[90] rounded-lg border border-[#D7E2E3] bg-white px-3 py-2 shadow-lg"}
+    >
+      <div className={requiresInstitutionSelection ? "w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" : "min-w-[240px]"}>
+        <label htmlFor="evidara-active-institution" className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#607078]">
+          Active institution
+        </label>
+        {requiresInstitutionSelection && (
+          <>
+            <h2 className="mt-2 text-xl font-bold text-[#14232B]">Choose the school you are working in</h2>
+            <p className="mt-1 text-sm leading-6 text-[#607078]">This account belongs to more than one institution. Evidara will not open or change school data until you choose the active institution.</p>
+          </>
+        )}
+        <select
+          id="evidara-active-institution"
+          value={activeOrganizationId || ""}
+          onChange={(event) => setActiveOrganizationId(event.target.value || null)}
+          className="mt-3 w-full rounded-lg border border-[#C9D5D7] bg-white px-3 py-2 text-sm font-medium text-[#14232B] outline-none focus:border-[#0E7773] focus:ring-2 focus:ring-[#0E7773]/15"
+          aria-required="true"
+        >
+          <option value="">Choose institution…</option>
+          {institutionMemberships.map((membership) => (
+            <option key={membership.organizationId} value={membership.organizationId}>{membership.organizationName}</option>
+          ))}
+        </select>
+        {requiresInstitutionSelection && <p className="mt-3 text-xs text-[#607078]">Your choice is remembered only for this signed-in account and is revalidated against current memberships each session.</p>}
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {institutionSelector}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
