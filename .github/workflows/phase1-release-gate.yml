@@ -66,6 +66,8 @@ jobs:
         run: node scripts/b1-transactional-onboarding-smoke.mjs
       - name: B2 institution onboarding wizard checks
         run: node scripts/b2-institution-onboarding-wizard-smoke.mjs
+      - name: B3 bulk student import checks
+        run: node scripts/b3-bulk-student-import-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
