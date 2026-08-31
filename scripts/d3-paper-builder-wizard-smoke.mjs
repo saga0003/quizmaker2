@@ -9,8 +9,12 @@ check('builder has explicit five-step state', () => {
   assert.ok(source.includes('const [builderStep, setBuilderStep] = useState<1 | 2 | 3 | 4 | 5>(1);'));
 });
 check('wizard exposes the five required labels in order', () => {
+  const navStart = source.indexOf("{ step: 1 as const, label: 'Basics' }");
+  const navEnd = source.indexOf(']).map((item)', navStart);
+  assert.ok(navStart >= 0 && navEnd > navStart);
+  const nav = source.slice(navStart, navEnd);
   const labels = ["label: 'Basics'", "label: 'Questions'", "label: 'Settings'", "label: 'Preview'", "label: 'Publish'"];
-  const positions = labels.map((label) => source.indexOf(label));
+  const positions = labels.map((label) => nav.indexOf(label));
   assert.ok(positions.every((position) => position >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
 });
