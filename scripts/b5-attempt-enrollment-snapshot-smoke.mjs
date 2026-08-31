@@ -35,3 +35,6 @@ if (failed) {
   process.exit(1);
 }
 console.log(`B5 attempt enrollment snapshot smoke passed: ${checks.length}/${checks.length}.`);
+
+// B6 is chained through the existing mandatory B3 → B4 → B5 release-gate path.
+await import('./b6-teacher-scope-smoke.mjs');
