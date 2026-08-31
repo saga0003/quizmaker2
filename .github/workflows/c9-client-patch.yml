@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Patch LiveQuestionBank
-        shell: python
+        shell: python {0}
         run: |
           from pathlib import Path
           import re
@@ -26,106 +26,39 @@ jobs:
           start=s.index('  const load = useCallback(async () => {')
           end=s.index('\n  useEffect(() => { void load(); }, [load]);', start)
           new_load=r'''  const load = useCallback(async () => {
-    if (!supabase || !configured) {
-      setQuestions([]); setTotalMatching(0); setLoading(false);
-      setError('Supabase is not configured. Question management is live-data only.');
-      return [] as QuestionRow[];
-    }
-    if (kind === 'school' && scopeLoading) return [] as QuestionRow[];
-    if (kind === 'school' && !organizationId) {
-      setQuestions([]); setTotalMatching(0); setLoading(false);
-      setError(scopeError || 'This account is not linked to a school organization.');
-      return [] as QuestionRow[];
-    }
-    if (bank === 'settings') {
-      setLoading(true); setError('');
-      const [subjectResult, chapterResult, topicResult] = await Promise.all([
-        supabase.from('subjects').select('id,name,code,organization_id').eq('is_active', true).order('name'),
-        supabase.from('chapters').select('id,name,subject_id,organization_id').eq('is_active', true).order('name'),
-        supabase.from('topics').select('id,name,chapter_id,organization_id').eq('is_active', true).order('name'),
-      ]);
-      const taxonomyError = subjectResult.error || chapterResult.error || topicResult.error;
-      if (taxonomyError) setError(taxonomyError.message || 'Unable to load academic setup.');
-      else { setSubjects((subjectResult.data || []) as TaxonomySubject[]); setChapters((chapterResult.data || []) as TaxonomyChapter[]); setTopics((topicResult.data || []) as TaxonomyTopic[]); }
-      setQuestions([]); setTotalMatching(0); setLoading(false); return [] as QuestionRow[];
-    }
-    setLoading(true); setError('');
-    const bankScope = bank === 'master' ? 'platform' : 'school';
-    const scopedOrganizationId = bankScope === 'school' ? (kind === 'school' ? organizationId : selectedSchoolId === 'all' ? null : selectedSchoolId) : null;
-    const [searchResult, subjectResult, chapterResult, topicResult] = await Promise.all([
-      supabase.rpc('search_question_bank_v1', {
-        p_bank_scope: bankScope,
-        p_organization_id: scopedOrganizationId,
-        p_only_mine: kind === 'school' && teacher,
-        p_search: search.trim(),
-        p_subject_id: subjectFilter === 'all' ? null : subjectFilter,
-        p_chapter_id: chapterFilter === 'all' ? null : chapterFilter,
-        p_topic_id: topicFilter === 'all' ? null : topicFilter,
-        p_status: statusFilter === 'all' ? null : statusFilter,
-        p_difficulty: difficultyFilter === 'all' ? null : difficultyFilter,
-        p_grade: gradeFilter === 'all' ? null : gradeFilter,
-        p_exam: examFilter === 'all' ? null : examFilter,
-        p_date_mode: dateMode, p_date_from: dateFrom || null, p_date_to: dateTo || null,
-        p_sort: sort, p_page: page, p_page_size: PAGE_SIZE,
-      }),
-      supabase.from('subjects').select('id,name,code,organization_id').eq('is_active', true).order('name'),
-      supabase.from('chapters').select('id,name,subject_id,organization_id').eq('is_active', true).order('name'),
-      supabase.from('topics').select('id,name,chapter_id,organization_id').eq('is_active', true).order('name'),
-    ]);
-    const loadError = searchResult.error || subjectResult.error || chapterResult.error || topicResult.error;
-    if (loadError) { setQuestions([]); setTotalMatching(0); setError(loadError.message || 'Unable to load question data.'); setLoading(false); return [] as QuestionRow[]; }
-    const payload = (searchResult.data || {}) as { ids?: string[]; total?: number; stats?: { total?: number; approved?: number; review?: number; topics?: number }; grades?: string[]; exams?: string[]; school_groups?: Array<{id:string;name:string;count:number;review:number;updated:string}> };
-    const ids = Array.isArray(payload.ids) ? payload.ids : [];
-    let rows: QuestionRow[] = [];
-    if (ids.length) {
-      const detailResult = await supabase.from('questions').select('*,subjects(name,code),chapters(name),topics(name),organizations(id,name),question_options(option_key,content_text,content_latex,image_url,is_correct,display_order),question_pyq_occurrences(id,source_question_number,subject_label,metadata,pyq_source_papers(id,exam_type,source_year,variant,paper_code,paper_key,display_name,source_key,expected_question_count))').in('id', ids);
-      if (detailResult.error) { setError(detailResult.error.message); setLoading(false); return [] as QuestionRow[]; }
-      const byId = new Map(((detailResult.data || []) as unknown as QuestionRow[]).map((row) => [row.id, row]));
-      rows = ids.map((id) => byId.get(id)).filter(Boolean) as QuestionRow[];
-    }
-    setQuestions(rows); setTotalMatching(Number(payload.total || 0));
-    setBankStats({ total: Number(payload.stats?.total || 0), approved: Number(payload.stats?.approved || 0), review: Number(payload.stats?.review || 0), topics: Number(payload.stats?.topics || 0) });
-    setGradeOptions(Array.isArray(payload.grades) ? payload.grades : []); setExamOptions(Array.isArray(payload.exams) ? payload.exams : []);
-    setSchoolGroups(Array.isArray(payload.school_groups) ? payload.school_groups : []);
-    setSubjects((subjectResult.data || []) as TaxonomySubject[]); setChapters((chapterResult.data || []) as TaxonomyChapter[]); setTopics((topicResult.data || []) as TaxonomyTopic[]);
-    setLoading(false); return rows;
-  }, [bank, chapterFilter, configured, dateFrom, dateMode, dateTo, difficultyFilter, examFilter, gradeFilter, kind, organizationId, page, scopeError, scopeLoading, search, selectedSchoolId, sort, statusFilter, subjectFilter, teacher, topicFilter]);'''
+            if (!supabase || !configured) { setQuestions([]); setTotalMatching(0); setLoading(false); setError('Supabase is not configured. Question management is live-data only.'); return [] as QuestionRow[]; }
+            if (kind === 'school' && scopeLoading) return [] as QuestionRow[];
+            if (kind === 'school' && !organizationId) { setQuestions([]); setTotalMatching(0); setLoading(false); setError(scopeError || 'This account is not linked to a school organization.'); return [] as QuestionRow[]; }
+            setLoading(true); setError('');
+            const bankScope = bank === 'master' ? 'platform' : 'school';
+            const scopedOrganizationId = bankScope === 'school' ? (kind === 'school' ? organizationId : selectedSchoolId === 'all' ? null : selectedSchoolId) : null;
+            const [searchResult, subjectResult, chapterResult, topicResult] = await Promise.all([
+              bank === 'settings' ? Promise.resolve({ data: { ids: [], total: 0, stats: {}, grades: [], exams: [], school_groups: [] }, error: null }) : supabase.rpc('search_question_bank_v1', { p_bank_scope: bankScope, p_organization_id: scopedOrganizationId, p_only_mine: kind === 'school' && teacher, p_search: search.trim(), p_subject_id: subjectFilter === 'all' ? null : subjectFilter, p_chapter_id: chapterFilter === 'all' ? null : chapterFilter, p_topic_id: topicFilter === 'all' ? null : topicFilter, p_status: statusFilter === 'all' ? null : statusFilter, p_difficulty: difficultyFilter === 'all' ? null : difficultyFilter, p_grade: gradeFilter === 'all' ? null : gradeFilter, p_exam: examFilter === 'all' ? null : examFilter, p_date_mode: dateMode, p_date_from: dateFrom || null, p_date_to: dateTo || null, p_sort: sort, p_page: page, p_page_size: PAGE_SIZE }),
+              supabase.from('subjects').select('id,name,code,organization_id').eq('is_active', true).order('name'),
+              supabase.from('chapters').select('id,name,subject_id,organization_id').eq('is_active', true).order('name'),
+              supabase.from('topics').select('id,name,chapter_id,organization_id').eq('is_active', true).order('name'),
+            ]);
+            const loadError = searchResult.error || subjectResult.error || chapterResult.error || topicResult.error;
+            if (loadError) { setQuestions([]); setTotalMatching(0); setError(loadError.message || 'Unable to load question data.'); setLoading(false); return [] as QuestionRow[]; }
+            const payload = (searchResult.data || {}) as { ids?: string[]; total?: number; stats?: { total?: number; approved?: number; review?: number; topics?: number }; grades?: string[]; exams?: string[]; school_groups?: Array<{id:string;name:string;count:number;review:number;updated:string}> };
+            const ids = Array.isArray(payload.ids) ? payload.ids : []; let rows: QuestionRow[] = [];
+            if (ids.length) { const detailResult = await supabase.from('questions').select('*,subjects(name,code),chapters(name),topics(name),organizations(id,name),question_options(option_key,content_text,content_latex,image_url,is_correct,display_order),question_pyq_occurrences(id,source_question_number,subject_label,metadata,pyq_source_papers(id,exam_type,source_year,variant,paper_code,paper_key,display_name,source_key,expected_question_count))').in('id', ids); if (detailResult.error) { setError(detailResult.error.message); setLoading(false); return [] as QuestionRow[]; } const byId = new Map(((detailResult.data || []) as unknown as QuestionRow[]).map((row) => [row.id, row])); rows = ids.map((id) => byId.get(id)).filter(Boolean) as QuestionRow[]; }
+            setQuestions(rows); setTotalMatching(Number(payload.total || 0)); setBankStats({ total: Number(payload.stats?.total || 0), approved: Number(payload.stats?.approved || 0), review: Number(payload.stats?.review || 0), topics: Number(payload.stats?.topics || 0) }); setGradeOptions(Array.isArray(payload.grades) ? payload.grades : []); setExamOptions(Array.isArray(payload.exams) ? payload.exams : []); setSchoolGroups(Array.isArray(payload.school_groups) ? payload.school_groups : []); setSubjects((subjectResult.data || []) as TaxonomySubject[]); setChapters((chapterResult.data || []) as TaxonomyChapter[]); setTopics((topicResult.data || []) as TaxonomyTopic[]); setLoading(false); return rows;
+          }, [bank, chapterFilter, configured, dateFrom, dateMode, dateTo, difficultyFilter, examFilter, gradeFilter, kind, organizationId, page, scopeError, scopeLoading, search, selectedSchoolId, sort, statusFilter, subjectFilter, teacher, topicFilter]);'''
           s=s[:start]+new_load+s[end:]
-          # remove client-derived whole-bank structures through stats
-          a=s.index('  const schoolGroups = useMemo(() => {')
-          b=s.index('\n  const editable = (question: QuestionRow) => {', a)
+          a=s.index('  const schoolGroups = useMemo(() => {'); b=s.index('\n  const editable = (question: QuestionRow) => {', a)
           replacement=r'''  const orderedSubjects = useMemo(() => [...subjects].sort((a, b) => a.name.localeCompare(b.name)), [subjects]);
-  const filteredChapterOptions = useMemo(() => chapters.filter((chapter) => subjectFilter === 'all' || chapter.subject_id === subjectFilter).sort((a, b) => a.name.localeCompare(b.name)), [chapters, subjectFilter]);
-  const filteredTopicOptions = useMemo(() => topics.filter((topic) => chapterFilter === 'all' || topic.chapter_id === chapterFilter).sort((a, b) => a.name.localeCompare(b.name)), [chapterFilter, topics]);
-  const totalPages = Math.max(1, Math.ceil(totalMatching / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const visibleRows = questions;
-  const reviewIndex = reviewQuestion ? visibleRows.findIndex((question) => question.id === reviewQuestion.id) : -1;
-  const reviewPosition = reviewIndex >= 0 ? (safePage - 1) * PAGE_SIZE + reviewIndex + 1 : 0;
-  const visibleIds = visibleRows.map((question) => question.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
-  const stats = bankStats;'''
+          const filteredChapterOptions = useMemo(() => chapters.filter((chapter) => subjectFilter === 'all' || chapter.subject_id === subjectFilter).sort((a, b) => a.name.localeCompare(b.name)), [chapters, subjectFilter]);
+          const filteredTopicOptions = useMemo(() => topics.filter((topic) => chapterFilter === 'all' || topic.chapter_id === chapterFilter).sort((a, b) => a.name.localeCompare(b.name)), [chapterFilter, topics]);
+          const totalPages = Math.max(1, Math.ceil(totalMatching / PAGE_SIZE)); const safePage = Math.min(page, totalPages); const visibleRows = questions;
+          const reviewIndex = reviewQuestion ? visibleRows.findIndex((question) => question.id === reviewQuestion.id) : -1; const reviewPosition = reviewIndex >= 0 ? (safePage - 1) * PAGE_SIZE + reviewIndex + 1 : 0;
+          const visibleIds = visibleRows.map((question) => question.id); const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id)); const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id)); const stats = bankStats;'''
           s=s[:a]+replacement+s[b:]
-          # bounded review navigation
-          s=re.sub(r"  function openReview\(question: QuestionRow\) \{[\s\S]*?\n  \}\n\n  function navigateReview\(direction: -1 \| 1\) \{[\s\S]*?\n  \}", r'''  function openReview(question: QuestionRow) { setReviewQuestion(question); setReviewOpen(true); }
-
-  function navigateReview(direction: -1 | 1) {
-    if (reviewIndex < 0) return;
-    const nextIndex = reviewIndex + direction;
-    if (nextIndex >= 0 && nextIndex < visibleRows.length) { setReviewQuestion(visibleRows[nextIndex]); return; }
-    setReviewOpen(false);
-    if (direction < 0 && safePage > 1) setPage(safePage - 1);
-    if (direction > 0 && safePage < totalPages) setPage(safePage + 1);
-  }''', s, count=1)
-          # remove global select-all helper
+          s=re.sub(r"  function openReview\(question: QuestionRow\) \{[\s\S]*?\n  \}\n\n  function navigateReview\(direction: -1 \| 1\) \{[\s\S]*?\n  \}", "  function openReview(question: QuestionRow) { setReviewQuestion(question); setReviewOpen(true); }\n\n  function navigateReview(direction: -1 | 1) { if (reviewIndex < 0) return; const nextIndex = reviewIndex + direction; if (nextIndex >= 0 && nextIndex < visibleRows.length) { setReviewQuestion(visibleRows[nextIndex]); return; } setReviewOpen(false); if (direction < 0 && safePage > 1) setPage(safePage - 1); if (direction > 0 && safePage < totalPages) setPage(safePage + 1); }", s, count=1)
           s=re.sub(r"\n  function selectAllMatching\(\) \{[\s\S]*?\n  \}\n", "\n", s, count=1)
-          # export current bounded page only
-          s=s.replace("await exportSchoolQuestionBank({ questions: filtered, schoolName, onProgress: setMessage });\n      setMessage(`Exported ${filtered.length} school-created question${filtered.length === 1 ? '' : 's'} with image links and available image files.`);", "await exportSchoolQuestionBank({ questions: visibleRows, schoolName, onProgress: setMessage });\n      setMessage(`Exported ${visibleRows.length} question${visibleRows.length === 1 ? '' : 's'} from the current page. Use filters to export another bounded page.`);")
-          s=s.replace("disabled={exporting || filtered.length === 0}", "disabled={exporting || visibleRows.length === 0}")
-          s=s.replace("{filtered.length} matching question{filtered.length === 1 ? '' : 's'}", "{totalMatching} matching question{totalMatching === 1 ? '' : 's'}")
+          s=s.replace("await exportSchoolQuestionBank({ questions: filtered, schoolName, onProgress: setMessage });\n      setMessage(`Exported ${filtered.length} school-created question${filtered.length === 1 ? '' : 's'} with image links and available image files.`);", "await exportSchoolQuestionBank({ questions: visibleRows, schoolName, onProgress: setMessage });\n      setMessage(`Exported ${visibleRows.length} question${visibleRows.length === 1 ? '' : 's'} from the current page.`);")
+          s=s.replace("disabled={exporting || filtered.length === 0}", "disabled={exporting || visibleRows.length === 0}").replace("{filtered.length} matching question{filtered.length === 1 ? '' : 's'}", "{totalMatching} matching question{totalMatching === 1 ? '' : 's'}").replace("total={filtered.length}", "total={totalMatching}")
           s=re.sub(r'<Button type="button" variant="ghost" size="sm" onClick=\{selectAllMatching\}[^>]*>Select all \{filtered\.length\} matching</Button>', '', s)
-          s=s.replace("total={filtered.length}", "total={totalMatching}")
           p.write_text(s)
       - name: Run C9 acceptance
         run: node scripts/c9-question-bank-pagination-smoke.mjs
