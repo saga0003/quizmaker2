@@ -247,3 +247,19 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{overall:.1f}%**).
 - **Why the run stopped:** this automation/tool window was shorter than the 45–50 minute engineering target. The 46 KB client conversion is being handed off at a test-defined checkpoint rather than rushed without TypeScript/regression/full-gate evidence.
 - **Exact next action:** convert `LiveQuestionBank.load()` to `search_question_bank_v1`, fetch only returned bounded page rows with nested relations, drive totals/facets/page count from server metadata, make review/select/export bounded, make the new 10-point C9 smoke pass, wire it into `phase1-release-gate.yml`, run the complete gate, and only after PASS mark C9 complete.
+
+## 2026-09-01 00:00:47 IST — C9 bounded question-bank client conversion (in progress) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 00:00:47 IST → approximately 00:34 IST.
+- **Section worked:** C — Question bank; C9.
+- **Checklist items completed:** None yet; C9 remains unchecked until the bounded client candidate passes the complete release gate.
+- **Substantial work completed:** Re-inspected checklist, progress log, `phase1-hardening`, latest release gate and the live C9 pagination contract. Confirmed starting head `1982830874b2a9a08c3689d4a79d653bb4717466` and prior gate `33421042431` PASS. Re-read `live-question-bank.tsx` and implemented a guarded one-time source conversion workflow that replaces 1,000-row whole-bank batching/local filtering with `search_question_bank_v1`, bounded page-ID detail hydration, server totals/stats/facets/school groups, page-bounded review/selection and current-page export. The first workflow definition failed before jobs due to an invalid Python shell declaration; it was corrected to `python {0}` and rerun as Actions run `33425625272`, queued at handoff.
+- **Active engineering time / observable span:** approximately **33 minutes** of inspection, client conversion design, guarded patch implementation and workflow rework in the available runtime. The 45–50 minute target was not fully reached before handoff; no idle padding was added.
+- **Branch/commits:** `12f96025f67cf26b0592162d1bc72663e7c1e406` (initial guarded client patch workflow), `91e579abea29b7da8f72da9125151cb814d4794f` (valid Python workflow shell), plus this heartbeat scheduling commit.
+- **CI/deployment state:** prior exact release gate `33421042431` PASS. C9 patch run `33425625272` queued at handoff; normal release gate `33425625343` also pending. Permanent production was not promoted or altered.
+- **Vercel/Supabase state:** C9 live Supabase `search_question_bank_v1` remains applied with bounded <=100 page semantics and RLS-preserving execution. No database change was needed in this run. Production remains protected; preview/full-gate evidence is still required for C9 completion.
+- **Rework/failures/blockers:** first temporary patch workflow run `33425564675` failed at workflow validation with zero jobs because `shell: python` was invalid in this new workflow. Corrected to `shell: python {0}`; no product code or production state was changed by the failed run. No user-input blocker.
+- **Section progress:** C has {cd}/{len(ci)} verified items (**{(100*cd/len(ci) if ci else 0):.1f}%**); C9 materially in progress.
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Why the run stopped:** the bounded client patch and release gate were still queued/running at the automation handoff boundary, so C9 was not marked complete without evidence.
+- **Exact next action:** inspect run `33425625272`; if patch succeeds, remove the temporary workflow, run/fix TypeScript and C9 acceptance, wire `c9-question-bank-pagination-smoke.mjs` into the permanent release gate, require a clean complete gate and matching preview, then mark C9 verified.
