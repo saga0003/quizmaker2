@@ -38,3 +38,6 @@ if (failed) {
   process.exit(1);
 }
 console.log(`B4 student lifecycle smoke passed: ${checks.length}/${checks.length}.`);
+
+// B5 is chained through the existing mandatory B3 → B4 release-gate path.
+await import('./b5-attempt-enrollment-snapshot-smoke.mjs');
