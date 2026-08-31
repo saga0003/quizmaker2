@@ -132,7 +132,9 @@ async function context(request: Request) {
     .single();
   if (error || !profile) throw Object.assign(new Error(error?.message ?? "Evidara profile not found."), { status: 403 });
 
-  const requestedOrg = new URL(request.url).searchParams.get("organizationId");
+  const urlRequestedOrg = new URL(request.url).searchParams.get("organizationId");
+  const headerRequestedOrg = request.headers.get("x-evidara-organization-id")?.trim() || null;
+  const requestedOrg = headerRequestedOrg || urlRequestedOrg;
   const platformAdmin = isPlatformAdmin(profile.role);
   let organizationId: string | null = null;
   let memberRole: string | null = null;
@@ -141,16 +143,27 @@ async function context(request: Request) {
     organizationId = requestedOrg;
     memberRole = profile.role;
   } else {
-    const { data: member } = await auth.admin
+    const { data: members, error: membershipError } = await auth.admin
       .from("organization_members")
       .select("organization_id,member_role")
       .eq("user_id", auth.user.id)
       .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    organizationId = member?.organization_id ?? null;
-    memberRole = member?.member_role ?? null;
+      .order("created_at", { ascending: true });
+    if (membershipError) throw new Error(membershipError.message);
+    const activeMembers = members ?? [];
+    if (requestedOrg) {
+      const selected = activeMembers.find((member) => member.organization_id === requestedOrg);
+      if (!selected) {
+        throw Object.assign(new Error("The selected institution is not an active membership for this account."), { status: 403 });
+      }
+      organizationId = selected.organization_id;
+      memberRole = selected.member_role;
+    } else if (activeMembers.length > 1) {
+      throw Object.assign(new Error("Choose an active institution before opening or changing school data."), { status: 409 });
+    } else {
+      organizationId = activeMembers[0]?.organization_id ?? null;
+      memberRole = activeMembers[0]?.member_role ?? null;
+    }
   }
 
   if (!organizationId) {
