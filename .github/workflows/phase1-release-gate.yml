@@ -60,6 +60,9 @@ jobs:
       - name: A4 legacy RLS checks
         run: node scripts/a4-legacy-rls-smoke.mjs
 
+      - name: A5 protected resource checks
+        run: node scripts/a5-protected-resource-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
