@@ -84,6 +84,8 @@ jobs:
         run: node scripts/c7-question-collaboration-smoke.mjs
       - name: C8 question retention checks
         run: node scripts/c8-question-retention-smoke.mjs
+      - name: C9 question-bank pagination checks
+        run: node scripts/c9-question-bank-pagination-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
