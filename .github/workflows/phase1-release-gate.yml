@@ -72,6 +72,9 @@ jobs:
       - name: A8 rich-content safety checks
         run: node scripts/a8-rich-content-safety-smoke.mjs
 
+      - name: A9 active institution checks
+        run: node scripts/a9-active-institution-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
