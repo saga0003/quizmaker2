@@ -55,7 +55,13 @@ export async function GET(request:Request){try{const ctx=await context(request);
     if(!resource.content_url)throw Object.assign(new Error('This platform resource does not have an available file URL.'),{status:404});
     return NextResponse.json({url:resource.content_url},{headers:{'Cache-Control':'no-store'}});
   }
-  const clientResources=safeResources.map(({content_url,...resource})=>({...resource,download_available:Boolean(resource.storage_key||content_url)}));
+  const clientResources=await Promise.all(safeResources.map(async({content_url,...resource})=>{
+    if(resource.resource_scope==='organization'){
+      const url=resource.metadata?.storage_backend==='supabase-private-v1'&&resource.storage_key?await createPrivateAcademicResourceUrl({admin:ctx.admin,key:resource.storage_key,expiresIn:600}):null;
+      return {...resource,content_url:url,download_available:Boolean(url)};
+    }
+    return {...resource,content_url,download_available:Boolean(content_url)};
+  }));
   return NextResponse.json({role:ctx.role,mode:ctx.mode,organizationId:ctx.organizationId,canManage:ctx.canManage,folders:folders||[],resources:clientResources},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return fail(e)}}
 
