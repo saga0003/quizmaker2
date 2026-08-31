@@ -28,9 +28,33 @@ type AuthValue = {
 };
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
+const PAPER_DRAFT_PREFIX = "evidara-v8-paper:";
 
 function activeInstitutionStorageKey(userId: string) {
   return `evidara:active-organization:${userId}`;
+}
+
+function matchingPaperDraftKeys(userId: string) {
+  if (typeof window === "undefined") return [] as string[];
+  const userPrefix = `${PAPER_DRAFT_PREFIX}${userId}:`;
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key?.startsWith(userPrefix)) keys.push(key);
+  }
+  return keys;
+}
+
+function purgeLegacyUnscopedPaperDrafts(userId: string) {
+  // Legacy layout: evidara-v8-paper:<user>:<kind>:<paper|new> (four colon-separated parts).
+  // New A10 layout adds an explicit organization/platform scope before the paper identifier.
+  for (const key of matchingPaperDraftKeys(userId)) {
+    if (key.split(":").length === 4) window.localStorage.removeItem(key);
+  }
+}
+
+function clearPaperDraftsForUser(userId: string) {
+  for (const key of matchingPaperDraftKeys(userId)) window.localStorage.removeItem(key);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -53,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setActiveOrganizationIdState(null);
       return;
     }
+    purgeLegacyUnscopedPaperDrafts(userId);
     setMembershipsLoading(true);
     try {
       const { data: rows, error } = await supabase
@@ -162,6 +187,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     configured: isSupabaseConfigured,
     signOut: async () => {
+      const signingOutUserId = session?.user.id;
+      if (signingOutUserId) clearPaperDraftsForUser(signingOutUserId);
       if (supabase) await supabase.auth.signOut();
       setSession(null);
       setProfile(null);
