@@ -1,0 +1,74 @@
+name: C10 Simplify Import Flow Once
+
+on:
+  push:
+    branches: [phase1-hardening]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply C10 flow and regression
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('src/components/evidara/question-bulk-import-dialog-core.tsx')
+          text = ui.read_text()
+          old = "[['1','Upload source','Add files or content'],['2','AI prepare','Convert difficult source files'],['3','Review & classify','Fix only what needs attention'],['4','Import & create paper','Save to bank and build paper']]"
+          new = "[['1','Upload','Choose source files or content'],['2','Map','Confirm academic mapping'],['3','Review','Fix only what needs attention'],['4','Import','Save ready questions']]"
+          if old not in text:
+              raise SystemExit('C10 step strip source not found')
+          text = text.replace(old, new, 1)
+          ui.write_text(text)
+
+          smoke = Path('scripts/c10-simplified-import-flow-smoke.mjs')
+          smoke.write_text(r'''import fs from 'node:fs';
+import assert from 'node:assert/strict';
+
+const component = fs.readFileSync('src/components/evidara/question-bulk-import-dialog-core.tsx', 'utf8');
+const checks = [];
+const check = (name, fn) => { fn(); checks.push(name); };
+
+check('flow exposes Upload step', () => assert.match(component, /'1','Upload','Choose source files or content'/));
+check('flow exposes Map step', () => assert.match(component, /'2','Map','Confirm academic mapping'/));
+check('flow exposes Review step', () => assert.match(component, /'3','Review','Fix only what needs attention'/));
+check('flow exposes Import step', () => assert.match(component, /'4','Import','Save ready questions'/));
+check('source selection remains the first user action', () => assert.match(component, /Choose file/));
+check('mapping is institution taxonomy aware', () => { assert.match(component, /subjectByName/); assert.match(component, /selectedChapter/); assert.match(component, /selectedTopic/); });
+check('review blocks invalid rows from import', () => { assert.match(component, /valid\.length/); assert.match(component, /correct every highlighted issue before importing/); });
+check('review has rendered learner preview', () => assert.match(component, /QuestionDevicePreview/));
+check('school import keeps Create Paper optional', () => { assert.match(component, /createPaper/); assert.match(component, /setCreatePaper/); assert.match(component, /paperPayload/); });
+check('paper creation is atomic with question import', () => assert.match(component, /bulk_import_questions_and_paper_phase1/));
+check('plain import remains supported when Create Paper is off', () => assert.match(component, /paperPayload\s*=\s*createPaper\s*&&\s*kind\s*===\s*'school'/));
+check('result distinguishes imported reused and failed rows', () => { assert.match(component, /result\?\.imported/); assert.match(component, /result\?\.reused/); assert.match(component, /result\?\.failed/); });
+
+console.log(`C10 simplified import flow smoke: ${checks.length}/${checks.length} checks passed`);
+''')
+
+          gate = Path('.github/workflows/phase1-release-gate.yml')
+          g = gate.read_text()
+          marker = "      - name: C9 question-bank pagination checks\n        run: node scripts/c9-question-bank-pagination-smoke.mjs\n"
+          addition = marker + "      - name: C10 simplified import-flow checks\n        run: node scripts/c10-simplified-import-flow-smoke.mjs\n"
+          if 'c10-simplified-import-flow-smoke.mjs' not in g:
+              if marker not in g:
+                  raise SystemExit('C9 gate marker not found')
+              g = g.replace(marker, addition, 1)
+              gate.write_text(g)
+          PY
+
+          node scripts/c10-simplified-import-flow-smoke.mjs
+          git rm .github/workflows/c10-simplify-import-once.yml
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add src/components/evidara/question-bulk-import-dialog-core.tsx scripts/c10-simplified-import-flow-smoke.mjs .github/workflows/phase1-release-gate.yml
+          git commit -m "feat(c10): simplify question import to upload map review import"
+          git push origin HEAD:phase1-hardening
