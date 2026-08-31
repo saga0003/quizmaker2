@@ -82,6 +82,8 @@ jobs:
         run: node scripts/c6-correct-answer-authority-smoke.mjs
       - name: C7 question collaboration checks
         run: node scripts/c7-question-collaboration-smoke.mjs
+      - name: C8 question retention checks
+        run: node scripts/c8-question-retention-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
