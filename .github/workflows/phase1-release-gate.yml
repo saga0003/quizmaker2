@@ -86,6 +86,8 @@ jobs:
         run: node scripts/c8-question-retention-smoke.mjs
       - name: C9 question-bank pagination checks
         run: node scripts/c9-question-bank-pagination-smoke.mjs
+      - name: C10 simplified import-flow checks
+        run: node scripts/c10-simplified-import-flow-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
