@@ -63,6 +63,9 @@ jobs:
       - name: A5 protected resource checks
         run: node scripts/a5-protected-resource-smoke.mjs
 
+      - name: A6 upload signature checks
+        run: node scripts/a6-upload-hardening-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
