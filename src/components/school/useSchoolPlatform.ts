@@ -49,7 +49,13 @@ export function useSchoolPlatform({
   allowDemo = true,
   unavailableMessage = "Supabase is not configured. Live student resources are unavailable.",
 }: SchoolPlatformOptions = {}) {
-  const { session, configured, loading: authLoading } = useAuth();
+  const {
+    session,
+    configured,
+    loading: authLoading,
+    activeOrganizationId,
+    requiresInstitutionSelection,
+  } = useAuth();
   const [state, setState] = useState<SchoolPlatformState>(
     allowDemo ? defaultSchoolPlatformState : unavailableCloudState,
   );
@@ -65,11 +71,15 @@ export function useSchoolPlatform({
   const requestCloud = useCallback(async (method: "GET" | "POST", body?: Record<string, unknown>) => {
     const token = session?.access_token;
     if (!token) throw new Error("Cloud sign-in is required.");
+    if (requiresInstitutionSelection) {
+      throw new SchoolPlatformRequestError("Choose an active institution before opening school data.", 409);
+    }
     const response = await fetch("/api/school-platform/", {
       method,
       cache: "no-store",
       headers: {
         Authorization: `Bearer ${token}`,
+        ...(activeOrganizationId ? { "X-Evidara-Organization-Id": activeOrganizationId } : {}),
         ...(body ? { "Content-Type": "application/json" } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -82,7 +92,7 @@ export function useSchoolPlatform({
       );
     }
     return payload as CloudPayload;
-  }, [session?.access_token]);
+  }, [activeOrganizationId, requiresInstitutionSelection, session?.access_token]);
 
   const applyCloud = useCallback((payload: CloudPayload) => {
     setState(payload.state);
@@ -126,6 +136,18 @@ export function useSchoolPlatform({
       return;
     }
 
+    if (requiresInstitutionSelection) {
+      setState(unavailableCloudState);
+      setMode("cloud");
+      setManager(false);
+      setSchoolStaff(false);
+      setRosterScope("own");
+      setError("Choose an active institution before opening school data.");
+      setErrorStatus(409);
+      setReady(true);
+      return;
+    }
+
     setSyncing(true);
     try {
       applyCloud(await requestCloud("GET"));
@@ -143,7 +165,7 @@ export function useSchoolPlatform({
       setSyncing(false);
       setReady(true);
     }
-  }, [allowDemo, applyCloud, authLoading, configured, requestCloud, session?.access_token, unavailableMessage]);
+  }, [allowDemo, applyCloud, authLoading, configured, requestCloud, requiresInstitutionSelection, session?.access_token, unavailableMessage]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
