@@ -80,6 +80,8 @@ jobs:
         run: node scripts/c5-analytics-ready-approval-smoke.mjs
       - name: C6 correct-answer authority checks
         run: node scripts/c6-correct-answer-authority-smoke.mjs
+      - name: C7 question collaboration checks
+        run: node scripts/c7-question-collaboration-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
