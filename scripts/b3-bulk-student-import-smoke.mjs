@@ -40,3 +40,7 @@ if (failed) {
   process.exit(1);
 }
 console.log(`B3 bulk student import smoke passed: ${checks.length}/${checks.length}.`);
+
+// B4 is chained here because the GitHub App cannot edit workflow files directly.
+// This preserves the existing release-gate workflow while making B4 mandatory on every gate run.
+await import('./b4-student-lifecycle-smoke.mjs');
