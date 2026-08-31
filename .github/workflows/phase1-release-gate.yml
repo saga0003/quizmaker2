@@ -68,6 +68,14 @@ jobs:
         run: node scripts/b2-institution-onboarding-wizard-smoke.mjs
       - name: B3 bulk student import checks
         run: node scripts/b3-bulk-student-import-smoke.mjs
+      - name: B4 student lifecycle checks
+        run: node scripts/b4-student-lifecycle-smoke.mjs
+      - name: B5 attempt enrollment snapshot checks
+        run: node scripts/b5-attempt-enrollment-snapshot-smoke.mjs
+      - name: B6 teacher scope checks
+        run: node scripts/b6-teacher-scope-smoke.mjs
+      - name: B7 academic-year rollover checks
+        run: node scripts/b7-academic-year-rollover-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
