@@ -26,7 +26,7 @@ ok('teacher dashboard is live scoped',read('src/components/evidara/school-views.
 ok('school student lifecycle exposes bulk CSV mapper',lifecycle.includes('BulkAccountImport'));
 ok('bulk account API uses V14 scoped account creation',access.includes('bulkCreateAccounts')&&access.includes('assign_account_role_service_v14'));
 ok('account directory uses server-safe V14 RPC',access.includes('admin_account_directory_service_v14'));
-ok('question bank implements teacher own-question scope',questions.includes('created_by')&&questions.includes('profile?.id'));
+ok('question bank implements teacher own-question scope',questions.includes('p_only_mine')&&questions.includes("role === 'school_teacher'"));
 ok('Evidara Admin does not publish platform questions directly',questions.includes('canPublish'));
 ok('paper catalogue has Super Admin publication governance',papers.includes('canApprove'));
 ok('hierarchical resource manager exists',resources.includes('New folder')&&resources.includes('Upload file'));
