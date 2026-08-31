@@ -39,8 +39,10 @@ begin
     raise exception 'Question cannot be approved: negative marks cannot exceed marks';
   end if;
 
-  if new.difficulty is null or new.difficulty < 1 or new.difficulty > 5 then
-    raise exception 'Question cannot be approved: difficulty must be between 1 and 5';
+  -- question_difficulty is a database enum; non-null is sufficient because its values
+  -- are constrained to the supported five-level scale by the enum itself.
+  if new.difficulty is null then
+    raise exception 'Question cannot be approved: difficulty is required';
   end if;
 
   select s.organization_id
