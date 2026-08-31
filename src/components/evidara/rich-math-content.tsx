@@ -16,9 +16,9 @@ export function MathBlock({ latex, inline = false }: { latex?: string; inline?: 
   return (
     <span className={inline ? "evidara-math math-inline" : "evidara-math math-block block overflow-x-auto"}>
       {inline ? (
-        <InlineMath math={normalized} renderError={renderError} settings={{ trust: false }} />
+        <InlineMath math={normalized} renderError={renderError} />
       ) : (
-        <BlockMath math={normalized} renderError={renderError} settings={{ trust: false }} />
+        <BlockMath math={normalized} renderError={renderError} />
       )}
     </span>
   );
