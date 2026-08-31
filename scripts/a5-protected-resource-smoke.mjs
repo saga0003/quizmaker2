@@ -12,7 +12,7 @@ const checks=[
   ['private storage creates short-lived signed URLs',storage.includes('createSignedUrl')&&storage.includes('expiresIn ?? 300')],
   ['resource download is re-authorized through authenticated API',route.includes("params.get('resourceId')")&&route.includes('studentEligibleResources')],
   ['legacy institution public resources fail closed',route.includes('legacy institution resource must be migrated to protected storage')],
-  ['resource list does not expose persisted content_url directly',route.includes('safeResources.map(({content_url,...resource})')],
+  ['resource list replaces persisted institution content_url with a signed URL',route.includes('safeResources.map(async({content_url,...resource})')&&route.includes('createPrivateAcademicResourceUrl({admin:ctx.admin,key:resource.storage_key,expiresIn:600})')],
 ];
 
 const failed=checks.filter(([,ok])=>!ok);
