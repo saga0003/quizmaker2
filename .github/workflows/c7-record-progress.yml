@@ -1,0 +1,42 @@
+name: Record C7 verification
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/c7-record-progress.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Record verified C7
+        shell: python
+        run: |
+          from pathlib import Path
+
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text()
+          old = '- [ ] C7 Institutional collaboration: teachers can view approved bank in assigned subjects, create/edit own drafts and submit; School Admin can review all institutional questions.'
+          new = '- [x] **C7 Institutional collaboration** — verified 31 Aug 2026. Teachers can read approved institution-bank questions only inside assigned subjects plus their own questions; teacher creation/editing is owner- and assigned-subject-scoped, with submitted/approved questions locked against further teacher edits and self-approval blocked. School managers/reviewers retain institution-wide review authority. Legacy broad option policies were replaced so option reads/writes follow the same approved-or-own and draft/rejected ownership boundaries. Live migration `phase1_question_collaboration_scope` is applied; the collaboration trigger is server-only. Dedicated 18-point `c7-question-collaboration-smoke.mjs`, all prior hardening checks, TypeScript, lint, every required regression suite, production build and final gate enforcement passed exact candidate `41b0da35a54e7b04b53cc3df5be61062fb854670` in release-gate run `33402384472` (2m 23s); matching Vercel preview is READY. Permanent production was not promoted.'
+          if old not in text:
+              raise SystemExit('Expected unchecked C7 line not found')
+          checklist.write_text(text.replace(old, new, 1))
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          body = log.read_text()
+          entry = '''\n\n## 2026-08-31 19:33:22 IST — C7 Institutional question collaboration (verified)\n\n- **Checklist item:** C7 — Institutional collaboration: teachers can view approved bank in assigned subjects, create/edit own drafts and submit; School Admin can review all institutional questions.\n- **Run start:** 2026-08-31 19:33:22 IST.\n- **Repository/CI/deployment inspection:** C6 was verified and recorded first in this run. Production runtime error/fatal checks for the preceding 24 hours were clean, so no incident remediation was required and permanent production remained protected.\n- **Implementation start (first relevant commit):** 2026-08-31 19:52:29 IST — `9e4fde82feecdded770a542a5baff504bd48b014` (`feat(c7): harden institution question collaboration`).\n- **Implementation end (final functional/release-gate commit):** 2026-08-31 19:53:51 IST — `41b0da35a54e7b04b53cc3df5be61062fb854670` (`ci(c7): enforce question collaboration regression`).\n- **Observable elapsed engineering span:** **1m 22s** from first C7 implementation commit to the exact functional/gate candidate.\n- **Verification:** GitHub Actions release-gate run `33402384472`, 2026-08-31 19:53:54–19:56:17 IST, duration **2m 23s — PASS**. Dedicated 18-point C7 collaboration regression, all prior hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed. Matching Vercel preview for the exact candidate is READY.\n- **Live database evidence:** Migration `phase1_question_collaboration_scope` is applied. `questions_insert_v15`, `questions_update_v15`, `question_options_read_v15` and `question_options_manage_v15` are live; `trg_institution_question_collaboration_v1` is enabled; its helper is unavailable to `anon`/`authenticated` and available only to `service_role`.\n- **Implementation result:** Teachers can see approved questions only in assigned subjects plus their own work; create or submit only their own subject-scoped questions; edit only their own draft/rejected questions; and cannot alter submitted/approved questions or self-approve/archive them. School managers/reviewers retain institution-wide review. The legacy option policies that treated every teacher as an institution-wide question manager were removed, closing an option-level cross-subject/ownership bypass.\n- **Rework/failures:** No functional or final CI verification failure occurred. Intermediate workflow runs from the migration/regression commits were superseded by the final release-gate wiring commit through normal concurrency. The live audit itself exposed the broad legacy option policy, which was fixed as part of C7 rather than accepted as existing behavior.\n- **Deployment/health:** Exact C7 branch preview is READY. Permanent production remained healthy and was not promoted or altered because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.\n- **Next action:** C8 — define and server-enforce the School Admin archive/delete policy so used questions are preserved and permanent deletion is allowed only for unused mistaken records.\n'''
+          if '## 2026-08-31 19:33:22 IST — C7 Institutional question collaboration (verified)' not in body:
+              log.write_text(body.rstrip() + entry)
+      - name: Commit documentation
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git commit -m "docs(c7): record verified collaboration [skip ci]"
+          git push origin HEAD:phase1-hardening
