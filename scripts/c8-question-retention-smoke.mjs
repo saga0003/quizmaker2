@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const retentionPath = 'supabase/migrations/20260831154100_phase1_question_retention_policy.sql';
 const indexPath = 'supabase/migrations/20260831154200_phase1_question_retention_lookup_index.sql';
 const workflowPath = '.github/workflows/phase1-release-gate.yml';
-const collaborationPath = 'supabase/migrations/20260831145400_phase1_question_collaboration_scope.sql';
+const collaborationPath = 'supabase/migrations/20260831143000_phase1_question_collaboration_scope.sql';
 
 const retention = fs.readFileSync(retentionPath, 'utf8');
 const indexSql = fs.readFileSync(indexPath, 'utf8');
