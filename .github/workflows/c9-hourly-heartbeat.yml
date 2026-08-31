@@ -1,0 +1,51 @@
+name: C9 hourly heartbeat
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/workflows/c9-hourly-heartbeat.yml'
+permissions:
+  contents: write
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Append run heartbeat and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOTAL=$(grep -Ec '^- \[[ x]\]' PHASE1_RELEASE_CHECKLIST.md || true)
+          DONE=$(grep -Ec '^- \[x\]' PHASE1_RELEASE_CHECKLIST.md || true)
+          OVERALL=$(awk -v d="$DONE" -v t="$TOTAL" 'BEGIN { if (t==0) print "0.0"; else printf "%.1f", (100*d/t) }')
+          C_TOTAL=$(awk '/^# C —/{f=1;next}/^# D —/{f=0}f' PHASE1_RELEASE_CHECKLIST.md | grep -Ec '^- \[[ x]\]' || true)
+          C_DONE=$(awk '/^# C —/{f=1;next}/^# D —/{f=0}f' PHASE1_RELEASE_CHECKLIST.md | grep -Ec '^- \[x\]' || true)
+          C_PCT=$(awk -v d="$C_DONE" -v t="$C_TOTAL" 'BEGIN { if (t==0) print "0.0"; else printf "%.1f", (100*d/t) }')
+          HEAD=$(git rev-parse HEAD)
+          cat >> PHASE1_PROGRESS_LOG.md <<EOF
+
+## 2026-08-31 23:00:15 IST — C9 server-pagination client conversion (in progress)
+
+- **Run start/end:** 2026-08-31 23:00:15 IST → approximately 23:13 IST.
+- **Section worked:** C — Question bank; active item C9 server-side search/filter/pagination.
+- **Checklist items completed:** None in this run; C9 remains deliberately unchecked pending browser conversion and exact full-gate verification.
+- **Substantial work completed:** Re-inspected the canonical hardening state and confirmed the prior C9 backend heartbeat release gate `33416067478` completed successfully (2m 50s). Production runtime errors remained clean. Re-read the 46 KB `LiveQuestionBank` implementation and isolated every remaining all-bank dependency: 1,000-row batching, local filtering/sorting/slicing, whole-result review navigation, all-matching selection, and export of the full filtered array. Added a permanent test-first C9 acceptance script (`scripts/c9-question-bank-pagination-smoke.mjs`) containing 10 explicit bounded-pagination assertions. The test is intentionally not wired into the release gate until the UI implementation satisfies it; it defines the no-regression boundary for the next implementation commit.
+- **Active engineering time / observable span:** about 13 minutes in this runtime; first implementation/test commit at 23:10:41 IST. The requested 45–50 minute target was not reached because this tool execution window ended earlier; time was not padded artificially.
+- **Branch head at heartbeat workflow start:** `${HEAD}`. Functional/test commit created this run: `3c8ff579a85c4c26e60f7258c6cee9587cf89458` (`test(c9): define bounded question-bank pagination acceptance`).
+- **CI:** Prior C9 heartbeat gate `33416067478` — PASS, 2m 50s. The new test-only commit triggers the normal release gate; C9 completion is not claimed from that gate because the new acceptance script is not yet wired and the client still uses the legacy loader.
+- **Vercel/Supabase state:** Vercel production error/fatal logs for the preceding 24 hours were clean; permanent production was not promoted or altered. The live Supabase `search_question_bank_v1` backend foundation from the previous run remains the intended pagination API; no database change was required in this run.
+- **Rework/failures/blockers:** Direct container DNS access to GitHub was unavailable, so repository work used the connected GitHub API. This is a transient runtime limitation, not a product/user-input blocker. No production or database failure occurred.
+- **Section progress:** C has ${C_DONE}/${C_TOTAL} verified items (${C_PCT}%). C9 remains in progress.
+- **Overall Phase 1 percentage:** ${DONE}/${TOTAL} checklist items verified (${OVERALL}%).
+- **Why the run stopped:** the automation/tool window was shorter than the 45–50 minute engineering target; a safe 46 KB client rewrite should not be rushed or marked complete without TypeScript/regression/full-gate evidence.
+- **Exact next action:** convert `LiveQuestionBank.load()` to call `search_question_bank_v1`, fetch only the returned bounded page rows with nested relations, drive counts/facets/page count from server metadata, make review/select/export page-bounded or explicitly server-fetched, make the new 10-point C9 smoke pass, wire it into `phase1-release-gate.yml`, run the complete release gate, then update C9 only after PASS.
+EOF
+          rm .github/workflows/c9-hourly-heartbeat.yml
+          git config user.name 'saga0003'
+          git config user.email 'sagar@smis.edu.in'
+          git add PHASE1_PROGRESS_LOG.md .github/workflows/c9-hourly-heartbeat.yml
+          git commit -m 'chore(c9): record 23:00 pagination heartbeat'
+          git push origin HEAD:phase1-hardening
