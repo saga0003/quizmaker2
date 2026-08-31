@@ -76,6 +76,8 @@ jobs:
         run: node scripts/b6-teacher-scope-smoke.mjs
       - name: B7 academic-year rollover checks
         run: node scripts/b7-academic-year-rollover-smoke.mjs
+      - name: C5 analytics-ready approval checks
+        run: node scripts/c5-analytics-ready-approval-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
