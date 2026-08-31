@@ -66,6 +66,9 @@ jobs:
       - name: A6 upload signature checks
         run: node scripts/a6-upload-hardening-smoke.mjs
 
+      - name: A7 ZIP safety checks
+        run: node scripts/a7-zip-safety-smoke.mjs
+
       - name: TypeScript
         run: npm run typecheck -- --incremental false
 
