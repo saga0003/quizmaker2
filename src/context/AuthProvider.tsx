@@ -111,6 +111,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Attach the validated active institution to every same-origin Evidara API call.
+  // Individual server routes still re-check membership and reject mismatches.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!activeOrganizationId) return originalFetch(input, init);
+      const requestUrl = input instanceof Request ? input.url : String(input);
+      const target = new URL(requestUrl, window.location.origin);
+      if (target.origin !== window.location.origin || !target.pathname.startsWith("/api/")) {
+        return originalFetch(input, init);
+      }
+      const headers = new Headers(input instanceof Request ? input.headers : undefined);
+      if (init?.headers) new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+      if (!headers.has("X-Evidara-Organization-Id")) headers.set("X-Evidara-Organization-Id", activeOrganizationId);
+      if (input instanceof Request) {
+        return originalFetch(new Request(input, { ...init, headers }));
+      }
+      return originalFetch(input, { ...init, headers });
+    };
+    return () => { window.fetch = originalFetch; };
+  }, [activeOrganizationId]);
+
   const setActiveOrganizationId = (organizationId: string | null) => {
     const userId = session?.user.id;
     if (!organizationId) {
