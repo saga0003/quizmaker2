@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { assertUploadSignature } from '@/lib/server/uploadValidation';
 
 export const PRIVATE_RESOURCE_BUCKET = 'academic-resources-private';
 
@@ -31,10 +32,13 @@ export async function uploadPrivateAcademicResource(input: {
   organizationId: string;
   userId: string;
 }) {
-  if (!allowedMimeTypes.has(input.contentType)) {
-    throw Object.assign(new Error(`Unsupported resource type: ${input.contentType || 'unknown'}.`), { status: 400 });
-  }
-  if (!input.bytes.length) throw Object.assign(new Error('The selected resource is empty.'), { status: 400 });
+  const contentType = assertUploadSignature({
+    bytes: input.bytes,
+    contentType: input.contentType,
+    originalName: input.originalName,
+    allowedMimeTypes,
+    label: 'resource',
+  });
   if (input.bytes.length > 20 * 1024 * 1024) throw Object.assign(new Error('Resource files must be 20 MB or smaller.'), { status: 413 });
 
   const original = safeSegment(input.originalName);
@@ -42,12 +46,12 @@ export async function uploadPrivateAcademicResource(input: {
   const month = now.toISOString().slice(0, 7);
   const key = `organization/${safeSegment(input.organizationId)}/${month}/${safeSegment(input.userId)}/${randomUUID()}-${original}`;
   const { error } = await input.admin.storage.from(PRIVATE_RESOURCE_BUCKET).upload(key, input.bytes, {
-    contentType: input.contentType,
+    contentType,
     cacheControl: 'private, max-age=0, no-store',
     upsert: false,
   });
   if (error) throw Object.assign(new Error(`Private resource upload failed. ${error.message}`), { status: 502 });
-  return { key, contentType: input.contentType, size: input.bytes.length };
+  return { key, contentType, size: input.bytes.length };
 }
 
 export async function createPrivateAcademicResourceUrl(input: {
