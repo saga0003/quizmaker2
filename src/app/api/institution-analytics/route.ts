@@ -124,16 +124,28 @@ async function requestContext(request: Request) {
   const role = normalizeEvidaraRole(profile.role);
   if (role === 'student') throw Object.assign(new Error('Institution analytics is available only to authorised staff.'), { status: 403 });
   const platformAdmin = isPlatformAdmin(role);
+  const selectedOrganizationId = request.headers.get('x-evidara-organization-id')?.trim() || null;
 
-  const { data: membership } = await auth.admin
-    .from('organization_members')
-    .select('organization_id,member_role,is_active')
-    .eq('user_id', auth.user.id)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-
-  const organizationId = membership?.organization_id || null;
+  let organizationId: string | null = null;
+  if (!platformAdmin) {
+    const { data: memberships, error: membershipError } = await auth.admin
+      .from('organization_members')
+      .select('organization_id,member_role,is_active')
+      .eq('user_id', auth.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    if (membershipError) throw new Error(membershipError.message);
+    const activeMemberships = memberships || [];
+    if (selectedOrganizationId) {
+      const selected = activeMemberships.find((membership) => membership.organization_id === selectedOrganizationId);
+      if (!selected) throw Object.assign(new Error('The selected institution is not an active membership for this account.'), { status: 403 });
+      organizationId = selected.organization_id;
+    } else if (activeMemberships.length > 1) {
+      throw Object.assign(new Error('Choose an active institution before opening institution analytics.'), { status: 409 });
+    } else {
+      organizationId = activeMemberships[0]?.organization_id || null;
+    }
+  }
   if (!platformAdmin && !organizationId) throw Object.assign(new Error('No active school is linked to this account.'), { status: 403 });
 
   let allowedSectionIds: string[] | null = null;
