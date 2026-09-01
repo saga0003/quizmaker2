@@ -1,0 +1,58 @@
+name: Record Phase 1 I/J checkpoint
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/workflows/phase1-record-i-j.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: ${{ !contains(github.event.head_commit.message, '[recorded-phase1]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Record checklist and heartbeat
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, datetime, zoneinfo
+
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text()
+          replacements = {
+            r'^- \[ \] I5 .*$': '- [x] **I5 Monitoring/alerts** — verified 2 Sep 2026. A sanitized no-store `/api/ops/health/` probe checks database snapshot, Supabase Auth, R2 readiness and measured 24-hour import/test-start/answer-save/submission failure categories without exposing personal or usage-detail records; `.github/workflows/phase1-production-monitor.yml` performs hourly permanent-application/dependency probing, while build failures remain release-gate enforced. Dedicated I5-I7 regression and complete release gate `33567377979` passed on exact functional candidate `7fc87d9c65ed249b16d8440def12b81e648d2729`.',
+            r'^- \[ \] I6 .*$': '- [x] **I6 Recovery/runbook** — verified 2 Sep 2026. `PHASE1_OPERATIONS_RUNBOOK.md` documents Supabase backup/PITR verification before cutover, database recovery ordering, R2 object recovery, Vercel last-known-good rollback, incident playbooks and post-recovery verification. It explicitly keeps web rollback separate from database recovery and does not claim PITR is enabled without provider-plan verification. The permanent I5-I7 regression and full gate `33567377979` passed.',
+            r'^- \[ \] I7 .*$': '- [x] **I7 Targeted hot-path indexes** — verified 2 Sep 2026. Live Supabase inspection avoided a redundant `paper_questions` index because `(paper_id, section_id, display_order)` already exists. Migration `phase1_hot_path_indexes` added five targeted organization/status/scope indexes for attempts, student memberships, questions, question papers and student assignments; live PostgreSQL verified every new index `indisvalid=true` and `indisready=true`. Versioned migration `20260901224500_phase1_hot_path_indexes.sql`, dedicated regression and complete gate `33567377979` passed.',
+            r'^- \[ \] J1 .*$': '- [x] **J1 Data minimisation** — engineering-verified 2 Sep 2026. Live schema review and `PHASE1_PRIVACY_GOVERNANCE.md` classify parent name/phone as optional operational contact data, not an analytics dimension; assessment evidence is limited to delivery/scoring/analytics needs, and audit/health telemetry is metadata-first without passwords, tokens or unnecessary contact payloads. Permanent J regression plus complete release gate `33567769216` passed on exact candidate `d4bdee0b23ff4181b5a7d56215af56d28f8c6878`.',
+            r'^- \[ \] J2 .*$': '- [x] **J2 Retention/export/termination policy** — engineering-verified 2 Sep 2026. `PHASE1_PRIVACY_GOVERNANCE.md` defines retention classes, institution-scoped export, controlled suspension/termination, dependency-safe deletion/anonymisation review and a requirement to test destructive deletion on a disposable tenant before first production use. Permanent J regression and full gate `33567769216` passed.',
+            r'^- \[ \] J4 .*$': '- [x] **J4 External AI data boundary** — engineering-verified 2 Sep 2026. The application package has no known external AI-provider SDK dependency; the Phase-1 contract restricts any future external AI helper to explicit question-content conversion, excludes student/parent identity, attempts, answers, marks, rankings, analytics, integrity and support/audit evidence, requires processor disclosure/approval, and routes returned drafts through normal validation/approval. Permanent J regression and full gate `33567769216` passed.',
+            r'^- \[ \] J5 .*$': '- [x] **J5 Least-privilege support/admin** — engineering-verified 2 Sep 2026. Support access is explicitly institution-scoped and audited, Super Admin View As remains read-only, individual privileged identities are required, and the staged AAL2/MFA cutover remains protected. Existing A3/P0.12 controls plus the permanent J regression passed complete release gate `33567769216`.'
+          }
+          for pattern, replacement in replacements.items():
+            text, n = re.subn(pattern, replacement, text, count=1, flags=re.M)
+            if n != 1:
+              raise SystemExit(f'Checklist replacement failed for {pattern}: {n}')
+          checklist.write_text(text)
+
+          tz = zoneinfo.ZoneInfo('Asia/Kolkata')
+          end = datetime.datetime.now(datetime.timezone.utc).astimezone(tz)
+          start = datetime.datetime(2026,9,2,4,2,53,tzinfo=tz)
+          span = max(0, round((end-start).total_seconds()/60,1))
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          entry = f'''\n\n## 2 Sep 2026 — Section I completion + Section J privacy-governance hardening\n\n- Run start: **04:02:53 IST**\n- Run end: **{end:%H:%M:%S} IST**\n- Active engineering / best observable engineering span: **~{span:.1f} minutes wall-clock engineering/verification span**. This execution window ended before the requested 45–50 productive-minute target; that limitation is recorded rather than padded.\n- Sections worked: **I — Super Admin operations/platform health; J — Privacy, data handling and launch documentation**.\n- Checklist completed this run: **I5, I6, I7, J1, J2, J4, J5**. J3 remains open because qualified legal review is external to engineering and must not be self-certified.\n- Prior logging gap reconciled: the preceding I1–I4 run had successfully updated the checklist but its heartbeat recorder did not execute; this entry records the continuation from that verified checkpoint.\n- Functional branch head verified for I: `7fc87d9c65ed249b16d8440def12b81e648d2729`. Privacy-governance candidate: `d4bdee0b23ff4181b5a7d56215af56d28f8c6878`.\n- Commits created in this run: `1b131ec96c96c052c8306ee1df4cbdae0a391341`, `e8c09c96a82ea9b4e6b38bef82266e63565abb20`, `8af16d8300e2587c43199dfb14e61684c5707cb1`, `c5db0119997af64758e841ade798b83cced24892`, `33c862a53ecbb7d551c85f11d6ec18a286d4889b`, `5b6c05d9e4e6ff58a77f6ef1251ea8bb6e93c54c`, `7fc87d9c65ed249b16d8440def12b81e648d2729`, `934bbbf1b00337ed066b6e5a19676e835b4aa4f1`, `9e50986827b3c5da02ae0c0c040cf13a5bab3171`, `d4bdee0b23ff4181b5a7d56215af56d28f8c6878`.\n- CI: standalone I5-I7 operations contract `33567377969` **PASS**; complete I release gate `33567377979` **PASS**; complete J release gate `33567769216` **PASS**, 22:44:43–22:47:43 UTC (**3m00s**), including J regression, TypeScript, lint, accumulated regressions, production build and final enforcement.\n- Vercel: permanent production remained protected/unpromoted; 24-hour production runtime error/fatal inspection was clean. Matching hardening previews reached READY. Direct protected-preview `/api/ops/health/` body fetch is blocked by Vercel SSO in the connector, so no false direct-probe claim is made.\n- Supabase: both connected projects were `ACTIVE_HEALTHY`; primary platform snapshot reported no measured 24-hour import/test-start/answer-save/submission failures. `phase1_hot_path_indexes` is applied; all five new indexes were live-verified valid/ready.\n- Rework/failures/blockers: no functional release-gate failures. The only material blocker in Section J is **J3 qualified legal review/approval of the actual Privacy Policy and institution DPA**. The MeitY DPDP Act/Rules have phased commencement, so production legal review must use the effective provisions on the planned launch date. Preview-health direct fetch remains SSO-protected.\n- Active section completion: **Section I 7/7 = 100%**; **Section J 4/5 = 80%**.\n- Overall Phase 1: **96/129 = 74.4% verified**.\n- Exact next action: prepare counsel-ready Privacy Policy/DPA drafts and obtain qualified legal review for **J3**; do not check J3 without that approval. In parallel, prepare the real-school R1–R18 acceptance harness and only execute it with an authorized representative institution/student dataset; permanent production remains protected until real-school, load and sign-off gates pass.\n'''
+          log.write_text(log.read_text() + entry)
+          PY
+          rm .github/workflows/phase1-record-i-j.yml
+          git config user.name "phase1-hardening-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md .github/workflows/phase1-record-i-j.yml
+          git commit -m "docs: record I/J verification heartbeat [skip ci] [recorded-phase1]"
+          git push origin HEAD:phase1-hardening
