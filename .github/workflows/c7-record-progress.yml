@@ -1,4 +1,4 @@
-name: Record current hardening heartbeat
+name: Apply canonical F6 F7 analytics thresholds
 on:
   push:
     branches:
@@ -8,42 +8,27 @@ on:
 permissions:
   contents: write
 jobs:
-  record:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Append I1-I3 heartbeat
-        shell: bash
+      - name: Align canonical patch anchor
+        run: sed -i "s/#9cabb7/#94A3B8/g" scripts/f6-f7-canonical-apply.py
+      - name: Apply canonical F6 F7 patch
+        run: python scripts/f6-f7-canonical-apply.py
+      - name: Run canonical F6 smoke
+        run: node scripts/f6-topic-evidence-threshold-smoke.mjs
+      - name: Run canonical F7 smoke
+        run: node scripts/f7-percentile-cohort-smoke.mjs
+      - name: Commit canonical H7 H8 H9 record
         run: |
-          if grep -q 'I1–I3 Super Admin platform health (verified)' PHASE1_PROGRESS_LOG.md; then
-            echo 'Heartbeat already recorded.'
-            exit 0
-          fi
-          cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
-
-## 2026-09-02 02:57:09–03:12:16 IST — I1–I3 Super Admin platform health (verified)
-- **Run start/end:** 2026-09-02 02:57:09 IST → 2026-09-02 03:12:16 IST.
-- **Active engineering minutes / best observable span:** approximately **15m 07s** of inspection, implementation, database work, CI rework and verification. The requested 45–50 minute target was **not met because this execution window was materially shorter**; no time was artificially padded.
-- **Section worked:** I — Super Admin operations and platform health.
-- **Checklist items completed:** I1 `Audit & Health`; I2 measured deployment/database/storage plus 24-hour import/test-start/answer-save/submission failure evidence; I3 database-side usage counts. I4 was already verified before this run.
-- **Items still pending:** I5 monitoring/alerts; I6 backup/PITR, R2 recovery, Vercel rollback and incident runbook; I7 targeted hot-path database indexes.
-- **Exact functional candidate:** `5792cd86edfd579eafd741a2a334f73f5407f9bf`.
-- **Branch head before heartbeat recording:** `d03e0ec129c84be579f608da032c3a20a0c52cc4` after checklist recording and temporary-recorder cleanup.
-- **Commits / implementation created:** privileged `/api/admin/platform-health/` endpoint; operational `AdminAuditHealthView`; database-side active-student licence counting; permanent `scripts/i1-i3-platform-health-smoke.mjs`; release-gate wiring; versioned `20260901213000_phase1_platform_health_snapshot.sql`; measured-health H1 contract correction; checklist recording and recorder cleanup.
-- **CI run/result:** complete release gate `33562079269` passed in approximately **3m 08s**. I1–I3, H regressions, TypeScript, lint, all accumulated regressions, production build and final enforcement passed. Earlier run `33561796699` failed only a stale H1 static-health assertion; it was corrected without weakening anti-fabrication coverage.
-- **Vercel state:** permanent production protected and unchanged; production error/fatal runtime inspection for the preceding 24 hours was clean; no promotion occurred.
-- **Supabase state:** both connected projects `ACTIVE_HEALTHY`. Primary migration `phase1_platform_health_snapshot` applied and versioned. Acceptance snapshot: users 8, schools 2, active students 8, questions 2841, papers 4, attempts 1, responses 1, active resources 0; measured 24-hour import/test-start/answer-save/submission failures all 0. No destructive database mutation.
-- **Rework/failures/blockers:** one contained H1/H2 regression-contract mismatch was caught by the first full gate and repaired. Existing Supabase performance-advisor warnings are inputs for I7 and were not bulk-fixed blindly.
-- **Active-section progress:** **4/7 = 57.1%** verified.
-- **Overall Phase 1 progress:** **89/129 = 69.0%** verified.
-- **Exact next action:** implement I5 monitoring/alerting for build failures, production 5xx, authentication/test/import failure signals and core dependency outages; add permanent regression and complete release-gate verification. If I5 clears early, continue directly into I6 and then I7.
-EOF
-          git config user.name 'evidara-hardening-bot'
-          git config user.email 'actions@users.noreply.github.com'
-          git add PHASE1_PROGRESS_LOG.md
-          git diff --cached --quiet && exit 0
-          git commit -m 'docs(i1-i3): record verified hardening heartbeat'
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git rm -f scripts/f6-f7-canonical-apply.py
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git commit -m "docs: record H7-H9 verification"
           git push origin HEAD:phase1-hardening
+# canonical recorder retry after checklist-token correction
