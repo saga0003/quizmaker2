@@ -31,3 +31,4 @@ jobs:
           git diff --cached --check
           git commit -m "feat(f8): implement institution hierarchy drilldown"
           git push origin HEAD:phase1-hardening
+# rerun after correcting URLSearchParams acceptance matching
