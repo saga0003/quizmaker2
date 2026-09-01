@@ -423,3 +423,20 @@ This log records each production-hardening run with observable implementation an
 - **Section progress:** F is {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**).
 - **Overall Phase 1:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**).
 - **Exact next action:** F5 — standardize each analytics taxonomy row/card to expose the full evidence set: exposure, Attempted (`correct + incorrect`), correct, incorrect, unanswered, Accuracy, Score %, time, trend and evidence count. Preserve `row.attempts` as response-record/evidence count rather than mislabelling it Attempted; add a permanent F5 regression and require a complete release-gate PASS before checking F5.
+
+
+## 2026-09-01 17:29:57 IST — F5/F6/F7 analytics verification / hourly heartbeat
+- **Run start/end:** 2026-09-01 17:29:57 IST → approximately 17:42 IST.
+- **Active engineering/review span:** approximately **12 minutes** of observable reconciliation, CI/deployment/database verification and release recording in the available execution window. The requested 45–50 minute target was **not met because this runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F5, F6 and F7.
+- **Items still pending:** F8–F13.
+- **Starting/functional branch head:** `f89629c31e632e6518f7ec11630f053ca5b0943e`.
+- **Commits created:** existing product/gate commits through `f89629c31e632e6518f7ec11630f053ca5b0943e`, plus this recorder commit.
+- **CI:** complete Phase-1 release gate `33505090942` on exact candidate `f89629c31e632e6518f7ec11630f053ca5b0943e` — **PASS**, 2026-09-01 17:27:12–17:29:23 IST (~2m11s). Gate includes F5 standardized analytics row, F6 topic evidence threshold, F7 percentile cohort checks, TypeScript, lint, all prior regressions and production build.
+- **Vercel:** production runtime inspection found **no error/fatal logs in the preceding 24 hours**. Preview creation for current rapid pushes remains Hobby build-rate limited; no production promotion occurred.
+- **Supabase:** project `xzfozpnzvznqrvcsoail` (`SMIS QP`) is **ACTIVE_HEALTHY** on Postgres 17.6.1. No database mutation was required for F5–F7 in this run.
+- **Rework/failures/blockers:** container-side direct GitHub clone could not resolve github.com, so source reconciliation used the connected GitHub API; this did not affect repository or production. No functional blocker remains for F5–F7.
+- **Section F progress:** 7/13 verified = **53.8%**.
+- **Overall Phase 1:** 65/129 verified = **50.4%**.
+- **Exact next action:** F8 — verify/implement School → programme → grade → section → subject → chapter → topic → student institutional drilldown, add a permanent F8 regression, and require a complete release-gate PASS before checking F8; continue immediately to F9 if green.
