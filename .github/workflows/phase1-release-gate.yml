@@ -146,6 +146,8 @@ jobs:
         run: node scripts/h3-h5-role-dashboard-smoke.mjs
       - name: H6 UI consistency checks
         run: node scripts/h6-ui-consistency-smoke.mjs
+      - name: I1-I3 platform health checks
+        run: node scripts/i1-i3-platform-health-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
