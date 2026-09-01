@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type MouseEvent } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, BookOpen, FilePlus, FileText, GraduationCap, Users } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BarChart3, BookOpen, FilePlus, FileText, GraduationCap, Users } from 'lucide-react';
 import { useAppStore, type AppView } from '@/store/use-app-store';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +41,126 @@ function StatCard({ icon: Icon, label, value, sub }: { icon: React.ElementType; 
 
 function viewHref(view: AppView) {
   return `/?view=${encodeURIComponent(view)}`;
+}
+
+type TeacherAttentionCandidate = {
+  id: string;
+  name: string;
+  section: string;
+  completedTests: number;
+  averagePercentage: number | null;
+  accuracy: number | null;
+  priority: number;
+  reasons: string[];
+};
+
+function TeacherNeedsAttention({ schoolId }: { schoolId: string }) {
+  const setView = useAppStore((s) => s.setView);
+  const [rows, setRows] = useState<TeacherAttentionCandidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [attentionError, setAttentionError] = useState('');
+
+  useEffect(() => {
+    if (!schoolId || !supabase) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        setLoading(true);
+        setAttentionError('');
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Your Evidara session has expired.');
+        const headers = { Authorization: `Bearer ${token}`, 'x-evidara-organization-id': schoolId };
+        const schoolResponse = await fetch(`/api/institution-analytics?level=school&organizationId=${encodeURIComponent(schoolId)}`, { headers, cache: 'no-store' });
+        const schoolPayload = await schoolResponse.json() as { error?: string; classes?: Array<{ id: string; name: string }> };
+        if (!schoolResponse.ok) throw new Error(schoolPayload.error || 'Unable to load assigned sections.');
+        const sections = schoolPayload.classes || [];
+        const sectionPayloads = await Promise.all(sections.map(async (section) => {
+          const response = await fetch(`/api/institution-analytics?level=class&organizationId=${encodeURIComponent(schoolId)}&sectionId=${encodeURIComponent(section.id)}`, { headers, cache: 'no-store' });
+          const payload = await response.json() as {
+            error?: string;
+            class?: { name?: string };
+            students?: Array<{ id: string; name: string; completedTests: number; averagePercentage: number | null; accuracy: number | null }>;
+          };
+          if (!response.ok) throw new Error(payload.error || `Unable to load ${section.name}.`);
+          return { section: payload.class?.name || section.name, students: payload.students || [] };
+        }));
+        const candidates = sectionPayloads.flatMap(({ section, students }) => students.map((student) => {
+          const reasons: string[] = [];
+          let priority = 0;
+          if (student.completedTests === 0) {
+            reasons.push('No submitted assessments');
+            priority += 90;
+          } else {
+            if (student.averagePercentage != null && student.averagePercentage < 55) {
+              reasons.push(`Average score ${Math.round(student.averagePercentage)}%`);
+              priority += 70 - student.averagePercentage;
+            }
+            if (student.accuracy != null && student.accuracy < 55) {
+              reasons.push(`Accuracy ${Math.round(student.accuracy)}%`);
+              priority += 70 - student.accuracy;
+            }
+          }
+          return { ...student, section, reasons, priority };
+        })).filter((student) => student.reasons.length > 0)
+          .sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name))
+          .slice(0, 5);
+        if (!cancelled) setRows(candidates);
+      } catch (value) {
+        if (!cancelled) setAttentionError(value instanceof Error ? value.message : 'Unable to load attention evidence.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [schoolId]);
+
+  function openAnalytics(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    setView('school-analytics-overview');
+    const url = new URL(window.location.href);
+    url.pathname = '/';
+    url.searchParams.set('view', 'school-analytics-overview');
+    window.history.pushState({ evidaraView: 'school-analytics-overview' }, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  return (
+    <Card className="rounded-xl shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /><p className="font-semibold text-[var(--foreground)]">Needs attention</p></div>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">Evidence-first queue from students in your assigned sections. It is a review prompt, not a prediction or judgement.</p>
+          </div>
+          <Badge variant="outline">Up to 5 priorities</Badge>
+        </div>
+        {loading ? <p className="mt-4 text-sm text-[var(--muted-foreground)]">Checking current assessment evidence…</p> : attentionError ? (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{attentionError}</p>
+        ) : rows.length === 0 ? (
+          <p className="mt-4 rounded-lg border border-[var(--line)] bg-[var(--muted)]/30 px-3 py-3 text-sm text-[var(--muted-foreground)]">No students currently meet the attention rules. Students are flagged only for no submitted assessments or measured score/accuracy below 55%.</p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {rows.map((student) => (
+              <div key={`${student.id}:${student.section}`} className="flex flex-col gap-3 rounded-lg border border-[var(--line)] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">{student.name}</p>
+                  <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{student.section} · {student.completedTests} submitted test{student.completedTests === 1 ? '' : 's'}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">{student.reasons.map((reason) => <Badge key={reason} variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">{reason}</Badge>)}</div>
+                </div>
+                <div className="shrink-0 text-left sm:text-right">
+                  <p className="text-xs text-[var(--muted-foreground)]">Measured evidence</p>
+                  <p className="text-sm font-medium text-[var(--foreground)]">Score {student.averagePercentage == null ? '—' : `${Math.round(student.averagePercentage)}%`} · Accuracy {student.accuracy == null ? '—' : `${Math.round(student.accuracy)}%`}</p>
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">{student.completedTests === 0 ? 'Action: check assignment participation.' : 'Action: review subject/topic evidence before intervention.'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <a href={viewHref('school-analytics-overview')} onClick={openAnalytics} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--teal)] hover:underline">Open scoped analytics <ArrowRight className="h-4 w-4" /></a>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function SchoolDashboardView() {
@@ -189,6 +309,8 @@ export function SchoolDashboardView() {
           </a>
         ))}
       </div>
+
+      {teacher && <TeacherNeedsAttention schoolId={state.school.id} />}
 
       <Card className="rounded-xl shadow-sm">
         <CardContent className="p-5">
