@@ -32,6 +32,19 @@ type AttemptRow = {
   status: string;
 };
 
+type AttemptMetricRow = {
+  student_id: string;
+  completed_tests: number | string;
+  percentage_sum: number | string | null;
+  average_percentage: number | string | null;
+  correct_count: number | string | null;
+  incorrect_count: number | string | null;
+  unanswered_count: number | string | null;
+  highest_percentage: number | string | null;
+  lowest_percentage: number | string | null;
+  last_test_at: string | null;
+};
+
 type MembershipRow = {
   organization_id: string;
   student_id: string;
@@ -253,6 +266,24 @@ async function attemptsForStudents(ctx: CloudContext, studentIds: string[], orga
   return output;
 }
 
+async function attemptMetricsForStudents(ctx: CloudContext, studentIds: string[], organizationId: string) {
+  if (!studentIds.length) return [] as AttemptMetricRow[];
+  const output: AttemptMetricRow[] = [];
+  for (let start = 0; start < studentIds.length; start += 500) {
+    const { data, error } = await ctx.admin.rpc('get_institution_student_attempt_metrics_v1', {
+      p_organization_id: organizationId,
+      p_student_ids: studentIds.slice(start, start + 500),
+    });
+    if (error) throw new Error(error.message);
+    output.push(...((data || []) as AttemptMetricRow[]));
+  }
+  return output;
+}
+
+function submittedAttemptCount(metrics: AttemptMetricRow[]) {
+  return metrics.reduce((sum, row) => sum + number(row.completed_tests), 0);
+}
+
 function studentMetrics(studentId: string, attempts: AttemptRow[]) {
   const rows = attempts.filter((attempt) => attempt.student_id === studentId);
   const percentages = rows.map((row) => number(row.percentage));
@@ -307,6 +338,30 @@ function scopeMetrics(memberships: MembershipRow[], attempts: AttemptRow[]) {
   };
 }
 
+function scopeAggregateMetrics(memberships: MembershipRow[], metrics: AttemptMetricRow[]) {
+  const studentIds = new Set(memberships.map((row) => row.student_id));
+  const rows = metrics.filter((row) => studentIds.has(row.student_id));
+  const completedTests = submittedAttemptCount(rows);
+  const percentageSum = rows.reduce((sum, row) => sum + number(row.percentage_sum), 0);
+  const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
+  const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
+  const participants = rows.filter((row) => number(row.completed_tests) > 0).length;
+  const highs = rows.map((row) => row.highest_percentage == null ? null : number(row.highest_percentage)).filter((value): value is number => value !== null);
+  const lows = rows.map((row) => row.lowest_percentage == null ? null : number(row.lowest_percentage)).filter((value): value is number => value !== null);
+  return {
+    studentCount: studentIds.size,
+    completedTests,
+    averageTestsPerStudent: studentIds.size ? rounded(completedTests / studentIds.size) : 0,
+    averagePercentage: completedTests ? rounded(percentageSum / completedTests) : null,
+    accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
+    participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
+    highestPercentage: highs.length ? Math.max(...highs) : null,
+    lowestPercentage: lows.length ? Math.min(...lows) : null,
+    lastTestAt: rows.map((row) => row.last_test_at).filter((value): value is string => Boolean(value)).sort().at(-1) || null,
+    rank: 0,
+  };
+}
+
 function rankScopeRows<T extends { averagePercentage: number | null; rank: number }>(rows: T[]) {
   return [...rows]
     .sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1))
@@ -330,8 +385,12 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
     .in('organization_id', organizationIds)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
-  const studentIds = [...new Set(memberships.map((row) => row.student_id))];
-  const attempts = await attemptsForStudents(ctx, studentIds);
+  const metricsByOrganization = new Map<string, AttemptMetricRow[]>();
+  for (const organizationId of organizationIds) {
+    const orgStudentIds = [...new Set(memberships.filter((row) => row.organization_id === organizationId).map((row) => row.student_id))];
+    metricsByOrganization.set(organizationId, await attemptMetricsForStudents(ctx, orgStudentIds, organizationId));
+  }
+  const totalSubmittedAttempts = [...metricsByOrganization.values()].reduce((sum, rows) => sum + submittedAttemptCount(rows), 0);
   const sections = await paged<SectionRow>((from, to) => ctx.admin
     .from('academic_sections')
     .select('id,organization_id,academic_year,grade,name,code')
@@ -341,12 +400,7 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
 
   const schools: InstitutionSchoolRow[] = (organizations || []).map((organization) => {
     const orgMemberships = memberships.filter((row) => row.organization_id === organization.id);
-    const orgStudentIds = new Set(orgMemberships.map((row) => row.student_id));
-    const orgAttempts = attempts.filter((row) => row.organization_id ? row.organization_id === organization.id : orgStudentIds.has(row.student_id));
-    const percentages = orgAttempts.map((row) => number(row.percentage));
-    const correct = orgAttempts.reduce((sum, row) => sum + number(row.correct_count), 0);
-    const incorrect = orgAttempts.reduce((sum, row) => sum + number(row.incorrect_count), 0);
-    const participants = new Set(orgAttempts.map((row) => row.student_id)).size;
+    const orgMetrics = metricsByOrganization.get(organization.id) || [];
     return {
       id: organization.id,
       name: organization.name,
@@ -354,17 +408,9 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
       state: organization.state,
       board: organization.board,
       status: organization.status,
-      totalStudents: orgStudentIds.size,
+      totalStudents: new Set(orgMemberships.map((row) => row.student_id)).size,
       totalClasses: sections.filter((row) => row.organization_id === organization.id).length,
-      completedTests: orgAttempts.length,
-      averageTestsPerStudent: orgStudentIds.size ? rounded(orgAttempts.length / orgStudentIds.size) : 0,
-      averagePercentage: average(percentages),
-      accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
-      participation: orgStudentIds.size ? rounded(participants / orgStudentIds.size * 100) : null,
-      highestPercentage: percentages.length ? Math.max(...percentages) : null,
-      lowestPercentage: percentages.length ? Math.min(...percentages) : null,
-      lastTestAt: orgAttempts.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
-      rank: 0,
+      ...scopeAggregateMetrics(orgMemberships, orgMetrics),
     };
   }).sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }));
 
@@ -375,10 +421,10 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
     generatedAt: new Date().toISOString(),
     schools,
     evidence: {
-      submittedAttempts: attempts.length,
+      submittedAttempts: totalSubmittedAttempts,
       classifiedResponses: 0,
-      hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live school records loaded. No submitted assessment attempts are available yet.',
+      hasLiveEvidence: totalSubmittedAttempts > 0,
+      note: totalSubmittedAttempts ? undefined : 'Live school records loaded. No submitted assessment attempts are available yet.',
     },
   };
 }
@@ -410,16 +456,10 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
   const permittedMemberships = ctx.actor.allowedSectionIds
     ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
     : memberships;
-  const attempts = await attemptsForStudents(ctx, [...new Set(permittedMemberships.map((row) => row.student_id))], organizationId);
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(permittedMemberships.map((row) => row.student_id))], organizationId);
 
   const classes: InstitutionClassRow[] = sections.map((section) => {
     const members = permittedMemberships.filter((row) => row.section_id === section.id);
-    const studentIds = new Set(members.map((row) => row.student_id));
-    const rows = attempts.filter((attempt) => studentIds.has(attempt.student_id));
-    const percentages = rows.map((row) => number(row.percentage));
-    const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
-    const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
-    const participants = new Set(rows.map((row) => row.student_id)).size;
     return {
       id: section.id,
       organizationId,
@@ -427,16 +467,7 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
       grade: section.grade,
       name: `Grade ${section.grade} · ${section.name}`,
       code: section.code,
-      studentCount: studentIds.size,
-      completedTests: rows.length,
-      averageTestsPerStudent: studentIds.size ? rounded(rows.length / studentIds.size) : 0,
-      averagePercentage: average(percentages),
-      accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
-      participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
-      highestPercentage: percentages.length ? Math.max(...percentages) : null,
-      lowestPercentage: percentages.length ? Math.min(...percentages) : null,
-      lastTestAt: rows.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
-      rank: 0,
+      ...scopeAggregateMetrics(members, aggregateMetrics),
     };
   }).sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }));
 
@@ -446,7 +477,7 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     organizationId,
     name: programmeLabel(programmeId),
     track: programmeId === UNASSIGNED_PROGRAMME ? null : programmeId,
-    ...scopeMetrics(membershipsForProgramme(permittedMemberships, programmeId), attempts),
+    ...scopeAggregateMetrics(membershipsForProgramme(permittedMemberships, programmeId), aggregateMetrics),
   })));
 
   return {
@@ -458,10 +489,10 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     programmes,
     classes,
     evidence: {
-      submittedAttempts: attempts.length,
+      submittedAttempts: submittedAttemptCount(aggregateMetrics),
       classifiedResponses: 0,
-      hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live classes and enrolments loaded. Results will appear after students submit assessments.',
+      hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live classes and enrolments loaded. Results will appear after students submit assessments.',
     },
   };
 }
@@ -475,7 +506,7 @@ async function programmeSnapshot(ctx: CloudContext, organizationId: string, prog
     ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
     : memberships;
   const scoped = membershipsForProgramme(permitted, programmeId);
-  const attempts = await attemptsForStudents(ctx, [...new Set(scoped.map((row) => row.student_id))], organizationId);
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(scoped.map((row) => row.student_id))], organizationId);
   const grades = rankScopeRows<InstitutionGradeRow>([...new Set(scoped.map((row) => row.grade))].sort((a, b) => a - b).map((grade) => ({
     id: `${programmeId}:${grade}`,
     organizationId,
@@ -483,13 +514,13 @@ async function programmeSnapshot(ctx: CloudContext, organizationId: string, prog
     programmeName: programme.name,
     grade,
     name: `Grade ${grade}`,
-    ...scopeMetrics(scoped.filter((row) => row.grade === grade), attempts),
+    ...scopeAggregateMetrics(scoped.filter((row) => row.grade === grade), aggregateMetrics),
   })));
   return {
     mode: 'live', level: 'programme', actor: ctx.actor, generatedAt: new Date().toISOString(),
     school: schoolPayload.school, programme, grades,
-    evidence: { submittedAttempts: attempts.length, classifiedResponses: 0, hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live programme roster loaded. Results will appear after students submit assessments.' },
+    evidence: { submittedAttempts: submittedAttemptCount(aggregateMetrics), classifiedResponses: 0, hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live programme roster loaded. Results will appear after students submit assessments.' },
   };
 }
 
@@ -501,7 +532,7 @@ async function gradeSnapshot(ctx: CloudContext, organizationId: string, programm
   const permitted = ctx.actor.allowedSectionIds
     ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
     : memberships;
-  const attempts = await attemptsForStudents(ctx, [...new Set(permitted.map((row) => row.student_id))], organizationId);
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(permitted.map((row) => row.student_id))], organizationId);
   let query = ctx.admin.from('academic_sections')
     .select('id,organization_id,academic_year,grade,name,code')
     .eq('organization_id', organizationId).eq('grade', grade).eq('is_active', true).order('name');
@@ -513,13 +544,13 @@ async function gradeSnapshot(ctx: CloudContext, organizationId: string, programm
     .map((section) => ({
       id: section.id, organizationId, academicYear: section.academic_year, grade: section.grade,
       name: section.name, code: section.code, programmeId, programmeName: programmeLabel(programmeId),
-      ...scopeMetrics(permitted.filter((row) => row.section_id === section.id), attempts),
+      ...scopeAggregateMetrics(permitted.filter((row) => row.section_id === section.id), aggregateMetrics),
     })));
   return {
     mode: 'live', level: 'grade', actor: ctx.actor, generatedAt: new Date().toISOString(),
     school: programmePayload.school, programme: programmePayload.programme, grade: gradeRow, sections,
-    evidence: { submittedAttempts: attempts.length, classifiedResponses: 0, hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live grade and section roster loaded. Results will appear after students submit assessments.' },
+    evidence: { submittedAttempts: submittedAttemptCount(aggregateMetrics), classifiedResponses: 0, hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live grade and section roster loaded. Results will appear after students submit assessments.' },
   };
 }
 
