@@ -497,3 +497,23 @@ This log records each production-hardening run with observable implementation an
 - **Active engineering/review span:** approximately 12 minutes of inspection, reconciliation, health verification and release evidence review in the available execution window; the requested 45–50 minute target was not met because the execution window is shorter, with no idle padding added.
 - **Items still pending:** H3–H9, then I, J, real-school acceptance, load acceptance and production sign-off.
 - **Exact next action:** implement/verify H3 School Admin focused dashboard metrics/actions, then H4 Teacher focus and H5 Student focus; add permanent regression coverage and run the complete release gate before checking those items.
+
+
+## 2026-09-01 20:55:12–21:07:13 IST — H3/H4/H5 role dashboards verified / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 20:55:12 IST → 2026-09-01 21:07:13 IST.
+- **Active engineering/review span:** approximately **12 minutes** of branch/CI/production/database inspection, H1/H2 reconciliation, H3–H5 implementation, regression correction, release-gate wiring and final verification. The requested 45–50 minute target was **not met** because this execution window ended materially earlier; no idle padding was added.
+- **Section worked:** H — Role-focused UI/UX.
+- **Checklist items completed this run:** H1, H2, H3, H4, H5. H1/H2 were reconciled from already-green implementation; H3–H5 were implemented and fully verified in this run.
+- **Items still pending:** H6 standardized UI states, H7 responsive QA, H8 mobile table readability, H9 accessibility baseline; then I, J, real-school acceptance, load acceptance and production sign-off.
+- **Starting branch head:** `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf`.
+- **Functional/release candidate:** `36e2ba78c874ebfb2cfe8f7a1a4b47baaba1a24f` (`ci(h3-h5): enforce role-dashboard regression`).
+- **Commits created/reconciled:** `a1eea1bd95f08dd78bab6851181fcc93a412d647` H1/H2 record, `5ed7867042e69fab53e1826982728f2ca76fd888` H3–H5 product implementation, `b92f579bef81c345ca5818cef0e31ae2140186ec` regression assertion-count correction, `36e2ba78c874ebfb2cfe8f7a1a4b47baaba1a24f` permanent release-gate wiring, plus this documentation recorder.
+- **Implementation result:** School Admin home now prioritizes Students, Teachers, Tests, Participation, Score and Licence usage with task actions; teacher home prioritizes Upload Questions, Create Test, Upcoming Tests, Recent Results and Students Needing Attention; student home prioritizes Next Test, Recent Result, Improvement and Focus Topics. Missing measured school metrics fail closed to `—`, and student Focus Topics routes to released evidence rather than invented recommendations.
+- **Verification/rework:** The 22-point H3–H5 smoke passed in the complete gate. The first smoke implementation had a reporting-only assertion-count typo (`19` instead of the actual `22` checks); it was corrected before the exact candidate was accepted. An intermediate release run was cancelled normally by branch concurrency while the final gate was wired; no functional regression remained.
+- **CI:** GitHub Actions release gate `33526523379`, 2026-09-01 21:04:09–21:07:13 IST, duration **3m 04s — PASS**. H1/H2 and H3/H4/H5 permanent checks, TypeScript, lint, every required regression and production build all passed.
+- **Vercel/Supabase state:** Permanent Vercel production remained protected and unchanged; production runtime inspection found no errors in the preceding 24 hours. Head preview status remains subject to the known Hobby-plan build-rate limit rather than a product runtime failure. Connected Supabase projects were `ACTIVE_HEALTHY`; H1–H5 required no database mutation.
+- **Rework/failures/blockers:** No production incident or final verification blocker. One regression output-count typo was corrected; transient CI concurrency cancellation was expected.
+- **Section progress:** H is **5/9 verified (55.6%)**.
+- **Overall Phase 1 progress:** **82/129 verified (63.6%)**.
+- **Exact next action:** H6 — audit and standardize headings, cards, tables, filters, loading states, error states and empty states across Phase-1 workspaces; add permanent regression coverage and run the complete release gate, then continue immediately to H7 responsive acceptance if H6 clears.
