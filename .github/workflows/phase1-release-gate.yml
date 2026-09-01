@@ -142,6 +142,8 @@ jobs:
         run: node scripts/g-commercial-controls-smoke.mjs
       - name: H1/H2 role-focused navigation checks
         run: node scripts/h1-h2-role-navigation-smoke.mjs
+      - name: H3/H4/H5 role-dashboard checks
+        run: node scripts/h3-h5-role-dashboard-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
