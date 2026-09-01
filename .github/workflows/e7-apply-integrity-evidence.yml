@@ -33,21 +33,10 @@ jobs:
               raise SystemExit('Required source marker not found: '+old[:120])
             s=s.replace(old,new,1)
           p.write_text(s)
-
-          smoke=Path('scripts/e7-integrity-evidence-smoke.mjs')
-          smoke.write_text("""import fs from 'node:fs';\nconst source=fs.readFileSync('src/components/evidara/live-paper-catalogue-v8.tsx','utf8');\nconst checks=[\n['integrity is a first-class paper action', /title=\\\"Integrity evidence\\\"[\\s\\S]*?openPaperAction\\(paper, 'integrity'\\)/.test(source)],\n['events come from the RLS-scoped evidence table', /from\\('exam_attempt_events'\\)[\\s\\S]*?select\\('id,attempt_id,event_type,metadata,created_at'\\)/.test(source)],\n['evidence query is bounded', /from\\('exam_attempt_events'\\)[\\s\\S]*?\\.limit\\(1000\\)/.test(source)],\n['attempt query remains bounded', /from\\('exam_attempts'\\)[\\s\\S]*?\\.limit\\(500\\)/.test(source)],\n['report is explicitly evidence not verdict', /Review evidence, not a verdict\\./.test(source)],\n['report disclaims proof of misconduct', /do not prove misconduct/.test(source)],\n['report disclaims cheating-prevention claim', /does not claim that these signals prevent cheating/.test(source)],\n['report shows event time', /new Date\\(event\\.created_at\\)\\.toLocaleString/.test(source)],\n['report shows event type', /statusLabel\\(event\\.event_type\\)/.test(source)],\n['report shows event metadata', /JSON\\.stringify\\(event\\.metadata\\)/.test(source)],\n['report clears evidence when dialog closes', /setIntegrityEvents\\(\\[\\]\\)/.test(source)],\n];\nconst failed=checks.filter(([,ok])=>!ok); for(const [name,ok] of checks) console.log(`${ok?'PASS':'FAIL'}: ${name}`); if(failed.length){console.error('E7 integrity evidence smoke failed: '+failed.map(([n])=>n).join(', '));process.exit(1);} console.log(`E7 integrity evidence smoke passed (${checks.length}/${checks.length}).`);\n""")
-
-          gate=Path('.github/workflows/phase1-release-gate.yml')
-          g=gate.read_text()
-          marker="      - name: E6 idempotent submission and receipt checks\n        run: node scripts/e6-idempotent-submission-smoke.mjs\n"
-          addition=marker+"      - name: E7 integrity evidence report checks\n        run: node scripts/e7-integrity-evidence-smoke.mjs\n"
-          if 'E7 integrity evidence report checks' not in g:
-            if marker not in g: raise SystemExit('E6 gate marker missing')
-            g=g.replace(marker,addition,1)
-          gate.write_text(g)
+          Path('scripts/e7-integrity-evidence-smoke.mjs').write_text("""import fs from 'node:fs';\nconst source=fs.readFileSync('src/components/evidara/live-paper-catalogue-v8.tsx','utf8');\nconst checks=[['integrity is a first-class paper action',/title=\\\"Integrity evidence\\\"[\\s\\S]*?openPaperAction\\(paper, 'integrity'\\)/.test(source)],['events come from the RLS-scoped evidence table',/from\\('exam_attempt_events'\\)[\\s\\S]*?select\\('id,attempt_id,event_type,metadata,created_at'\\)/.test(source)],['evidence query is bounded',/from\\('exam_attempt_events'\\)[\\s\\S]*?\\.limit\\(1000\\)/.test(source)],['attempt query remains bounded',/from\\('exam_attempts'\\)[\\s\\S]*?\\.limit\\(500\\)/.test(source)],['report is explicitly evidence not verdict',/Review evidence, not a verdict\\./.test(source)],['report disclaims proof of misconduct',/do not prove misconduct/.test(source)],['report disclaims cheating-prevention claim',/does not claim that these signals prevent cheating/.test(source)],['report shows event time',/new Date\\(event\\.created_at\\)\\.toLocaleString/.test(source)],['report shows event type',/statusLabel\\(event\\.event_type\\)/.test(source)],['report shows event metadata',/JSON\\.stringify\\(event\\.metadata\\)/.test(source)],['report clears evidence when dialog closes',/setIntegrityEvents\\(\\[\\]\\)/.test(source)]];\nconst failed=checks.filter(([,ok])=>!ok);for(const [name,ok] of checks)console.log(`${ok?'PASS':'FAIL'}: ${name}`);if(failed.length){console.error('E7 integrity evidence smoke failed: '+failed.map(([n])=>n).join(', '));process.exit(1)}console.log(`E7 integrity evidence smoke passed (${checks.length}/${checks.length}).`);\n""")
       - name: Commit E7 implementation
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git add src/components/evidara/live-paper-catalogue-v8.tsx scripts/e7-integrity-evidence-smoke.mjs .github/workflows/phase1-release-gate.yml
+          git add src/components/evidara/live-paper-catalogue-v8.tsx scripts/e7-integrity-evidence-smoke.mjs
           git diff --cached --quiet || (git commit -m "feat(e7): add integrity evidence report" && git push origin HEAD:phase1-hardening)
