@@ -61,7 +61,11 @@ check('draft saving remains available throughout the guided flow', () => {
   assert.ok(source.includes('Save Draft'));
 });
 check('final publish or submit action is gated to step 5', () => {
-  assert.ok(source.includes('{builderStep === 5 && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)}'));
+  assert.ok(source.includes("{builderStep === 5 && submitStatus === 'published' && ("));
+  assert.ok(source.includes('onClick={() => void publishCheckedPaper()}'));
+  assert.ok(source.includes('disabled={saving || readinessLoading || !releaseCheckCurrent}'));
+  assert.ok(source.includes("{builderStep === 5 && submitStatus !== 'published' && ("));
+  assert.ok(source.includes('onClick={() => void savePaper(submitStatus)}'));
 });
 
 console.log(`D3 paper builder wizard smoke: ${checks.length}/${checks.length} checks passed`);
