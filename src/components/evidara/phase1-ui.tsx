@@ -21,7 +21,7 @@ export function Phase1Card({ children, className = '' }: { children: ReactNode; 
 }
 
 export function Phase1FilterBar({ children, label = 'Filters' }: { children: ReactNode; label?: string }) {
-  return <div aria-label={label} className="flex flex-col min-w-0 gap-2 rounded-xl border border-[var(--line)] bg-white p-3 [&>*]:min-w-0 sm:flex-row sm:flex-wrap sm:items-end">{children}</div>;
+  return <div aria-label={label} className="flex flex-col min-w-0 gap-2 rounded-xl border border-[var(--line)] bg-white p-3 [&>*]:min-w-0 [&_button]:min-h-[44px] [&_input]:min-h-[44px] [&_select]:min-h-[44px] sm:flex-row sm:flex-wrap sm:items-end">{children}</div>;
 }
 
 export function Phase1TableFrame({ children, label }: { children: ReactNode; label: string }) {
