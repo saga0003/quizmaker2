@@ -42,9 +42,9 @@ check('all assignment outcomes remain server-previewed before materialization', 
   assert.ok(ui.includes("preview_paper_assignment_v19"));
   assert.ok(ui.includes("assign_paper_audience_v19"));
 });
-check('D6 regression is permanent in release gate', () => {
-  assert.ok(workflow.includes('D6 audience-filter checks'));
+check('D4 audience regression is permanent in release gate', () => {
+  assert.ok(workflow.includes('D4 audience-filter checks'));
   assert.ok(workflow.includes('node scripts/d6-audience-filter-smoke.mjs'));
 });
 
-console.log(`D6 audience filter smoke: ${checks.length}/${checks.length} checks passed`);
+console.log(`D4 audience filter smoke: ${checks.length}/${checks.length} checks passed`);
