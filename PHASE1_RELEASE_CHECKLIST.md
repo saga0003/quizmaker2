@@ -111,12 +111,12 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # G — Subscription and commercial controls
 
-- [ ] G1 Canonical plan: ₹199 × licensed students × annual licence period.
-- [ ] G2 School view: Licensed Students, Active Students, Available Licences, Rate, Start, End.
-- [ ] G3 Super Admin: annual amount calculated from licensed quantity; payment/invoice reference fields retained.
-- [ ] G4 No per-test charge; unlimited tests within active licence.
-- [ ] G5 Grace/expired/suspended states preserve historical read/export access and block restricted new activity according to policy.
-- [ ] G6 Manual invoicing/activation supported; payment gateway not required for Phase 1.
+- [x] G1 Canonical plan: ₹199 × licensed students × annual licence period — verified 1 Sep 2026. The canonical rate is immutable at UI/API/database layers; live `school_subscriptions` is constrained to `annual_price_per_student_paise = 19900`. Exact candidate `0c5e8fe410fc7797cff9f6a6edce720ab47d89cc` passed release gate `33523993848`.
+- [x] G2 School view: Licensed Students, Active Students, Available Licences, Rate, Start, End — verified 1 Sep 2026 by permanent Section G regression in release gate `33523993848`.
+- [x] G3 Super Admin: annual amount calculated from licensed quantity; payment/invoice reference fields retained — verified 1 Sep 2026. Existing-school editing now fixes rate at ₹199 and displays annual amount as licensed quantity × ₹199 while retaining manual payment/invoice references; release gate `33523993848` passed.
+- [x] G4 No per-test charge; unlimited tests within active licence — verified 1 Sep 2026. School subscription UI explicitly states Unlimited tests / No per-test charge and server licence enforcement governs new institutional activity; release gate `33523993848` passed.
+- [x] G5 Grace/expired/suspended states preserve historical read/export access and block restricted new activity according to policy — verified 1 Sep 2026. Existing server-authoritative P0.8 licence states allow new activity only for active/grace while historical result reads remain independent of current licence; permanent G regression and release gate `33523993848` passed.
+- [x] G6 Manual invoicing/activation supported; payment gateway not required for Phase 1 — verified 1 Sep 2026. Super Admin retains manual payment status, amount/date/method/reference/invoice/notes and institution-controlled activation without checkout dependency; release gate `33523993848` passed.
 
 # H — Role-focused UI/UX
 
