@@ -1,0 +1,77 @@
+name: Apply H1 H2 navigation hardening
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/workflows/h1-h2-nav-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Patch role-focused Phase 1 navigation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/store/use-app-store.ts')
+          s = p.read_text()
+          old = "  | 'admin-self-assessment'\n  | 'admin-access';"
+          new = "  | 'admin-self-assessment'\n  | 'admin-audit-health'\n  | 'admin-access';"
+          if old not in s: raise SystemExit('AppView anchor not found')
+          p.write_text(s.replace(old, new))
+
+          p = Path('src/lib/workspaceViews.ts')
+          s = p.read_text()
+          old = "  'admin-self-assessment',\n  'admin-access',"
+          new = "  'admin-self-assessment',\n  'admin-audit-health',\n  'admin-access',"
+          if old not in s: raise SystemExit('APP_VIEWS anchor not found')
+          p.write_text(s.replace(old, new))
+
+          p = Path('src/components/evidara/app-sidebar.tsx')
+          s = p.read_text()
+          old = "  BarChart3,\n  BookOpen,"
+          new = "  Activity,\n  BarChart3,\n  BookOpen,"
+          if old not in s: raise SystemExit('icon anchor not found')
+          s = s.replace(old, new)
+          start = s.index('const adminNav: NavEntry[] = [')
+          end = s.index('\n];', start) + 3
+          replacement = """const adminNav: NavEntry[] = [
+  { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },
+  { label: 'Institutions', icon: Landmark, view: 'admin-institutions', moduleKey: 'students' },
+  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },
+  { label: 'Analytics', icon: BarChart3, view: 'admin-analytics', moduleKey: 'analytics' },
+  { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },
+  { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },
+  { label: 'Resources', icon: FolderOpen, view: 'admin-resources', moduleKey: 'resources' },
+  { label: 'Access & Accounts', icon: ShieldCheck, view: 'admin-access' },
+  { label: 'Audit & Health', icon: Activity, view: 'admin-audit-health' },
+];"""
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s)
+
+          p = Path('src/app/page.tsx')
+          s = p.read_text()
+          anchor = "import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';"
+          addition = anchor + "\nimport { AdminAuditHealthView } from '@/components/evidara/admin-audit-health';"
+          if anchor not in s: raise SystemExit('page import anchor not found')
+          s = s.replace(anchor, addition)
+          anchor = "  if (view === 'admin-access') return <AccessControlView kind=\"admin\" />;"
+          addition = "  if (view === 'admin-audit-health') return <AdminAuditHealthView />;\n" + anchor
+          if anchor not in s: raise SystemExit('page route anchor not found')
+          p.write_text(s.replace(anchor, addition))
+      - name: Commit product changes
+        run: |
+          git config user.name "Evidara Phase 1 Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/store/use-app-store.ts src/lib/workspaceViews.ts src/components/evidara/app-sidebar.tsx src/app/page.tsx
+          git commit -m "feat(h1-h2): focus Phase 1 Super Admin navigation"
+          git push origin HEAD:phase1-hardening
