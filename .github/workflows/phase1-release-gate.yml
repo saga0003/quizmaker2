@@ -132,6 +132,8 @@ jobs:
         run: node scripts/f9-teacher-needs-attention-smoke.mjs
       - name: F10 raw response evidence scope checks
         run: node scripts/f10-raw-response-evidence-smoke.mjs
+      - name: F11 traditional result sheet checks
+        run: node scripts/f11-traditional-result-sheet-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
