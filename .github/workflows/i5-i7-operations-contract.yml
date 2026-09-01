@@ -1,0 +1,23 @@
+name: Evidara I5-I7 Operations Contract
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  operations-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: I5-I7 operations hardening checks
+        run: node scripts/i5-i7-operations-smoke.mjs
