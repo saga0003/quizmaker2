@@ -132,9 +132,9 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # I — Super Admin operations and platform health
 
-- [ ] I1 `Audit & Health` workspace.
-- [ ] I2 Health status: deployment, database, storage, failed imports, failed test starts/saves/submissions.
-- [ ] I3 Usage counts computed in PostgreSQL, not by downloading entire tables into application memory.
+- [x] I1 `Audit & Health` workspace — verified 2 Sep 2026. The first-class Super Admin workspace now reads authenticated operational evidence from a platform-admin-only health endpoint and presents deployment, database, storage, usage and failure evidence without fabricated uptime claims. Exact candidate `5792cd86edfd579eafd741a2a334f73f5407f9bf` passed complete release gate `33562079269`.
+- [x] I2 Health status: deployment, database, storage, failed imports, failed test starts/saves/submissions — verified 2 Sep 2026. Live PostgreSQL snapshot reports the measured 24-hour failure window; Vercel production runtime check was clean during acceptance, and the health UI fails visibly rather than inventing operational success.
+- [x] I3 Usage counts computed in PostgreSQL, not by downloading entire tables into application memory — verified 2 Sep 2026. `phase1_platform_health_snapshot()` computes core counts in PostgreSQL; platform-overview totals and per-institution active-student licence usage use exact HEAD counts instead of loading membership rows. The migration is versioned in `supabase/migrations/20260901213000_phase1_platform_health_snapshot.sql` and enforced by the permanent I1-I3 regression.
 - [x] I4 Support-safe View As actions are audited — verified as part of A3; read-only Super Admin View As records guarded start/end events in `audit_logs` and refuses to enter preview if the start event cannot be recorded.
 - [ ] I5 Monitoring/alerts for build failures, 5xx, auth/test/import failures and core dependency outages.
 - [ ] I6 Backup/PITR strategy, R2 recovery, Vercel rollback and documented incident runbook.
