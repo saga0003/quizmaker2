@@ -44,6 +44,13 @@ jobs:
           if marker not in text:
               raise SystemExit('F12 RPC anchor missing')
           path.write_text(text.replace(marker, replacement, 1))
+          smoke = Path('scripts/f12-excel-export-smoke.mjs')
+          smoke_text = smoke.read_text()
+          old_smoke = "/supabase\\.rpc\\('get_student_analytics_v12'/"
+          new_smoke = "/\\.rpc\\('get_student_analytics_v12'/"
+          if old_smoke not in smoke_text:
+              raise SystemExit('F12 smoke RPC anchor missing')
+          smoke.write_text(smoke_text.replace(old_smoke, new_smoke, 1))
           PY
           node scripts/f12-excel-export-smoke.mjs
           npm run typecheck -- --incremental false
