@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, LoaderCircle, Search, ShieldCheck, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LoaderCircle, Search, ShieldCheck, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthProvider';
 import { useQuestionScope } from '@/components/questions/useQuestionScope';
@@ -53,6 +53,7 @@ type AssignmentPreview = {
   };
   assigned_count: number;
   sample: StudentOption[];
+  warnings?: Array<{ code: string; severity: 'warning' | 'blocking'; count?: number; message: string }>;
   materialized?: boolean;
   materialized_at?: string;
   licence?: {
@@ -249,12 +250,13 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" disabled={busy !== '' || !paperId || (mode === 'students' && !studentIds.length)} onClick={() => void previewAssignment()}>{busy === 'preview' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Preview audience</Button>
-          <Button type="button" disabled={busy !== '' || !preview?.assigned_count} onClick={() => void assign()}>{busy === 'assign' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Assign {preview?.assigned_count ? preview.assigned_count.toLocaleString('en-IN') : ''} students</Button>
+          <Button type="button" disabled={busy !== '' || !preview?.assigned_count || preview?.warnings?.some((warning) => warning.severity === 'blocking')} onClick={() => void assign()}>{busy === 'assign' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Assign {preview?.assigned_count ? preview.assigned_count.toLocaleString('en-IN') : ''} students</Button>
         </div>
 
         {preview && <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
           <div className="rounded-xl border border-[var(--teal)]/20 bg-[var(--teal)]/5 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--teal)]">Audience preview</p><p className="mt-1 text-3xl font-bold text-[var(--foreground)]">{preview.assigned_count.toLocaleString('en-IN')}</p><p className="mt-1 text-sm text-[var(--muted-foreground)]">active students match these filters.</p></div>
           <div className="rounded-xl border border-[var(--line)] p-4"><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--teal)]" /><strong className="text-sm">Institution licence</strong></div><p className="mt-2 text-sm capitalize">State: <strong>{preview.licence?.state || 'unknown'}</strong></p><p className="mt-1 text-sm">Licensed: <strong>{Number(preview.licence?.licensed_students || 0).toLocaleString('en-IN')}</strong> · Active: <strong>{Number(preview.licence?.active_students || 0).toLocaleString('en-IN')}</strong></p></div>
+          {preview.warnings?.length ? <div className="md:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-4"><div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-700" /><strong className="text-sm text-amber-950">Eligibility warnings</strong></div><div className="mt-2 space-y-1">{preview.warnings.map((warning) => <p key={warning.code} className="text-sm text-amber-900"><strong>{warning.severity === 'blocking' ? 'Action required: ' : ''}</strong>{warning.message}</p>)}</div></div> : null}
           {preview.sample?.length ? <div className="md:col-span-2 rounded-xl border border-[var(--line)] p-4"><p className="text-sm font-semibold">Sample students</p><div className="mt-2 flex flex-wrap gap-2">{preview.sample.map((student) => <Badge key={student.student_id} variant="outline" className="border-[var(--line)]">{student.name} · G{student.grade} {student.section}</Badge>)}</div></div> : null}
         </div>}
       </>}
