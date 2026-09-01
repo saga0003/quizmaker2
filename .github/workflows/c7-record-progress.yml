@@ -1,4 +1,4 @@
-name: Apply F5 standardized analytics row
+name: Apply F6 measured class leaderboard
 on:
   push:
     branches:
@@ -15,117 +15,91 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Apply F5 product and regression changes
+      - name: Apply F6 product and regression changes
         shell: python {0}
         run: |
           from pathlib import Path
-          import re
 
-          source_path = Path('src/components/analytics-v12/student-analytics-v12.tsx')
+          source_path = Path('src/components/institution-analytics/institution-analytics-workspace.tsx')
           source = source_path.read_text()
-          replacement = r'''function formatTaxonomyTime(value: number | null) {
-            if (value === null || value === undefined) return '—';
-            const rounded = Math.max(0, Math.round(value));
-            if (rounded < 60) return `${rounded}s`;
-            const minutes = Math.floor(rounded / 60);
-            const seconds = rounded % 60;
-            return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
-          }
 
-          function MasteryRows({ rows, onSelect }: { rows: AnalyticsTaxonomyRow[]; onSelect?: (row: AnalyticsTaxonomyRow) => void }) {
-            if (!rows.length) return <EmptyState title="No evidence yet" copy="This view will populate after completed tests contain matching taxonomy." />;
-            return <div className="analytics-v12-mastery-list">{rows.map((row) => {
-              const attempted = row.correct + row.incorrect;
-              const accuracy = attempted > 0 ? metricValue(row.accuracy, '%') : '—';
-              const scorePercentage = row.questions > 0 && row.average_percentage !== null && row.average_percentage !== undefined
-                ? metricValue(row.average_percentage, '%')
-                : '—';
-              const trend = row.trend_delta === null
-                ? '—'
-                : `${row.trend_delta >= 0 ? '▲' : '▼'} ${Math.abs(round(row.trend_delta, 1) || 0)} pts`;
-              return <button type="button" key={row.id} className="analytics-v12-mastery-row" onClick={() => onSelect?.(row)} disabled={!onSelect}>
-                <span className="analytics-v12-mastery-head">
-                  <span className="analytics-v12-mastery-name">{row.name}</span>
-                  <span className="analytics-v12-bar-track" aria-label={`Accuracy ${accuracy}`}><span className={`analytics-v12-bar-fill ${attempted > 0 && row.accuracy < 70 ? 'attention' : ''}`} style={{ width: `${attempted > 0 ? clamp(row.accuracy) : 0}%` }} /></span>
-                </span>
-                <span className="analytics-v12-mastery-metrics">
-                  <span><small>Exposure</small><strong>{row.questions}</strong></span>
-                  <span><small>Attempted</small><strong>{attempted}</strong></span>
-                  <span><small>Correct</small><strong>{row.correct}</strong></span>
-                  <span><small>Incorrect</small><strong>{row.incorrect}</strong></span>
-                  <span><small>Unanswered</small><strong>{row.unanswered}</strong></span>
-                  <span><small>Accuracy</small><strong>{accuracy}</strong></span>
-                  <span><small>Score %</small><strong>{scorePercentage}</strong></span>
-                  <span><small>Time</small><strong>{formatTaxonomyTime(row.average_seconds)}</strong></span>
-                  <span><small>Trend</small><strong className={`analytics-v12-mini-trend ${(row.trend_delta || 0) < 0 ? 'down' : ''}`}>{trend}</strong></span>
-                  <span><small>Evidence</small><strong>{row.attempts}</strong></span>
-                </span>
-              </button>;
-            })}</div>;
-          }
+          old = """  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv } = props;\n  return <>"""
+          new = """  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv } = props;\n  const leaderboard = allStudents\n    .filter((row) => row.averagePercentage !== null)\n    .sort((a, b) => a.rank - b.rank)\n    .slice(0, 5);\n  return <>"""
+          if old not in source:
+            raise SystemExit('F6 ClassView anchor not found')
+          source = source.replace(old, new, 1)
 
-          function PriorityList'''
-          source, count = re.subn(r'function MasteryRows\(.*?\n}\n\nfunction PriorityList', replacement, source, count=1, flags=re.S)
-          if count != 1:
-            raise SystemExit(f'Expected one MasteryRows block, replaced {count}')
+          anchor = '''    <section className="institution-section"><div className="institution-section-heading report-heading"><div><h2>Student performance</h2><p>Filter, select specific students, then download report cards or the results sheet.</p></div><div><Button variant="outline" onClick={onDownloadCsv} disabled={!students.length}><FileDown />Download CSV</Button><Button onClick={onDownloadReports} disabled={!selected.size}><Download />Report cards ({selected.size})</Button></div></div>'''
+          leaderboard_block = '''    <section className="institution-section institution-leaderboard-section"><div className="institution-section-heading"><div><h2>Class leaderboard</h2><p>Ranked only from submitted assessment percentages. Students without measured evidence are excluded.</p></div><Badge variant="outline">{leaderboard.length} assessed</Badge></div>
+      {leaderboard.length ? <div className="institution-leaderboard">{leaderboard.map((row) => <article key={row.id} className="institution-leaderboard-card">
+        <span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span>
+        <div><strong>{row.name}</strong><small>{row.completedTests} submitted test{row.completedTests === 1 ? '' : 's'} · {percentage(row.accuracy)} accuracy</small></div>
+        <b style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</b>
+        <button type="button" onClick={() => onStudent(row)}>Click to Analyse <ChevronRight /></button>
+      </article>)}</div> : <InstitutionEmptyState title="Leaderboard awaiting evidence" copy="Ranks will appear after students submit measured assessments. No synthetic or placeholder scores are used." />}
+    </section>
+''' + anchor
+          if anchor not in source:
+            raise SystemExit('F6 student-performance anchor not found')
+          source = source.replace(anchor, leaderboard_block, 1)
+
+          old_action = '''<TableCell><button type="button" onClick={() => onStudent(row)} className="institution-row-arrow"><ChevronRight /></button></TableCell>'''
+          new_action = '''<TableCell><button type="button" onClick={() => onStudent(row)} className="institution-analyse-button">Click to Analyse <ChevronRight /></button></TableCell>'''
+          if old_action not in source:
+            raise SystemExit('F6 student row action anchor not found')
+          source = source.replace(old_action, new_action, 1)
           source_path.write_text(source)
 
-          css_path = Path('src/components/analytics-v12/analytics-v12.css')
+          css_path = Path('src/components/institution-analytics/institution-analytics.css')
           css = css_path.read_text()
-          marker = '/* F5 standardized taxonomy evidence row */'
+          marker = '/* F6 measured class leaderboard */'
           if marker not in css:
-            css += '''\n/* F5 standardized taxonomy evidence row */
-          .analytics-v12-mastery-row{display:block;width:100%;border:1px solid var(--a-line);border-radius:10px;background:#fff;padding:12px 13px;text-align:left;color:#173047}
-          .analytics-v12-mastery-row:not(:disabled):hover{background:#f7fbfb;border-color:#cbdedc}
-          .analytics-v12-mastery-head{display:grid;grid-template-columns:minmax(120px,180px) minmax(120px,1fr);gap:14px;align-items:center;margin-bottom:10px}
-          .analytics-v12-mastery-name{font-size:12px;font-weight:700;line-height:1.3}
-          .analytics-v12-mastery-metrics{display:grid;grid-template-columns:repeat(5,minmax(72px,1fr));gap:8px}
-          .analytics-v12-mastery-metrics>span{display:grid;gap:3px;min-width:0;padding:6px 7px;border-radius:7px;background:#f8fafb}
-          .analytics-v12-mastery-metrics small{color:var(--a-muted);font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
-          .analytics-v12-mastery-metrics strong{font-size:10px;line-height:1.25;white-space:nowrap}
-          @media(max-width:900px){.analytics-v12-mastery-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-v12-mastery-head{grid-template-columns:1fr}}
+            css += '''\n/* F6 measured class leaderboard */
+          .institution-leaderboard-section{margin-top:18px}
+          .institution-leaderboard{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+          .institution-leaderboard-card{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px;min-width:0}
+          .institution-leaderboard-card>div{min-width:0}.institution-leaderboard-card>div strong,.institution-leaderboard-card>div small{display:block}.institution-leaderboard-card>div strong{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.institution-leaderboard-card>div small{margin-top:3px;color:var(--muted-foreground);font-size:9px;line-height:1.4}
+          .institution-leaderboard-card>b{grid-column:1/3;font-size:20px}.institution-leaderboard-card>button,.institution-analyse-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:0;background:transparent;color:var(--teal);font-size:10px;font-weight:700;cursor:pointer}.institution-leaderboard-card>button{grid-column:1/3;justify-content:flex-start;padding:2px 0}.institution-leaderboard-card>button svg,.institution-analyse-button svg{width:13px;height:13px}
+          .institution-analyse-button{white-space:nowrap}
+          @media(max-width:1100px){.institution-leaderboard{grid-template-columns:repeat(2,minmax(0,1fr))}}
+          @media(max-width:640px){.institution-leaderboard{grid-template-columns:1fr}}
           '''
             css_path.write_text(css)
 
           smoke = r'''import fs from 'node:fs';
           import assert from 'node:assert/strict';
 
-          const source = fs.readFileSync('src/components/analytics-v12/student-analytics-v12.tsx', 'utf8');
-          const css = fs.readFileSync('src/components/analytics-v12/analytics-v12.css', 'utf8');
-          const sql = fs.readFileSync('supabase/45_v12_evidence_analytics.sql', 'utf8');
+          const ui = fs.readFileSync('src/components/institution-analytics/institution-analytics-workspace.tsx', 'utf8');
+          const api = fs.readFileSync('src/app/api/institution-analytics/route.ts', 'utf8');
+          const css = fs.readFileSync('src/components/institution-analytics/institution-analytics.css', 'utf8');
 
           const checks = [
-            ['shared taxonomy row exposes Exposure', source.includes('<small>Exposure</small><strong>{row.questions}</strong>')],
-            ['Attempted follows canonical correct + incorrect denominator', source.includes('const attempted = row.correct + row.incorrect;')],
-            ['row exposes Attempted', source.includes('<small>Attempted</small><strong>{attempted}</strong>')],
-            ['row exposes Correct', source.includes('<small>Correct</small><strong>{row.correct}</strong>')],
-            ['row exposes Incorrect', source.includes('<small>Incorrect</small><strong>{row.incorrect}</strong>')],
-            ['row exposes Unanswered', source.includes('<small>Unanswered</small><strong>{row.unanswered}</strong>')],
-            ['Accuracy fails closed without attempted evidence', source.includes("const accuracy = attempted > 0 ? metricValue(row.accuracy, '%') : '—';")],
-            ['row exposes weighted Score %', source.includes('<small>Score %</small><strong>{scorePercentage}</strong>')],
-            ['Score % is backed by marks-awarded / marks SQL', /round\(100 \* sum\(marks_awarded\)::numeric \/ greatest\(sum\(marks\),1\), 1\) as average_percentage/.test(sql)],
-            ['row exposes Time', source.includes('<small>Time</small><strong>{formatTaxonomyTime(row.average_seconds)}</strong>')],
-            ['row exposes Trend', source.includes('<small>Trend</small>') && source.includes("' pts'".trim()) === false ? true : source.includes('pts`')],
-            ['row exposes evidence-record count', source.includes('<small>Evidence</small><strong>{row.attempts}</strong>')],
-            ['SQL exposure counts all question opportunities', sql.includes('count(*)::integer as questions')],
-            ['SQL evidence records count recorded responses', sql.includes('count(*) filter(where response_recorded)::integer as attempts')],
-            ['responsive standardized metric grid is present', css.includes('/* F5 standardized taxonomy evidence row */') && css.includes('.analytics-v12-mastery-metrics{display:grid;grid-template-columns:repeat(5')],
+            ['student rank is derived after sorting by measured average percentage', api.includes(".sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }))")],
+            ['student average percentage derives only from submitted attempts', api.includes(".eq('status', 'submitted')") && api.includes('averagePercentage: average(percentages)')],
+            ['leaderboard excludes students without measured score evidence', ui.includes('.filter((row) => row.averagePercentage !== null)')],
+            ['leaderboard preserves backend measured rank order', ui.includes('.sort((a, b) => a.rank - b.rank)')],
+            ['leaderboard is bounded to five students', ui.includes('.slice(0, 5);')],
+            ['leaderboard explains measured-evidence ranking', ui.includes('Ranked only from submitted assessment percentages. Students without measured evidence are excluded.')],
+            ['leaderboard shows score, accuracy and submitted-test evidence', ui.includes("{percentage(row.averagePercentage)}") && ui.includes("{percentage(row.accuracy)} accuracy") && ui.includes("{row.completedTests} submitted test")],
+            ['leaderboard has explicit Click to Analyse action', ui.includes('Click to Analyse <ChevronRight />')],
+            ['student table has explicit Click to Analyse action', ui.includes('className="institution-analyse-button">Click to Analyse <ChevronRight />')],
+            ['empty leaderboard refuses synthetic scores', ui.includes('No synthetic or placeholder scores are used.')],
+            ['leaderboard layout is responsive', css.includes('/* F6 measured class leaderboard */') && css.includes('@media(max-width:640px){.institution-leaderboard{grid-template-columns:1fr}}')],
           ];
-
           let passed = 0;
           for (const [name, ok] of checks) {
-            assert.ok(ok, `F5 check failed: ${name}`);
+            assert.ok(ok, `F6 check failed: ${name}`);
             console.log(`PASS: ${name}`);
             passed += 1;
           }
-          console.log(`F5 standardized analytics row checks passed: ${passed}/${checks.length}`);
+          console.log(`F6 measured class leaderboard checks passed: ${passed}/${checks.length}`);
           '''
-          Path('scripts/f5-standard-analytics-row-smoke.mjs').write_text(smoke)
-      - name: Run F5 smoke
-        run: node scripts/f5-standard-analytics-row-smoke.mjs
-      - name: Commit F5 implementation
+          Path('scripts/f6-measured-class-leaderboard-smoke.mjs').write_text(smoke)
+      - name: Run F6 smoke
+        run: node scripts/f6-measured-class-leaderboard-smoke.mjs
+      - name: Commit F6 implementation
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git add src/components/analytics-v12/student-analytics-v12.tsx src/components/analytics-v12/analytics-v12.css scripts/f5-standard-analytics-row-smoke.mjs
-          git diff --cached --quiet || (git commit -m "feat(f5): standardize taxonomy analytics evidence row" && git push origin HEAD:phase1-hardening)
+          git add src/components/institution-analytics/institution-analytics-workspace.tsx src/components/institution-analytics/institution-analytics.css scripts/f6-measured-class-leaderboard-smoke.mjs
+          git diff --cached --quiet || (git commit -m "feat(f6): add measured class leaderboard actions" && git push origin HEAD:phase1-hardening)
