@@ -1,0 +1,33 @@
+name: F8 guarded hierarchy patch
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/f8-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Apply deterministic F8 patch
+        run: python3 scripts/apply-f8-drilldown.py
+      - name: Run F8 acceptance
+        run: node scripts/f8-institution-drilldown-smoke.mjs
+      - name: Commit guarded source changes
+        run: |
+          git config user.name "evidara-phase1-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/app/api/institution-analytics/route.ts src/components/institution-analytics/institution-analytics-workspace.tsx scripts/f8-institution-drilldown-smoke.mjs
+          git diff --cached --check
+          git commit -m "feat(f8): implement institution hierarchy drilldown"
+          git push origin HEAD:phase1-hardening
