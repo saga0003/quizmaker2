@@ -184,7 +184,7 @@
 .so-btn-primary {
   background: var(--primary);
   color: var(--primary-foreground);
-  min-height: 40px;
+  min-height: 44px;
   border-radius: calc(var(--radius) - 2px);
   font-weight: 600;
   transition: background 0.15s ease;
@@ -200,7 +200,7 @@ button,
 a,
 input,
 select {
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .secure-exam-content main.rm-card > div:first-child > div:first-child > div {
