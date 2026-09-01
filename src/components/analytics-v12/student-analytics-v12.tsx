@@ -462,10 +462,22 @@ function TopicView({ payload, topicId, setTopicId, studentId, openQuestionIntell
 function QuestionIntelligenceView({ payload, topicId }: { payload: AnalyticsV12Payload; topicId: string }) {
   const topic = payload.topics.find((row)=>row.id===topicId) || payload.topics[0];
   if (!topic) return <EmptyState title="Not enough data yet" copy="Complete more tests with verified topic taxonomy before Question Intelligence becomes available." />;
+  const questionEvidence = (payload.question_evidence || [])
+    .filter((row) => row.topic_id === topic.id)
+    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime() || a.question_no - b.question_no);
   return <>
     <section className="analytics-v12-question-intro"><div><Eye/><span><small>Question intelligence</small><h2>{topic.name}</h2><p>Question-level evidence must come from submitted responses, recorded timing and student reflection.</p></span></div></section>
     <section className="analytics-v12-metrics"><MetricCard icon={<CheckCircle2/>} tone="green" label="Correct" value={topic.correct} copy={`${topic.questions} total outcomes`}/><MetricCard icon={<XCircle/>} tone="amber" label="Incorrect" value={topic.incorrect} copy="Reviewable after submission"/><MetricCard icon={<Clock3/>} tone="blue" label="Average time" value={<>{metricValue(topic.average_seconds)} <small>sec</small></>} copy="Active question time"/><MetricCard icon={<Gauge/>} tone="green" label="Reflection" value="Evidence only" copy="Never inferred or fabricated"/></section>
-    <article className="analytics-v12-section-card analytics-v12-question-table"><div className="analytics-v12-section-head"><div><h3>Response evidence</h3><p>Only authorized live response data may appear here.</p></div></div><EmptyState title="Question-level detail is not available yet" copy="The current analytics contract provides real topic aggregates but not authorized question rows. No synthetic questions, retry status, confidence, or mistake reasons are being substituted." /></article>
+    <article className="analytics-v12-section-card analytics-v12-question-table">
+      <div className="analytics-v12-section-head"><div><h3>Response evidence</h3><p>Authorized submitted responses for this exact topic.</p></div><span className="analytics-v12-panel-mode">{questionEvidence.length} outcomes</span></div>
+      {questionEvidence.length ? <div data-f4-question-evidence className="divide-y divide-[var(--line)]">
+        {questionEvidence.slice(0, 150).map((row) => <div key={row.response_id} className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0"><small className="text-[var(--muted-foreground)]">{row.paper_title} · Q{row.question_no} · {formatDate(row.submitted_at)}</small><strong className="mt-1 block">{row.question_text}</strong><span className="mt-1 block text-xs text-[var(--muted-foreground)]">{row.subject_name} · {row.chapter_name} · {row.topic_name}</span></div>
+          <div className="flex flex-wrap items-center gap-2 text-sm md:justify-end"><span className="rounded-full border border-[var(--line)] px-2.5 py-1 font-semibold">{row.outcome === 'correct' ? 'Correct' : row.outcome === 'incorrect' ? 'Incorrect' : 'Unanswered'}</span><span>{row.marks_awarded > 0 ? `+${row.marks_awarded}` : row.marks_awarded} marks</span><span>{row.time_spent_seconds == null ? 'Time —' : `${row.time_spent_seconds}s`}</span></div>
+        </div>)}
+        {questionEvidence.length > 150 && <p className="pt-3 text-xs text-[var(--muted-foreground)]">Showing the latest 150 question outcomes for this topic.</p>}
+      </div> : <EmptyState title="No question evidence for this topic" copy="Question rows appear only when authorized submitted responses exist for this exact topic. No synthetic rows are substituted." />}
+    </article>
   </>;
 }
 
