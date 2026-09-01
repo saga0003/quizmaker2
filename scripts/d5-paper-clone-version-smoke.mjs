@@ -24,7 +24,9 @@ check('concurrent version numbering is serialized', () => {
 });
 check('new paper is a fresh draft without publication identity', () => {
   assert.ok(migration.includes("v_source.exam_type,'draft'"));
-  assert.ok(migration.includes("-'assignment' - 'assigned_student_count' - 'demo_batch_id'"));
+  assert.ok(/coalesce\(v_source\.settings,'\{\}'::jsonb\)\s*-\s*'assignment'\s*-\s*'assigned_student_count'\s*-\s*'demo_batch_id'/.test(migration));
+  assert.ok(migration.includes('null,null,null,v_source.attempt_limit'));
+  assert.ok(migration.includes('null,v_source.access_label'));
 });
 check('version lineage records source root and version number', () => {
   for (const field of ['root_paper_id','source_paper_id','version_number','cloned_at','cloned_by']) assert.ok(migration.includes(`'${field}'`));
