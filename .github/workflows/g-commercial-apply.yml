@@ -1,4 +1,4 @@
-# one-time Section G guarded patch
+# one-time Section G guarded product patch
 name: Apply Section G commercial controls
 
 on:
@@ -42,21 +42,11 @@ jobs:
           if s.count("annual_price_per_student_paise: 19900,") < 2:
               raise SystemExit('route canonical-rate replacement incomplete')
           p.write_text(s)
-
-          p = Path('.github/workflows/phase1-release-gate.yml')
-          s = p.read_text()
-          needle = "      - name: F13 institution aggregate scaling checks\n        run: node scripts/f13-institution-aggregate-scaling-smoke.mjs\n"
-          addition = needle + "      - name: G subscription commercial-control checks\n        run: node scripts/g-commercial-controls-smoke.mjs\n"
-          if 'g-commercial-controls-smoke.mjs' not in s:
-              if needle not in s:
-                  raise SystemExit('release-gate insertion guard not found')
-              s = s.replace(needle, addition)
-              p.write_text(s)
-      - name: Commit changes
+      - name: Commit product changes
         run: |
           git config user.name "Evidara Phase 1 Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add src/components/evidara/admin-school-control.tsx src/app/api/admin/school-control/route.ts .github/workflows/phase1-release-gate.yml
+          git add src/components/evidara/admin-school-control.tsx src/app/api/admin/school-control/route.ts
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
