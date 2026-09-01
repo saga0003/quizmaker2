@@ -1,0 +1,41 @@
+name: Record F2 verification
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/f2-recorder.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: github.event.head_commit.message == 'chore(f2): record verified analytics metric dictionary'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Record checklist and heartbeat
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text()
+          old = '- [ ] F2 Define metric dictionary: Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score %, Participation.'
+          new = '- [x] **F2 Canonical analytics metric dictionary** — verified 1 Sep 2026. `src/lib/evidaraMetrics.ts` now defines one shared product contract for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, including numerator/denominator rules and explicit `Not assessed` empty semantics. The dictionary distinguishes repeated question outcomes from distinct canonical questions, defines Accuracy as correct/attempted, Score % as pooled marks awarded / marks available rather than an unweighted average of test percentages, and Participation from frozen eligible assignment opportunities rather than question attempt rate. Permanent `f2-analytics-metric-dictionary-smoke.mjs` checks the dictionary against the existing evidence SQL. Exact candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` passed complete release gate `33483020214` (1m54s), including TypeScript, lint, every regression and production build.'
+          if old not in text:
+              raise SystemExit('F2 unchecked checklist line not found')
+          checklist.write_text(text.replace(old, new, 1))
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          entry = '''\n\n## 2026-09-01 12:58:26 IST — F2 canonical analytics metric dictionary (verified) / hourly heartbeat\n\n- **Run start/end:** 2026-09-01 12:58:26 IST → approximately 13:11 IST.\n- **Section worked:** F — Results and analytics.\n- **Checklist items completed:** F2 — canonical metric dictionary for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation. F3–F13 remain pending.\n- **Starting branch head:** `b655029608a8fc2383e14314b2fa06f45c8649b2`.\n- **Implementation result:** Added the canonical analytics contract to `src/lib/evidaraMetrics.ts` so student, school, export and future database aggregates share the same meanings. Tests Taken counts submitted attempts only; Unique Questions counts distinct canonical question IDs; Question Outcomes counts every presented question instance across submitted attempts; Attempted = correct + incorrect; Unanswered = outcomes − attempted; Accuracy = correct / attempted and is `Not assessed` with no attempted denominator; Score % pools marks awarded / marks available under exact published scoring rules; Participation uses eligible frozen/materialized assignment opportunities rather than question attempt rate.\n- **Commits created:** functional dictionary commit, permanent F2 smoke commit, release-gate wiring commit, and rework commit `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` (`fix(f2): scope empty-state regression to canonical dictionary`), followed by this documentation recorder commit.\n- **CI:** Initial F2 release-gate candidate `33482884639` failed only the new empty-state assertion because it counted the TypeScript type declaration as a ninth occurrence. The assertion was corrected to inspect only the canonical dictionary block. Exact candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` then passed complete release gate `33483020214`, 2026-09-01 13:07:29–13:09:23 IST, **1m54s — PASS**, including F2, TypeScript, lint, all required regressions and production build.\n- **Vercel/Supabase state:** Vercel production runtime-error inspection for the preceding 24 hours was clean. Both connected Supabase projects reported `ACTIVE_HEALTHY`; no database mutation was required for F2. Permanent production remained protected and was not promoted.\n- **Rework/failures/blockers:** One legitimate test-only false negative was found and fixed before acceptance; no production/runtime regression remained. F3 inspection began and confirmed the student analytics overview already has a whole-view zero-test empty state, while deeper metric rendering still needs an evidence-aware audit so `0%` is reserved for genuine zero performance rather than absent denominators. No user-input blocker exists.\n- **Active engineering/review span:** approximately **13 minutes** in the available automation execution window. The requested 45–50 minute target was **not met because this tool execution window ended materially earlier**; no artificial padding was added.\n- **Section progress:** F is **2/13 verified = 15.4%**.\n- **Overall Phase 1 progress:** **60/129 verified = 46.5%**.\n- **Exact next action:** F3 — audit all student/institution analytics percentage and rate render paths, distinguish genuine measured zero from absent denominator/no evidence, centralize `Not assessed`/`—` display semantics, add permanent F3 regression, wire it into the complete release gate and check F3 only after an exact green candidate.\n'''
+          log.write_text(log.read_text() + entry)
+          PY
+          git config user.name 'Evidara Phase 1 Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git commit -m 'docs(f2): record verified analytics dictionary and heartbeat [skip ci]'
+          git push origin HEAD:phase1-hardening
