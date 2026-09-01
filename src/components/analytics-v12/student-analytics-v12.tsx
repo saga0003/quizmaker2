@@ -152,14 +152,45 @@ function MetricCard({ icon, tone, label, value, copy, delta }: { icon: ReactNode
   </article>;
 }
 
+function formatTaxonomyTime(value: number | null) {
+  if (value === null || value === undefined) return '—';
+  const rounded = Math.max(0, Math.round(value));
+  if (rounded < 60) return `${rounded}s`;
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
+  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
 function MasteryRows({ rows, onSelect }: { rows: AnalyticsTaxonomyRow[]; onSelect?: (row: AnalyticsTaxonomyRow) => void }) {
   if (!rows.length) return <EmptyState title="No evidence yet" copy="This view will populate after completed tests contain matching taxonomy." />;
-  return <div className="analytics-v12-mastery-list">{rows.map((row) => <button type="button" key={row.id} className="analytics-v12-mastery-row" onClick={() => onSelect?.(row)} disabled={!onSelect}>
-    <span className="analytics-v12-mastery-name">{row.name}</span>
-    <span className="analytics-v12-bar-track"><span className={`analytics-v12-bar-fill ${row.accuracy < 70 ? 'attention' : ''}`} style={{ width: `${clamp(row.accuracy)}%` }} /></span>
-    <strong>{round(row.accuracy)}%</strong>
-    <span className={`analytics-v12-mini-trend ${(row.trend_delta || 0) < 0 ? 'down' : ''}`}>{row.trend_delta === null ? '—' : `${(row.trend_delta || 0) >= 0 ? '▲' : '▼'} ${Math.abs(round(row.trend_delta, 1) || 0)}`}</span>
-  </button>)}</div>;
+  return <div className="analytics-v12-mastery-list">{rows.map((row) => {
+    const attempted = row.correct + row.incorrect;
+    const accuracy = attempted > 0 ? metricValue(row.accuracy, '%') : '—';
+    const scorePercentage = row.questions > 0 && row.average_percentage !== null && row.average_percentage !== undefined
+      ? metricValue(row.average_percentage, '%')
+      : '—';
+    const trend = row.trend_delta === null
+      ? '—'
+      : `${row.trend_delta >= 0 ? '▲' : '▼'} ${Math.abs(round(row.trend_delta, 1) || 0)} pts`;
+    return <button type="button" key={row.id} className="analytics-v12-mastery-row" onClick={() => onSelect?.(row)} disabled={!onSelect}>
+      <span className="analytics-v12-mastery-head">
+        <span className="analytics-v12-mastery-name">{row.name}</span>
+        <span className="analytics-v12-bar-track" aria-label={`Accuracy ${accuracy}`}><span className={`analytics-v12-bar-fill ${attempted > 0 && row.accuracy < 70 ? 'attention' : ''}`} style={{ width: `${attempted > 0 ? clamp(row.accuracy) : 0}%` }} /></span>
+      </span>
+      <span className="analytics-v12-mastery-metrics">
+        <span><small>Exposure</small><strong>{row.questions}</strong></span>
+        <span><small>Attempted</small><strong>{attempted}</strong></span>
+        <span><small>Correct</small><strong>{row.correct}</strong></span>
+        <span><small>Incorrect</small><strong>{row.incorrect}</strong></span>
+        <span><small>Unanswered</small><strong>{row.unanswered}</strong></span>
+        <span><small>Accuracy</small><strong>{accuracy}</strong></span>
+        <span><small>Score %</small><strong>{scorePercentage}</strong></span>
+        <span><small>Time</small><strong>{formatTaxonomyTime(row.average_seconds)}</strong></span>
+        <span><small>Trend</small><strong className={`analytics-v12-mini-trend ${(row.trend_delta || 0) < 0 ? 'down' : ''}`}>{trend}</strong></span>
+        <span><small>Evidence</small><strong>{row.attempts}</strong></span>
+      </span>
+    </button>;
+  })}</div>;
 }
 
 function PriorityList({ rows }: { rows: AnalyticsPriority[] }) {
