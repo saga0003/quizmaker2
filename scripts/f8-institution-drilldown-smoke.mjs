@@ -13,6 +13,7 @@ const checks = [
   ['school drilldown exposes programme rows', types.includes('programmes?:') || types.includes('InstitutionProgrammeRow')],
   ['programme drilldown exposes grades', types.includes('grades?:') || types.includes('InstitutionGradeRow')],
   ['grade drilldown exposes sections', types.includes('sections?:') || types.includes('InstitutionSectionRow')],
+  ['canonical student roster tracks field supplies programme identity', api.includes('tracks: string[] | null') && api.includes('programmeIds(membership')],
   ['API accepts programme level', api.includes("level === 'programme'")],
   ['API accepts grade level', api.includes("level === 'grade'")],
   ['API accepts section level', api.includes("level === 'section'")],
