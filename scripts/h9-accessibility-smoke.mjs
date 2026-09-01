@@ -37,7 +37,7 @@ const checks = [
   ['mobile analytics cards retain visible keyboard focus', mobileCards.includes('focus-visible:ring-2')],
   ['mobile analytics cards retain baseline touch height', mobileCards.includes('min-h-11')],
   ['table overflow regions are keyboard reachable and labelled', phase1.includes('role="region"') && phase1.includes('aria-label={label}') && phase1.includes('tabIndex={0}')],
-  ['async status blocks expose assistive status semantics', phase1.includes("role={state === 'error' ? 'alert' : 'status'}") && phase1.includes('aria-live="polite"')],
+  ['async status blocks expose assistive status semantics', phase1.includes("const statusRole = state === 'error' ? 'alert' : 'status'") && phase1.includes('role={statusRole}') && phase1.includes("aria-live={state === 'error' ? 'assertive' : 'polite'}")],
   ['institution loading and error states carry meaningful visible text', css.includes('.institution-error') && css.includes('.institution-loading')],
   ['primary text contrast on light canvas meets WCAG AA', contrast('#0F172A', '#FAFBFC') >= 4.5],
   ['muted text contrast on white cards meets WCAG AA', contrast('#64748B', '#FFFFFF') >= 4.5],
