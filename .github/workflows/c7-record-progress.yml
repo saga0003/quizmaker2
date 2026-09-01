@@ -27,7 +27,7 @@ jobs:
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git rm scripts/f6-f7-canonical-apply.py
+          git rm -f scripts/f6-f7-canonical-apply.py
           git add src/components/analytics-v12/student-analytics-v12.tsx scripts/f6-topic-evidence-threshold-smoke.mjs scripts/f7-percentile-cohort-smoke.mjs
           git commit -m "feat(f6-f7): enforce analytics evidence and cohort thresholds"
           git push origin HEAD:phase1-hardening
