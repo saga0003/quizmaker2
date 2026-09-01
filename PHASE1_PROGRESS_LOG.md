@@ -370,3 +370,20 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1 checklist:** **59/129 = 45.7% verified** after this update.
 - **Permanent production protection:** maintained; no production promotion occurred.
 - **Exact next action:** begin **F2** by defining one canonical analytics metric dictionary for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, wire UI/analytics calculations to those definitions, add a permanent F2 regression, and require the complete release gate before checking F2; continue directly into F3 if F2 clears early.
+
+
+## 2026-09-01 12:58:26 IST — F2 canonical analytics metric dictionary (verified) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 12:58:26 IST → approximately 13:13 IST.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F2. F3–F13 remain pending.
+- **Starting branch head:** `b655029608a8fc2383e14314b2fa06f45c8649b2`.
+- **Implementation result:** Centralized the eight Phase-1 analytics metric contracts in `src/lib/evidaraMetrics.ts`: submitted-attempt Tests Taken; distinct canonical Unique Questions; repeated Question Outcomes; Attempted = correct + incorrect; Unanswered = outcomes − attempted; Accuracy = correct / attempted with no-denominator `Not assessed`; pooled Score % = marks awarded / marks available; and assignment-based Participation from frozen/materialized eligible opportunities.
+- **Commits created:** F2 dictionary, permanent smoke, release-gate wiring and rework candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8`, followed by documentation-recorder cleanup commits.
+- **CI:** Initial gate `33482884639` failed only the new empty-state assertion because it counted the TypeScript type declaration as a ninth occurrence. The assertion was scoped to the canonical dictionary block. Exact candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` then passed complete release gate `33483020214`, 13:07:29–13:09:23 IST, **1m54s — PASS**, including F2, TypeScript, lint, all regressions and production build.
+- **Vercel/Supabase state:** Vercel production showed no runtime errors in the preceding 24 hours. Both connected Supabase projects reported `ACTIVE_HEALTHY`; F2 required no database mutation. Permanent production remained protected and unpromoted.
+- **Rework/failures/blockers:** One F2 test-only false negative was corrected. A first temporary recorder workflow was rejected before jobs ran; it made no product/production change and was removed. F3 inspection confirmed the top-level zero-test state is already explicit, but deeper percentage/rate render paths still require denominator-aware `Not assessed` semantics. No user-input blocker exists.
+- **Active engineering/review span:** approximately **15 minutes** in the available execution window. The 45–50 minute target was **not met because the tool execution window ended earlier**; no artificial padding was added.
+- **Section progress:** F is **2/13 verified = 15.4%**.
+- **Overall Phase 1 progress:** **60/129 verified = 46.5%**.
+- **Exact next action:** F3 — audit every student/institution analytics percentage/rate display, distinguish genuine measured zero from absent denominator, centralize `Not assessed`/`—` display semantics, add permanent F3 regression and require an exact full-gate PASS before checking F3.

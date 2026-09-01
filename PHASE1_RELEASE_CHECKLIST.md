@@ -96,7 +96,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 # F — Results and analytics
 
 - [x] F1 Live student analytics engine exists with subject/chapter/topic breakdowns, timing, trends and priorities. Existing implementation verified.
-- [ ] F2 Define metric dictionary: Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score %, Participation.
+- [x] **F2 Canonical analytics metric dictionary** — verified 1 Sep 2026. `src/lib/evidaraMetrics.ts` now defines one shared product contract for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, including numerator/denominator rules and explicit `Not assessed` empty semantics. The dictionary distinguishes repeated question outcomes from distinct canonical questions, defines Accuracy as correct/attempted, Score % as pooled marks awarded / marks available rather than an unweighted average of test percentages, and Participation from frozen eligible assignment opportunities rather than question attempt rate. Permanent `f2-analytics-metric-dictionary-smoke.mjs` checks the dictionary against the evidence SQL. Exact candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` passed complete release gate `33483020214` (1m54s), including TypeScript, lint, every regression and production build.
 - [ ] F3 `No data` displays as `— / Not assessed`, never misleading 0%.
 - [ ] F4 Student hierarchy: Overview → Subject → Chapter → Topic → Question Evidence.
 - [ ] F5 Standard analytics row/card contains exposure, attempted, correct, incorrect, unanswered, accuracy, score %, time, trend and evidence count.
