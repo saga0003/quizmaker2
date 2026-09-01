@@ -150,6 +150,8 @@ jobs:
         run: node scripts/i1-i3-platform-health-smoke.mjs
       - name: I5-I7 operations hardening checks
         run: node scripts/i5-i7-operations-smoke.mjs
+      - name: J privacy governance checks
+        run: node scripts/j1-j5-privacy-governance-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
