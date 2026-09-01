@@ -39,7 +39,8 @@ for (const [token, label] of [
   ['function HistoryView', 'test history exists'],
   ["get_student_analytics_v12", 'live evidence analytics RPC is used'],
   ["get_topic_reflection_analytics_v13", 'topic confidence/reflection analytics is connected'],
-  ['Question-level detail is not available yet', 'unavailable question intelligence is labelled honestly'],
+  ['const questionEvidence = (payload.question_evidence || [])', 'question intelligence uses authorized live response evidence'],
+  ['No synthetic rows are substituted', 'missing question evidence is labelled honestly without fabricated rows'],
   ['Sub-concept mastery will appear', 'fabricated sub-concept mastery is not shown'],
 ]) contains(analyticsFile, token, label);
 check('real student analytics does not call the benchmark bridge', !read(analyticsFile).includes('get_v13_benchmark_analytics'));
