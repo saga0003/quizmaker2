@@ -102,6 +102,8 @@ jobs:
         run: node scripts/d6-paper-publish-readiness-smoke.mjs
       - name: D7 normalized paper-access checks
         run: node scripts/d7-normalized-paper-access-smoke.mjs
+      - name: D7 paper-card action checks
+        run: node scripts/d7-paper-card-actions-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
