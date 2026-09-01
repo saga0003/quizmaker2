@@ -2,67 +2,23 @@ name: H8 Source Patch
 
 on:
   push:
-    branches: [phase1-hardening]
+    branches:
+      - phase1-hardening
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: contains(github.event.head_commit.message, 'stage mobile analytics source patch')
+    if: contains(github.event.head_commit.message, 'stage mobile analytics source patch retry')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: phase1-hardening
-      - name: Apply H8 mobile card treatment
-        shell: python
-        run: |
-          from pathlib import Path
-          p = Path('src/components/institution-analytics/institution-analytics-workspace.tsx')
-          s = p.read_text()
-          imp = "import { InstitutionMobileCards } from '@/components/institution-analytics/institution-mobile-cards';\n"
-          anchor = "import './institution-analytics.css';\n"
-          if imp not in s:
-              s = s.replace(anchor, imp + anchor, 1)
-
-          # Schools: mobile cards + desktop table.
-          old = '''    <Card className="institution-table-card"><Table className="min-w-[1180px]">'''
-          new = '''    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, subtitle: `${row.city || 'Location pending'} · ${row.board || 'Board pending'}`, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.totalStudents }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage="No live schools found." />
-    <Card className="institution-table-card hidden md:block"><Table className="min-w-[1180px]">'''
-          if old not in s: raise SystemExit('schools anchor missing')
-          s = s.replace(old, new, 1)
-
-          # Hierarchy programme/grade/section.
-          old = '''    <Card className="institution-table-card"><Table className="min-w-[960px]">'''
-          new = '''    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.studentCount }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage={empty} />
-    <Card className="institution-table-card hidden md:block"><Table className="min-w-[960px]">'''
-          if old not in s: raise SystemExit('hierarchy anchor missing')
-          s = s.replace(old, new, 1)
-
-          # Classes.
-          old = '''    <Card className="institution-table-card"><Table className="min-w-[1120px]">'''
-          new = '''    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, subtitle: `${row.academicYear} · ${row.code || 'No class code'}`, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.studentCount }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage="No classes found." />
-    <Card className="institution-table-card hidden md:block"><Table className="min-w-[1120px]">'''
-          if old not in s: raise SystemExit('classes anchor missing')
-          s = s.replace(old, new, 1)
-
-          # Class student performance.
-          old = '''      <Card className="institution-table-card"><Table className="min-w-[1050px]">'''
-          new = '''      <InstitutionMobileCards rows={students.map((row) => ({ id: row.id, title: row.name, subtitle: row.sectionName, badge: row.rank ? `#${row.rank}` : undefined, metrics: [{ label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Accuracy', value: percentage(row.accuracy) }, { label: 'Last test', value: shortDate(row.lastTestAt) }], onOpen: () => onStudent(row) }))} emptyMessage="No students in this class." />
-      <Card className="institution-table-card hidden md:block"><Table className="min-w-[1050px]">'''
-          if old not in s: raise SystemExit('class students anchor missing')
-          s = s.replace(old, new, 1)
-
-          # Topic students; replace only the later non-min-width table.
-          topic_anchor = '''    <Card className="institution-table-card"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead /></TableRow></TableHeader>'''
-          topic_new = '''    <InstitutionMobileCards rows={students.map((row) => ({ id: row.id, title: row.name, subtitle: row.sectionName, metrics: [{ label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Accuracy', value: percentage(row.accuracy) }], onOpen: () => onStudent(row) }))} emptyMessage="No students in scope." />
-    <Card className="institution-table-card hidden md:block"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead /></TableRow></TableHeader>'''
-          if topic_anchor not in s: raise SystemExit('topic students anchor missing')
-          s = s.replace(topic_anchor, topic_new, 1)
-          p.write_text(s)
+      - name: Apply guarded H8 patch
+        run: python scripts/h8-apply-mobile-patch.py
       - name: Commit source patch
-        shell: bash
         run: |
           git config user.name "evidara-phase1-bot"
           git config user.email "actions@users.noreply.github.com"
