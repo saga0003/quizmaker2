@@ -1,0 +1,72 @@
+name: Apply F4 student drill-down hardening
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/f4-apply-student-drilldown.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Patch live question-level drill-down
+        shell: python {0}
+        run: |
+          from pathlib import Path
+          p=Path('src/components/analytics-v12/student-analytics-v12.tsx')
+          s=p.read_text()
+          anchor="""  if (!topic) return <EmptyState title=\"Not enough data yet\" copy=\"Complete more tests with verified topic taxonomy before Question Intelligence becomes available.\" />;\n  return <>"""
+          insert="""  if (!topic) return <EmptyState title=\"Not enough data yet\" copy=\"Complete more tests with verified topic taxonomy before Question Intelligence becomes available.\" />;\n  const questionEvidence = (payload.question_evidence || [])\n    .filter((row) => row.topic_id === topic.id)\n    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime() || a.question_no - b.question_no);\n  return <>"""
+          if anchor not in s:
+            raise SystemExit('F4 anchor not found or already patched')
+          s=s.replace(anchor,insert,1)
+          old="""    <article className=\"analytics-v12-section-card analytics-v12-question-table\"><div className=\"analytics-v12-section-head\"><div><h3>Response evidence</h3><p>Only authorized live response data may appear here.</p></div></div><EmptyState title=\"Question-level detail is not available yet\" copy=\"The current analytics contract provides real topic aggregates but not authorized question rows. No synthetic questions, retry status, confidence, or mistake reasons are being substituted.\" /></article>"""
+          new="""    <article className=\"analytics-v12-section-card analytics-v12-question-table\">\n      <div className=\"analytics-v12-section-head\"><div><h3>Response evidence</h3><p>Authorized submitted responses for this exact topic.</p></div><span className=\"analytics-v12-panel-mode\">{questionEvidence.length} outcomes</span></div>\n      {questionEvidence.length ? <div data-f4-question-evidence className=\"divide-y divide-[var(--line)]\">\n        {questionEvidence.slice(0, 150).map((row) => <div key={row.response_id} className=\"grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto]\">\n          <div className=\"min-w-0\"><small className=\"text-[var(--muted-foreground)]\">{row.paper_title} · Q{row.question_no} · {formatDate(row.submitted_at)}</small><strong className=\"mt-1 block\">{row.question_text}</strong><span className=\"mt-1 block text-xs text-[var(--muted-foreground)]\">{row.subject_name} · {row.chapter_name} · {row.topic_name}</span></div>\n          <div className=\"flex flex-wrap items-center gap-2 text-sm md:justify-end\"><span className=\"rounded-full border border-[var(--line)] px-2.5 py-1 font-semibold\">{row.outcome === 'correct' ? 'Correct' : row.outcome === 'incorrect' ? 'Incorrect' : 'Unanswered'}</span><span>{row.marks_awarded > 0 ? `+${row.marks_awarded}` : row.marks_awarded} marks</span><span>{row.time_spent_seconds == null ? 'Time —' : `${row.time_spent_seconds}s`}</span></div>\n        </div>)}\n        {questionEvidence.length > 150 && <p className=\"pt-3 text-xs text-[var(--muted-foreground)]\">Showing the latest 150 question outcomes for this topic.</p>}\n      </div> : <EmptyState title=\"No question evidence for this topic\" copy=\"Question rows appear only when authorized submitted responses exist for this exact topic. No synthetic rows are substituted.\" />}\n    </article>"""
+          if old not in s:
+            raise SystemExit('F4 placeholder block not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+      - name: Create F4 regression
+        shell: bash
+        run: |
+          cat > scripts/f4-student-question-drilldown-smoke.mjs <<'EOF'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root = process.cwd();
+          const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+          const analytics = read('src/components/analytics-v12/student-analytics-v12.tsx');
+          const institution = read('src/components/institution-analytics/institution-analytics-workspace.tsx');
+          const types = read('src/types/analytics-v12.ts');
+          const failures = [];
+          let passed = 0;
+          const check = (label, condition) => { if (condition) { passed += 1; console.log(`✓ ${label}`); } else { failures.push(label); console.error(`✗ ${label}`); } };
+          check('institution student drill-down embeds the live AnalyticsV12 workspace', /AnalyticsV12Workspace mode="school" selectedStudentId=\{detail\.student\.id\} embedded hideStudentSelector/.test(institution));
+          check('subject opens chapter drill-down', /openChapter=\{\(row\) => \{ setChapterId\(row\.id\); go\('chapter'\); \}\}/.test(analytics));
+          check('chapter opens topic drill-down', /openTopic=\{\(row\) => \{ setTopicId\(row\.id\); go\('topic'\); \}\}/.test(analytics));
+          check('topic opens question intelligence', /openQuestionIntelligence=\{\(\) => go\('question-intelligence'\)\}/.test(analytics));
+          check('analytics contract carries question-level response evidence', /question_evidence\?: AnalyticsQuestionEvidenceRow\[\]/.test(types));
+          check('question intelligence uses the current authorized payload rather than a second RPC', /const questionEvidence = \(payload\.question_evidence \|\| \[\]\)/.test(analytics));
+          check('question evidence is restricted to the selected topic id', /\.filter\(\(row\) => row\.topic_id === topic\.id\)/.test(analytics));
+          check('question rows expose question text, test and question number', /row\.paper_title[\s\S]*?row\.question_no[\s\S]*?row\.question_text/.test(analytics));
+          check('question rows expose canonical outcome evidence', /row\.outcome === 'correct'[\s\S]*?'Incorrect'[\s\S]*?'Unanswered'/.test(analytics));
+          check('question rows expose awarded marks and recorded time', /row\.marks_awarded[\s\S]*?row\.time_spent_seconds/.test(analytics));
+          check('question rows use response id as stable evidence key', /key=\{row\.response_id\}/.test(analytics));
+          check('missing topic evidence fails honestly without synthetic rows', /No question evidence for this topic[\s\S]*?No synthetic rows are substituted/.test(analytics));
+          check('legacy question-level-not-available placeholder is removed', !analytics.includes('Question-level detail is not available yet'));
+          if (failures.length) { console.error(`\nF4 student question drill-down smoke failed: ${failures.length} failed, ${passed} passed.`); process.exit(1); }
+          console.log(`\nF4 student question drill-down checks passed (${passed} checks).`);
+          EOF
+      - name: Verify focused F4 regression
+        run: node scripts/f4-student-question-drilldown-smoke.mjs
+      - name: Commit implementation
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add src/components/analytics-v12/student-analytics-v12.tsx scripts/f4-student-question-drilldown-smoke.mjs
+          git diff --cached --quiet || (git commit -m "feat(f4): expose question-level student analytics evidence" && git push origin HEAD:phase1-hardening)
