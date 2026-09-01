@@ -171,6 +171,7 @@ export function SchoolDashboardView() {
   const salesDemoMode = useSalesDemoMode();
   const { data: salesDemo } = useSalesDemoData(salesDemoMode);
   const [contentMetrics, setContentMetrics] = useState({ questions: 0, papers: 0 });
+  const [schoolAdminMetrics, setSchoolAdminMetrics] = useState<{ teachers: number | null; participation: number | null; averageScore: number | null }>({ teachers: null, participation: null, averageScore: null });
   const { state, ready, mode, error, syncing, refresh } = useSchoolPlatform({
     allowDemo: false,
     unavailableMessage: 'Live institution dashboard requires configured Evidara cloud access.',
@@ -181,12 +182,19 @@ export function SchoolDashboardView() {
   const displayedQuestions = salesDemoMode && salesDemo ? salesDemo.stats.questionInstances : contentMetrics.questions;
   const displayedPapers = salesDemoMode && salesDemo ? salesDemo.stats.tests : contentMetrics.papers;
 
-  const quickActions = [
-    { label: teacher ? 'New My Question' : 'New Question', icon: FilePlus, view: 'school-questions' as const },
-    { label: 'Create Paper', icon: FileText, view: 'school-papers' as const },
-    { label: teacher ? 'Assigned Students' : 'Manage Students', icon: Users, view: 'school-students' as const },
-    { label: 'View Analytics', icon: BarChart3, view: 'school-analytics-overview' as const },
-  ];
+  const quickActions = teacher
+    ? [
+        { label: 'Upload Questions', icon: FilePlus, view: 'school-questions' as const },
+        { label: 'Create Test', icon: FileText, view: 'school-papers' as const },
+        { label: 'Upcoming Tests', icon: FileText, view: 'school-papers' as const },
+        { label: 'Recent Results', icon: BarChart3, view: 'school-analytics-overview' as const },
+      ]
+    : [
+        { label: 'Manage Students', icon: Users, view: 'school-students' as const },
+        { label: 'Manage Teachers', icon: Users, view: 'school-access' as const },
+        { label: 'Create Test', icon: FileText, view: 'school-papers' as const },
+        { label: 'View Results', icon: BarChart3, view: 'school-analytics-overview' as const },
+      ];
 
   function openView(event: MouseEvent<HTMLAnchorElement>, next: AppView) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -217,6 +225,45 @@ export function SchoolDashboardView() {
     })();
     return () => { cancelled = true; };
   }, [profile?.id, salesDemoMode, state.school.id, teacher]);
+
+  useEffect(() => {
+    if (teacher || salesDemoMode || !supabase || !state.school.id) {
+      setSchoolAdminMetrics({ teachers: null, participation: null, averageScore: null });
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData.session?.access_token;
+        if (!token) throw new Error('Your Evidara session has expired.');
+        const headers = { Authorization: `Bearer ${token}`, 'x-evidara-organization-id': state.school.id };
+        const [accessResponse, analyticsResponse] = await Promise.all([
+          fetch(`/api/access-control/?organizationId=${encodeURIComponent(state.school.id)}&page=1&pageSize=1&role=school_teacher`, { headers, cache: 'no-store' }),
+          fetch(`/api/institution-analytics?level=school&organizationId=${encodeURIComponent(state.school.id)}`, { headers, cache: 'no-store' }),
+        ]);
+        const accessPayload = await accessResponse.json() as { accountPage?: { total?: number } };
+        const analyticsPayload = await analyticsResponse.json() as { classes?: Array<{ studentCount: number; participation: number | null; averagePercentage: number | null }> };
+        if (!accessResponse.ok) throw new Error('Unable to load teacher count.');
+        if (!analyticsResponse.ok) throw new Error('Unable to load school assessment summary.');
+        const classes = analyticsPayload.classes || [];
+        const weighted = (key: 'participation' | 'averagePercentage') => {
+          const rows = classes.filter((row) => row[key] != null && row.studentCount > 0);
+          const denominator = rows.reduce((sum, row) => sum + row.studentCount, 0);
+          if (!denominator) return null;
+          return rows.reduce((sum, row) => sum + Number(row[key]) * row.studentCount, 0) / denominator;
+        };
+        if (!cancelled) setSchoolAdminMetrics({
+          teachers: Number(accessPayload.accountPage?.total ?? 0),
+          participation: weighted('participation'),
+          averageScore: weighted('averagePercentage'),
+        });
+      } catch {
+        if (!cancelled) setSchoolAdminMetrics({ teachers: null, participation: null, averageScore: null });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [salesDemoMode, state.school.id, teacher]);
 
   if (!ready)
     return <div className="p-6 text-sm text-[var(--muted-foreground)]">Loading live institution dashboard…</div>;
@@ -259,42 +306,23 @@ export function SchoolDashboardView() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-        <StatCard
-          icon={Users}
-          label={teacher ? 'Students in scope' : 'Active students'}
-          value={String(activeStudents)}
-          sub={
-            salesDemoMode && salesDemo
-              ? `${salesDemo.stats.neetStudents} NEET + ${salesDemo.stats.jeeStudents} JEE · ${Math.max(0, seatLimit - activeStudents)} of ${seatLimit} licences available`
-              : teacher
-                ? 'Only actively assigned sections'
-                : seatLimit > 0
-                  ? `${Math.max(0, seatLimit - activeStudents)} of ${seatLimit} seats available`
-                  : state.school.subscription.status === 'active'
-                    ? 'Unlimited student access'
-                    : 'Activates with institution plan'
-          }
-        />
-        <StatCard
-          icon={BookOpen}
-          label={salesDemoMode ? 'Demo question instances' : teacher ? 'My questions' : 'School questions'}
-          value={String(displayedQuestions)}
-          sub={salesDemoMode ? 'Across seeded chapter, topic, mock and full-length tests' : 'Live question count'}
-        />
-        <StatCard
-          icon={FileText}
-          label={salesDemoMode ? 'Demo tests' : teacher ? 'My papers' : 'School papers'}
-          value={String(displayedPapers)}
-          sub={salesDemoMode && salesDemo ? `${salesDemo.stats.attempts.toLocaleString('en-IN')} submitted demo attempts` : 'Live paper count'}
-        />
-        <StatCard
-          icon={BookOpen}
-          label="Resources"
-          value={String(state.resources.length)}
-          sub="Authorized live resources"
-        />
-      </div>
+      {teacher ? (
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <StatCard icon={Users} label="Students in scope" value={String(activeStudents)} sub="Only actively assigned sections" />
+          <StatCard icon={BookOpen} label="My questions" value={String(displayedQuestions)} sub="Questions authored by you" />
+          <StatCard icon={FileText} label="My tests" value={String(displayedPapers)} sub="Tests authored by you" />
+          <StatCard icon={BarChart3} label="Students Needing Attention" value="Review" sub="Evidence-first queue below" />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6" aria-label="School Admin focus metrics">
+          <StatCard icon={Users} label="Students" value={String(activeStudents)} sub="Active licensed students" />
+          <StatCard icon={Users} label="Teachers" value={schoolAdminMetrics.teachers == null ? '—' : String(schoolAdminMetrics.teachers)} sub="Active teacher accounts" />
+          <StatCard icon={FileText} label="Tests" value={String(displayedPapers)} sub="Institution tests" />
+          <StatCard icon={BarChart3} label="Participation" value={schoolAdminMetrics.participation == null ? '—' : `${schoolAdminMetrics.participation.toFixed(1)}%`} sub="Submitted-participant evidence" />
+          <StatCard icon={BarChart3} label="Score" value={schoolAdminMetrics.averageScore == null ? '—' : `${schoolAdminMetrics.averageScore.toFixed(1)}%`} sub="Weighted measured class score" />
+          <StatCard icon={GraduationCap} label="Licence usage" value={seatLimit > 0 ? `${activeStudents}/${seatLimit}` : '—'} sub={seatLimit > 0 ? `${Math.max(0, seatLimit - activeStudents)} licences available` : 'Licence quantity unavailable'} />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {quickActions.map((action) => (

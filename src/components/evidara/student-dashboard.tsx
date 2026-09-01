@@ -178,6 +178,12 @@ export function StudentDashboard() {
     if (!submittedResults?.length) return null;
     return submittedResults.reduce((sum, result) => sum + percentageValue(result.percentage), 0) / submittedResults.length;
   }, [submittedResults]);
+  const improvement = useMemo(() => {
+    if (!submittedResults || submittedResults.length < 2) return null;
+    return percentageValue(submittedResults[0].percentage) - percentageValue(submittedResults[1].percentage);
+  }, [submittedResults]);
+  const nextTest = startablePapers?.[0] ?? null;
+  const recentResult = submittedResults?.[0] ?? null;
   const trend = useMemo(() => [...(submittedResults ?? [])]
     .slice(0, 8)
     .reverse()
@@ -259,6 +265,13 @@ export function StudentDashboard() {
           <Button onClick={() => setView('student-tests')} className="bg-[var(--amber)] font-semibold text-[var(--foreground)] hover:bg-[#e5a938]"><Play className="mr-2 h-4 w-4" />Take a Test</Button>
           <Button variant="outline" onClick={() => setView('student-results')} className="border-[var(--teal)]/30 text-[var(--teal)] hover:bg-[var(--secondary)]">View Results</Button>
           <Button variant="outline" onClick={() => setView('student-resources')} className="border-[var(--line)] text-[var(--muted-foreground)] hover:bg-[var(--secondary)]">Study Resources</Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Student focus dashboard">
+          <Card className="rounded-xl border-[var(--line)] bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Next Test</CardTitle></CardHeader><CardContent><p className="text-sm font-semibold text-[var(--foreground)]">{nextTest?.title || 'No eligible test right now'}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{nextTest ? `${nextTest.duration_minutes} min · ${nextTest.total_questions} questions` : 'New assignments will appear here when released.'}</p></CardContent><CardFooter><Button variant="ghost" className="text-[var(--teal)]" onClick={() => setView('student-tests')}>Open tests<ArrowRight className="ml-1 h-4 w-4" /></Button></CardFooter></Card>
+          <Card className="rounded-xl border-[var(--line)] bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Recent Result</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-[var(--foreground)]">{recentResult ? `${percentageValue(recentResult.percentage).toFixed(1)}%` : '—'}</p><p className="mt-1 truncate text-xs text-[var(--muted-foreground)]">{recentResult?.paper_title || 'No submitted result yet'}</p></CardContent><CardFooter><Button variant="ghost" className="text-[var(--teal)]" onClick={() => setView('student-results')}>Open results<ArrowRight className="ml-1 h-4 w-4" /></Button></CardFooter></Card>
+          <Card className="rounded-xl border-[var(--line)] bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Improvement</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-[var(--foreground)]">{improvement == null ? '—' : `${improvement >= 0 ? '+' : ''}${improvement.toFixed(1)} pp`}</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">{improvement == null ? 'Two submitted tests are required.' : 'Latest score versus the previous submitted test.'}</p></CardContent></Card>
+          <Card className="rounded-xl border-[var(--line)] bg-white shadow-sm"><CardHeader><CardTitle className="text-base">Focus Topics</CardTitle></CardHeader><CardContent><p className="text-sm text-[var(--muted-foreground)]">Open your released evidence-based priorities; no topic is invented when assessment evidence is insufficient.</p></CardContent><CardFooter><Button variant="ghost" className="text-[var(--teal)]" onClick={() => setView('student-analytics-priorities')}>Open focus topics<ArrowRight className="ml-1 h-4 w-4" /></Button></CardFooter></Card>
         </div>
 
         <div className="grid min-w-0 gap-4 sm:gap-5 lg:gap-6 lg:grid-cols-5">
