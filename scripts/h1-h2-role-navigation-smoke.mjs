@@ -22,7 +22,7 @@ for (const label of ['Command Centre', 'Institutions', 'Subscriptions', 'Analyti
   check(`H1 Super Admin menu includes ${label}`, adminBlock.includes(`label: '${label}'`));
 }
 check('H1 Audit & Health has a first-class AppView', store.includes("'admin-audit-health'") && views.includes("'admin-audit-health'"));
-check('H1 Audit & Health route renders a real workspace', page.includes("view === 'admin-audit-health'") && page.includes('<AdminAuditHealthView />') && /Audit &amp; Health/.test(auditHealth));
+check('H1 Audit & Health route renders a real workspace', page.includes("view === 'admin-audit-health'") && page.includes('<AdminAuditHealthView />') && (/Audit &amp; Health/.test(auditHealth) || /title=["']Audit & Health["']/.test(auditHealth)));
 check('H1 View As remains a visible Super Admin sidebar affordance', sidebar.includes('<LoginAsSwitcher />'));
 check('H2 parked Products is absent from Phase 1 admin navigation', !adminBlock.includes("label: 'Products'"));
 check('H2 parked Referral Settings is absent from Phase 1 admin navigation', !adminBlock.includes("label: 'Referral Settings'"));
