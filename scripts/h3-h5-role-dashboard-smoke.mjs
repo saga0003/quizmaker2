@@ -14,5 +14,5 @@ check('H4 Students Needing Attention is first-class', school.includes('Students 
 for (const label of ['Next Test', 'Recent Result', 'Improvement', 'Focus Topics']) check(`H5 Student focus includes ${label}`, student.includes(`>${label}<`));
 check('H5 Improvement uses two submitted results only', /submittedResults\.length < 2/.test(student) && /submittedResults\[0\]/.test(student) && /submittedResults\[1\]/.test(student));
 check('H5 Focus Topics routes to released analytics priorities', student.includes("setView('student-analytics-priorities')") && /no topic is invented/i.test(student));
-console.log(`\n${19 - failures.length}/19 H3-H5 role-dashboard checks passed.`);
+console.log(`\n${22 - failures.length}/22 H3-H5 role-dashboard checks passed.`);
 if (failures.length) { console.error(`Failed: ${failures.join(', ')}`); process.exit(1); }
