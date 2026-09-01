@@ -122,6 +122,10 @@ jobs:
         run: node scripts/f6-measured-class-leaderboard-smoke.mjs
       - name: F7 taxonomy response evidence checks
         run: node scripts/f7-taxonomy-evidence-smoke.mjs
+      - name: F6 canonical topic evidence threshold checks
+        run: node scripts/f6-topic-evidence-threshold-smoke.mjs
+      - name: F7 canonical percentile cohort checks
+        run: node scripts/f7-percentile-cohort-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
