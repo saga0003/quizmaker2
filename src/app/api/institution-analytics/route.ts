@@ -536,7 +536,7 @@ function aggregateTaxonomy<T extends InstitutionSubjectRow | InstitutionChapterR
       accuracy: answered ? rounded(correct / answered * 100) : null,
       highestPercentage: studentPercentages.length ? Math.max(...studentPercentages) : null,
       lowestPercentage: studentPercentages.length ? Math.min(...studentPercentages) : null,
-      averageSeconds: average(group.responses.map((row) => number(row.time_spent_seconds))),
+      averageSeconds: average(group.responses.map((row) => row.time_spent_seconds == null ? null : number(row.time_spent_seconds))),
       scoreBands: scoreBands(studentPercentages),
     };
     if (input.level === 'chapter') return { ...result, subjectId: group.subjectId || '', subjectName: group.subjectName || 'Subject' } as T;
