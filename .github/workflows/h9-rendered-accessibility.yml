@@ -24,6 +24,8 @@ jobs:
         run: |
           mkdir -p src/app/h9-a11y-qa
           cat > src/app/h9-a11y-qa/page.tsx <<'EOF'
+          'use client';
+
           import { Phase1AsyncState, Phase1Card, Phase1FilterBar, Phase1PageHeading, Phase1TableFrame } from '@/components/evidara/phase1-ui';
           import { InstitutionMobileCards } from '@/components/institution-analytics/institution-mobile-cards';
           import { Button } from '@/components/ui/button';
@@ -66,8 +68,10 @@ jobs:
           import AxeBuilder from '@axe-core/playwright';
           import fs from 'node:fs';
           const browser = await chromium.launch({headless:true});
-          const page = await browser.newPage({viewport:{width:390,height:844}, hasTouch:true});
-          await page.goto('http://127.0.0.1:3000/h9-a11y-qa', {waitUntil:'networkidle'});
+          const context = await browser.newContext({viewport:{width:390,height:844}, hasTouch:true});
+          const page = await context.newPage();
+          const response = await page.goto('http://127.0.0.1:3000/h9-a11y-qa', {waitUntil:'networkidle'});
+          if (!response?.ok()) throw new Error(`H9 QA route returned HTTP ${response?.status() ?? 'unknown'}`);
           const axe = await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
           const serious = axe.violations.filter(v => ['serious','critical'].includes(v.impact || ''));
           const metrics = await page.evaluate(() => {
@@ -91,6 +95,7 @@ jobs:
           fs.writeFileSync('h9-a11y-artifacts/report.json', JSON.stringify(report,null,2));
           await page.screenshot({path:'h9-a11y-artifacts/390.png', fullPage:true});
           console.log(JSON.stringify(report,null,2));
+          await context.close();
           await browser.close();
           if (serious.length || metrics.unnamed || undersized.length || !visibleFocus || metrics.statuses.length < 2 || metrics.statuses.some(s => !s.text)) process.exit(1);
           EOF
