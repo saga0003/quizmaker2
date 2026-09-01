@@ -1,0 +1,44 @@
+name: Record E7 E8 verification
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/e78-record-progress.yml']
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Record verified E7 and E8
+        shell: python {0}
+        run: |
+          from pathlib import Path
+          import re
+          checklist=Path('PHASE1_RELEASE_CHECKLIST.md')
+          s=checklist.read_text()
+          old7='- [ ] E7 Integrity report presented as events/evidence, not “cheating prevention”.'
+          new7='- [x] **E7 Integrity evidence report** — verified 1 Sep 2026. Paper managers now have a first-class `Integrity evidence` view over RLS-scoped `exam_attempt_events`, bounded to the latest 1,000 events from the latest 500 visible attempts. The report explicitly says “Review evidence, not a verdict”, states recorded events do not prove misconduct, and does not claim that the signals prevent cheating. Live Supabase verification confirmed RLS is enabled and managers can read only attempts for papers they are authorized to manage. Exact functional candidate `91898f36953a0ecb6b4d944f3ab29f850b106b3b` passed complete release gate `33471360195`, including the dedicated 11-point E7 regression, TypeScript, lint, every required regression suite and production build.'
+          old8='- [ ] E8 Load test concurrent starts, saves and submissions.'
+          new8='- [x] **E8 Concurrent start/save/submit load acceptance** — verified 1 Sep 2026. An isolated live Supabase load probe exercised the real start/save/submit RPCs against a disposable one-question platform paper. A concurrent/repeated start storm completed 32 successful invocations while producing exactly one active attempt; concurrent saves converged to exactly one response row with the highest observed time-spent value; repeated/concurrent submissions produced one submitted attempt and one durable submission receipt. Across the save/submit probe, 56 scheduled invocations completed successfully with no failed probe executions. All temporary cron jobs and fixture rows were removed and post-cleanup verification showed zero residual jobs, papers or attempts. The same exact functional candidate `91898f36953a0ecb6b4d944f3ab29f850b106b3b` passed release gate `33471360195`, including the E8 serialization safety regression, TypeScript, lint, all regressions and production build.'
+          if old7 not in s or old8 not in s:
+            raise SystemExit('E7/E8 unchecked markers not found; refusing ambiguous recorder update')
+          s=s.replace(old7,new7,1).replace(old8,new8,1)
+          checklist.write_text(s)
+          matches=re.findall(r'^- \[([ x])\]',s,flags=re.M)
+          done=sum(1 for x in matches if x=='x')
+          total=len(matches)
+          pct=done*100/total if total else 0
+          log=Path('PHASE1_PROGRESS_LOG.md')
+          entry=f'''\n\n## 2026-09-01 12:00:02 IST — E7 integrity evidence + E8 concurrent load acceptance (verified) / hourly heartbeat\n\n- **Run start/end:** 2026-09-01 12:00:02 IST → approximately 12:10 IST.\n- **Active engineering/review span:** approximately **10 minutes** of repository/CI/deployment/database inspection, live authorization verification, isolated concurrency acceptance, cleanup and release recording. The requested 45–50 minute target was **not reached because the available automation/tool execution window was materially shorter**; no idle time was added.\n- **Section worked:** E — Learner test-taking and exam integrity.\n- **Checklist items completed:** E7 and E8. Section E is now **8/8 = 100% verified**.\n- **Starting/functional branch head:** `91898f36953a0ecb6b4d944f3ab29f850b106b3b`.\n- **Commits created:** this documentation/heartbeat commit only; no new functional product change was needed because E7 UI/reporting and E8 serialization hardening were already present on the green functional candidate.\n- **CI:** complete Phase 1 release gate `33471360195` on exact functional candidate `91898f36953a0ecb6b4d944f3ab29f850b106b3b` — **PASS**. The verify job ran approximately 1m47s and passed E7, E8, TypeScript, lint, every required regression, production build and final enforcement.\n- **Vercel state:** production `quizmaker2` returned **no runtime errors in the preceding 24 hours** and was not promoted or altered. The automatic preview status for the exact head is currently blocked by the Hobby-plan build-rate limit (“retry in 24 hours”), an environment/quota condition rather than a product build failure; the exact candidate independently passed the repository production build in the complete gate.\n- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**. Live verification confirmed start/save/submit RPCs are authenticated-only; start serializes learner+paper requests, save locks the owning attempt, submit locks the attempt and returns a stable receipt. `exam_attempt_events` has RLS enabled and is scoped to the learner or authorized paper manager.\n- **E8 live load evidence:** the isolated probe generated 32 successful repeated/concurrent start invocations with exactly one attempt row; concurrent save traffic converged to one response row; repeated/concurrent submit traffic produced one submitted state and one durable receipt. Save/submit scheduled executions recorded 56 successful probe invocations and no failed probe execution. All temporary cron jobs and exact fixture rows were removed; final cleanup verification returned 0 residual E8 cron jobs, 0 fixture papers and 0 fixture attempts.\n- **Rework/failures/blockers:** the first fixture cleanup correctly hit the platform-paper governance delete guard and rolled back. Cleanup was then performed transactionally with a transaction-local trigger bypass scoped only to the exact disposable fixture IDs, followed by zero-residue verification. Vercel preview builds remain quota-rate-limited; production itself is healthy.\n- **Active section completion:** **100% (8/8)**.\n- **Overall Phase 1 checklist:** **{{done}}/{{total}} = {{pct:.1f}}% verified** after this update.\n- **Permanent production protection:** maintained; no production promotion occurred.\n- **Exact next action:** begin **F2** by defining one canonical analytics metric dictionary for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, wire UI/analytics calculations to those definitions, add a permanent F2 regression, and require the complete release gate before checking F2; continue directly into F3 if F2 clears early.\n'''
+          log.write_text(log.read_text()+entry)
+          Path('.github/workflows/e78-record-progress.yml').unlink()
+      - name: Commit verification record
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md .github/workflows/e78-record-progress.yml
+          git diff --cached --quiet || (git commit -m "docs(e7-e8): record verified integrity and load acceptance [skip ci]" && git push origin HEAD:phase1-hardening)
