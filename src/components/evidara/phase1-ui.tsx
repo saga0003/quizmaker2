@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function Phase1PageHeading({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col min-w-0 gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <h1 className="break-words text-2xl font-bold tracking-tight text-[var(--foreground)] [overflow-wrap:anywhere]">{title}</h1>
         {description ? <p className="mt-1 max-w-3xl break-words text-sm text-[var(--muted-foreground)] [overflow-wrap:anywhere]">{description}</p> : null}
@@ -21,7 +21,7 @@ export function Phase1Card({ children, className = '' }: { children: ReactNode; 
 }
 
 export function Phase1FilterBar({ children, label = 'Filters' }: { children: ReactNode; label?: string }) {
-  return <div aria-label={label} className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 [&>*]:min-w-0 sm:flex-row sm:flex-wrap sm:items-end">{children}</div>;
+  return <div aria-label={label} className="flex flex-col min-w-0 gap-2 rounded-xl border border-[var(--line)] bg-white p-3 [&>*]:min-w-0 sm:flex-row sm:flex-wrap sm:items-end">{children}</div>;
 }
 
 export function Phase1TableFrame({ children, label }: { children: ReactNode; label: string }) {
