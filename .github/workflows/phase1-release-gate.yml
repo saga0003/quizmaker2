@@ -94,10 +94,12 @@ jobs:
         run: node scripts/d3-paper-builder-wizard-smoke.mjs
       - name: D4 assignment-preview checks
         run: node scripts/d4-assignment-preview-smoke.mjs
+      - name: D4 audience-filter checks
+        run: node scripts/d6-audience-filter-smoke.mjs
       - name: D5 paper version-clone checks
         run: node scripts/d5-paper-clone-version-smoke.mjs
-      - name: D6 audience-filter checks
-        run: node scripts/d6-audience-filter-smoke.mjs
+      - name: D6 publish-readiness checks
+        run: node scripts/d6-paper-publish-readiness-smoke.mjs
       - name: D7 normalized paper-access checks
         run: node scripts/d7-normalized-paper-access-smoke.mjs
 
