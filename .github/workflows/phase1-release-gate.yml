@@ -140,6 +140,8 @@ jobs:
         run: node scripts/f13-institution-aggregate-scaling-smoke.mjs
       - name: G subscription commercial-control checks
         run: node scripts/g-commercial-controls-smoke.mjs
+      - name: H1/H2 role-focused navigation checks
+        run: node scripts/h1-h2-role-navigation-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
