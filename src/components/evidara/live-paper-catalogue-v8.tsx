@@ -192,7 +192,8 @@ type Selected = PaperQuestionInput & { question: QuestionRow };
 type PublishReadinessCheck = { code: string; label: string; ok: boolean; message: string };
 type PublishReadiness = { paper_id: string; ready: boolean; checks: PublishReadinessCheck[] };
 type PaperAttemptSummary = { id: string; student_id: string; attempt_number: number; status: string; score: number | null; maximum_marks: number | null; percentage: number | null; correct_count: number; incorrect_count: number; unanswered_count: number; started_at: string | null; submitted_at: string | null; created_at: string };
-type PaperActionMode = 'results' | 'analytics' | null;
+type IntegrityEvent = { id: number; attempt_id: string; event_type: string; metadata: Record<string, unknown>; created_at: string };
+type PaperActionMode = 'results' | 'analytics' | 'integrity' | null;
 type Builder = {
 id: string | null;
 title: string;
@@ -330,6 +331,7 @@ const [cloningPaperId, setCloningPaperId] = useState('');
 const [actionPaper, setActionPaper] = useState<PaperListRow | null>(null);
 const [actionMode, setActionMode] = useState<PaperActionMode>(null);
 const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);
+const [integrityEvents, setIntegrityEvents] = useState<IntegrityEvent[]>([]);
 const [actionLoading, setActionLoading] = useState(false);
 const [error, setError] = useState('');
 const [message, setMessage] = useState('');
@@ -888,20 +890,45 @@ const { data, error: attemptsError } = await supabase
 if (attemptsError) return { rows: [] as PaperAttemptSummary[], error: attemptsError.message };
 return { rows: (data || []) as PaperAttemptSummary[], error: '' };
 }
+async function fetchIntegrityEvents(attempts: PaperAttemptSummary[]) {
+if (!supabase || !attempts.length) return { rows: [] as IntegrityEvent[], error: '' };
+const attemptIds = attempts.map((attempt) => attempt.id);
+const { data, error: eventError } = await supabase
+.from('exam_attempt_events')
+.select('id,attempt_id,event_type,metadata,created_at')
+.in('attempt_id', attemptIds)
+.order('created_at', { ascending: false })
+.limit(1000);
+if (eventError) return { rows: [] as IntegrityEvent[], error: eventError.message };
+return { rows: (data || []) as IntegrityEvent[], error: '' };
+}
 async function openPaperAction(paper: PaperListRow, mode: Exclude<PaperActionMode, null>) {
 setActionPaper(paper);
 setActionMode(mode);
 setActionLoading(true);
 setError('');
+setIntegrityEvents([]);
 const result = await fetchPaperAttempts(paper);
-setActionLoading(false);
 if (result.error) {
+setActionLoading(false);
 setActionMode(null);
 setActionPaper(null);
 setError(result.error);
 return;
 }
 setPaperAttempts(result.rows);
+if (mode === 'integrity') {
+const evidence = await fetchIntegrityEvents(result.rows);
+if (evidence.error) {
+setActionLoading(false);
+setActionMode(null);
+setActionPaper(null);
+setError(evidence.error);
+return;
+}
+setIntegrityEvents(evidence.rows);
+}
+setActionLoading(false);
 }
 async function exportPaperResults(paper: PaperListRow) {
 setActionLoading(true);
@@ -1077,6 +1104,7 @@ className="h-11 border-[var(--line)] pl-9"
 <Button variant="ghost" size="icon" title="Duplicate paper" disabled={cloningPaperId === paper.id} onClick={() => void cloneAsNewVersion(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]">{cloningPaperId === paper.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CopyPlus className="h-4 w-4" />}</Button>
 <Button variant="ghost" size="icon" title="Test Results" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'results')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><FileQuestion className="h-4 w-4" /></Button>
 <Button variant="ghost" size="icon" title="Analytics" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'analytics')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><BookOpenCheck className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Integrity evidence" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'integrity')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><ShieldCheck className="h-4 w-4" /></Button>
 <Button variant="ghost" size="icon" title="Export" disabled={actionLoading} onClick={() => void exportPaperResults(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><Save className="h-4 w-4" /></Button>
 {paper.status === 'under_review' && canApprove && (
 <>
@@ -1386,13 +1414,15 @@ return <div key={label} className={`rounded-xl border p-4 ${check && current ? (
 </DialogFooter>
 </DialogContent>
 </Dialog>
-<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); } }}>
+<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); setIntegrityEvents([]); } }}>
 <DialogContent className="max-h-[90vh] w-[96vw] max-w-4xl overflow-y-auto border-[var(--line)]">
-<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>
+<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : actionMode === 'integrity' ? 'Integrity Evidence' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : actionMode === 'integrity' ? 'Recorded exam-session events for human review. These events are evidence only; they do not prove or prevent cheating.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>
 {actionLoading ? <div className="py-10 text-center text-sm text-[var(--muted-foreground)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading…</div> : actionMode === 'analytics' ? (
 <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 {[{ label: 'Attempts', value: paperAttempts.length }, { label: 'Submitted', value: submittedAttempts.length }, { label: 'Average', value: `${averagePercentage.toFixed(1)}%` }, { label: 'Highest', value: `${highestPercentage.toFixed(1)}%` }].map((item) => <div key={item.label} className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--muted-foreground)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--foreground)]">{item.value}</p></div>)}
 </div><p className="text-xs text-[var(--muted-foreground)]">Analytics are calculated from up to the latest 500 attempts visible to your role and institution scope.</p></div>
+) : actionMode === 'integrity' ? (
+<div className="space-y-4"><div className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/10 p-4 text-sm leading-relaxed text-[#6F5600]"><strong>Review evidence, not a verdict.</strong> Recorded events can help a school review an exam session, but they do not prove misconduct and Evidara does not claim that these signals prevent cheating.</div>{integrityEvents.length ? <div className="overflow-hidden rounded-xl border border-[var(--line)]"><Table><TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Attempt</TableHead><TableHead>Recorded event</TableHead><TableHead>Evidence details</TableHead></TableRow></TableHeader><TableBody>{integrityEvents.map((event) => <TableRow key={event.id}><TableCell className="whitespace-nowrap text-xs">{new Date(event.created_at).toLocaleString('en-IN')}</TableCell><TableCell className="font-mono text-xs">…{event.attempt_id.slice(-8)}</TableCell><TableCell className="text-sm font-medium">{statusLabel(event.event_type)}</TableCell><TableCell className="max-w-[320px] break-words text-xs text-[var(--muted-foreground)]">{Object.keys(event.metadata || {}).length ? JSON.stringify(event.metadata) : 'No additional metadata recorded'}</TableCell></TableRow>)}</TableBody></Table></div> : <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]">No integrity events were recorded for the latest 500 visible attempts on this paper.</div>}<p className="text-xs text-[var(--muted-foreground)]">Evidence is limited to up to 1,000 latest events from the latest 500 attempts visible to your role and institution scope.</p></div>
 ) : paperAttempts.length ? (
 <div className="overflow-x-auto rounded-xl border border-[var(--line)]"><Table><TableHeader><TableRow><TableHead>Attempt</TableHead><TableHead>Status</TableHead><TableHead>Score</TableHead><TableHead>Percentage</TableHead><TableHead>Correct</TableHead><TableHead>Submitted</TableHead></TableRow></TableHeader><TableBody>{paperAttempts.map((attempt) => <TableRow key={attempt.id}><TableCell>#{attempt.attempt_number}</TableCell><TableCell>{statusLabel(String(attempt.status))}</TableCell><TableCell>{attempt.score ?? '—'} / {attempt.maximum_marks ?? '—'}</TableCell><TableCell>{attempt.percentage === null ? '—' : `${Number(attempt.percentage).toFixed(1)}%`}</TableCell><TableCell>{attempt.correct_count ?? 0}</TableCell><TableCell>{attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString('en-IN') : 'Not submitted'}</TableCell></TableRow>)}</TableBody></Table></div>
 ) : <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]">No attempts have been recorded for this paper yet.</div>}
