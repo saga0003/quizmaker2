@@ -1,0 +1,22 @@
+name: H7 Responsive Contract
+
+on:
+  push:
+    branches: [phase1-hardening, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  responsive-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: H7 responsive contract regression
+        run: node scripts/h7-responsive-contract-smoke.mjs
