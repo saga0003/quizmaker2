@@ -41,6 +41,8 @@ import {
   exportInstitutionSchoolResultsCsv,
 } from '@/lib/institutionReportPdf';
 import { useAppStore } from '@/store/use-app-store';
+import { exportInstitutionAnalyticsWorkbook } from '@/lib/institutionExcelExport';
+import type { AnalyticsV12Payload } from '@/types/analytics-v12';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
 import type {
   InstitutionAnalyticsActor,
@@ -222,6 +224,7 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   const [sort, setSort] = useState<SortState>({ key: mode === 'platform' ? 'rank' : 'grade', direction: 'asc' });
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDownloading, setBulkDownloading] = useState<'pdf' | 'csv' | null>(null);
+  const [excelDownloading, setExcelDownloading] = useState(false);
 
   const load = useCallback(async (nextLevel: InstitutionAnalyticsLevel, params?: Partial<TrailItem>) => {
     const nextOrganizationId = params?.organizationId ?? organizationId;
@@ -352,6 +355,43 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     exportInstitutionResultsCsv({ schoolName: payload.school?.name || 'Evidara School', classRow: payload.class, students: chosen });
   }
 
+  async function downloadExcel() {
+    const chosen = selectedStudents.size ? (payload.students || []).filter((row) => selectedStudents.has(row.id)) : students;
+    if (!chosen.length || !(payload.section || payload.class) || excelDownloading) return;
+    if (!supabase) { setError('Supabase is not configured on this device.'); return; }
+    setExcelDownloading(true);
+    setError('');
+    try {
+      const analytics: AnalyticsV12Payload[] = [];
+      const client = supabase;
+      const batchSize = 5;
+      for (let offset = 0; offset < chosen.length; offset += batchSize) {
+        const batch = chosen.slice(offset, offset + batchSize);
+        const results = await Promise.all(batch.map(async (student) => {
+          const { data, error: analyticsError } = await client.rpc('get_student_analytics_v12', {
+            p_student_id: student.id,
+            p_product_id: null,
+            p_date_from: null,
+            p_date_to: null,
+          });
+          if (analyticsError) throw new Error(`${student.name}: ${analyticsError.message}`);
+          return data as AnalyticsV12Payload;
+        }));
+        analytics.push(...results);
+      }
+      await exportInstitutionAnalyticsWorkbook({
+        schoolName: payload.school?.name || 'Evidara School',
+        classRow: (payload.section || payload.class)!,
+        students: chosen,
+        analytics,
+      });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to create the Excel analytics workbook.');
+    } finally {
+      setExcelDownloading(false);
+    }
+  }
+
   async function downloadSchoolResults(kind: 'pdf' | 'csv') {
     if (!classes.length || bulkDownloading) return;
     setBulkDownloading(kind);
@@ -410,7 +450,7 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     {!loading && level === 'school' && <HierarchyScopeView title="Programmes" rows={programmes} empty="No active programmes are assigned to students in this school." onOpen={(row) => navigate('programme', row.name, { organizationId: payload.school?.id, programme: row.id })} />}
     {!loading && level === 'programme' && <HierarchyScopeView title="Grades" rows={grades} empty="No active grades are assigned to this programme." onOpen={(row) => navigate('grade', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: row.grade })} />}
     {!loading && level === 'grade' && <HierarchyScopeView title="Sections" rows={sections} empty="No active sections are assigned to this grade and programme." onOpen={(row) => navigate('section', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: payload.grade?.grade, sectionId: row.id })} />}
-    {!loading && (level === 'section' || level === 'class') && (payload.section || payload.class) && <ClassView classRow={payload.section || payload.class!} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} />}
+    {!loading && (level === 'section' || level === 'class') && (payload.section || payload.class) && <ClassView classRow={payload.section || payload.class!} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} onDownloadExcel={downloadExcel} excelDownloading={excelDownloading} />}
     {!loading && level === 'subject' && payload.subject && <SubjectView subject={payload.subject} chapters={payload.chapters || []} bands={payload.scoreBands || []} onChapter={(row) => navigate('chapter', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: row.id })} />}
     {!loading && level === 'chapter' && payload.chapter && <ChapterView chapter={payload.chapter} topics={payload.topics || []} bands={payload.scoreBands || []} onTopic={(row) => navigate('topic', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: payload.chapter?.id, topicId: row.id } as Partial<TrailItem>)} />}
     {!loading && level === 'topic' && payload.topic && <TopicView topic={payload.topic} students={students} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId, chapterId, studentId: row.id })} />}
@@ -449,8 +489,8 @@ function ClassesView({ rows, allRows, search, setSearch, filter, setFilter, sort
   </>;
 }
 
-function ClassView(props: { classRow: InstitutionClassRow; students: InstitutionStudentRow[]; allStudents: InstitutionStudentRow[]; subjects: InstitutionSubjectRow[]; bands: ScoreBand[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; selected: Set<string>; setSelected: Dispatch<SetStateAction<Set<string>>>; allVisibleSelected: boolean; toggleAll: (checked: boolean) => void; onSubject: (row: InstitutionSubjectRow) => void; onStudent: (row: InstitutionStudentRow) => void; onDownloadReports: () => void; onDownloadCsv: () => void }) {
-  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv } = props;
+function ClassView(props: { classRow: InstitutionClassRow; students: InstitutionStudentRow[]; allStudents: InstitutionStudentRow[]; subjects: InstitutionSubjectRow[]; bands: ScoreBand[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; selected: Set<string>; setSelected: Dispatch<SetStateAction<Set<string>>>; allVisibleSelected: boolean; toggleAll: (checked: boolean) => void; onSubject: (row: InstitutionSubjectRow) => void; onStudent: (row: InstitutionStudentRow) => void; onDownloadReports: () => void; onDownloadCsv: () => void; onDownloadExcel: () => void; excelDownloading: boolean }) {
+  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv, onDownloadExcel, excelDownloading } = props;
   const leaderboard = allStudents
     .filter((row) => row.averagePercentage !== null)
     .sort((a, b) => a.rank - b.rank)
@@ -467,7 +507,7 @@ function ClassView(props: { classRow: InstitutionClassRow; students: Institution
         <button type="button" onClick={() => onStudent(row)}>Click to Analyse <ChevronRight /></button>
       </article>)}</div> : <InstitutionEmptyState title="Leaderboard awaiting evidence" copy="Ranks will appear after students submit measured assessments. No synthetic or placeholder scores are used." />}
     </section>
-    <section className="institution-section"><div className="institution-section-heading report-heading"><div><h2>Student performance</h2><p>Filter, select specific students, then download report cards or the results sheet.</p></div><div><Button variant="outline" onClick={onDownloadCsv} disabled={!students.length}><FileDown />Download CSV</Button><Button onClick={onDownloadReports} disabled={!selected.size}><Download />Report cards ({selected.size})</Button></div></div>
+    <section className="institution-section"><div className="institution-section-heading report-heading"><div><h2>Student performance</h2><p>Filter, select specific students, then download report cards or the results sheet.</p></div><div><Button variant="outline" onClick={onDownloadExcel} disabled={!students.length || excelDownloading}>{excelDownloading ? <LoaderCircle className="institution-button-spinner" /> : <FileDown />}Download Excel</Button><Button variant="outline" onClick={onDownloadCsv} disabled={!students.length}><FileDown />Download CSV</Button><Button onClick={onDownloadReports} disabled={!selected.size}><Download />Report cards ({selected.size})</Button></div></div>
       <DataToolbar search={search} setSearch={setSearch} placeholder="Search student" filter={filter} setFilter={setFilter} options={[{ value: 'strong', label: 'Strong · 75%+' }, { value: 'developing', label: 'Developing · 60–74%' }, { value: 'support', label: 'Needs support · 40–59%' }, { value: 'critical', label: 'Urgent · below 40%' }, { value: 'no-data', label: 'No evidence' }]} filterLabel="All performance" count={students.length} />
       <Card className="institution-table-card"><Table className="min-w-[1050px]"><TableHeader><TableRow><TableHead className="institution-check-column"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleAll(checked === true)} aria-label="Select all filtered students" /></TableHead><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Highest" sortKey="highestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Lowest" sortKey="lowestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{students.length ? students.map((row) => <TableRow key={row.id} className={selected.has(row.id) ? 'institution-selected-row' : ''}><TableCell className="institution-check-column" onClick={(event) => event.stopPropagation()}><Checkbox checked={selected.has(row.id)} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); checked ? next.add(row.id) : next.delete(row.id); return next; })} /></TableCell><TableCell>{row.rank}</TableCell><TableCell onClick={() => onStudent(row)} className="institution-student-link"><strong>{row.name}</strong><small>{row.sectionName}</small></TableCell><TableCell>{row.completedTests}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.highestPercentage)}</TableCell><TableCell>{percentage(row.lowestPercentage)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><button type="button" onClick={() => onStudent(row)} className="institution-analyse-button">Click to Analyse <ChevronRight /></button></TableCell></TableRow>) : <TableRow><TableCell colSpan={10}><InstitutionEmptyState title="No students in this class" copy="Add active student memberships to this academic section to begin class analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
     </section>

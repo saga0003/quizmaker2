@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const pkg = JSON.parse(read('package.json'));
+const exporter = read('src/lib/institutionExcelExport.ts');
+const workspace = read('src/components/institution-analytics/institution-analytics-workspace.tsx');
+const failures = [];
+let passed = 0;
+const check = (label, condition) => { if (condition) { passed += 1; console.log(`✓ ${label}`); } else { failures.push(label); console.error(`✗ ${label}`); } };
+check('ExcelJS is a pinned production dependency', pkg.dependencies?.exceljs === '4.4.0');
+check('exporter creates a true XLSX workbook', /workbook\.xlsx\.writeBuffer\(\)/.test(exporter) && /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/.test(exporter));
+check('download uses .xlsx extension', /analytics\.xlsx/.test(exporter));
+check('results worksheet is present', /'Results'/.test(exporter));
+check('test-results worksheet is present', /'Test Results'/.test(exporter));
+check('subject worksheet is present', /'Subject Analytics'/.test(exporter));
+check('chapter worksheet is present', /'Chapter Analytics'/.test(exporter));
+check('topic worksheet is present', /'Topic Analytics'/.test(exporter));
+check('taxonomy export keeps exposure/attempted/outcome evidence', /Exposure:[\s\S]*?Attempted:[\s\S]*?Correct:[\s\S]*?Incorrect:[\s\S]*?Unanswered:/.test(exporter));
+check('taxonomy export includes accuracy, score, time, trend and evidence count', /'Accuracy %'[\s\S]*?'Score %'[\s\S]*?'Avg Time \(sec\)'[\s\S]*?'Trend Δ'[\s\S]*?'Evidence Count'/.test(exporter));
+check('workspace fetches authorized student analytics for workbook rows', /\.rpc\('get_student_analytics_v12'/.test(workspace) && /batchSize = 5/.test(workspace));
+check('workspace exposes an explicit Download Excel action', /Download Excel/.test(workspace) && /onDownloadExcel=\{downloadExcel\}/.test(workspace));
+check('Excel export does not masquerade as CSV', !/analytics\.csv/.test(exporter));
+if (failures.length) { console.error(`\nF12 Excel export smoke failed: ${failures.length} failed, ${passed} passed.`); process.exit(1); }
+console.log(`\nF12 Excel export checks passed (${passed} checks).`);
