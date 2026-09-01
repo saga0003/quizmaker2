@@ -191,6 +191,8 @@ return subjectAliases(subject).some((value) => name.includes(value) || code.incl
 type Selected = PaperQuestionInput & { question: QuestionRow };
 type PublishReadinessCheck = { code: string; label: string; ok: boolean; message: string };
 type PublishReadiness = { paper_id: string; ready: boolean; checks: PublishReadinessCheck[] };
+type PaperAttemptSummary = { id: string; student_id: string; attempt_number: number; status: string; score: number | null; maximum_marks: number | null; percentage: number | null; correct_count: number; incorrect_count: number; unanswered_count: number; started_at: string | null; submitted_at: string | null; created_at: string };
+type PaperActionMode = 'results' | 'analytics' | null;
 type Builder = {
 id: string | null;
 title: string;
@@ -325,6 +327,10 @@ const [publishReadiness, setPublishReadiness] = useState<PublishReadiness | null
 const [readinessFingerprint, setReadinessFingerprint] = useState('');
 const [readinessPaperId, setReadinessPaperId] = useState('');
 const [cloningPaperId, setCloningPaperId] = useState('');
+const [actionPaper, setActionPaper] = useState<PaperListRow | null>(null);
+const [actionMode, setActionMode] = useState<PaperActionMode>(null);
+const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);
+const [actionLoading, setActionLoading] = useState(false);
 const [error, setError] = useState('');
 const [message, setMessage] = useState('');
 const [search, setSearch] = useState('');
@@ -509,7 +515,7 @@ localStorage.removeItem(`${draftBase}:new`);
 setBuilderOpen(true);
 }
 async function openEdit(paper: PaperListRow) {
-if (!supabase) return;
+if (!supabase) return false;
 setBuilderStep(1);
 setBuilderOpen(true);
 setSaving(true);
@@ -522,7 +528,7 @@ supabase.from('paper_questions').select('question_id,section_id,display_order,ma
 if (p.error || s.error || i.error || !p.data) {
 setError(p.error?.message || s.error?.message || i.error?.message || 'Unable to open paper.');
 setSaving(false);
-return;
+return false;
 }
 const row = p.data as Record<string, any>;
 const loadedSections = (s.data || []).map((section: Record<string, any>, index) => ({
@@ -583,6 +589,7 @@ setSections(sectionsReady);
 setActiveSection(sectionsReady[0].client_id);
 setSelected(loadedItems);
 setSaving(false);
+return true;
 }
 useEffect(() => {
 if (!startInCreate || loading || routeHandled.current) return;
@@ -863,6 +870,63 @@ const clone = data as { title?: string; version_number?: number } | null;
 setMessage(`Created ${clone?.title || 'a new draft version'}. Audience and publication state were reset.`);
 await load();
 }
+async function openPaperPreview(paper: PaperListRow) {
+const opened = await openEdit(paper);
+if (!opened) return;
+setBuilderStep(5);
+setBuilderOpen(false);
+setPreviewOpen(true);
+}
+async function fetchPaperAttempts(paper: PaperListRow) {
+if (!supabase) return { rows: [] as PaperAttemptSummary[], error: 'Supabase is not configured.' };
+const { data, error: attemptsError } = await supabase
+.from('exam_attempts')
+.select('id,student_id,attempt_number,status,score,maximum_marks,percentage,correct_count,incorrect_count,unanswered_count,started_at,submitted_at,created_at')
+.eq('paper_id', paper.id)
+.order('created_at', { ascending: false })
+.limit(500);
+if (attemptsError) return { rows: [] as PaperAttemptSummary[], error: attemptsError.message };
+return { rows: (data || []) as PaperAttemptSummary[], error: '' };
+}
+async function openPaperAction(paper: PaperListRow, mode: Exclude<PaperActionMode, null>) {
+setActionPaper(paper);
+setActionMode(mode);
+setActionLoading(true);
+setError('');
+const result = await fetchPaperAttempts(paper);
+setActionLoading(false);
+if (result.error) {
+setActionMode(null);
+setActionPaper(null);
+setError(result.error);
+return;
+}
+setPaperAttempts(result.rows);
+}
+async function exportPaperResults(paper: PaperListRow) {
+setActionLoading(true);
+setError('');
+const result = await fetchPaperAttempts(paper);
+setActionLoading(false);
+if (result.error) {
+setError(result.error);
+return;
+}
+const escapeCsv = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+const header = ['attempt_id','student_id','attempt_number','status','score','maximum_marks','percentage','correct','incorrect','unanswered','started_at','submitted_at'];
+const rows = result.rows.map((attempt) => [attempt.id, attempt.student_id, attempt.attempt_number, attempt.status, attempt.score, attempt.maximum_marks, attempt.percentage, attempt.correct_count, attempt.incorrect_count, attempt.unanswered_count, attempt.started_at, attempt.submitted_at]);
+const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+const url = URL.createObjectURL(blob);
+const anchor = document.createElement('a');
+anchor.href = url;
+anchor.download = `${String(paper.code || paper.title || 'paper').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'paper'}-results.csv`;
+document.body.appendChild(anchor);
+anchor.click();
+anchor.remove();
+URL.revokeObjectURL(url);
+setMessage(`Exported ${result.rows.length} attempt${result.rows.length === 1 ? '' : 's'} for ${paper.title}.`);
+}
 async function confirmDelete() {
 if (!supabase || !deleteTarget) return;
 setSaving(true);
@@ -890,6 +954,10 @@ const topicOptions = topics.filter((topic) => active?.chapter_ids?.includes(topi
 const toggle = (values: string[] | undefined, value: string) => (values || []).includes(value)
 ? (values || []).filter((item) => item !== value)
 : [...(values || []), value];
+const submittedAttempts = paperAttempts.filter((attempt) => Boolean(attempt.submitted_at) || attempt.status === 'submitted' || attempt.status === 'completed');
+const scoredAttempts = submittedAttempts.filter((attempt) => attempt.percentage !== null && Number.isFinite(Number(attempt.percentage)));
+const averagePercentage = scoredAttempts.length ? scoredAttempts.reduce((sum, attempt) => sum + Number(attempt.percentage || 0), 0) / scoredAttempts.length : 0;
+const highestPercentage = scoredAttempts.length ? Math.max(...scoredAttempts.map((attempt) => Number(attempt.percentage || 0))) : 0;
 const stats = [
 { label: 'Total papers', value: papers.length, icon: FileQuestion, tone: 'var(--foreground)' },
 { label: 'Published', value: papers.filter((paper) => paper.status === 'published').length, icon: CheckCircle2, tone: 'var(--teal)' },
@@ -1004,8 +1072,12 @@ className="h-11 border-[var(--line)] pl-9"
 <TableCell><Badge variant="outline" className={statusClass(paper.status)}>{statusLabel(paper.status)}</Badge></TableCell>
 <TableCell className="text-right">
 <div className="flex justify-end gap-1">
-<Button variant="ghost" size="icon" title="Clone as new version" disabled={cloningPaperId === paper.id} onClick={() => void cloneAsNewVersion(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]">{cloningPaperId === paper.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CopyPlus className="h-4 w-4" />}</Button>
 <Button variant="ghost" size="icon" title="Edit paper" onClick={() => void openEdit(paper)} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><Edit3 className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Preview paper" onClick={() => void openPaperPreview(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><Eye className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Duplicate paper" disabled={cloningPaperId === paper.id} onClick={() => void cloneAsNewVersion(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]">{cloningPaperId === paper.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CopyPlus className="h-4 w-4" />}</Button>
+<Button variant="ghost" size="icon" title="Test Results" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'results')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><FileQuestion className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Analytics" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'analytics')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><BookOpenCheck className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Export" disabled={actionLoading} onClick={() => void exportPaperResults(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><Save className="h-4 w-4" /></Button>
 {paper.status === 'under_review' && canApprove && (
 <>
 <Button variant="ghost" size="icon" title="Approve paper" onClick={() => void setStatus(paper, 'approved')} className="h-9 w-9 text-[#237A57] hover:bg-[#237A57]/10"><Check className="h-4 w-4" /></Button>
@@ -1312,6 +1384,18 @@ return <div key={label} className={`rounded-xl border p-4 ${check && current ? (
 {builderStep === 5 && submitStatus === 'published' && (<Button type="button" disabled={saving || readinessLoading || !releaseCheckCurrent} onClick={() => void publishCheckedPaper()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Check className="mr-2 h-4 w-4" />Save and Publish</Button>)}
 {builderStep === 5 && submitStatus !== 'published' && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Send className="mr-2 h-4 w-4" />Submit for Approval</Button>)}
 </DialogFooter>
+</DialogContent>
+</Dialog>
+<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); } }}>
+<DialogContent className="max-h-[90vh] w-[96vw] max-w-4xl overflow-y-auto border-[var(--line)]">
+<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>
+{actionLoading ? <div className="py-10 text-center text-sm text-[var(--muted-foreground)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading…</div> : actionMode === 'analytics' ? (
+<div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+{[{ label: 'Attempts', value: paperAttempts.length }, { label: 'Submitted', value: submittedAttempts.length }, { label: 'Average', value: `${averagePercentage.toFixed(1)}%` }, { label: 'Highest', value: `${highestPercentage.toFixed(1)}%` }].map((item) => <div key={item.label} className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--muted-foreground)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--foreground)]">{item.value}</p></div>)}
+</div><p className="text-xs text-[var(--muted-foreground)]">Analytics are calculated from up to the latest 500 attempts visible to your role and institution scope.</p></div>
+) : paperAttempts.length ? (
+<div className="overflow-x-auto rounded-xl border border-[var(--line)]"><Table><TableHeader><TableRow><TableHead>Attempt</TableHead><TableHead>Status</TableHead><TableHead>Score</TableHead><TableHead>Percentage</TableHead><TableHead>Correct</TableHead><TableHead>Submitted</TableHead></TableRow></TableHeader><TableBody>{paperAttempts.map((attempt) => <TableRow key={attempt.id}><TableCell>#{attempt.attempt_number}</TableCell><TableCell>{statusLabel(String(attempt.status))}</TableCell><TableCell>{attempt.score ?? '—'} / {attempt.maximum_marks ?? '—'}</TableCell><TableCell>{attempt.percentage === null ? '—' : `${Number(attempt.percentage).toFixed(1)}%`}</TableCell><TableCell>{attempt.correct_count ?? 0}</TableCell><TableCell>{attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString('en-IN') : 'Not submitted'}</TableCell></TableRow>)}</TableBody></Table></div>
+) : <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]">No attempts have been recorded for this paper yet.</div>}
 </DialogContent>
 </Dialog>
 <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
