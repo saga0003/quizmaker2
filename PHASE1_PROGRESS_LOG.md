@@ -333,3 +333,21 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
 - **Target status:** 45–50 minute productive target **not met** because the automation execution window available for this block was materially shorter; limitation recorded explicitly.
 - **Exact next action:** resume E6 by inspecting and hardening `submit_exam_attempt` for replay-safe/idempotent final submission and a durable server-confirmed submission receipt; add permanent E6 regression, live-verify Supabase concurrency/replay behavior, run the complete release gate, then continue immediately to E7 and E8.
+
+## 2026-09-01 09:58:54 IST — E6 verified; E7 evidence-report review started / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 09:58:54 IST → approximately 10:12 IST.
+- **Active engineering/review span:** approximately **13 minutes** in the observable execution window. The requested 45–50 minute target was not reached because the runtime window available for this block ended materially earlier; no idle padding was added.
+- **Section worked:** E — Learner exam runtime.
+- **Checklist items completed this run:** E6 — idempotent/replay-safe final submission with a durable server-confirmed submission receipt.
+- **Items still pending in active section:** E7 integrity report must be presented as neutral events/evidence, not as “cheating prevention”; E8 concurrent start/save/submit load acceptance.
+- **Branch head at heartbeat source:** `{head}`; exact E6 engineering candidate: `bafcf8e267c311458583876567af9a0fbb2ae5cd`.
+- **Commits created this run:** `bafcf8e267c311458583876567af9a0fbb2ae5cd` (`hardening(e6): persist stable submission receipt`) plus this recorder staging commit; the recorder creates the checklist/log commit automatically.
+- **CI run and duration/result:** complete Phase-1 release gate `33470270087` for exact E6 candidate `bafcf8e267c311458583876567af9a0fbb2ae5cd` ran from 10:03:14–10:05:16 IST (approximately **2m02s**) and passed. E6 permanent smoke, TypeScript, lint, all legacy regressions, production build and final enforcement were green.
+- **Vercel state:** connected project `quizmaker2` (`prj_NvZZl1cJh6I1NfGHePAnAztGr8nY`) was resolved correctly. Exact E6 preview `dpl_CGmorKsHjnvH9fjfpA6iuU61hbru` reached **READY** with `target=null` (preview only); Vercel reported no runtime errors in the previous 24 hours. No production promotion was attempted.
+- **Supabase state:** project `xzfozpnzvznqrvcsoail`; migration `phase1_e6_submission_receipt` applied successfully. Live verification: receipt logic present, anon EXECUTE=false, authenticated EXECUTE=true, **0 attempts / 0 submitted attempts / 3 papers / 0 published papers**, so no existing learner attempt was mutated by the migration. `exam_attempt_events` and its authenticated RLS read policy were also inspected for E7 and correctly scope evidence to the owning learner or authorized paper manager.
+- **Rework/failures/blockers:** one read-only E7 policy-introspection query used the wrong catalog column name (`polname` instead of `policyname`) and failed harmlessly; it was corrected immediately. The earlier Vercel project-ID verification limitation was resolved by connected-team/project discovery. No product rollback or production incident occurred. E7 remains intentionally unchecked because the manager-facing neutral evidence report is not yet implemented/gated.
+- **Section progress:** E has {ed}/{len(ei)} verified items (**{(100*ed/len(ei) if ei else 0):.1f}%**).
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Target status:** 45–50 minute productive target **not met** because the available execution window was materially shorter; limitation recorded explicitly.
+- **Exact next action:** implement E7 as a paper-manager integrity-evidence report backed by RLS-scoped `exam_attempt_events`, using neutral event/timestamp/evidence wording and explicitly avoiding claims that Evidara “prevents cheating”; add a permanent E7 regression and run the complete gate. Then continue immediately to E8 concurrent start/save/submit load acceptance.

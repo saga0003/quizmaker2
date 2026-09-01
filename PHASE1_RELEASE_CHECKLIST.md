@@ -89,7 +89,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [x] E3 Basic integrity events (tab/window/fullscreen/copy shortcuts) exist. Existing implementation verified.
 - [x] E4 Reliable sync queue with retry/backoff and visible `All saved / Waiting / Offline` state. Verified as part of P0.10; physical disconnect/reconnect remains R10.
 - [x] E5 Numeric/text answer final-save confirmation before navigation/submit. Verified as part of P0.10; final submit waits for server-confirmed pending responses.
-- [ ] E6 Idempotent submission and clear submission receipt.
+- [x] **E6 Idempotent submission and clear submission receipt** — verified 1 Sep 2026. `submit_exam_attempt` serializes concurrent/retried final submissions with an attempt-row `FOR UPDATE`, skips re-scoring after submission, persists one stable `submission_receipt_id` plus authoritative confirmation time in attempt metadata, and returns the same durable receipt on replay. Legacy submitted attempts receive one receipt under the same lock. Anonymous execution is denied and authenticated execution retained. The learner enters the clear “Test submitted” confirmation only from the authoritative server response after all pending answers are confirmed. Live Supabase verification showed receipt logic active with 0 attempts affected; exact candidate `bafcf8e267c311458583876567af9a0fbb2ae5cd` passed complete release gate `33470270087` and its Vercel preview reached READY. Permanent production was not promoted.
 - [ ] E7 Integrity report presented as events/evidence, not “cheating prevention”.
 - [ ] E8 Load test concurrent starts, saves and submissions.
 
