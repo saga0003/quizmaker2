@@ -126,6 +126,8 @@ jobs:
         run: node scripts/f6-topic-evidence-threshold-smoke.mjs
       - name: F7 canonical percentile cohort checks
         run: node scripts/f7-percentile-cohort-smoke.mjs
+      - name: F8 institution hierarchy drilldown checks
+        run: node scripts/f8-institution-drilldown-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
