@@ -144,6 +144,8 @@ jobs:
         run: node scripts/h1-h2-role-navigation-smoke.mjs
       - name: H3/H4/H5 role-dashboard checks
         run: node scripts/h3-h5-role-dashboard-smoke.mjs
+      - name: H6 UI consistency checks
+        run: node scripts/h6-ui-consistency-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
