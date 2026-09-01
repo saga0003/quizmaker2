@@ -387,3 +387,21 @@ This log records each production-hardening run with observable implementation an
 - **Section progress:** F is **2/13 verified = 15.4%**.
 - **Overall Phase 1 progress:** **60/129 verified = 46.5%**.
 - **Exact next action:** F3 — audit every student/institution analytics percentage/rate display, distinguish genuine measured zero from absent denominator, centralize `Not assessed`/`—` display semantics, add permanent F3 regression and require an exact full-gate PASS before checking F3.
+
+## 2026-09-01 15:00:07 IST — F3 denominator-aware analytics implementation / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 15:00:07 IST → approximately 15:13 IST.
+- **Active engineering/review span:** approximately **13 minutes** in the observable execution window. The requested 45–50 minute target was not met because the available automation/tool window was materially shorter; no idle padding was added.
+- **Section worked:** F — Analytics and reporting; active item F3.
+- **Checklist items completed this run:** none yet. F3 remains intentionally unchecked until the exact cleanup candidate passes the complete release gate.
+- **Items still pending in active section:** F3 final complete-gate acceptance, then F4 onward.
+- **Branch head at heartbeat source:** `{head}`; F3 product commit `1bca668e2580dea00c6773b9528b9bca506f6a1d`; release-gate wiring commit `093f14bc7db89d772643d3f5c391442cbe466883`; cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf`.
+- **Commits created:** staging/rework `0e7d1c64055a4c1e77323f5ce4fcf3dbeb353fbc`, `bb2f07d0f8ad4a3399bba6e06143a022aeba08cb`, `221858a3cedb552890c13e9272146aadd3d0c084`, `5346f347f87514e3982faa084eb3ed83481aeb2c`; product `1bca668e2580dea00c6773b9528b9bca506f6a1d`; gate `093f14bc7db89d772643d3f5c391442cbe466883`; cleanup `57d8c6c4ff642bde93d8272ccba3322316baacaf`; plus this recorder staging commit.
+- **Implementation result:** missing analytics evidence now remains null and renders `— / Not assessed` rather than `0%` in legacy launch/demo hierarchy, subject donuts, topic bars and no-student derived-rate surfaces; genuine measured zero remains `0%`. Permanent `f3-not-assessed-smoke.mjs` has 15 assertions and is wired into the complete release gate.
+- **CI run/result:** the guarded patch passed all **15/15** F3 checks. Initial source-patch workflow attempts failed before product publication due YAML/workflow-token permission boundaries and were reworked safely. Final complete release gate `33493636272` on cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf` was **in progress** at heartbeat time, so F3 was not checked prematurely.
+- **Vercel state:** production project `quizmaker2` had **no error/fatal runtime logs in the preceding 24 hours**. No production deployment/promotion was attempted.
+- **Supabase state:** project `xzfozpnzvznqrvcsoail` is **ACTIVE_HEALTHY**. F3 required no database migration or mutation.
+- **Rework/failures/blockers:** the first embedded staging workflow was rejected with zero jobs; the simplified workflow then proved the F3 patch and 15/15 smoke, but its push was rejected because the workflow token cannot modify release workflows. Product and workflow-wiring commits were separated; no failed attempt changed production. No user-input blocker remains.
+- **Section progress:** F remains {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**) until F3 gate completes.
+- **Overall Phase 1 percentage:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**) until F3 is formally accepted.
+- **Exact next action:** inspect release gate `33493636272`; if PASS, mark F3 verified with exact gate evidence and immediately start F4. If it fails, fix the failing regression/type/build issue before any checklist update.
