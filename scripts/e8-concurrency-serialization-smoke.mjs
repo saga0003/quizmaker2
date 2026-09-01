@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const migration = fs.readFileSync('supabase/migrations/20260901044500_phase1_e8_exam_concurrency_serialization.sql', 'utf8');
 const e6 = fs.readFileSync('supabase/migrations/20260901043000_phase1_e6_submission_receipt.sql', 'utf8');
 const checks = [
-  ['start requests serialize by learner + paper', /pg_advisory_xact_lock\(hashtextextended\(p_paper_id::text \|\| ':' \|\| v_user::text, 0\)\)/.test(migration)],
+  ['start requests serialize by learner + paper', migration.includes("pg_advisory_xact_lock(hashtextextended(p_paper_id::text || '':'' || v_user::text, 0))")],
   ['start lock is injected immediately after authenticated-user validation', /v_needle := 'if v_user is null then raise exception ''Login required\.''; end if;'[\s\S]*?v_needle \|\| E'\\n  -- Serialize starts[\s\S]*?pg_advisory_xact_lock/.test(migration)],
   ['save locks the owning attempt before status validation', /student_id=auth\.uid\(\) for update;/.test(migration)],
   ['save stays authenticated-only', /revoke all on function public\.save_exam_response[\s\S]*?from anon;[\s\S]*?grant execute[\s\S]*?to authenticated;/.test(migration)],
