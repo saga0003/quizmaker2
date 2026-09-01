@@ -1,0 +1,64 @@
+name: Apply Section G commercial controls
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/workflows/g-commercial-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Patch canonical commercial controls
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('src/components/evidara/admin-school-control.tsx')
+          s = p.read_text()
+          s = s.replace("const onboardingSteps = ['Institution', 'First admin', 'Licence', 'Review'] as const;", "const onboardingSteps = ['Institution', 'First admin', 'Licence', 'Review'] as const;\nconst ANNUAL_RATE_PAISE = 19900;")
+          s = s.replace("seat_limit: 100, resource_access: 'full', annual_price_per_student_paise: 19900,", "seat_limit: 100, resource_access: 'full', annual_price_per_student_paise: ANNUAL_RATE_PAISE,")
+          s = s.replace("annual_price_per_student_paise: String(sub.annual_price_per_student_paise),", "annual_price_per_student_paise: String(ANNUAL_RATE_PAISE),")
+          s = s.replace("annual_price_per_student_paise: Number(subForm.annual_price_per_student_paise || 19900),", "annual_price_per_student_paise: ANNUAL_RATE_PAISE,")
+          old = "<Field label=\"Price / student / year (paise)\" type=\"number\" value={subForm.annual_price_per_student_paise} onChange={(v) => setSubForm((s) => ({ ...s, annual_price_per_student_paise: v }))} />"
+          new = "<Field label=\"Price / student / year\" value=\"₹199\" onChange={() => {}} disabled /><Field label=\"Annual licence amount\" value={money(Math.max(0, Number(subForm.seat_limit || 0)) * ANNUAL_RATE_PAISE)} onChange={() => {}} disabled />"
+          if old not in s:
+              raise SystemExit('admin price field guard not found')
+          s = s.replace(old, new)
+          p.write_text(s)
+
+          p = Path('src/app/api/admin/school-control/route.ts')
+          s = p.read_text()
+          s = s.replace("annual_price_per_student_paise: Math.max(0, Number(subscription.annual_price_per_student_paise || 19900)),", "annual_price_per_student_paise: 19900,")
+          if s.count("annual_price_per_student_paise: 19900,") < 2:
+              raise SystemExit('route canonical-rate replacement incomplete')
+          p.write_text(s)
+
+          p = Path('.github/workflows/phase1-release-gate.yml')
+          s = p.read_text()
+          needle = "      - name: F13 institution aggregate scaling checks\n        run: node scripts/f13-institution-aggregate-scaling-smoke.mjs\n"
+          addition = needle + "      - name: G subscription commercial-control checks\n        run: node scripts/g-commercial-controls-smoke.mjs\n"
+          if 'g-commercial-controls-smoke.mjs' not in s:
+              if needle not in s:
+                  raise SystemExit('release-gate insertion guard not found')
+              s = s.replace(needle, addition)
+              p.write_text(s)
+      - name: Commit changes
+        run: |
+          git config user.name "Evidara Phase 1 Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/evidara/admin-school-control.tsx src/app/api/admin/school-control/route.ts .github/workflows/phase1-release-gate.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "feat(g): enforce canonical annual commercial controls"
+            git push origin HEAD:phase1-hardening
+          fi
