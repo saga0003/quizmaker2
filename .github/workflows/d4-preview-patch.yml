@@ -19,10 +19,10 @@ jobs:
           ref: phase1-hardening
       - name: Apply guarded D4 patch
         run: python scripts/d4_preview_patch.py
-      - name: Commit product patch
+      - name: Commit component patch
         run: |
           git config user.name "Evidara Phase 1 Hardening"
           git config user.email "sagar@smis.edu.in"
-          git add src/components/evidara/paper-assignment-center.tsx .github/workflows/phase1-release-gate.yml PHASE1_RELEASE_CHECKLIST.md
+          git add src/components/evidara/paper-assignment-center.tsx
           git commit -m "feat(d4): show server eligibility warnings in assignment preview"
           git push origin HEAD:phase1-hardening
