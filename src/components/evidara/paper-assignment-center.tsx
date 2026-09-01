@@ -68,12 +68,12 @@ function toggle<T>(items: T[], value: T) {
   return items.includes(value) ? items.filter((item) => item !== value) : [...items, value];
 }
 
-export function PaperAssignmentCenter() {
+export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false }: { paperId?: string; embedded?: boolean } = {}) {
   const { configured } = useAuth();
   const { organizationId, organizationName, loading: scopeLoading, error: scopeError } = useQuestionScope('school');
   const [papers, setPapers] = useState<PaperOption[]>([]);
   const [sections, setSections] = useState<SectionOption[]>([]);
-  const [paperId, setPaperId] = useState('');
+  const [paperId, setPaperId] = useState(fixedPaperId || '');
   const [mode, setMode] = useState<'filters' | 'students'>('filters');
   const [academicYear, setAcademicYear] = useState('all');
   const [grades, setGrades] = useState<number[]>([]);
@@ -115,11 +115,12 @@ export function PaperAssignmentCenter() {
       const loadedPapers = (paperResult.data || []) as PaperOption[];
       setPapers(loadedPapers);
       setSections((sectionResult.data || []) as SectionOption[]);
-      setPaperId((current) => current || loadedPapers[0]?.id || '');
+      setPaperId((current) => fixedPaperId || current || loadedPapers[0]?.id || '');
     }
     setLoading(false);
-  }, [configured, organizationId]);
+  }, [configured, fixedPaperId, organizationId]);
 
+  useEffect(() => { if (fixedPaperId) setPaperId(fixedPaperId); }, [fixedPaperId]);
   useEffect(() => { void load(); }, [load]);
 
   const years = useMemo(() => [...new Set(sections.map((row) => row.academic_year))], [sections]);
@@ -205,8 +206,8 @@ export function PaperAssignmentCenter() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--teal)]"><Users className="h-4 w-4" />Audience & Assignment</div>
-          <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">Assign a test to the right students</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">Choose an institutional paper, define the audience, preview the exact eligible count, then materialize the cohort. {organizationName}</p>
+          <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{embedded ? 'Choose the audience for this paper' : 'Assign a test to the right students'}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">{embedded ? 'Define the audience, preview the exact eligible count, then materialize the cohort before publishing.' : 'Choose an institutional paper, define the audience, preview the exact eligible count, then materialize the cohort.'} {organizationName}</p>
         </div>
         <Badge variant="outline" className="w-fit border-[var(--line)]">₹199 licensed-student plan</Badge>
       </div>
@@ -216,12 +217,12 @@ export function PaperAssignmentCenter() {
 
       {!papers.length ? <div className="rounded-xl border border-dashed border-[var(--line)] p-8 text-center text-sm text-[var(--muted-foreground)]">Create a school paper first. It will appear here for audience assignment.</div> : <>
         <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-          <div>
+          {!fixedPaperId && <div>
             <Label htmlFor="assignment-paper">Paper / Test</Label>
             <select id="assignment-paper" className="mt-1 min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={paperId} onChange={(event) => setPaperId(event.target.value)}>
               {papers.map((paper) => <option key={paper.id} value={paper.id}>{paper.title} · {paper.status.replaceAll('_', ' ')}</option>)}
             </select>
-          </div>
+          </div>}
           <div>
             <Label>Audience mode</Label>
             <div className="mt-1 grid grid-cols-2 gap-2">

@@ -42,6 +42,7 @@ import { normalizeEvidaraRole } from '@/lib/roles';
 import { useQuestionScope } from '@/components/questions/useQuestionScope';
 import { QuestionBulkImportDialog } from '@/components/evidara/question-bulk-import-dialog';
 import { PaperFileImportDialog } from '@/components/evidara/paper-file-import-dialog';
+import { PaperAssignmentCenter } from '@/components/evidara/paper-assignment-center';
 import { PyqPaperManager } from '@/components/evidara/pyq-paper-manager';
 import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 import type {
@@ -987,11 +988,11 @@ className="h-11 border-[var(--line)] pl-9"
 <div className="mb-5 overflow-x-auto rounded-xl border border-[var(--line)] bg-white p-2">
 <div className="grid min-w-[620px] grid-cols-5 gap-2">
 {([
-{ step: 1 as const, label: 'Basics' },
+{ step: 1 as const, label: 'Details' },
 { step: 2 as const, label: 'Questions' },
-{ step: 3 as const, label: 'Settings' },
-{ step: 4 as const, label: 'Preview' },
-{ step: 5 as const, label: 'Publish' },
+{ step: 3 as const, label: 'Audience' },
+{ step: 4 as const, label: 'Settings' },
+{ step: 5 as const, label: 'Preview & Publish' },
 ]).map((item) => (
 <button key={item.step} type="button" onClick={() => setBuilderStep(item.step)} className={`rounded-lg px-3 py-2 text-left transition ${builderStep === item.step ? 'bg-[var(--teal)] text-white' : 'text-[var(--muted-foreground)] hover:bg-[var(--canvas)]'}`}>
 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] opacity-75">Step {item.step}</span>
@@ -1031,9 +1032,15 @@ className="h-11 border-[var(--line)] pl-9"
 </Card>
 )}
 {builderStep === 3 && (
+<div className="space-y-4">
+<SectionHeading number="3" title="Audience" description="Choose the students who can take this institutional test and preview the exact eligible cohort before publishing." />
+{kind === 'school' ? (builder.id ? <PaperAssignmentCenter paperId={builder.id} embedded /> : <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl"><CardContent className="space-y-3 p-5"><p className="text-sm font-semibold text-[var(--foreground)]">Save this paper draft before choosing its audience.</p><p className="text-sm text-[var(--muted-foreground)]">Audience eligibility is server-validated against the saved paper, active student memberships and the institution licence.</p><Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save draft to configure audience</Button></CardContent></Card>) : <Card className="gap-0 border border-[var(--line)] bg-white shadow-sm rounded-xl"><CardContent className="p-5 text-sm text-[var(--muted-foreground)]">Platform papers do not use an institution student audience. Continue to Settings.</CardContent></Card>}
+</div>
+)}
+{builderStep === 4 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="3" title="Delivery and student experience" description="Set time, attempts and result visibility. Institution assignment and publishing rules control access outside this builder." />
+<SectionHeading number="4" title="Delivery and student experience" description="Set time, attempts, schedule, shuffle and result visibility for the assigned test." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 <div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
 <div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
@@ -1190,10 +1197,10 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 </Card>
 </div>
 )}
-{builderStep === 4 && (
+{builderStep === 5 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="4" title="Preview" description="Review the learner-facing paper before moving to the final publish step." />
+<SectionHeading number="5" title="Preview & Publish" description="Review the learner-facing paper and final summary before publishing or submitting for approval." />
 <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-5">
 <div className="grid gap-3 sm:grid-cols-3"><div><p className="text-xs text-[var(--muted-foreground)]">Questions</p><p className="mt-1 text-xl font-bold">{selected.length}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Marks</p><p className="mt-1 text-xl font-bold">{totalMarks}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Duration</p><p className="mt-1 text-xl font-bold">{builder.duration} min</p></div></div>
 <Button type="button" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="mt-5 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Eye className="mr-2 h-4 w-4" />Open learner preview</Button>
