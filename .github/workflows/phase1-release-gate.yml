@@ -118,6 +118,8 @@ jobs:
         run: node scripts/f4-student-question-drilldown-smoke.mjs
       - name: F5 standardized analytics row checks
         run: node scripts/f5-standard-analytics-row-smoke.mjs
+      - name: F6 measured class leaderboard checks
+        run: node scripts/f6-measured-class-leaderboard-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
