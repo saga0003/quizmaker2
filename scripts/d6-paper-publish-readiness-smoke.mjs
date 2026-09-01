@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 const migration = fs.readFileSync('supabase/migrations/20260901070000_phase1_paper_publish_readiness.sql', 'utf8');
 const workflow = fs.readFileSync('.github/workflows/phase1-release-gate.yml', 'utf8');
+const builderUi = fs.readFileSync('src/components/evidara/live-paper-catalogue-v8.tsx', 'utf8');
 const checks = [];
 const check = (name, fn) => { fn(); checks.push(name); };
 
@@ -67,6 +68,17 @@ check('readiness response is structured for a visible publish checklist', () => 
   assert.ok(migration.includes("'ready',v_ready"));
   assert.ok(migration.includes("'checks',v_checks"));
   for (const label of ['Approved questions','Duration','Marks','Audience','Schedule','Result policy']) assert.ok(migration.includes(`'label','${label}'`));
+});
+check('Preview & Publish renders the six server-authoritative readiness dimensions', () => {
+  assert.ok(builderUi.includes("supabase.rpc('get_paper_publish_readiness_v1'"));
+  for (const label of ['Approved questions','Duration','Marks','Audience','Schedule','Result policy']) assert.ok(builderUi.includes(label));
+  assert.ok(builderUi.includes('Run release check'));
+});
+check('publish remains locked until the current paper fingerprint has a passing release check', () => {
+  assert.ok(builderUi.includes('releaseCheckCurrent'));
+  assert.ok(builderUi.includes('readinessFingerprint === publishFingerprint'));
+  assert.ok(builderUi.includes('disabled={saving || readinessLoading || !releaseCheckCurrent}'));
+  assert.ok(builderUi.includes('publishCheckedPaper'));
 });
 check('D6 publish-readiness regression is permanent in release gate', () => {
   assert.ok(workflow.includes('D6 publish-readiness checks'));

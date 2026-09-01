@@ -189,6 +189,8 @@ return true;
 return subjectAliases(subject).some((value) => name.includes(value) || code.includes(value) || tags.includes(value));
 }
 type Selected = PaperQuestionInput & { question: QuestionRow };
+type PublishReadinessCheck = { code: string; label: string; ok: boolean; message: string };
+type PublishReadiness = { paper_id: string; ready: boolean; checks: PublishReadinessCheck[] };
 type Builder = {
 id: string | null;
 title: string;
@@ -318,6 +320,10 @@ const [chapters, setChapters] = useState<TaxonomyChapter[]>([]);
 const [topics, setTopics] = useState<TaxonomyTopic[]>([]);
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
+const [readinessLoading, setReadinessLoading] = useState(false);
+const [publishReadiness, setPublishReadiness] = useState<PublishReadiness | null>(null);
+const [readinessFingerprint, setReadinessFingerprint] = useState('');
+const [readinessPaperId, setReadinessPaperId] = useState('');
 const [cloningPaperId, setCloningPaperId] = useState('');
 const [error, setError] = useState('');
 const [message, setMessage] = useState('');
@@ -454,6 +460,12 @@ const canDeletePaper = role === 'super_admin' || (kind === 'school' && role === 
 const submitStatus: PaperStatus = canApprove ? 'published' : 'under_review';
 const totalMarks = selected.reduce((sum, item) => sum + Number(item.marks || 0), 0);
 const selectedInActive = selected.filter((item) => item.section_client_id === active?.client_id).length;
+const publishFingerprint = useMemo(() => JSON.stringify({
+  builder: { ...builder, id: undefined },
+  sections: sections.map(({ id: _id, ...section }) => section),
+  questions: selected.map(({ question: _question, ...item }) => item),
+}), [builder, sections, selected]);
+const releaseCheckCurrent = Boolean(publishReadiness?.ready && readinessFingerprint === publishFingerprint && readinessPaperId);
 const distributionTotal = active
 ? DIFFICULTIES.reduce((sum, difficulty) => sum + Number(active.difficulty_distribution?.[difficulty] || 0), 0)
 : 0;
@@ -467,6 +479,9 @@ setSelected([]);
 setQuestionSearch('');
 setDifficultyFilter('all');
 setAutosave('Autosave ready');
+setPublishReadiness(null);
+setReadinessFingerprint('');
+setReadinessPaperId('');
 }
 function openCreate() {
 resetBuilder();
@@ -701,7 +716,7 @@ return `${section.title}: difficulty counts must equal its question target.`;
 }
 return '';
 }
-async function savePaper(status: PaperStatus) {
+async function savePaper(status: PaperStatus, paperIdOverride?: string) {
 if (!supabase) return;
 const validation = validate(status);
 if (validation) {
@@ -740,15 +755,15 @@ is_mandatory: item.is_mandatory,
 };
 setSaving(true);
 setError('');
-const wasNew = !builder.id;
+const wasNew = !(paperIdOverride || builder.id);
 const key = draftKey;
 const { data, error: saveError } = await supabase.rpc('save_question_paper', {
-p_paper_id: builder.id,
+p_paper_id: paperIdOverride || builder.id,
 p_organization_id: kind === 'admin' ? null : organizationId,
 p_payload: payload,
 });
 if (!saveError && kind === 'admin' && role === 'super_admin') {
-  const savedPaperId = String(data || builder.id || '');
+  const savedPaperId = String(data || paperIdOverride || builder.id || '');
   if (savedPaperId) {
     const { error: pyqIdentityError } = await supabase.rpc('set_question_paper_pyq_identity_v18', {
       p_paper_id: savedPaperId,
@@ -780,6 +795,41 @@ setBuilderOpen(false);
 }
 setMessage(status === 'draft' ? 'Draft saved.' : status === 'under_review' ? 'Paper submitted for approval.' : 'Paper published.');
 await load();
+return String(data || paperIdOverride || builder.id || '');
+}
+async function runPublishPreflight() {
+if (!supabase) return;
+setReadinessLoading(true);
+setError('');
+setPublishReadiness(null);
+const paperId = await savePaper('draft');
+if (!paperId) {
+setReadinessLoading(false);
+return;
+}
+const { data, error: readinessError } = await supabase.rpc('get_paper_publish_readiness_v1', { p_paper_id: paperId });
+setReadinessLoading(false);
+if (readinessError) {
+setError(`Release check failed: ${readinessError.message}`);
+return;
+}
+const readiness = data as PublishReadiness;
+setPublishReadiness(readiness);
+setReadinessFingerprint(publishFingerprint);
+setReadinessPaperId(paperId);
+if (!readiness.ready) {
+const failed = (readiness.checks || []).filter((item) => !item.ok).map((item) => item.label).join(', ');
+setError(`Not ready to publish. Fix: ${failed || 'release checklist'}.`);
+} else {
+setMessage('Release check passed. Publish is unlocked for this exact paper state.');
+}
+}
+async function publishCheckedPaper() {
+if (!releaseCheckCurrent || !readinessPaperId) {
+setError('Run the release check again before publishing this paper state.');
+return;
+}
+await savePaper('published', readinessPaperId);
 }
 async function setStatus(paper: PaperListRow, status: PaperStatus, reason: string | null = null) {
 if (!supabase) return;
@@ -1232,6 +1282,15 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 {builderStep === 5 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
+<SectionHeading number="5" title="Release check" description="Verify every server-authoritative publishing requirement before the final action is unlocked." />
+<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+{(['Approved questions','Duration','Marks','Audience','Schedule','Result policy'] as const).map((label) => {
+const check = publishReadiness?.checks?.find((item) => item.label === label);
+const current = readinessFingerprint === publishFingerprint;
+return <div key={label} className={`rounded-xl border p-4 ${check && current ? (check.ok ? 'border-[#237A57]/20 bg-[#237A57]/5' : 'border-[var(--destructive)]/20 bg-[var(--destructive)]/5') : 'border-[var(--line)] bg-[var(--canvas)]'}`}><div className="flex items-center gap-2">{check && current ? (check.ok ? <CheckCircle2 className="h-4 w-4 text-[#237A57]" /> : <XCircle className="h-4 w-4 text-[var(--destructive)]" />) : <ShieldCheck className="h-4 w-4 text-[var(--muted-foreground)]" />}<p className="text-sm font-semibold text-[var(--foreground)]">{label}</p></div><p className="mt-2 text-xs leading-relaxed text-[var(--muted-foreground)]">{check && current ? check.message : 'Run release check to verify this requirement against the saved paper.'}</p></div>;
+})}
+</div>
+<div className="flex flex-wrap items-center gap-3"><Button type="button" variant="outline" disabled={saving || readinessLoading} onClick={() => void runPublishPreflight()} className="h-10 border-[var(--teal)]/30 text-[var(--teal)]">{readinessLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Run release check</Button><span className={`text-xs font-medium ${releaseCheckCurrent ? 'text-[#237A57]' : 'text-[var(--muted-foreground)]'}`}>{releaseCheckCurrent ? 'All six checks passed for the current paper state.' : publishReadiness && readinessFingerprint !== publishFingerprint ? 'Paper changed after the last check. Run it again.' : 'Publish stays locked until all six checks pass.'}</span></div>
 <SectionHeading number="5" title="Publish" description="Ready to publish or submit? Review the paper summary, then use the final action below." />
 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 <div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Title</p><p className="mt-1 font-semibold">{builder.title || 'Not set'}</p></div>
@@ -1250,7 +1309,8 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 {builderStep > 1 && <Button type="button" variant="outline" disabled={saving} onClick={() => setBuilderStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 border-[var(--line)]">Back</Button>}
 <Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
 {builderStep < 5 && <Button type="button" disabled={saving} onClick={() => setBuilderStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">Next</Button>}
-{builderStep === 5 && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>)}
+{builderStep === 5 && submitStatus === 'published' && (<Button type="button" disabled={saving || readinessLoading || !releaseCheckCurrent} onClick={() => void publishCheckedPaper()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Check className="mr-2 h-4 w-4" />Save and Publish</Button>)}
+{builderStep === 5 && submitStatus !== 'published' && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Send className="mr-2 h-4 w-4" />Submit for Approval</Button>)}
 </DialogFooter>
 </DialogContent>
 </Dialog>
