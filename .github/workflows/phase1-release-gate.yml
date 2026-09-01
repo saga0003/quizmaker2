@@ -92,6 +92,8 @@ jobs:
         run: node scripts/c11-question-duplicate-prevention-smoke.mjs
       - name: D3 guided paper-builder checks
         run: node scripts/d3-paper-builder-wizard-smoke.mjs
+      - name: D4 assignment-preview checks
+        run: node scripts/d4-assignment-preview-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
