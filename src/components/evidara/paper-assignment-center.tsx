@@ -236,6 +236,10 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
         {selectedPaper && <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] px-4 py-3 text-sm"><strong>{selectedPaper.exam_type}</strong>{selectedPaper.grade_level ? ` · ${selectedPaper.grade_level}` : ''} · <span className="capitalize">{selectedPaper.status.replaceAll('_', ' ')}</span></div>}
 
         {mode === 'filters' ? <div className="space-y-4 rounded-xl border border-[var(--line)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--canvas)] px-3 py-2">
+            <div><strong className="text-sm">Audience presets</strong><p className="text-xs text-[var(--muted-foreground)]">Start broad, then narrow by grade, section or programme.</p></div>
+            <Button type="button" variant="outline" size="sm" onClick={() => { setAcademicYear('all'); setGrades([]); setSectionIds([]); setTracks([]); }}>All Students</Button>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div><Label>Academic year</Label><select className="mt-1 min-h-10 w-full rounded-md border border-[var(--line)] bg-white px-3 text-sm" value={academicYear} onChange={(event) => { setAcademicYear(event.target.value); setGrades([]); setSectionIds([]); }}><option value="all">All active academic years</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></div>
             <div><Label>Grade</Label><div className="mt-2 flex flex-wrap gap-2">{gradeOptions.map((grade) => <label key={grade} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-sm"><Checkbox checked={grades.includes(grade)} onCheckedChange={() => { setGrades((current) => toggle(current, grade)); setSectionIds([]); }} />Grade {grade}</label>)}{!gradeOptions.length && <span className="text-sm text-[var(--muted-foreground)]">No active sections configured.</span>}</div></div>
