@@ -120,8 +120,8 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # H — Role-focused UI/UX
 
-- [ ] H1 Super Admin menu: Command Centre, Institutions, Subscriptions, Analytics, Questions, Papers, Resources, Access & Accounts, Audit & Health, View As.
-- [ ] H2 Hide parked Phase-2 modules from Phase-1 navigation.
+- [x] H1 Super Admin menu: Command Centre, Institutions, Subscriptions, Analytics, Questions, Papers, Resources, Access & Accounts, Audit & Health, View As — verified 1 Sep 2026. Phase-1 Super Admin navigation now exposes the required focused menu, preserves the audited read-only View As affordance, and adds a first-class Audit & Health workspace. Exact candidate `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf` passed complete release gate `33524781955`.
+- [x] H2 Hide parked Phase-2 modules from Phase-1 navigation — verified 1 Sep 2026. Products, Referral Settings and Self Assessment are absent from Phase-1 Super Admin navigation while their feature flags remain parked/off; permanent H1/H2 regression is enforced in release gate `33524781955`.
 - [ ] H3 School Admin dashboard focuses on students, teachers, tests, participation, score, licence usage and actions.
 - [ ] H4 Teacher dashboard focuses on Upload Questions, Create Test, Upcoming Tests, Recent Results, Students Needing Attention.
 - [ ] H5 Student dashboard focuses on Next Test, Recent Result, Improvement and Focus Topics.
