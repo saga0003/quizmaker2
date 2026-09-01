@@ -405,3 +405,21 @@ This log records each production-hardening run with observable implementation an
 - **Section progress:** F remains {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**) until F3 gate completes.
 - **Overall Phase 1 percentage:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**) until F3 is formally accepted.
 - **Exact next action:** inspect release gate `33493636272`; if PASS, mark F3 verified with exact gate evidence and immediately start F4. If it fails, fix the failing regression/type/build issue before any checklist update.
+
+## 2026-09-01 15:58:37 IST — F3/F4 analytics verification / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 15:58:37 IST → approximately 16:17 IST.
+- **Active engineering/review span:** approximately **17 minutes** of observable inspect/audit/implementation/rework/verification. The requested 45–50 minute target was not met because this automation execution window was materially shorter; no idle padding was added.
+- **Section worked:** F — Analytics and reporting; F3 acceptance and F4 student drill-down.
+- **Checklist items completed:** **F3 and F4**.
+- **Items still pending in active section:** F5–F13.
+- **Starting branch head:** `caf3fa32f70a7a10f2506a5488620cf80918dce2`. **Recorder source head:** `{head}`.
+- **Commits created/relevant:** F4 staging `92258d1e4dd417c6785774d74ee1401743d45318`; product `e60943eccbb87b1af4b5c3e76946ca797733dda2`; gate wiring `7fe05f2abcc91b2c242311bc8d4eabcb3ecdf054`; temporary-workflow cleanup `85276c9195c67a5bee4a0bd8784425ce0998a782`; stale-regression alignment `e86fb9718855bd225b3a7a268afa99e42ea46e3d` and final candidate `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a`; plus this recorder commit.
+- **Implementation result:** F3 is accepted on prior complete-gate evidence. F4 now provides the required Student → Subject → Chapter → Topic → Question path using the existing authorized analytics payload rather than a new/raw response data path. Question Intelligence is selected-topic scoped, bounded to the latest 150 evidence rows, and displays exact assessment/question, canonical outcome, marks and time.
+- **CI:** F3 descendant full gate `33493732256` — PASS. F4 first exact full gate `33498556903` correctly failed only two stale legacy assertions that required the old question-unavailable placeholder. Those assertions were reworked to enforce the real authorized-evidence contract. Final exact release gate `33498871986` on `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a` — **PASS**, about **2m29s**, including F4 13/13, TypeScript, lint, every regression, production build and final enforcement.
+- **Vercel:** permanent production had **no error/fatal runtime logs in the preceding 24h** and was not promoted. The F4 gate-wiring preview (`7fe05f2...`, deployment `dpl_3zxA4yFv2ehKhCTSt8QHqcBF29HH`) is READY; rapid intermediate previews were cancelled normally by newer pushes.
+- **Supabase:** production app project remained healthy; read-only snapshot showed **2,841 questions, 4 papers, 1 exam attempt and 1 response**. No database mutation was required for F3/F4.
+- **Rework/failures/blockers:** the first clean F4 gate surfaced two obsolete regression expectations tied to the former honest-but-placeholder Question Intelligence state. Product/TypeScript/lint/build were already green. Both tests were updated to verify authorized `question_evidence` and no synthetic rows; final gate passed. No user-input blocker.
+- **Section progress:** F is {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**).
+- **Overall Phase 1:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**).
+- **Exact next action:** F5 — standardize each analytics taxonomy row/card to expose the full evidence set: exposure, Attempted (`correct + incorrect`), correct, incorrect, unanswered, Accuracy, Score %, time, trend and evidence count. Preserve `row.attempts` as response-record/evidence count rather than mislabelling it Attempted; add a permanent F5 regression and require a complete release-gate PASS before checking F5.
