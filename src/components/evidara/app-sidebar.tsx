@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
+  Activity,
   BarChart3,
   BookOpen,
   BookOpenCheck,
@@ -103,16 +104,14 @@ const schoolNav: NavEntry[] = [
 
 const adminNav: NavEntry[] = [
   { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },
+  { label: 'Institutions', icon: Landmark, view: 'admin-institutions', moduleKey: 'students' },
+  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },
   { label: 'Analytics', icon: BarChart3, view: 'admin-analytics', moduleKey: 'analytics' },
   { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },
   { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },
-  { label: 'Products', icon: Package, view: 'admin-products', moduleKey: 'subscriptions' },
-  { label: 'Institutions', icon: Landmark, view: 'admin-institutions', moduleKey: 'students' },
-  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },
   { label: 'Resources', icon: FolderOpen, view: 'admin-resources', moduleKey: 'resources' },
-  { label: 'Referral Settings', icon: Share2, view: 'admin-referrals', moduleKey: 'subscriptions' },
-  { label: 'Self Assessment', icon: Sparkles, view: 'admin-self-assessment', moduleKey: 'papers' },
   { label: 'Access & Accounts', icon: ShieldCheck, view: 'admin-access' },
+  { label: 'Audit & Health', icon: Activity, view: 'admin-audit-health' },
 ];
 
 function isGroup(entry: NavEntry): entry is NavGroup {

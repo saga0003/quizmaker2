@@ -24,6 +24,7 @@ import {
   AdminProductsView,
 } from '@/components/evidara/admin-views';
 import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';
+import { AdminAuditHealthView } from '@/components/evidara/admin-audit-health';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
 import { PaperAssignmentCenter } from '@/components/evidara/paper-assignment-center';
@@ -118,6 +119,7 @@ function ViewRouter() {
   if (view === 'admin-resources') return <AdminResourcesView />;
   if (view === 'admin-referrals') return <ReferralSettingsView />;
   if (view === 'admin-self-assessment') return <AdminSelfAssessmentView />;
+  if (view === 'admin-audit-health') return <AdminAuditHealthView />;
   if (view === 'admin-access') return <AccessControlView kind="admin" />;
 
   return null;

@@ -93,6 +93,7 @@ const APP_VIEWS = new Set<AppView>([
   'admin-resources',
   'admin-referrals',
   'admin-self-assessment',
+  'admin-audit-health',
   'admin-access',
 ]);
 
