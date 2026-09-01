@@ -116,6 +116,8 @@ jobs:
         run: node scripts/f3-not-assessed-smoke.mjs
       - name: F4 student question drill-down checks
         run: node scripts/f4-student-question-drilldown-smoke.mjs
+      - name: F5 standardized analytics row checks
+        run: node scripts/f5-standard-analytics-row-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
