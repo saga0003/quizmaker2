@@ -1,4 +1,4 @@
-name: Apply F7 taxonomy evidence
+name: Apply canonical F6 F7 analytics thresholds
 on:
   push:
     branches:
@@ -15,15 +15,17 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Apply F7 patch
-        run: python scripts/f7-apply.py
-      - name: Run F7 smoke
-        run: node scripts/f7-taxonomy-evidence-smoke.mjs
-      - name: Commit F7 implementation
+      - name: Apply canonical F6 F7 patch
+        run: python scripts/f6-f7-canonical-apply.py
+      - name: Run canonical F6 smoke
+        run: node scripts/f6-topic-evidence-threshold-smoke.mjs
+      - name: Run canonical F7 smoke
+        run: node scripts/f7-percentile-cohort-smoke.mjs
+      - name: Commit canonical F6 F7 implementation
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git rm scripts/f7-apply.py
-          git add src/app/api/institution-analytics/route.ts src/components/institution-analytics/institution-analytics-workspace.tsx scripts/f7-taxonomy-evidence-smoke.mjs
-          git commit -m "feat(f7): expose taxonomy response evidence metrics"
+          git rm scripts/f6-f7-canonical-apply.py
+          git add src/components/analytics-v12/student-analytics-v12.tsx scripts/f6-topic-evidence-threshold-smoke.mjs scripts/f7-percentile-cohort-smoke.mjs
+          git commit -m "feat(f6-f7): enforce analytics evidence and cohort thresholds"
           git push origin HEAD:phase1-hardening
