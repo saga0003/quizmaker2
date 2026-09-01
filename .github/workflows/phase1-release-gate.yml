@@ -148,6 +148,8 @@ jobs:
         run: node scripts/h6-ui-consistency-smoke.mjs
       - name: I1-I3 platform health checks
         run: node scripts/i1-i3-platform-health-smoke.mjs
+      - name: I5-I7 operations hardening checks
+        run: node scripts/i5-i7-operations-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
