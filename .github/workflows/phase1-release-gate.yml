@@ -138,6 +138,8 @@ jobs:
         run: node scripts/f12-excel-export-smoke.mjs
       - name: F13 institution aggregate scaling checks
         run: node scripts/f13-institution-aggregate-scaling-smoke.mjs
+      - name: G subscription commercial-control checks
+        run: node scripts/g-commercial-controls-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
