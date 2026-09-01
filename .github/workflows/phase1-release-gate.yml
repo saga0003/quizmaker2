@@ -104,6 +104,8 @@ jobs:
         run: node scripts/d7-normalized-paper-access-smoke.mjs
       - name: D7 paper-card action checks
         run: node scripts/d7-paper-card-actions-smoke.mjs
+      - name: E6 idempotent submission and receipt checks
+        run: node scripts/e6-idempotent-submission-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
