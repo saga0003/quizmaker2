@@ -440,3 +440,21 @@ This log records each production-hardening run with observable implementation an
 - **Section F progress:** 7/13 verified = **53.8%**.
 - **Overall Phase 1:** 65/129 verified = **50.4%**.
 - **Exact next action:** F8 — verify/implement School → programme → grade → section → subject → chapter → topic → student institutional drilldown, add a permanent F8 regression, and require a complete release-gate PASS before checking F8; continue immediately to F9 if green.
+
+## 2026-09-01 19:54:33 IST — F8–F11 verification reconciliation / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 19:54:33 IST → approximately 20:10 IST.
+- **Active engineering/review span:** approximately **15 minutes** of repository-state reconciliation, release-gate inspection, regression review and checklist/log repair in the available execution window. The requested 45–50 minute target was **not met because this runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F8, F9, F10 and F11.
+- **Items still pending:** F12 and F13.
+- **Starting branch head:** `64683beed8dffbe2470c70b4bf1baf9661247b27`.
+- **Commits created:** this recorder commit only; F8–F11 product/gate commits were already present on the branch and were reconciled rather than reimplemented.
+- **CI:** complete Phase-1 release gate `33518782850` on exact candidate `64683beed8dffbe2470c70b4bf1baf9661247b27` — **PASS**, 2026-09-01 19:49:29–19:51:35 IST (~2m06s). Gate includes permanent F8 hierarchy, F9 teacher attention, F10 raw evidence scope and F11 traditional result-sheet checks, plus TypeScript, lint, all prior regressions and production build.
+- **Vercel:** current commit status reports only the known Hobby preview build-rate-limit condition; no production promotion was attempted. Permanent production remains protected pending the remaining checklist and acceptance gates.
+- **Supabase:** no database mutation was performed in this reconciliation run. F10's scoped raw-evidence migration is represented in the green release candidate; live-state revalidation remains part of subsequent acceptance before production sign-off.
+- **Rework/failures/blockers:** the prior F8 heartbeat recorder had failed before creating a job, leaving verified work unrecorded. This run repaired that documentation gap. No product-code rework was required for F8–F11 because the exact F11 candidate already passed the complete gate.
+- **Section F progress:** 11/13 verified = **84.6%**.
+- **Overall Phase 1:** 69/129 verified = **53.5%**.
+- **Exact next action:** F12 — implement a true Excel workbook export for test results plus student×subject/chapter/topic analytics (not CSV-only), add a permanent F12 regression, wire it into the release gate, run the complete gate, then continue directly to F13 if green.
+
