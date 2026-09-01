@@ -17,11 +17,12 @@ jobs:
           fetch-depth: 0
       - name: Apply guarded F3 source patch
         run: python scripts/f3-apply-not-assessed.py
+      - name: Keep release-gate wiring for connector-authorized commit
+        run: git checkout -- .github/workflows/phase1-release-gate.yml
       - name: Verify F3 regression
         run: node scripts/f3-not-assessed-smoke.mjs
-      - name: Commit F3 candidate
+      - name: Commit F3 product candidate
         run: |
-          rm .github/workflows/f3-apply-not-assessed.yml
           rm scripts/f3-apply-not-assessed.py
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
