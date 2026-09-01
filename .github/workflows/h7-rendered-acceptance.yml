@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p h7-rendered-artifacts
-          cat > /tmp/h7-rendered.mjs <<'EOF'
+          cat > h7-rendered.mjs <<'EOF'
           import { chromium } from 'playwright';
           import fs from 'node:fs';
           const viewports = [
@@ -121,7 +121,7 @@ jobs:
           console.log(JSON.stringify(report,null,2));
           if (failures) process.exit(1);
           EOF
-          node /tmp/h7-rendered.mjs
+          node h7-rendered.mjs
       - name: Upload rendered evidence
         if: always()
         uses: actions/upload-artifact@v4
