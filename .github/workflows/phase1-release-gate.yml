@@ -112,6 +112,8 @@ jobs:
         run: node scripts/e8-concurrency-serialization-smoke.mjs
       - name: F2 analytics metric dictionary checks
         run: node scripts/f2-analytics-metric-dictionary-smoke.mjs
+      - name: F3 not-assessed analytics checks
+        run: node scripts/f3-not-assessed-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
