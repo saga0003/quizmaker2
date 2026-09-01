@@ -136,6 +136,8 @@ jobs:
         run: node scripts/f11-traditional-result-sheet-smoke.mjs
       - name: F12 Excel analytics export checks
         run: node scripts/f12-excel-export-smoke.mjs
+      - name: F13 institution aggregate scaling checks
+        run: node scripts/f13-institution-aggregate-scaling-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
