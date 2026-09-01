@@ -1,4 +1,4 @@
-export type InstitutionAnalyticsLevel = 'schools' | 'school' | 'programme' | 'grade' | 'section' | 'class' | 'subject' | 'chapter' | 'student';
+export type InstitutionAnalyticsLevel = 'schools' | 'school' | 'programme' | 'grade' | 'section' | 'class' | 'subject' | 'chapter' | 'topic' | 'student';
 
 export type ScoreBand = {
   label: string;
@@ -158,6 +158,7 @@ export type InstitutionAnalyticsPayload = {
   class?: InstitutionClassRow | null;
   subject?: InstitutionSubjectRow | null;
   chapter?: InstitutionChapterRow | null;
+  topic?: InstitutionTopicRow | null;
   schools?: InstitutionSchoolRow[];
   programmes?: InstitutionProgrammeRow[];
   grades?: InstitutionGradeRow[];
