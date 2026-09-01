@@ -351,3 +351,22 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
 - **Target status:** 45–50 minute productive target **not met** because the available execution window was materially shorter; limitation recorded explicitly.
 - **Exact next action:** implement E7 as a paper-manager integrity-evidence report backed by RLS-scoped `exam_attempt_events`, using neutral event/timestamp/evidence wording and explicitly avoiding claims that Evidara “prevents cheating”; add a permanent E7 regression and run the complete gate. Then continue immediately to E8 concurrent start/save/submit load acceptance.
+
+
+## 2026-09-01 12:00:02 IST — E7 integrity evidence + E8 concurrent load acceptance (verified) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 12:00:02 IST → approximately 12:10 IST.
+- **Active engineering/review span:** approximately **10 minutes** of repository/CI/deployment/database inspection, live authorization verification, isolated concurrency acceptance, cleanup and release recording. The requested 45–50 minute target was **not reached because the available automation/tool execution window was materially shorter**; no idle time was added.
+- **Section worked:** E — Learner test-taking and exam integrity.
+- **Checklist items completed:** E7 and E8. Section E is now **8/8 = 100% verified**.
+- **Starting/functional branch head:** `91898f36953a0ecb6b4d944f3ab29f850b106b3b`.
+- **Commits created:** this documentation/heartbeat commit only; no new functional product change was needed because E7 UI/reporting and E8 serialization hardening were already present on the green functional candidate.
+- **CI:** complete Phase 1 release gate `33471360195` on exact functional candidate `91898f36953a0ecb6b4d944f3ab29f850b106b3b` — **PASS**. The verify job ran approximately 1m47s and passed E7, E8, TypeScript, lint, every required regression, production build and final enforcement.
+- **Vercel state:** production `quizmaker2` returned **no runtime errors in the preceding 24 hours** and was not promoted or altered. The automatic preview status for the exact head is currently blocked by the Hobby-plan build-rate limit (“retry in 24 hours”), an environment/quota condition rather than a product build failure; the exact candidate independently passed the repository production build in the complete gate.
+- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**. Live verification confirmed start/save/submit RPCs are authenticated-only; start serializes learner+paper requests, save locks the owning attempt, submit locks the attempt and returns a stable receipt. `exam_attempt_events` has RLS enabled and is scoped to the learner or authorized paper manager.
+- **E8 live load evidence:** the isolated probe generated 32 successful repeated/concurrent start invocations with exactly one attempt row; concurrent save traffic converged to one response row; repeated/concurrent submit traffic produced one submitted state and one durable receipt. Save/submit scheduled executions recorded 56 successful probe invocations and no failed probe execution. All temporary cron jobs and exact fixture rows were removed; final cleanup verification returned 0 residual E8 cron jobs, 0 fixture papers and 0 fixture attempts.
+- **Rework/failures/blockers:** the first fixture cleanup correctly hit the platform-paper governance delete guard and rolled back. Cleanup was then performed transactionally with a transaction-local trigger bypass scoped only to the exact disposable fixture IDs, followed by zero-residue verification. Vercel preview builds remain quota-rate-limited; production itself is healthy.
+- **Active section completion:** **100% (8/8)**.
+- **Overall Phase 1 checklist:** **{done}/{total} = {pct:.1f}% verified** after this update.
+- **Permanent production protection:** maintained; no production promotion occurred.
+- **Exact next action:** begin **F2** by defining one canonical analytics metric dictionary for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, wire UI/analytics calculations to those definitions, add a permanent F2 regression, and require the complete release gate before checking F2; continue directly into F3 if F2 clears early.
