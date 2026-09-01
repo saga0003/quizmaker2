@@ -1,0 +1,53 @@
+name: Apply E7 integrity evidence report
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/e7-apply-integrity-evidence.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Patch manager integrity evidence report
+        shell: python {0}
+        run: |
+          from pathlib import Path
+          p=Path('src/components/evidara/live-paper-catalogue-v8.tsx')
+          s=p.read_text()
+          replacements=[
+            ("type PaperActionMode = 'results' | 'analytics' | null;", "type IntegrityEvent = { id: number; attempt_id: string; event_type: string; metadata: Record<string, unknown>; created_at: string };\ntype PaperActionMode = 'results' | 'analytics' | 'integrity' | null;"),
+            ("const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);", "const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);\nconst [integrityEvents, setIntegrityEvents] = useState<IntegrityEvent[]>([]);"),
+            ("async function openPaperAction(paper: PaperListRow, mode: Exclude<PaperActionMode, null>) {\nsetActionPaper(paper);\nsetActionMode(mode);\nsetActionLoading(true);\nsetError('');\nconst result = await fetchPaperAttempts(paper);\nsetActionLoading(false);\nif (result.error) {\nsetActionMode(null);\nsetActionPaper(null);\nsetError(result.error);\nreturn;\n}\nsetPaperAttempts(result.rows);\n}", "async function fetchIntegrityEvents(attempts: PaperAttemptSummary[]) {\nif (!supabase || !attempts.length) return { rows: [] as IntegrityEvent[], error: '' };\nconst attemptIds = attempts.map((attempt) => attempt.id);\nconst { data, error: eventError } = await supabase\n.from('exam_attempt_events')\n.select('id,attempt_id,event_type,metadata,created_at')\n.in('attempt_id', attemptIds)\n.order('created_at', { ascending: false })\n.limit(1000);\nif (eventError) return { rows: [] as IntegrityEvent[], error: eventError.message };\nreturn { rows: (data || []) as IntegrityEvent[], error: '' };\n}\nasync function openPaperAction(paper: PaperListRow, mode: Exclude<PaperActionMode, null>) {\nsetActionPaper(paper);\nsetActionMode(mode);\nsetActionLoading(true);\nsetError('');\nsetIntegrityEvents([]);\nconst result = await fetchPaperAttempts(paper);\nif (result.error) {\nsetActionLoading(false);\nsetActionMode(null);\nsetActionPaper(null);\nsetError(result.error);\nreturn;\n}\nsetPaperAttempts(result.rows);\nif (mode === 'integrity') {\nconst evidence = await fetchIntegrityEvents(result.rows);\nif (evidence.error) {\nsetActionLoading(false);\nsetActionMode(null);\nsetActionPaper(null);\nsetError(evidence.error);\nreturn;\n}\nsetIntegrityEvents(evidence.rows);\n}\nsetActionLoading(false);\n}"),
+            ("<Button variant=\"ghost\" size=\"icon\" title=\"Analytics\" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'analytics')} className=\"h-9 w-9 text-[#44545C] hover:bg-[var(--line)]\"><BookOpenCheck className=\"h-4 w-4\" /></Button>\n<Button variant=\"ghost\" size=\"icon\" title=\"Export\"", "<Button variant=\"ghost\" size=\"icon\" title=\"Analytics\" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'analytics')} className=\"h-9 w-9 text-[#44545C] hover:bg-[var(--line)]\"><BookOpenCheck className=\"h-4 w-4\" /></Button>\n<Button variant=\"ghost\" size=\"icon\" title=\"Integrity evidence\" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'integrity')} className=\"h-9 w-9 text-[#44545C] hover:bg-[var(--line)]\"><ShieldCheck className=\"h-4 w-4\" /></Button>\n<Button variant=\"ghost\" size=\"icon\" title=\"Export\""),
+            ("<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); } }}>", "<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); setIntegrityEvents([]); } }}>"),
+            ("<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>\n{actionLoading ? <div className=\"py-10 text-center text-sm text-[var(--muted-foreground)]\"><LoaderCircle className=\"mx-auto mb-2 h-5 w-5 animate-spin\" />Loading…</div> : actionMode === 'analytics' ? (", "<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : actionMode === 'integrity' ? 'Integrity Evidence' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : actionMode === 'integrity' ? 'Recorded exam-session events for human review. These events are evidence only; they do not prove or prevent cheating.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>\n{actionLoading ? <div className=\"py-10 text-center text-sm text-[var(--muted-foreground)]\"><LoaderCircle className=\"mx-auto mb-2 h-5 w-5 animate-spin\" />Loading…</div> : actionMode === 'analytics' ? ("),
+            ("</div><p className=\"text-xs text-[var(--muted-foreground)]\">Analytics are calculated from up to the latest 500 attempts visible to your role and institution scope.</p></div>\n) : paperAttempts.length ? (", "</div><p className=\"text-xs text-[var(--muted-foreground)]\">Analytics are calculated from up to the latest 500 attempts visible to your role and institution scope.</p></div>\n) : actionMode === 'integrity' ? (\n<div className=\"space-y-4\"><div className=\"rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/10 p-4 text-sm leading-relaxed text-[#6F5600]\"><strong>Review evidence, not a verdict.</strong> Recorded events can help a school review an exam session, but they do not prove misconduct and Evidara does not claim that these signals prevent cheating.</div>{integrityEvents.length ? <div className=\"overflow-hidden rounded-xl border border-[var(--line)]\"><Table><TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Attempt</TableHead><TableHead>Recorded event</TableHead><TableHead>Evidence details</TableHead></TableRow></TableHeader><TableBody>{integrityEvents.map((event) => <TableRow key={event.id}><TableCell className=\"whitespace-nowrap text-xs\">{new Date(event.created_at).toLocaleString('en-IN')}</TableCell><TableCell className=\"font-mono text-xs\">…{event.attempt_id.slice(-8)}</TableCell><TableCell className=\"text-sm font-medium\">{statusLabel(event.event_type)}</TableCell><TableCell className=\"max-w-[320px] break-words text-xs text-[var(--muted-foreground)]\">{Object.keys(event.metadata || {}).length ? JSON.stringify(event.metadata) : 'No additional metadata recorded'}</TableCell></TableRow>)}</TableBody></Table></div> : <div className=\"rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]\">No integrity events were recorded for the latest 500 visible attempts on this paper.</div>}<p className=\"text-xs text-[var(--muted-foreground)]\">Evidence is limited to up to 1,000 latest events from the latest 500 attempts visible to your role and institution scope.</p></div>\n) : paperAttempts.length ? (")
+          ]
+          for old,new in replacements:
+            if old not in s:
+              raise SystemExit('Required source marker not found: '+old[:120])
+            s=s.replace(old,new,1)
+          p.write_text(s)
+
+          smoke=Path('scripts/e7-integrity-evidence-smoke.mjs')
+          smoke.write_text("""import fs from 'node:fs';\nconst source=fs.readFileSync('src/components/evidara/live-paper-catalogue-v8.tsx','utf8');\nconst checks=[\n['integrity is a first-class paper action', /title=\\\"Integrity evidence\\\"[\\s\\S]*?openPaperAction\\(paper, 'integrity'\\)/.test(source)],\n['events come from the RLS-scoped evidence table', /from\\('exam_attempt_events'\\)[\\s\\S]*?select\\('id,attempt_id,event_type,metadata,created_at'\\)/.test(source)],\n['evidence query is bounded', /from\\('exam_attempt_events'\\)[\\s\\S]*?\\.limit\\(1000\\)/.test(source)],\n['attempt query remains bounded', /from\\('exam_attempts'\\)[\\s\\S]*?\\.limit\\(500\\)/.test(source)],\n['report is explicitly evidence not verdict', /Review evidence, not a verdict\\./.test(source)],\n['report disclaims proof of misconduct', /do not prove misconduct/.test(source)],\n['report disclaims cheating-prevention claim', /does not claim that these signals prevent cheating/.test(source)],\n['report shows event time', /new Date\\(event\\.created_at\\)\\.toLocaleString/.test(source)],\n['report shows event type', /statusLabel\\(event\\.event_type\\)/.test(source)],\n['report shows event metadata', /JSON\\.stringify\\(event\\.metadata\\)/.test(source)],\n['report clears evidence when dialog closes', /setIntegrityEvents\\(\\[\\]\\)/.test(source)],\n];\nconst failed=checks.filter(([,ok])=>!ok); for(const [name,ok] of checks) console.log(`${ok?'PASS':'FAIL'}: ${name}`); if(failed.length){console.error('E7 integrity evidence smoke failed: '+failed.map(([n])=>n).join(', '));process.exit(1);} console.log(`E7 integrity evidence smoke passed (${checks.length}/${checks.length}).`);\n""")
+
+          gate=Path('.github/workflows/phase1-release-gate.yml')
+          g=gate.read_text()
+          marker="      - name: E6 idempotent submission and receipt checks\n        run: node scripts/e6-idempotent-submission-smoke.mjs\n"
+          addition=marker+"      - name: E7 integrity evidence report checks\n        run: node scripts/e7-integrity-evidence-smoke.mjs\n"
+          if 'E7 integrity evidence report checks' not in g:
+            if marker not in g: raise SystemExit('E6 gate marker missing')
+            g=g.replace(marker,addition,1)
+          gate.write_text(g)
+      - name: Commit E7 implementation
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add src/components/evidara/live-paper-catalogue-v8.tsx scripts/e7-integrity-evidence-smoke.mjs .github/workflows/phase1-release-gate.yml
+          git diff --cached --quiet || (git commit -m "feat(e7): add integrity evidence report" && git push origin HEAD:phase1-hardening)
