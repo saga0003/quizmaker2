@@ -110,6 +110,8 @@ jobs:
         run: node scripts/e7-integrity-evidence-smoke.mjs
       - name: E8 concurrency serialization safety checks
         run: node scripts/e8-concurrency-serialization-smoke.mjs
+      - name: F2 analytics metric dictionary checks
+        run: node scripts/f2-analytics-metric-dictionary-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
