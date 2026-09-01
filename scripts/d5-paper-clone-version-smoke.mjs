@@ -50,9 +50,10 @@ check('browser privileges deny anonymous clone execution', () => {
   assert.ok(migration.includes('revoke all on function public.clone_paper_as_new_version_v1(uuid,text) from public, anon'));
   assert.ok(migration.includes('grant execute on function public.clone_paper_as_new_version_v1(uuid,text) to authenticated, service_role'));
 });
-check('paper UI exposes clone-as-new-version action', () => {
+check('paper UI exposes the verified duplicate action', () => {
   assert.ok(ui.includes('clone_paper_as_new_version_v1'));
-  assert.ok(ui.includes('Clone as new version'));
+  assert.ok(ui.includes('title="Duplicate paper"'));
+  assert.ok(ui.includes('onClick={() => void cloneAsNewVersion(paper)}'));
 });
 check('D5 regression is permanent in release gate', () => {
   assert.ok(workflow.includes('D5 paper version-clone checks'));
