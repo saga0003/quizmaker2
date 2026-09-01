@@ -134,6 +134,8 @@ jobs:
         run: node scripts/f10-raw-response-evidence-smoke.mjs
       - name: F11 traditional result sheet checks
         run: node scripts/f11-traditional-result-sheet-smoke.mjs
+      - name: F12 Excel analytics export checks
+        run: node scripts/f12-excel-export-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
