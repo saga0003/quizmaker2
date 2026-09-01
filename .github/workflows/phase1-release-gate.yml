@@ -128,6 +128,8 @@ jobs:
         run: node scripts/f7-percentile-cohort-smoke.mjs
       - name: F8 institution hierarchy drilldown checks
         run: node scripts/f8-institution-drilldown-smoke.mjs
+      - name: F9 teacher needs-attention checks
+        run: node scripts/f9-teacher-needs-attention-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
