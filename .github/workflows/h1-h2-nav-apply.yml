@@ -21,21 +21,18 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-
           p = Path('src/store/use-app-store.ts')
           s = p.read_text()
           old = "  | 'admin-self-assessment'\n  | 'admin-access';"
           new = "  | 'admin-self-assessment'\n  | 'admin-audit-health'\n  | 'admin-access';"
           if old not in s: raise SystemExit('AppView anchor not found')
           p.write_text(s.replace(old, new))
-
           p = Path('src/lib/workspaceViews.ts')
           s = p.read_text()
           old = "  'admin-self-assessment',\n  'admin-access',"
           new = "  'admin-self-assessment',\n  'admin-audit-health',\n  'admin-access',"
           if old not in s: raise SystemExit('APP_VIEWS anchor not found')
           p.write_text(s.replace(old, new))
-
           p = Path('src/components/evidara/app-sidebar.tsx')
           s = p.read_text()
           old = "  BarChart3,\n  BookOpen,"
@@ -44,20 +41,9 @@ jobs:
           s = s.replace(old, new)
           start = s.index('const adminNav: NavEntry[] = [')
           end = s.index('\n];', start) + 3
-          replacement = """const adminNav: NavEntry[] = [
-  { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },
-  { label: 'Institutions', icon: Landmark, view: 'admin-institutions', moduleKey: 'students' },
-  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },
-  { label: 'Analytics', icon: BarChart3, view: 'admin-analytics', moduleKey: 'analytics' },
-  { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },
-  { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },
-  { label: 'Resources', icon: FolderOpen, view: 'admin-resources', moduleKey: 'resources' },
-  { label: 'Access & Accounts', icon: ShieldCheck, view: 'admin-access' },
-  { label: 'Audit & Health', icon: Activity, view: 'admin-audit-health' },
-];"""
-          s = s[:start] + replacement + s[end:]
+          lines = ["const adminNav: NavEntry[] = [", "  { label: 'Command Centre', icon: LayoutDashboard, view: 'admin-dashboard' },", "  { label: 'Institutions', icon: Landmark, view: 'admin-institutions', moduleKey: 'students' },", "  { label: 'Subscriptions', icon: CreditCard, view: 'admin-subscriptions', moduleKey: 'subscriptions' },", "  { label: 'Analytics', icon: BarChart3, view: 'admin-analytics', moduleKey: 'analytics' },", "  { label: 'Questions', icon: BookOpen, view: 'admin-questions', moduleKey: 'questions' },", "  { label: 'Papers', icon: FileText, view: 'admin-papers', moduleKey: 'papers' },", "  { label: 'Resources', icon: FolderOpen, view: 'admin-resources', moduleKey: 'resources' },", "  { label: 'Access & Accounts', icon: ShieldCheck, view: 'admin-access' },", "  { label: 'Audit & Health', icon: Activity, view: 'admin-audit-health' },", "];" ]
+          s = s[:start] + '\n'.join(lines) + s[end:]
           p.write_text(s)
-
           p = Path('src/app/page.tsx')
           s = p.read_text()
           anchor = "import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';"
