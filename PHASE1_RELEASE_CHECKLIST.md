@@ -126,9 +126,9 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 - [x] H4 Teacher dashboard focuses on Upload Questions, Create Test, Upcoming Tests, Recent Results, Students Needing Attention — verified 1 Sep 2026. Teacher quick actions now use the Phase-1 task language and the existing evidence-first Students Needing Attention queue remains first-class. Permanent H3–H5 regression passed complete release gate `33526523379`.
 - [x] H5 Student dashboard focuses on Next Test, Recent Result, Improvement and Focus Topics — verified 1 Sep 2026. Student home now surfaces the next eligible test, latest submitted result, two-test improvement delta and a link to released evidence-based focus topics without inventing priorities when evidence is insufficient. Permanent H3–H5 regression passed complete release gate `33526523379`.
 - [x] H6 Standardize page headings, cards, tables, filters, loading, error and empty states.
-- [ ] H7 Responsive QA at 360, 390, 430, tablet, 1366 and 1920 widths with long real-world content.
-- [ ] H8 Mobile tables use readable cards/compact rows where appropriate.
-- [ ] H9 Accessibility baseline: keyboard, focus, labels, contrast, touch target size and meaningful status text.
+- [x] H7 Responsive QA at 360, 390, 430, tablet, 1366 and 1920 widths with long real-world content.
+- [x] H8 Mobile tables use readable cards/compact rows where appropriate.
+- [x] H9 Accessibility baseline: keyboard, focus, labels, contrast, touch target size and meaningful status text.
 
 # I — Super Admin operations and platform health
 
