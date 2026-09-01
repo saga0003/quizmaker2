@@ -1,0 +1,60 @@
+name: Phase 1 F completion recorder
+on:
+  push:
+    branches: [phase1-hardening]
+permissions:
+  contents: write
+jobs:
+  record:
+    if: ${{ !contains(github.event.head_commit.message, '[phase1-heartbeat]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Record verified F12/F13 completion and heartbeat
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text()
+          old12 = '- [ ] F12 Excel export for test results and student×subject/chapter/topic analytics.'
+          new12 = '- [x] F12 Excel export for test results and student×subject/chapter/topic analytics — verified 1 Sep 2026. Exact candidate `23bcae9726c3e4493e478053be4b4995cf7a10db` passed complete release gate `33521024715`; the class workspace now creates a genuine `.xlsx` workbook with Results, Test Results, Subject Analytics, Chapter Analytics and Topic Analytics sheets using authorized student analytics evidence, and the permanent 13-point F12 regression is enforced in the release gate.'
+          old13 = '- [ ] F13 Heavy institutional aggregates progressively move to database-side aggregation where needed for scale.'
+          new13 = '- [x] F13 Heavy institutional aggregates progressively move to database-side aggregation where needed for scale — verified 1 Sep 2026. Live migration `phase1_institution_attempt_aggregate_scaling` adds the partial submitted-attempt index and service-role-only `get_institution_student_attempt_metrics_v1`; school/programme/grade summary paths now aggregate inside PostgreSQL while question-evidence paths retain raw attempt IDs only where required. Exact candidate `cd70cb3e756f54604b2e80d8226310d88a89ee07` passed complete release gate `33521642436` including the permanent 13-point F13 regression, TypeScript, lint, every existing regression and production build.'
+          if old12 not in text or old13 not in text:
+              raise SystemExit('F12/F13 checklist anchors missing or already changed')
+          checklist.write_text(text.replace(old12, new12, 1).replace(old13, new13, 1))
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          entry = '''
+
+## 2026-09-01 19:58:37 IST — F12/F13 analytics export + aggregate scaling verified / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 19:58:37 IST → approximately 20:20:32 IST for the final exact F13 release-gate result; logging/cleanup continued immediately afterward.
+- **Active engineering/review span:** approximately **22 minutes** from start through final F13 gate confirmation, plus final checklist/log cleanup. The requested 45–50 minute target was **not met because the available tool execution window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Analytics, results and reporting.
+- **Checklist items completed:** **F12** real Excel analytics export and **F13** database-side heavy institutional aggregate scaling. Section F is now **13/13 verified (100%)**.
+- **Starting branch head:** `3eaf57381f7a4bb09a8d47f6cf4696bea95f1c6b`.
+- **Functional commits/candidates:** F12 product commit `2aacc2e64d94d415088bdeec1aa9d35e1266c8f7`; exact cleaned F12 candidate `23bcae9726c3e4493e478053be4b4995cf7a10db`. F13 product commit `c5113d727262733087343f683dd98d4fb1c6548e`; exact cleaned F13 candidate `cd70cb3e756f54604b2e80d8226310d88a89ee07`.
+- **F12 implementation:** Added pinned `exceljs` 4.4.0 and an on-demand genuine `.xlsx` workbook exporter. The class analytics workspace now exports Results, Test Results, Subject Analytics, Chapter Analytics and Topic Analytics sheets with exposure, attempted/correct/incorrect/unanswered, accuracy, score, time, trend and evidence counts. Workbook evidence is fetched through the already-authorized `get_student_analytics_v12` RPC in bounded batches rather than bypassing school/teacher scope.
+- **F12 verification:** Exact candidate release gate `33521024715` — **PASS**, approximately **2m19s**. Permanent 13-point F12 smoke, TypeScript, lint, all prior regressions, production build and final enforcement passed.
+- **F13 implementation:** Live Supabase migration `phase1_institution_attempt_aggregate_scaling` added `exam_attempts_org_student_submitted_idx` and service-role-only `get_institution_student_attempt_metrics_v1`. School list, class, programme and grade summary paths now request one aggregate row per student from PostgreSQL in batches of at most 500 student IDs, preserving weighted attempt-level percentages. The deeper class/question evidence route intentionally retains raw attempt IDs because it needs question-response evidence.
+- **F13 live database verification:** Supabase project remained `ACTIVE_HEALTHY`; the aggregate RPC is executable by `service_role` but not `anon`/`authenticated`, the partial index is present, and a live scoped probe returned the expected per-student aggregate row. No browser role was granted aggregate access.
+- **F13 verification:** Exact candidate `cd70cb3e756f54604b2e80d8226310d88a89ee07`, release gate `33521642436` — **PASS**, 2026-09-01 20:17:16–20:20:32 IST (**3m16s**). F13 smoke, every earlier P0/A/B/C/D/E/F regression, TypeScript, lint, production build and final release-gate enforcement passed.
+- **Vercel/production state:** Fresh production runtime-error inspection found **no runtime errors in the preceding 24 hours**. Permanent production was not promoted or changed; it remains protected pending the remaining checklist, real-school acceptance, load acceptance and production sign-off.
+- **Rework/failures:** F12 initially exposed three contained pre-commit issues: npm wrote a caret dependency range instead of the required exact pin, TypeScript caught nullable Supabase closure narrowing, and the smoke test was overly coupled to the client variable name. All were corrected and re-run before the final product commit. F13 had normal intermediate workflow/concurrency churn while its live migration and product candidate were staged; the final cleaned candidate is green. No production incident or unresolved functional failure remains.
+- **Pending:** Section G onward, real-school acceptance, load acceptance and final production sign-off.
+- **Section progress:** F = **13/13 (100%)**.
+- **Overall Phase 1 progress:** **71/129 verified (55.0%)**.
+- **Exact next action:** Begin **G1** by auditing the canonical `₹199 × licensed students × annual licence period` commercial model end-to-end, then harden G1–G6 in sequence with permanent regressions and a complete release gate before checking any item.
+'''
+          with log.open('a') as handle:
+              handle.write(entry)
+          PY
+          git config user.name 'Evidara Phase 1 Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git commit -m 'docs(f13): record verified section F completion [phase1-heartbeat] [skip ci]'
+          git push
