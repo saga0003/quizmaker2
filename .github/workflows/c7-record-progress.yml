@@ -31,3 +31,4 @@ jobs:
           git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
           git commit -m "docs: record H7-H9 verification"
           git push origin HEAD:phase1-hardening
+# canonical recorder retry after checklist-token correction
