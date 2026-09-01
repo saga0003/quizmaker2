@@ -5,6 +5,7 @@ on:
     branches: [phase1-hardening]
     paths:
       - scripts/apply-d7-paper-actions-patch.mjs
+      - scripts/d7-retry-trigger.txt
 
 permissions:
   contents: write
