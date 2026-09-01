@@ -8,6 +8,7 @@ const types = fs.readFileSync('src/types/institution-analytics.ts', 'utf8');
 const checks = [
   ['analytics levels expose programme', types.includes("'programme'")],
   ['analytics levels expose grade', types.includes("'grade'")],
+  ['analytics levels expose topic', types.includes("'topic'")],
   ['analytics levels expose section independently of class', types.includes("'section'")],
   ['school drilldown exposes programme rows', types.includes('programmes?:') || types.includes('InstitutionProgrammeRow')],
   ['programme drilldown exposes grades', types.includes('grades?:') || types.includes('InstitutionGradeRow')],
@@ -15,11 +16,13 @@ const checks = [
   ['API accepts programme level', api.includes("level === 'programme'")],
   ['API accepts grade level', api.includes("level === 'grade'")],
   ['API accepts section level', api.includes("level === 'section'")],
+  ['API accepts topic level', api.includes("level === 'topic'")],
   ['programme selection is propagated as an API parameter', ui.includes("query.set('programme',") || ui.includes("query.set('programmeId',")],
   ['grade selection is propagated as an API parameter', ui.includes("query.set('grade',")],
   ['section remains a distinct breadcrumb/drilldown step', ui.includes("navigate('section'") || ui.includes("level: 'section'")],
   ['subject drilldown remains after section', ui.includes("navigate('subject'")],
   ['chapter drilldown remains after subject', ui.includes("navigate('chapter'")],
+  ['topic is a first-class drilldown after chapter', ui.includes("navigate('topic'")],
   ['student drilldown remains available from scoped institution analytics', ui.includes("navigate('student'")],
 ];
 

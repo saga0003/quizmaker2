@@ -48,7 +48,10 @@ import type {
   InstitutionAnalyticsPayload,
   InstitutionChapterRow,
   InstitutionClassRow,
+  InstitutionGradeRow,
+  InstitutionProgrammeRow,
   InstitutionSchoolRow,
+  InstitutionSectionRow,
   InstitutionStudentRow,
   InstitutionSubjectRow,
   InstitutionTopicRow,
@@ -75,9 +78,12 @@ type TrailItem = {
   level: InstitutionAnalyticsLevel;
   label: string;
   organizationId?: string | null;
+  programme?: string | null;
+  grade?: number | null;
   sectionId?: string | null;
   subjectId?: string | null;
   chapterId?: string | null;
+  topicId?: string | null;
   studentId?: string | null;
 };
 
@@ -174,6 +180,9 @@ function blankPayload(mode: 'platform' | 'school', level: InstitutionAnalyticsLe
     actor,
     generatedAt: new Date().toISOString(),
     schools: [],
+    programmes: [],
+    grades: [],
+    sections: [],
     classes: [],
     students: [],
     subjects: [],
@@ -200,9 +209,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [programme, setProgramme] = useState<string | null>(null);
+  const [grade, setGrade] = useState<number | null>(null);
   const [sectionId, setSectionId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [chapterId, setChapterId] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [trail, setTrail] = useState<TrailItem[]>([{ level: initialLevel, label: mode === 'platform' ? 'All schools' : 'My school' }]);
   const [search, setSearch] = useState('');
@@ -213,9 +225,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
 
   const load = useCallback(async (nextLevel: InstitutionAnalyticsLevel, params?: Partial<TrailItem>) => {
     const nextOrganizationId = params?.organizationId ?? organizationId;
+    const nextProgramme = params?.programme ?? programme;
+    const nextGrade = params?.grade ?? grade;
     const nextSectionId = params?.sectionId ?? sectionId;
     const nextSubjectId = params?.subjectId ?? subjectId;
     const nextChapterId = params?.chapterId ?? chapterId;
+    const nextTopicId = params?.topicId ?? topicId;
     const nextStudentId = params?.studentId ?? studentId;
     setLoading(true);
     setError('');
@@ -226,9 +241,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
       if (!token) throw new Error('Your Evidara session has expired. Sign in again.');
       const query = new URLSearchParams({ level: nextLevel });
       if (nextOrganizationId) query.set('organizationId', nextOrganizationId);
+      if (nextProgramme) query.set('programme', nextProgramme);
+      if (nextGrade != null) query.set('grade', String(nextGrade));
       if (nextSectionId) query.set('sectionId', nextSectionId);
       if (nextSubjectId) query.set('subjectId', nextSubjectId);
       if (nextChapterId) query.set('chapterId', nextChapterId);
+      if (nextTopicId) query.set('topicId', nextTopicId);
       if (nextStudentId) query.set('studentId', nextStudentId);
       const response = await fetch(`/api/institution-analytics?${query.toString()}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
       const result = await response.json() as InstitutionAnalyticsPayload & { error?: string };
@@ -236,9 +254,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
       setPayload(result);
       setLevel(nextLevel);
       setOrganizationId(result.school?.id || nextOrganizationId || null);
-      setSectionId(result.class?.id || nextSectionId || null);
+      setProgramme(result.programme?.id || nextProgramme || null);
+      setGrade(result.grade?.grade ?? nextGrade ?? null);
+      setSectionId(result.section?.id || result.class?.id || nextSectionId || null);
       setSubjectId(result.subject?.id || nextSubjectId || null);
       setChapterId(result.chapter?.id || nextChapterId || null);
+      setTopicId(result.topic?.id || nextTopicId || null);
       setStudentId(result.studentDetail?.student.id || nextStudentId || null);
       setSelectedStudents(new Set());
       setSearch('');
@@ -251,7 +272,7 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     } finally {
       setLoading(false);
     }
-  }, [chapterId, mode, organizationId, sectionId, studentId, subjectId]);
+  }, [chapterId, grade, mode, organizationId, programme, sectionId, studentId, subjectId, topicId]);
 
   useEffect(() => { void load(initialLevel); }, [initialLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -286,6 +307,10 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     });
     return [...rows].sort((a, b) => compare(a[sort.key as keyof InstitutionSchoolRow], b[sort.key as keyof InstitutionSchoolRow], sort.direction));
   }, [filter, payload.schools, search, sort]);
+
+  const programmes = useMemo(() => [...(payload.programmes || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionProgrammeRow], b[sort.key as keyof InstitutionProgrammeRow], sort.direction)), [payload.programmes, sort]);
+  const grades = useMemo(() => [...(payload.grades || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionGradeRow], b[sort.key as keyof InstitutionGradeRow], sort.direction)), [payload.grades, sort]);
+  const sections = useMemo(() => [...(payload.sections || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionSectionRow], b[sort.key as keyof InstitutionSectionRow], sort.direction)), [payload.sections, sort]);
 
   const classes = useMemo(() => {
     const rows = (payload.classes || []).filter((row) => {
@@ -359,17 +384,20 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   }
 
   const title = level === 'schools' ? 'School performance analytics'
-    : level === 'school' ? `${payload.school?.name || 'School'} analytics`
-      : level === 'class' ? `${payload.class?.name || 'Class'} performance`
-        : level === 'subject' ? `${payload.subject?.name || 'Subject'} chapter analysis`
-          : level === 'chapter' ? `${payload.chapter?.name || 'Chapter'} topic analysis`
-            : `${payload.studentDetail?.student.name || 'Student'} performance`;
+    : level === 'school' ? `${payload.school?.name || 'School'} programmes`
+      : level === 'programme' ? `${payload.programme?.name || 'Programme'} grades`
+        : level === 'grade' ? `${payload.grade?.name || 'Grade'} sections`
+          : level === 'section' || level === 'class' ? `${payload.section?.name || payload.class?.name || 'Section'} performance`
+            : level === 'subject' ? `${payload.subject?.name || 'Subject'} chapter analysis`
+              : level === 'chapter' ? `${payload.chapter?.name || 'Chapter'} topic analysis`
+                : level === 'topic' ? `${payload.topic?.name || 'Topic'} student evidence`
+                  : `${payload.studentDetail?.student.name || 'Student'} performance`;
 
   return <div className="institution-analytics">
     <header className="institution-page-header">
       <div className="institution-title-row">
         {trail.length > 1 && <Button variant="outline" size="icon" onClick={goBack} aria-label="Go back"><ArrowLeft /></Button>}
-        <div><span className="institution-kicker">{mode === 'platform' ? 'Evidara intelligence' : user?.accessRole === 'school_teacher' ? 'Assigned class intelligence' : 'School intelligence'}</span><h1>{title}</h1><p>Drill down from institution to class, subject, chapter, topic and individual student evidence.</p></div>
+        <div><span className="institution-kicker">{mode === 'platform' ? 'Evidara intelligence' : user?.accessRole === 'school_teacher' ? 'Assigned class intelligence' : 'School intelligence'}</span><h1>{title}</h1><p>Drill down from school to programme, grade, section, subject, chapter, topic and individual student evidence.</p></div>
       </div>
       <div className="institution-breadcrumbs">{trail.map((item, index) => <button type="button" key={`${item.level}-${index}`} onClick={() => goTrail(item, index)} className={index === trail.length - 1 ? 'active' : ''}>{item.label}{index < trail.length - 1 && <ChevronRight />}</button>)}</div>
     </header>
@@ -379,10 +407,13 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     {loading && <div className="institution-loading"><LoaderCircle /><span>Calculating analytics…</span></div>}
 
     {!loading && level === 'schools' && <SchoolsView rows={schools} allRows={payload.schools || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} onOpen={(school) => navigate('school', school.name, { organizationId: school.id })} />}
-    {!loading && level === 'school' && <ClassesView rows={classes} allRows={payload.classes || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} onOpen={(row) => navigate('class', row.name, { organizationId: payload.school?.id, sectionId: row.id })} bulkDownloading={bulkDownloading} onDownloadPdf={() => void downloadSchoolResults('pdf')} onDownloadCsv={() => void downloadSchoolResults('csv')} />}
-    {!loading && level === 'class' && payload.class && <ClassView classRow={payload.class} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} />}
-    {!loading && level === 'subject' && payload.subject && <SubjectView subject={payload.subject} chapters={payload.chapters || []} bands={payload.scoreBands || []} onChapter={(row) => navigate('chapter', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, subjectId: payload.subject?.id, chapterId: row.id })} />}
-    {!loading && level === 'chapter' && payload.chapter && <ChapterView chapter={payload.chapter} topics={payload.topics || []} bands={payload.scoreBands || []} />}
+    {!loading && level === 'school' && <HierarchyScopeView title="Programmes" rows={programmes} empty="No active programmes are assigned to students in this school." onOpen={(row) => navigate('programme', row.name, { organizationId: payload.school?.id, programme: row.id })} />}
+    {!loading && level === 'programme' && <HierarchyScopeView title="Grades" rows={grades} empty="No active grades are assigned to this programme." onOpen={(row) => navigate('grade', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: row.grade })} />}
+    {!loading && level === 'grade' && <HierarchyScopeView title="Sections" rows={sections} empty="No active sections are assigned to this grade and programme." onOpen={(row) => navigate('section', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: payload.grade?.grade, sectionId: row.id })} />}
+    {!loading && (level === 'section' || level === 'class') && (payload.section || payload.class) && <ClassView classRow={payload.section || payload.class!} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} />}
+    {!loading && level === 'subject' && payload.subject && <SubjectView subject={payload.subject} chapters={payload.chapters || []} bands={payload.scoreBands || []} onChapter={(row) => navigate('chapter', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: row.id })} />}
+    {!loading && level === 'chapter' && payload.chapter && <ChapterView chapter={payload.chapter} topics={payload.topics || []} bands={payload.scoreBands || []} onTopic={(row) => navigate('topic', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: payload.chapter?.id, topicId: row.id } as Partial<TrailItem>)} />}
+    {!loading && level === 'topic' && payload.topic && <TopicView topic={payload.topic} students={students} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId, chapterId, studentId: row.id })} />}
     {!loading && level === 'student' && payload.studentDetail && <StudentView detail={payload.studentDetail} />}
   </div>;
 }
@@ -399,6 +430,13 @@ function SchoolsView({ rows, allRows, search, setSearch, filter, setFilter, sort
     <DataToolbar search={search} setSearch={setSearch} placeholder="Search school, city, board or state" filter={filter} setFilter={setFilter} options={boards.map((board) => ({ value: board, label: board }))} filterLabel="All boards" count={rows.length} />
     <Card className="institution-table-card"><Table className="min-w-[1180px]"><TableHeader><TableRow><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="School" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} /><SortHeader label="Students" sortKey="totalStudents" sort={sort} onSort={onSort} /><SortHeader label="Classes" sortKey="totalClasses" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Tests / student" sortKey="averageTestsPerStudent" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Participation" sortKey="participation" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} onClick={() => onOpen(row)} className="institution-clickable-row"><TableCell><span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span></TableCell><TableCell><strong>{row.name}</strong><small>{row.city}, {row.state} · {row.board}</small></TableCell><TableCell><Badge variant={row.status === 'active' ? 'default' : 'outline'}>{row.status || 'pending'}</Badge></TableCell><TableCell>{row.totalStudents}</TableCell><TableCell>{row.totalClasses}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{number(row.averageTestsPerStudent)}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={12}><InstitutionEmptyState title="No live schools found" copy="Create or activate a school organization to begin platform analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
   </>;
+}
+
+function HierarchyScopeView<T extends InstitutionProgrammeRow | InstitutionGradeRow | InstitutionSectionRow>({ title, rows, empty, onOpen }: { title: string; rows: T[]; empty: string; onOpen: (row: T) => void }) {
+  return <section className="institution-section">
+    <div className="institution-section-heading"><div><h2>{title}</h2><p>Open a row to continue through the institution hierarchy using live roster and submitted assessment evidence.</p></div><Badge variant="outline">{rows.length} records</Badge></div>
+    <Card className="institution-table-card"><Table className="min-w-[960px]"><TableHeader><TableRow><TableHead>Rank</TableHead><TableHead>{title.slice(0, -1)}</TableHead><TableHead>Students</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead>Participation</TableHead><TableHead>Last test</TableHead><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} className="institution-clickable-row" onClick={() => onOpen(row)}><TableCell>{row.rank}</TableCell><TableCell><strong>{row.name}</strong></TableCell><TableCell>{row.studentCount}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={9}><InstitutionEmptyState title={`No ${title.toLowerCase()} found`} copy={empty} /></TableCell></TableRow>}</TableBody></Table></Card>
+  </section>;
 }
 
 function ClassesView({ rows, allRows, search, setSearch, filter, setFilter, sort, onSort, onOpen, bulkDownloading, onDownloadPdf, onDownloadCsv }: { rows: InstitutionClassRow[]; allRows: InstitutionClassRow[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; onOpen: (row: InstitutionClassRow) => void; bulkDownloading: 'pdf' | 'csv' | null; onDownloadPdf: () => void; onDownloadCsv: () => void }) {
@@ -444,12 +482,19 @@ function SubjectView({ subject, chapters, bands, onChapter }: { subject: Institu
   </>;
 }
 
-function ChapterView({ chapter, topics, bands }: { chapter: InstitutionChapterRow; topics: InstitutionTopicRow[]; bands: ScoreBand[] }) {
+function ChapterView({ chapter, topics, bands, onTopic }: { chapter: InstitutionChapterRow; topics: InstitutionTopicRow[]; bands: ScoreBand[]; onTopic: (row: InstitutionTopicRow) => void }) {
   const chartRows = topics.map((row) => ({ name: row.name, highest: row.highestPercentage, average: row.averagePercentage, lowest: row.lowestPercentage, students: row.studentCount }));
   return <><div className="institution-stat-grid"><StatCard icon={Users} label="Students assessed" value={chapter.studentCount} /><StatCard icon={BarChart3} label="Chapter average" value={percentage(chapter.averagePercentage)} tone={metricTone(chapter.averagePercentage)} /><StatCard icon={Trophy} label="Highest" value={percentage(chapter.highestPercentage)} tone={GREEN} /><StatCard icon={TrendingDown} label="Lowest" value={percentage(chapter.lowestPercentage)} tone={RED} /><StatCard icon={BookOpenCheck} label="Responses" value={chapter.responseCount} tone={BLUE} /></div>
     <Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic performance</h3><p>Identify whether a weak result is isolated to a few students or affects the whole class.</p></div></div><div className="institution-chart institution-chart-large"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartRows} margin={{ top: 12, right: 12, left: -12, bottom: 55 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" /><XAxis dataKey="name" angle={-24} textAnchor="end" height={75} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><Tooltip formatter={(value) => percentage(Number(value))} /><Legend /><Bar dataKey="average" name="Class average" fill={TEAL} radius={[6, 6, 0, 0]} /><Line type="monotone" dataKey="highest" name="Highest" stroke={GREEN} strokeWidth={2.5} /><Line type="monotone" dataKey="lowest" name="Lowest" stroke={RED} strokeWidth={2.5} /></ComposedChart></ResponsiveContainer></div></CardContent></Card>
-    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${chapter.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic diagnosis</h3><p>Statistical view of class-level strengths and gaps.</p></div></div><div className="institution-topic-diagnosis">{topics.map((row) => <div key={row.id}><div><strong>{row.name}</strong><small>{row.studentCount} students · {row.responseCount} responses · Accuracy {percentage(row.accuracy)} · Avg time {evidenceTime(row.averageSeconds)}</small></div><div className="institution-topic-track">{row.averagePercentage == null ? null : <i style={{ width: `${row.averagePercentage}%`, backgroundColor: metricTone(row.averagePercentage) }} />}</div><b>{percentage(row.averagePercentage)}</b><span>{row.scoreBands.filter((band) => band.max <= 40).reduce((sum, band) => sum + band.students, 0)} below 40%</span></div>)}</div></CardContent></Card></div>
+    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${chapter.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic diagnosis</h3><p>Statistical view of class-level strengths and gaps.</p></div></div><div className="institution-topic-diagnosis">{topics.map((row) => <div key={row.id} role="button" tabIndex={0} onClick={() => onTopic(row)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onTopic(row); }}><div><strong>{row.name}</strong><small>{row.studentCount} students · {row.responseCount} responses · Accuracy {percentage(row.accuracy)} · Avg time {evidenceTime(row.averageSeconds)}</small></div><div className="institution-topic-track">{row.averagePercentage == null ? null : <i style={{ width: `${row.averagePercentage}%`, backgroundColor: metricTone(row.averagePercentage) }} />}</div><b>{percentage(row.averagePercentage)}</b><span>{row.scoreBands.filter((band) => band.max <= 40).reduce((sum, band) => sum + band.students, 0)} below 40%</span></div>)}</div></CardContent></Card></div>
   </>;
+}
+
+function TopicView({ topic, students, onStudent }: { topic: InstitutionTopicRow; students: InstitutionStudentRow[]; onStudent: (row: InstitutionStudentRow) => void }) {
+  return <section className="institution-section"><div className="institution-stat-grid"><StatCard icon={Users} label="Students assessed" value={topic.studentCount} /><StatCard icon={BarChart3} label="Topic average" value={percentage(topic.averagePercentage)} tone={metricTone(topic.averagePercentage)} /><StatCard icon={BookOpenCheck} label="Responses" value={topic.responseCount} tone={BLUE} /></div>
+    <div className="institution-section-heading"><div><h2>Students</h2><p>Continue to an individual student to inspect their authorised evidence in the selected section context.</p></div></div>
+    <Card className="institution-table-card"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead /></TableRow></TableHeader><TableBody>{students.length ? students.map((row) => <TableRow key={row.id} className="institution-clickable-row" onClick={() => onStudent(row)}><TableCell><strong>{row.name}</strong><small>{row.sectionName}</small></TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{percentage(row.averagePercentage)}</TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={5}><InstitutionEmptyState title="No students in scope" copy="The selected topic has no student roster available in this section." /></TableCell></TableRow>}</TableBody></Table></Card>
+  </section>;
 }
 
 function StudentView({ detail }: { detail: NonNullable<InstitutionAnalyticsPayload['studentDetail']> }) {

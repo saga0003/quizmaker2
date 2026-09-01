@@ -6,7 +6,10 @@ import type {
   InstitutionAnalyticsPayload,
   InstitutionChapterRow,
   InstitutionClassRow,
+  InstitutionGradeRow,
+  InstitutionProgrammeRow,
   InstitutionSchoolRow,
+  InstitutionSectionRow,
   InstitutionStudentRow,
   InstitutionSubjectRow,
   InstitutionTopicRow,
@@ -36,6 +39,7 @@ type MembershipRow = {
   grade: number;
   section: string | null;
   section_id: string | null;
+  tracks: string[] | null;
   status: string;
 };
 
@@ -224,7 +228,7 @@ async function ensureSectionAccess(ctx: CloudContext, sectionId: string) {
 async function membershipsForOrganization(ctx: CloudContext, organizationId: string) {
   return paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .eq('organization_id', organizationId)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
@@ -266,6 +270,49 @@ function studentMetrics(studentId: string, attempts: AttemptRow[]) {
   };
 }
 
+
+const UNASSIGNED_PROGRAMME = '__unassigned__';
+
+function programmeIds(membership: MembershipRow) {
+  const tracks = (membership.tracks || []).map((track) => String(track || '').trim()).filter(Boolean);
+  return tracks.length ? [...new Set(tracks)] : [UNASSIGNED_PROGRAMME];
+}
+
+function programmeLabel(programmeId: string) {
+  return programmeId === UNASSIGNED_PROGRAMME ? 'Unassigned programme' : programmeId;
+}
+
+function membershipsForProgramme(memberships: MembershipRow[], programmeId: string) {
+  return memberships.filter((membership) => programmeIds(membership).includes(programmeId));
+}
+
+function scopeMetrics(memberships: MembershipRow[], attempts: AttemptRow[]) {
+  const studentIds = new Set(memberships.map((row) => row.student_id));
+  const rows = attempts.filter((attempt) => studentIds.has(attempt.student_id));
+  const percentages = rows.map((row) => number(row.percentage));
+  const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
+  const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
+  const participants = new Set(rows.map((row) => row.student_id)).size;
+  return {
+    studentCount: studentIds.size,
+    completedTests: rows.length,
+    averageTestsPerStudent: studentIds.size ? rounded(rows.length / studentIds.size) : 0,
+    averagePercentage: average(percentages),
+    accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
+    participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
+    highestPercentage: percentages.length ? Math.max(...percentages) : null,
+    lowestPercentage: percentages.length ? Math.min(...percentages) : null,
+    lastTestAt: rows.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
+    rank: 0,
+  };
+}
+
+function rankScopeRows<T extends { averagePercentage: number | null; rank: number }>(rows: T[]) {
+  return [...rows]
+    .sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
 async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayload> {
   let organizationQuery = ctx.admin.from('organizations').select('id,name,city,state,board,status').neq('status', 'suspended').order('name');
   if (!ctx.actor.platformAdmin && ctx.actor.organizationId) organizationQuery = organizationQuery.eq('id', ctx.actor.organizationId);
@@ -279,7 +326,7 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
 
   const memberships = await paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .in('organization_id', organizationIds)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
@@ -353,7 +400,7 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     .order('name');
   if (ctx.actor.allowedSectionIds) {
     if (!ctx.actor.allowedSectionIds.length) {
-      return { mode: 'live', level: 'school', actor: ctx.actor, generatedAt: new Date().toISOString(), school, classes: [], evidence: { submittedAttempts: 0, classifiedResponses: 0, hasLiveEvidence: false } };
+      return { mode: 'live', level: 'school', actor: ctx.actor, generatedAt: new Date().toISOString(), school, programmes: [], classes: [], evidence: { submittedAttempts: 0, classifiedResponses: 0, hasLiveEvidence: false } };
     }
     sectionQuery = sectionQuery.in('id', ctx.actor.allowedSectionIds);
   }
@@ -393,12 +440,22 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     };
   }).sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }));
 
+  const programmeKeys = [...new Set(permittedMemberships.flatMap(programmeIds))].sort((a, b) => programmeLabel(a).localeCompare(programmeLabel(b)));
+  const programmes = rankScopeRows<InstitutionProgrammeRow>(programmeKeys.map((programmeId) => ({
+    id: programmeId,
+    organizationId,
+    name: programmeLabel(programmeId),
+    track: programmeId === UNASSIGNED_PROGRAMME ? null : programmeId,
+    ...scopeMetrics(membershipsForProgramme(permittedMemberships, programmeId), attempts),
+  })));
+
   return {
     mode: 'live',
     level: 'school',
     actor: ctx.actor,
     generatedAt: new Date().toISOString(),
     school,
+    programmes,
     classes,
     evidence: {
       submittedAttempts: attempts.length,
@@ -409,13 +466,71 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
   };
 }
 
-async function classStudents(ctx: CloudContext, section: SectionRow): Promise<{ memberships: MembershipRow[]; students: InstitutionStudentRow[]; attempts: AttemptRow[]; profiles: Map<string, string> }> {
-  const memberships = await paged<MembershipRow>((from, to) => ctx.admin
+async function programmeSnapshot(ctx: CloudContext, organizationId: string, programmeId: string): Promise<InstitutionAnalyticsPayload> {
+  const schoolPayload = await schoolClasses(ctx, organizationId);
+  const programme = (schoolPayload.programmes || []).find((row) => row.id === programmeId) || null;
+  if (!programme) throw Object.assign(new Error('Programme not found in the active school roster.'), { status: 404 });
+  const memberships = await membershipsForOrganization(ctx, organizationId);
+  const permitted = ctx.actor.allowedSectionIds
+    ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
+    : memberships;
+  const scoped = membershipsForProgramme(permitted, programmeId);
+  const attempts = await attemptsForStudents(ctx, [...new Set(scoped.map((row) => row.student_id))], organizationId);
+  const grades = rankScopeRows<InstitutionGradeRow>([...new Set(scoped.map((row) => row.grade))].sort((a, b) => a - b).map((grade) => ({
+    id: `${programmeId}:${grade}`,
+    organizationId,
+    programmeId,
+    programmeName: programme.name,
+    grade,
+    name: `Grade ${grade}`,
+    ...scopeMetrics(scoped.filter((row) => row.grade === grade), attempts),
+  })));
+  return {
+    mode: 'live', level: 'programme', actor: ctx.actor, generatedAt: new Date().toISOString(),
+    school: schoolPayload.school, programme, grades,
+    evidence: { submittedAttempts: attempts.length, classifiedResponses: 0, hasLiveEvidence: attempts.length > 0,
+      note: attempts.length ? undefined : 'Live programme roster loaded. Results will appear after students submit assessments.' },
+  };
+}
+
+async function gradeSnapshot(ctx: CloudContext, organizationId: string, programmeId: string, grade: number): Promise<InstitutionAnalyticsPayload> {
+  const programmePayload = await programmeSnapshot(ctx, organizationId, programmeId);
+  const gradeRow = (programmePayload.grades || []).find((row) => row.grade === grade) || null;
+  if (!gradeRow) throw Object.assign(new Error('Grade not found in the selected programme.'), { status: 404 });
+  const memberships = membershipsForProgramme(await membershipsForOrganization(ctx, organizationId), programmeId).filter((row) => row.grade === grade);
+  const permitted = ctx.actor.allowedSectionIds
+    ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
+    : memberships;
+  const attempts = await attemptsForStudents(ctx, [...new Set(permitted.map((row) => row.student_id))], organizationId);
+  let query = ctx.admin.from('academic_sections')
+    .select('id,organization_id,academic_year,grade,name,code')
+    .eq('organization_id', organizationId).eq('grade', grade).eq('is_active', true).order('name');
+  if (ctx.actor.allowedSectionIds) query = query.in('id', ctx.actor.allowedSectionIds);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const sections = rankScopeRows<InstitutionSectionRow>(((data || []) as SectionRow[])
+    .filter((section) => permitted.some((row) => row.section_id === section.id))
+    .map((section) => ({
+      id: section.id, organizationId, academicYear: section.academic_year, grade: section.grade,
+      name: section.name, code: section.code, programmeId, programmeName: programmeLabel(programmeId),
+      ...scopeMetrics(permitted.filter((row) => row.section_id === section.id), attempts),
+    })));
+  return {
+    mode: 'live', level: 'grade', actor: ctx.actor, generatedAt: new Date().toISOString(),
+    school: programmePayload.school, programme: programmePayload.programme, grade: gradeRow, sections,
+    evidence: { submittedAttempts: attempts.length, classifiedResponses: 0, hasLiveEvidence: attempts.length > 0,
+      note: attempts.length ? undefined : 'Live grade and section roster loaded. Results will appear after students submit assessments.' },
+  };
+}
+
+async function classStudents(ctx: CloudContext, section: SectionRow, programmeId?: string | null): Promise<{ memberships: MembershipRow[]; students: InstitutionStudentRow[]; attempts: AttemptRow[]; profiles: Map<string, string> }> {
+  const allMemberships = await paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .eq('section_id', section.id)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
+  const memberships = programmeId ? membershipsForProgramme(allMemberships, programmeId) : allMemberships;
   const studentIds = [...new Set(memberships.map((row) => row.student_id))];
   const attempts = await attemptsForStudents(ctx, studentIds, section.organization_id);
   const profiles = new Map<string, string>();
@@ -570,15 +685,21 @@ function classRowFromEvidence(section: SectionRow, students: InstitutionStudentR
   };
 }
 
-async function classSnapshot(ctx: CloudContext, sectionId: string): Promise<InstitutionAnalyticsPayload> {
+function sectionRowFromEvidence(section: SectionRow, students: InstitutionStudentRow[], attempts: AttemptRow[], programmeId: string): InstitutionSectionRow {
+  return { ...classRowFromEvidence(section, students, attempts), programmeId, programmeName: programmeLabel(programmeId), name: section.name };
+}
+
+async function classSnapshot(ctx: CloudContext, sectionId: string, programmeId?: string | null, outputLevel: 'section' | 'class' = 'section'): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = visibleTeacherSubjects(ctx, section.id, aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' }));
   const { data: school } = await ctx.admin.from('organizations').select('id,name,city,state,board').eq('id', section.organization_id).single();
   return {
     mode: 'live',
-    level: 'class', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    level: outputLevel, actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), students, subjects,
     scoreBands: scoreBands(students.map((row) => row.averagePercentage).filter((value): value is number => value !== null)),
     evidence: {
@@ -590,9 +711,9 @@ async function classSnapshot(ctx: CloudContext, sectionId: string): Promise<Inst
   };
 }
 
-async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: string): Promise<InstitutionAnalyticsPayload> {
+async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
   const subject = subjects.find((row) => row.id === subjectId) || null;
@@ -604,6 +725,7 @@ async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   return {
     mode: 'live',
     level: 'subject', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), subject, chapters,
     scoreBands: subject?.scoreBands || [],
     evidence: {
@@ -615,9 +737,9 @@ async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   };
 }
 
-async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string): Promise<InstitutionAnalyticsPayload> {
+async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
   const subject = subjects.find((row) => row.id === subjectId) || null;
@@ -631,6 +753,7 @@ async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   return {
     mode: 'live',
     level: 'chapter', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), subject, chapter, topics,
     scoreBands: chapter?.scoreBands || [],
     evidence: {
@@ -642,9 +765,31 @@ async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   };
 }
 
-async function studentSnapshot(ctx: CloudContext, studentId: string, sectionId: string): Promise<InstitutionAnalyticsPayload> {
+async function topicSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string, topicId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
+  const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
+  const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
+  const subject = subjects.find((row) => row.id === subjectId) || null;
+  if (subject && !teacherCanOpenSubject(ctx, section.id, subject.name)) throw Object.assign(new Error('This subject is not assigned to the signed-in teacher.'), { status: 403 });
+  const chapters = aggregateTaxonomy<InstitutionChapterRow>({ responses, attempts, students, level: 'chapter', subjectId });
+  const chapter = chapters.find((row) => row.id === chapterId) || null;
+  const topics = aggregateTaxonomy<InstitutionTopicRow>({ responses, attempts, students, level: 'topic', subjectId, chapterId });
+  const topic = topics.find((row) => row.id === topicId) || null;
+  const { data: school } = await ctx.admin.from('organizations').select('id,name,city,state,board').eq('id', section.organization_id).single();
+  return {
+    mode: 'live', level: 'topic', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
+    class: classRowFromEvidence(section, students, attempts), subject, chapter, topic, students,
+    scoreBands: topic?.scoreBands || [],
+    evidence: { submittedAttempts: attempts.length, classifiedResponses: responses.length, hasLiveEvidence: Boolean(topic && responses.length),
+      note: topic ? undefined : 'No submitted response evidence is available for this topic yet.' },
+  };
+}
+
+async function studentSnapshot(ctx: CloudContext, studentId: string, sectionId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
+  const section = await ensureSectionAccess(ctx, sectionId);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const student = students.find((row) => row.id === studentId);
   if (!student) throw Object.assign(new Error('The selected student is not part of this class.'), { status: 404 });
   const { data: school } = await ctx.admin
@@ -678,13 +823,23 @@ export async function GET(request: Request) {
     if (level === 'schools') return NextResponse.json(await schoolList(ctx), { headers: { 'Cache-Control': 'no-store' } });
     if (!organizationId) throw Object.assign(new Error('Choose a school.'), { status: 400 });
     if (level === 'school') return NextResponse.json(await schoolClasses(ctx, organizationId), { headers: { 'Cache-Control': 'no-store' } });
+    const programmeId = params.get('programme') || '';
+    if (level === 'programme') return NextResponse.json(await programmeSnapshot(ctx, organizationId, programmeId), { headers: { 'Cache-Control': 'no-store' } });
+    const requestedGrade = Number(params.get('grade'));
+    if (level === 'grade') {
+      if (!Number.isInteger(requestedGrade)) throw Object.assign(new Error('Choose a valid grade.'), { status: 400 });
+      return NextResponse.json(await gradeSnapshot(ctx, organizationId, programmeId, requestedGrade), { headers: { 'Cache-Control': 'no-store' } });
+    }
     const sectionId = params.get('sectionId') || '';
-    if (level === 'class') return NextResponse.json(await classSnapshot(ctx, sectionId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'section') return NextResponse.json(await classSnapshot(ctx, sectionId, programmeId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'class') return NextResponse.json(await classSnapshot(ctx, sectionId, programmeId || null, 'class'), { headers: { 'Cache-Control': 'no-store' } });
     const subjectId = params.get('subjectId') || '';
-    if (level === 'subject') return NextResponse.json(await subjectSnapshot(ctx, sectionId, subjectId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'subject') return NextResponse.json(await subjectSnapshot(ctx, sectionId, subjectId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
     const chapterId = params.get('chapterId') || '';
-    if (level === 'chapter') return NextResponse.json(await chapterSnapshot(ctx, sectionId, subjectId, chapterId), { headers: { 'Cache-Control': 'no-store' } });
-    if (level === 'student') return NextResponse.json(await studentSnapshot(ctx, params.get('studentId') || '', sectionId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'chapter') return NextResponse.json(await chapterSnapshot(ctx, sectionId, subjectId, chapterId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
+    const topicId = params.get('topicId') || '';
+    if (level === 'topic') return NextResponse.json(await topicSnapshot(ctx, sectionId, subjectId, chapterId, topicId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'student') return NextResponse.json(await studentSnapshot(ctx, params.get('studentId') || '', sectionId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
     throw Object.assign(new Error('Unsupported analytics level.'), { status: 400 });
   } catch (error) {
     return failure(error);
