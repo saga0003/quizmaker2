@@ -5,12 +5,15 @@ text = checklist.read_text()
 lines = text.splitlines()
 for key in ('H7', 'H8', 'H9'):
     found = False
+    prefix = f'- [ ] {key} '
     for i, line in enumerate(lines):
-        if f'**{key}**' in line:
+        if line.startswith(prefix):
             lines[i] = line.replace('- [ ]', '- [x]', 1)
             found = True
             break
     if not found:
+        if any(line.startswith(f'- [x] {key} ') for line in lines):
+            continue
         raise SystemExit(f'Could not find checklist item {key}')
 checklist.write_text('\n'.join(lines) + '\n')
 
@@ -30,9 +33,9 @@ entry = r'''
 - **Complete CI / release gate:** GitHub Actions run `33556565584` **PASS**, 2026-09-02 02:09:08–02:12:25 IST, approximately **3m17s**. TypeScript, lint, all Phase 1 hardening/regressions, production build and final gate enforcement passed.
 - **Vercel state:** permanent production remained protected and unchanged; production error/fatal runtime-log query for the preceding 24 hours returned no matching logs. No promotion was performed.
 - **Supabase state:** `SMIS QP` and `NatSciX Online Test` both **ACTIVE_HEALTHY**; no database mutation was performed.
-- **Rework/failures/blockers:** the first rendered H9 attempt exposed two QA-harness defects (axe context and server/client event-handler boundary). After repairing those, rendered acceptance exposed genuine 40px touch targets. Shared controls and global CSS were corrected to 44px and the final browser/full-gate candidate passed. Two temporary inline recorder workflows were rejected before creating jobs, so recording was retried through the repository's previously valid recorder pattern; this was documentation tooling rework, not a product failure.
+- **Rework/failures/blockers:** the first rendered H9 attempt exposed two QA-harness defects (axe context and server/client event-handler boundary). After repairing those, rendered acceptance exposed genuine 40px touch targets. Shared controls and global CSS were corrected to 44px and the final browser/full-gate candidate passed. Two temporary inline recorder workflows were rejected before creating jobs, and one canonical recorder attempt used the wrong checklist token; this was documentation tooling rework, not a product failure.
 - **Branch head at handoff:** documentation/cleanup head after the verified functional candidate; permanent production remains unchanged.
-- **Items still pending:** Section I (I1–I3; I4 already verified), Section J, real-school acceptance, load acceptance and final production sign-off.
+- **Items still pending:** Section I (I1–I3 and I5–I7; I4 already verified), Section J, real-school acceptance, load acceptance and final production sign-off.
 - **Progress:** Section H **9/9 = 100%**; overall Phase 1 **86/129 = 66.7% verified**.
 - **Exact next action:** begin **I1** by implementing/verifying the School Admin Audit & Health workspace; continue directly into **I2** deployment/database/storage/import/exam health statuses and **I3** PostgreSQL-side usage counts, each with permanent regression coverage and the complete release gate before checkmarking.
 '''
