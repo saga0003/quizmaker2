@@ -10,7 +10,7 @@ export type InstitutionMobileMetric = {
 export type InstitutionMobileCard = {
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle?: string | null;
   badge?: string;
   metrics: InstitutionMobileMetric[];
   onOpen?: () => void;
