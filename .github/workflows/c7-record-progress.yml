@@ -1,4 +1,4 @@
-name: Record F3 hourly heartbeat
+name: Record F3 F4 verified progress
 on:
   push:
     branches:
@@ -15,27 +15,33 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Append F3 heartbeat
+      - name: Record F3 F4 verification and heartbeat
         shell: python {0}
         run: |
           from pathlib import Path
-          import re, subprocess
-          checklist=Path('PHASE1_RELEASE_CHECKLIST.md').read_text()
+          import re, subprocess, datetime
+          cp=Path('PHASE1_RELEASE_CHECKLIST.md')
+          checklist=cp.read_text()
+          f3='- [ ] F3 Empty state must be `— / Not assessed`, not a misleading 0%.'
+          f3_new='- [x] F3 Empty state must be `— / Not assessed`, not a misleading 0%. — Verified 1 Sep 2026: missing analytics denominators remain null and render `— / Not assessed` across the affected hierarchy/chart surfaces while genuine measured zero remains `0%`; permanent 15-point `f3-not-assessed-smoke.mjs` is enforced in the release gate. F3 source commit `1bca668e2580dea00c6773b9528b9bca506f6a1d` is contained in descendant release-gate run `33493732256`, which passed the complete Phase-1 gate.'
+          f4='- [ ] F4 Student drill-down: Student → Subject → Chapter → Topic → Question.'
+          f4_new='- [x] F4 Student drill-down: Student → Subject → Chapter → Topic → Question. — Verified 1 Sep 2026: the institution student detail embeds the live analytics workspace, Subject opens Chapter, Chapter opens Topic, and Topic opens Question Intelligence backed by the already-authorized `question_evidence` payload. Question rows are exact-topic scoped and show assessment/question identity, question text, canonical Correct/Incorrect/Unanswered outcome, awarded marks and recorded time; empty evidence fails honestly with no synthetic rows. Product commit `e60943eccbb87b1af4b5c3e76946ca797733dda2`; permanent 13-point `f4-student-question-drilldown-smoke.mjs`; final candidate `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a` passed complete release gate `33498871986` in about 2m29s after two stale legacy regression expectations were updated to the new authorized-evidence contract.'
+          if f3 in checklist: checklist=checklist.replace(f3,f3_new,1)
+          if f4 in checklist: checklist=checklist.replace(f4,f4_new,1)
+          cp.write_text(checklist)
           log=Path('PHASE1_PROGRESS_LOG.md')
           body=log.read_text()
-          marker='## 2026-09-01 15:00:07 IST — F3 denominator-aware analytics implementation / hourly heartbeat'
-          items=re.findall(r'^- \[([ x])\]', checklist, re.M)
-          done=sum(v=='x' for v in items); total=len(items)
-          fm=re.search(r'^# F —.*?(?=^# G —)', checklist, re.M|re.S)
-          fi=re.findall(r'^- \[([ x])\]', fm.group(0), re.M) if fm else []
-          fd=sum(v=='x' for v in fi)
+          marker='## 2026-09-01 15:58:37 IST — F3/F4 analytics verification / hourly heartbeat'
+          items=re.findall(r'^- \[([ x])\]', checklist, re.M); done=sum(v=='x' for v in items); total=len(items)
+          fm=re.search(r'^# F —.*?(?=^# G —)', checklist, re.M|re.S); fi=re.findall(r'^- \[([ x])\]', fm.group(0), re.M) if fm else []; fd=sum(v=='x' for v in fi)
           head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-          entry=f'''\n\n{marker}\n\n- **Run start/end:** 2026-09-01 15:00:07 IST → approximately 15:13 IST.\n- **Active engineering/review span:** approximately **13 minutes** in the observable execution window. The requested 45–50 minute target was not met because the available automation/tool window was materially shorter; no idle padding was added.\n- **Section worked:** F — Analytics and reporting; active item F3.\n- **Checklist items completed this run:** none yet. F3 remains intentionally unchecked until the exact cleanup candidate passes the complete release gate.\n- **Items still pending in active section:** F3 final complete-gate acceptance, then F4 onward.\n- **Branch head at heartbeat source:** `{{head}}`; F3 product commit `1bca668e2580dea00c6773b9528b9bca506f6a1d`; release-gate wiring commit `093f14bc7db89d772643d3f5c391442cbe466883`; cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf`.\n- **Commits created:** staging/rework `0e7d1c64055a4c1e77323f5ce4fcf3dbeb353fbc`, `bb2f07d0f8ad4a3399bba6e06143a022aeba08cb`, `221858a3cedb552890c13e9272146aadd3d0c084`, `5346f347f87514e3982faa084eb3ed83481aeb2c`; product `1bca668e2580dea00c6773b9528b9bca506f6a1d`; gate `093f14bc7db89d772643d3f5c391442cbe466883`; cleanup `57d8c6c4ff642bde93d8272ccba3322316baacaf`; plus this recorder staging commit.\n- **Implementation result:** missing analytics evidence now remains null and renders `— / Not assessed` rather than `0%` in legacy launch/demo hierarchy, subject donuts, topic bars and no-student derived-rate surfaces; genuine measured zero remains `0%`. Permanent `f3-not-assessed-smoke.mjs` has 15 assertions and is wired into the complete release gate.\n- **CI run/result:** the guarded patch passed all **15/15** F3 checks. Initial source-patch workflow attempts failed before product publication due YAML/workflow-token permission boundaries and were reworked safely. Final complete release gate `33493636272` on cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf` was **in progress** at heartbeat time, so F3 was not checked prematurely.\n- **Vercel state:** production project `quizmaker2` had **no error/fatal runtime logs in the preceding 24 hours**. No production deployment/promotion was attempted.\n- **Supabase state:** project `xzfozpnzvznqrvcsoail` is **ACTIVE_HEALTHY**. F3 required no database migration or mutation.\n- **Rework/failures/blockers:** the first embedded staging workflow was rejected with zero jobs; the simplified workflow then proved the F3 patch and 15/15 smoke, but its push was rejected because the workflow token cannot modify release workflows. Product and workflow-wiring commits were separated; no failed attempt changed production. No user-input blocker remains.\n- **Section progress:** F remains {{fd}}/{{len(fi)}} verified (**{{(100*fd/len(fi) if fi else 0):.1f}}%**) until F3 gate completes.\n- **Overall Phase 1 percentage:** {{done}}/{{total}} verified (**{{(100*done/total if total else 0):.1f}}%**) until F3 is formally accepted.\n- **Exact next action:** inspect release gate `33493636272`; if PASS, mark F3 verified with exact gate evidence and immediately start F4. If it fails, fix the failing regression/type/build issue before any checklist update.\n'''
-          if marker not in body:
-            log.write_text(body.rstrip()+entry)
-      - name: Commit heartbeat
+          now=datetime.datetime.utcnow()+datetime.timedelta(hours=5,minutes=30)
+          end=now.strftime('%H:%M')
+          entry=f'''\n\n{marker}\n\n- **Run start/end:** 2026-09-01 15:58:37 IST → approximately {end} IST.\n- **Active engineering/review span:** approximately **17 minutes** of observable inspect/audit/implementation/rework/verification. The requested 45–50 minute target was not met because this automation execution window was materially shorter; no idle padding was added.\n- **Section worked:** F — Analytics and reporting; F3 acceptance and F4 student drill-down.\n- **Checklist items completed:** **F3 and F4**.\n- **Items still pending in active section:** F5–F13.\n- **Starting branch head:** `caf3fa32f70a7a10f2506a5488620cf80918dce2`. **Recorder source head:** `{{head}}`.\n- **Commits created/relevant:** F4 staging `92258d1e4dd417c6785774d74ee1401743d45318`; product `e60943eccbb87b1af4b5c3e76946ca797733dda2`; gate wiring `7fe05f2abcc91b2c242311bc8d4eabcb3ecdf054`; temporary-workflow cleanup `85276c9195c67a5bee4a0bd8784425ce0998a782`; stale-regression alignment `e86fb9718855bd225b3a7a268afa99e42ea46e3d` and final candidate `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a`; plus this recorder commit.\n- **Implementation result:** F3 is accepted on prior complete-gate evidence. F4 now provides the required Student → Subject → Chapter → Topic → Question path using the existing authorized analytics payload rather than a new/raw response data path. Question Intelligence is selected-topic scoped, bounded to the latest 150 evidence rows, and displays exact assessment/question, canonical outcome, marks and time.\n- **CI:** F3 descendant full gate `33493732256` — PASS. F4 first exact full gate `33498556903` correctly failed only two stale legacy assertions that required the old question-unavailable placeholder. Those assertions were reworked to enforce the real authorized-evidence contract. Final exact release gate `33498871986` on `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a` — **PASS**, about **2m29s**, including F4 13/13, TypeScript, lint, every regression, production build and final enforcement.\n- **Vercel:** permanent production had **no error/fatal runtime logs in the preceding 24h** and was not promoted. The F4 gate-wiring preview (`7fe05f2...`, deployment `dpl_3zxA4yFv2ehKhCTSt8QHqcBF29HH`) is READY; rapid intermediate previews were cancelled normally by newer pushes.\n- **Supabase:** production app project remained healthy; read-only snapshot showed **2,841 questions, 4 papers, 1 exam attempt and 1 response**. No database mutation was required for F3/F4.\n- **Rework/failures/blockers:** the first clean F4 gate surfaced two obsolete regression expectations tied to the former honest-but-placeholder Question Intelligence state. Product/TypeScript/lint/build were already green. Both tests were updated to verify authorized `question_evidence` and no synthetic rows; final gate passed. No user-input blocker.\n- **Section progress:** F is {{fd}}/{{len(fi)}} verified (**{{(100*fd/len(fi) if fi else 0):.1f}}%**).\n- **Overall Phase 1:** {{done}}/{{total}} verified (**{{(100*done/total if total else 0):.1f}}%**).\n- **Exact next action:** F5 — standardize each analytics taxonomy row/card to expose the full evidence set: exposure, Attempted (`correct + incorrect`), correct, incorrect, unanswered, Accuracy, Score %, time, trend and evidence count. Preserve `row.attempts` as response-record/evidence count rather than mislabelling it Attempted; add a permanent F5 regression and require a complete release-gate PASS before checking F5.\n'''
+          if marker not in body: log.write_text(body.rstrip()+entry)
+      - name: Commit verified progress
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git add PHASE1_PROGRESS_LOG.md
-          git diff --cached --quiet || (git commit -m "docs(f3): record denominator-aware analytics heartbeat" && git push origin HEAD:phase1-hardening)
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
+          git diff --cached --quiet || (git commit -m "docs(f4): record verified analytics drilldown" && git push origin HEAD:phase1-hardening)
