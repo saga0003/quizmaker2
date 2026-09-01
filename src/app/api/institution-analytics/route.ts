@@ -699,7 +699,6 @@ async function classSnapshot(ctx: CloudContext, sectionId: string, programmeId?:
     mode: 'live',
     level: outputLevel, actor: ctx.actor, generatedAt: new Date().toISOString(), school,
     section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
-    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), students, subjects,
     scoreBands: scoreBands(students.map((row) => row.averagePercentage).filter((value): value is number => value !== null)),
     evidence: {
