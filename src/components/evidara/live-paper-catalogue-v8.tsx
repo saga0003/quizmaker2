@@ -10,6 +10,7 @@ ChevronDown,
 ChevronUp,
 CircleStop,
 Clock3,
+CopyPlus,
 Edit3,
 Eraser,
 Eye,
@@ -317,6 +318,7 @@ const [chapters, setChapters] = useState<TaxonomyChapter[]>([]);
 const [topics, setTopics] = useState<TaxonomyTopic[]>([]);
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
+const [cloningPaperId, setCloningPaperId] = useState('');
 const [error, setError] = useState('');
 const [message, setMessage] = useState('');
 const [search, setSearch] = useState('');
@@ -793,6 +795,24 @@ return;
 setMessage(`Paper moved to ${statusLabel(status)}.`);
 await load();
 }
+async function cloneAsNewVersion(paper: PaperListRow) {
+if (!supabase) return;
+setCloningPaperId(paper.id);
+setError('');
+setMessage('');
+const { data, error: cloneError } = await supabase.rpc('clone_paper_as_new_version_v1', {
+p_source_paper_id: paper.id,
+p_title: null,
+});
+setCloningPaperId('');
+if (cloneError) {
+setError(cloneError.message);
+return;
+}
+const clone = data as { title?: string; version_number?: number } | null;
+setMessage(`Created ${clone?.title || 'a new draft version'}. Audience and publication state were reset.`);
+await load();
+}
 async function confirmDelete() {
 if (!supabase || !deleteTarget) return;
 setSaving(true);
@@ -934,6 +954,7 @@ className="h-11 border-[var(--line)] pl-9"
 <TableCell><Badge variant="outline" className={statusClass(paper.status)}>{statusLabel(paper.status)}</Badge></TableCell>
 <TableCell className="text-right">
 <div className="flex justify-end gap-1">
+<Button variant="ghost" size="icon" title="Clone as new version" disabled={cloningPaperId === paper.id} onClick={() => void cloneAsNewVersion(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]">{cloningPaperId === paper.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CopyPlus className="h-4 w-4" />}</Button>
 <Button variant="ghost" size="icon" title="Edit paper" onClick={() => void openEdit(paper)} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><Edit3 className="h-4 w-4" /></Button>
 {paper.status === 'under_review' && canApprove && (
 <>
