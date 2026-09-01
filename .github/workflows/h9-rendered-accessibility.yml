@@ -1,0 +1,108 @@
+name: H9 Rendered Accessibility Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+
+permissions:
+  contents: read
+
+jobs:
+  rendered-accessibility:
+    if: contains(github.event.head_commit.message, 'run H9 rendered accessibility')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Add isolated accessibility QA route
+        shell: bash
+        run: |
+          mkdir -p src/app/h9-a11y-qa
+          cat > src/app/h9-a11y-qa/page.tsx <<'EOF'
+          import { Phase1AsyncState, Phase1Card, Phase1FilterBar, Phase1PageHeading, Phase1TableFrame } from '@/components/evidara/phase1-ui';
+          import { InstitutionMobileCards } from '@/components/institution-analytics/institution-mobile-cards';
+          import { Button } from '@/components/ui/button';
+          import { Input } from '@/components/ui/input';
+
+          export default function H9A11yQA() {
+            const records = [{ id: 'student-1', title: 'Ananya Narayan Rao', subtitle: 'Grade 11 · Section Alpha', badge: '#1', metrics: [{ label: 'Tests', value: 12 }, { label: 'Accuracy', value: '78.4%' }], onOpen: () => {} }];
+            return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-8">
+              <Phase1PageHeading title="Institution accessibility acceptance" description="Keyboard, labels, contrast, touch targets and status semantics." actions={<Button>Export report</Button>} />
+              <Phase1FilterBar label="Analytics accessibility filters">
+                <label className="grid gap-1 text-sm"><span>Search student</span><Input aria-label="Search student" placeholder="Search student" /></label>
+                <label className="grid gap-1 text-sm"><span>Grade</span><select aria-label="Grade" className="min-h-11 rounded-md border bg-background px-3"><option>Grade 11</option></select></label>
+                <Button>Apply filters</Button>
+              </Phase1FilterBar>
+              <Phase1Card><p>Measured evidence only. Missing evidence is shown as Not assessed rather than zero.</p></Phase1Card>
+              <InstitutionMobileCards rows={records} emptyMessage="No students in scope." />
+              <Phase1TableFrame label="Accessible evidence table"><table className="min-w-[720px]"><thead><tr><th className="p-2 text-left">Student</th><th className="p-2 text-left">Status</th></tr></thead><tbody><tr><td className="p-2">Ananya Narayan Rao</td><td className="p-2">Assessed</td></tr></tbody></table></Phase1TableFrame>
+              <Phase1AsyncState state="loading" title="Loading measured evidence" description="Results are being refreshed from submitted assessments." />
+              <Phase1AsyncState state="error" title="Could not refresh analytics" description="Existing results remain unchanged. Retry when connectivity returns." action={<Button>Retry analytics</Button>} />
+            </main>;
+          }
+          EOF
+      - name: Install browser and axe runtime
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.55.0 @axe-core/playwright@4.10.2
+          npx playwright install --with-deps chromium
+      - name: Start application
+        shell: bash
+        run: |
+          npm run dev -- --hostname 127.0.0.1 > /tmp/h9-next.log 2>&1 &
+          for i in {1..90}; do if curl -fsS http://127.0.0.1:3000/h9-a11y-qa >/dev/null; then exit 0; fi; sleep 1; done
+          cat /tmp/h9-next.log
+          exit 1
+      - name: Run rendered accessibility acceptance
+        shell: bash
+        run: |
+          mkdir -p h9-a11y-artifacts
+          cat > h9-a11y.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import AxeBuilder from '@axe-core/playwright';
+          import fs from 'node:fs';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:390,height:844}, hasTouch:true});
+          await page.goto('http://127.0.0.1:3000/h9-a11y-qa', {waitUntil:'networkidle'});
+          const axe = await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+          const serious = axe.violations.filter(v => ['serious','critical'].includes(v.impact || ''));
+          const metrics = await page.evaluate(() => {
+            const touch = [...document.querySelectorAll('[data-slot="button"], [data-slot="input"], select')].map((el) => { const r=el.getBoundingClientRect(); return {tag:el.tagName,label:el.getAttribute('aria-label') || el.textContent?.trim() || '',width:r.width,height:r.height}; });
+            const unnamed = [...document.querySelectorAll('input,select,button')].filter((el) => {
+              const labelled = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby');
+              const text = (el.textContent || '').trim();
+              const id = el.getAttribute('id');
+              const explicit = id ? document.querySelector(`label[for="${id}"]`) : null;
+              const wrapped = el.closest('label');
+              return !labelled && !text && !explicit && !wrapped;
+            }).length;
+            const statuses = [...document.querySelectorAll('[role="status"],[role="alert"]')].map(el => ({role:el.getAttribute('role'),live:el.getAttribute('aria-live'),text:(el.textContent||'').trim()}));
+            return {touch,unnamed,statuses};
+          });
+          const undersized = metrics.touch.filter(x => x.width < 44 || x.height < 44);
+          await page.keyboard.press('Tab');
+          const focus = await page.evaluate(() => { const el=document.activeElement; if (!el) return null; const s=getComputedStyle(el); return {tag:el.tagName,outline:s.outlineStyle,outlineWidth:s.outlineWidth,boxShadow:s.boxShadow}; });
+          const visibleFocus = focus && ((focus.outline !== 'none' && focus.outlineWidth !== '0px') || focus.boxShadow !== 'none');
+          const report = {serious,metrics,undersized,focus,visibleFocus};
+          fs.writeFileSync('h9-a11y-artifacts/report.json', JSON.stringify(report,null,2));
+          await page.screenshot({path:'h9-a11y-artifacts/390.png', fullPage:true});
+          console.log(JSON.stringify(report,null,2));
+          await browser.close();
+          if (serious.length || metrics.unnamed || undersized.length || !visibleFocus || metrics.statuses.length < 2 || metrics.statuses.some(s => !s.text)) process.exit(1);
+          EOF
+          node h9-a11y.mjs
+      - name: Upload accessibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h9-rendered-accessibility
+          path: h9-a11y-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/h9-next.log || true
