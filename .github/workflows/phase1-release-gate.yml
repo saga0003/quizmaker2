@@ -130,6 +130,8 @@ jobs:
         run: node scripts/f8-institution-drilldown-smoke.mjs
       - name: F9 teacher needs-attention checks
         run: node scripts/f9-teacher-needs-attention-smoke.mjs
+      - name: F10 raw response evidence scope checks
+        run: node scripts/f10-raw-response-evidence-smoke.mjs
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
