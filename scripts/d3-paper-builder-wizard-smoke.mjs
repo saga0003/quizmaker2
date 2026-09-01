@@ -21,7 +21,12 @@ check('wizard exposes Phase 1 labels in required order', () => {
 });
 check('new and edit flows start at Details', () => {
   assert.ok(source.includes('function resetBuilder() {\nsetBuilderStep(1);'));
-  assert.ok(source.includes('async function openEdit(paper: PaperListRow) {\nif (!supabase) return;\nsetBuilderStep(1);'));
+  const editStart = source.indexOf('async function openEdit(paper: PaperListRow) {');
+  assert.ok(editStart >= 0);
+  const editHydration = source.indexOf("supabase.from('question_papers')", editStart);
+  assert.ok(editHydration > editStart);
+  const editPrelude = source.slice(editStart, editHydration);
+  assert.ok(editPrelude.includes('setBuilderStep(1);'));
 });
 check('Questions remains the dedicated selection step', () => {
   assert.ok(source.includes('{builderStep === 2 && ('));
