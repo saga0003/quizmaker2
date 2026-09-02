@@ -1,0 +1,69 @@
+name: R11 Score-only Reflection Patch
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/r11-score-only-reflection-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Guard and patch score-only reflection flow
+        shell: python
+        run: |
+          from pathlib import Path
+
+          live_exam = Path('src/components/papers/LiveExam.tsx')
+          text = live_exam.read_text()
+          old = """    persistPending(payload.attempt_id, {});\n    setResult(data as AttemptResult);\n    setReflectionOpen(true);\n    setSubmitting(false);"""
+          new = """    persistPending(payload.attempt_id, {});\n    const submittedResult = data as AttemptResult;\n    setResult(submittedResult);\n    setReflectionOpen(submittedResult.answers_released === true);\n    setSubmitting(false);"""
+          if old not in text:
+              raise SystemExit('LiveExam submit guard not found')
+          text = text.replace(old, new, 1)
+
+          old = """            {!reflectionOpen && (\n              <button"""
+          new = """            {result.answers_released === true && !reflectionOpen && (\n              <button"""
+          if old not in text:
+              raise SystemExit('LiveExam reflection action guard not found')
+          text = text.replace(old, new, 1)
+
+          old = """        {reflectionOpen && (\n          <PostTestErrorClassification"""
+          new = """        {result.answers_released === true && reflectionOpen && (\n          <PostTestErrorClassification"""
+          if old not in text:
+              raise SystemExit('LiveExam reflection component guard not found')
+          text = text.replace(old, new, 1)
+          live_exam.write_text(text)
+
+          results = Path('src/components/evidara/student-live-views.tsx')
+          text = results.read_text()
+          old = """                            <button\n                              type=\"button\"\n                              className=\"mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline\"\n                              onClick={() => {\n                                setReflectionNotice('');\n                                setReflectionAttemptId(result.attempt_id);\n                              }}\n                            >\n                              <ListChecks className=\"h-3.5 w-3.5\" />\n                              {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}\n                            </button>"""
+          new = """                            {result.answers_released === true && (\n                              <button\n                                type=\"button\"\n                                className=\"mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline\"\n                                onClick={() => {\n                                  setReflectionNotice('');\n                                  setReflectionAttemptId(result.attempt_id);\n                                }}\n                              >\n                                <ListChecks className=\"h-3.5 w-3.5\" />\n                                {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}\n                              </button>\n                            )}"""
+          if old not in text:
+              raise SystemExit('StudentResults reflection action block not found')
+          text = text.replace(old, new, 1)
+          results.write_text(text)
+      - name: Verify guarded source contract
+        run: |
+          grep -q "setReflectionOpen(submittedResult.answers_released === true)" src/components/papers/LiveExam.tsx
+          grep -q "result.answers_released === true && !reflectionOpen" src/components/papers/LiveExam.tsx
+          grep -q "result.answers_released === true && reflectionOpen" src/components/papers/LiveExam.tsx
+          grep -q "result.answers_released === true && (" src/components/evidara/student-live-views.tsx
+          npm ci
+          npm run typecheck -- --incremental false
+          npm run lint -- src/components/papers/LiveExam.tsx src/components/evidara/student-live-views.tsx
+      - name: Commit R11 product fix
+        run: |
+          git config user.name "evidara-phase1-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/papers/LiveExam.tsx src/components/evidara/student-live-views.tsx
+          git commit -m "fix(r11): respect answer-release policy for reflection"
+          git push origin HEAD:phase1-hardening
