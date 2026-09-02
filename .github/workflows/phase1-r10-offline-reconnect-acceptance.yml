@@ -5,6 +5,7 @@ on:
     branches: [phase1-hardening]
     paths:
       - .github/workflows/phase1-r10-offline-reconnect-acceptance.yml
+      - scripts/phase1-r10-offline-reconnect-acceptance.mjs
       - .phase1-r10-trigger
 
 permissions:
@@ -21,6 +22,7 @@ jobs:
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
       EVIDARA_ACCEPTANCE_URL: http://127.0.0.1:3000
       EVIDARA_ACCEPTANCE_LOCALHOST: YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY
+      EVIDARA_ACCEPTANCE_ATTEMPT_ID: d970d756-f56c-4e9a-9057-f2c775658719
       EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
       EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
@@ -43,7 +45,8 @@ jobs:
           test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
           test "$EVIDARA_ACCEPTANCE_URL" = "http://127.0.0.1:3000"
           test "$EVIDARA_ACCEPTANCE_LOCALHOST" = "YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY"
-          echo "R10 target is isolated localhost against the synthetic acceptance tenant only."
+          test "$EVIDARA_ACCEPTANCE_ATTEMPT_ID" = "d970d756-f56c-4e9a-9057-f2c775658719"
+          echo "R10 target is isolated localhost against the preserved synthetic acceptance attempt only."
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
