@@ -1,4 +1,4 @@
-name: Apply canonical F6 F7 analytics thresholds
+name: Record Phase 1 security acceptance heartbeat
 on:
   push:
     branches:
@@ -8,27 +8,60 @@ on:
 permissions:
   contents: write
 jobs:
-  apply:
+  record:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Align canonical patch anchor
-        run: sed -i "s/#9cabb7/#94A3B8/g" scripts/f6-f7-canonical-apply.py
-      - name: Apply canonical F6 F7 patch
-        run: python scripts/f6-f7-canonical-apply.py
-      - name: Run canonical F6 smoke
-        run: node scripts/f6-topic-evidence-threshold-smoke.mjs
-      - name: Run canonical F7 smoke
-        run: node scripts/f7-percentile-cohort-smoke.mjs
-      - name: Commit canonical H7 H8 H9 record
+      - name: Record canonical checkpoint
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text(encoding='utf-8')
+          old = "anonymous access is limited to a documented nine-RPC compatibility/read/lead allowlist (`create_institute`, username availability and legacy public catalogue reads)."
+          new = "anonymous access was originally limited to a documented compatibility/read/lead allowlist; follow-up hardening candidate `b1a099b8570ff2ba07eefd7aef51f5e066b27a96` removes `create_institute` from anonymous access because it is authenticated institution onboarding, while preserving intentional username-availability and legacy public catalogue reads."
+          if old in text:
+              text = text.replace(old, new, 1)
+              checklist.write_text(text, encoding='utf-8')
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          marker = '## 2026-09-02 09:57:48 IST — security acceptance checkpoint / hourly heartbeat'
+          body = log.read_text(encoding='utf-8')
+          if marker not in body:
+              entry = '''
+## 2026-09-02 09:57:48 IST — security acceptance checkpoint / hourly heartbeat
+
+- **Run start/end:** 2026-09-02 09:57:48 IST → approximately 10:01 IST.
+- **Active engineering/review span:** approximately **3 minutes** of branch/checklist/log reconciliation, exact release-gate verification, Vercel production/preview health inspection, live Supabase permission verification and security-advisor review. The requested 45–50 minute productive target was **not met because this automation execution window was materially shorter**; no artificial padding was added.
+- **Section worked:** production-sign-off security / acceptance readiness after Section J engineering completion.
+- **Checklist items completed:** none. J3 remains externally gated by qualified legal approval; R1–R18 and L1–L6 remain pending genuine acceptance execution.
+- **Starting branch head:** `b1a099b8570ff2ba07eefd7aef51f5e066b27a96`.
+- **Commits created:** this recorder/workflow update plus its documentation heartbeat commit; no functional product code change and no production/database mutation.
+- **CI:** complete Phase 1 release gate `33587887273` on exact security candidate `b1a099b8570ff2ba07eefd7aef51f5e066b27a96` is now confirmed **PASS**, approximately **2m06s** wall-clock. The matching Vercel preview is READY.
+- **Vercel state:** permanent production remains protected and unchanged; the preceding 24-hour runtime error inspection returned **no runtime errors**.
+- **Supabase state:** both connected projects reported `ACTIVE_HEALTHY`. Live `SMIS QP` verification confirmed `public.create_institute(text,text,text,text,text,text)` is still executable by both `anon` and `authenticated`, proving the staged revocation has not been applied to production. The second connected project does not contain that function. Security advisors still report leaked-password protection disabled.
+- **Rework/failures/blockers:** no safe dedicated non-production Evidara Supabase acceptance tenant was identified, so the staged RPC revocation and L1–L6 load suite were not applied against production. J3 requires qualified legal review; R1–R18 require authorized real-school operators/data; leaked-password protection remains a final security setting blocker. Broader SECURITY DEFINER/RLS advisor findings require scoped review and must not be bulk-revoked blindly.
+- **Active section completion:** Section J remains **4/5 = 80%**.
+- **Overall Phase 1 percentage:** **96/129 = 74.4% verified**.
+- **Permanent production protection:** maintained; no promotion occurred.
+- **Exact next action:** provision or identify an isolated non-production Evidara acceptance Supabase environment tied to the exact green candidate; apply and verify the staged `create_institute` anonymous-execute revocation there (`anon=false`, `authenticated=true`), resolve leaked-password protection before sign-off, then execute L1–L6 with synthetic identities and predeclared budgets while J3 legal and R1–R18 real-school acceptance proceed independently.
+'''
+              log.write_text(body.rstrip() + '\n\n' + entry.lstrip(), encoding='utf-8')
+          PY
+      - name: Commit canonical record
+        shell: bash
         run: |
           git config user.name "Evidara Hardening Bot"
           git config user.email "sagar@smis.edu.in"
-          git rm -f scripts/f6-f7-canonical-apply.py
           git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
-          git commit -m "docs: record H7-H9 verification"
+          if git diff --cached --quiet; then
+            echo "Checkpoint already recorded."
+            exit 0
+          fi
+          git commit -m "docs(phase1): record security acceptance checkpoint"
           git push origin HEAD:phase1-hardening
-# canonical recorder retry after checklist-token correction
