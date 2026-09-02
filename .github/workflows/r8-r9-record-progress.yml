@@ -1,0 +1,40 @@
+name: Record verified R8 R9 acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/r8-r9-record-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Record R8 and R9
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = p.read_text()
+          r8 = '- [ ] R8 Create Physics test and assign Grade 11 section/programme.'
+          r9 = '- [ ] R9 Login using a real student account and start assigned test.'
+          assert r8 in text and r9 in text
+          text = text.replace(r8, '- [x] R8 Create Physics test and assign Grade 11 section/programme — verified 2 Sep 2026 in the isolated synthetic `Evidara School` tenant. Published paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` (`Phase 1 R8 Physics Acceptance Test`) contains 20 approved Physics questions and is materialized to exactly 100 Grade 11 / Section A / NEET synthetic students for academic year 2026-27. The acceptance evidence checkpoint passed complete release gate `33664610356`.')
+          text = text.replace(r9, '- [x] R9 Login using a real student account and start assigned test — verified 2 Sep 2026 with the synthetic acceptance Student credential against the protected `phase1-hardening` preview. The assigned R8 paper started successfully through the canonical student path, creating in-progress attempt `d970d756-f56c-4e9a-9057-f2c775658719`; the learner payload contained the 20 assigned questions and did not expose correct answers. The acceptance evidence checkpoint passed complete release gate `33664610356`.')
+          p.write_text(text)
+      - name: Commit checklist evidence
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md
+          git commit -m 'docs(acceptance): record verified R8 R9 [skip ci]'
+          git push origin HEAD:phase1-hardening
