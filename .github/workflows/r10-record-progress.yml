@@ -1,5 +1,6 @@
 name: Record verified R10 acceptance
 
+# Triggered only after rendered R10 and the complete release gate are green.
 on:
   push:
     branches: [phase1-hardening]
