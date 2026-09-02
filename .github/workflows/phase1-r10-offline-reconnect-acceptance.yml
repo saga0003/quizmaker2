@@ -1,0 +1,51 @@
+name: Phase 1 R10 Offline Reconnect Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/phase1-r10-offline-reconnect-acceptance.yml
+      - .phase1-r10-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  r10-offline-reconnect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-f5sdk5vi7-saga0003s-projects.vercel.app
+      EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
+      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
+      EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r10-offline-reconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run same-project safety preflight
+        run: node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+      - name: Install Playwright without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Execute R10 rendered offline reconnect acceptance
+        run: node scripts/phase1-r10-offline-reconnect-acceptance.mjs
+      - name: Upload redacted R10 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r10-offline-reconnect-${{ github.sha }}
+          path: acceptance-evidence/r10-offline-reconnect
+          if-no-files-found: warn
+          retention-days: 14
