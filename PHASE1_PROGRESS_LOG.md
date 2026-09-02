@@ -606,3 +606,19 @@ This log records each production-hardening run with observable implementation an
 - **Active section completion:** Section J remains 4/5 = 80% verified.
 - **Overall Phase 1:** remains 96/129 = 74.4% verified.
 - **Exact next action:** obtain/record qualified counsel review against `PHASE1_LEGAL_REVIEW_PACKET.md` without weakening J3, while beginning R1–R8 only when an authorised real institution dataset and operators are available on the exact green hardening candidate; capture private/redacted evidence per `PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md`, then continue R9–R18, the complete release gate, load acceptance and production sign-off.
+
+## 2026-09-02 11:00:45 IST — acceptance readiness / heartbeat repair
+
+- **Run start/end:** 2026-09-02 11:00:45 IST → approximately 11:08 IST.
+- **Active engineering/review span:** approximately **7 minutes** of canonical branch/checklist/log/CI inspection and heartbeat-path recovery. The requested 45–50 minute target was **not met because the available execution window was materially shorter**; no artificial padding was added.
+- **Section worked:** production-sign-off acceptance readiness after Section J engineering completion.
+- **Checklist items completed:** none. Section J remains 4/5; R1–R18 and L1–L6 remain pending genuine acceptance execution.
+- **Branch head at run start:** `615fe37efe23dc894c19519e25f50043adf9b5fe`.
+- **Commits created:** heartbeat trigger/recorder commit only; no product-code or production/database mutation.
+- **CI status:** last fully verified complete Phase 1 release gate remains `33587887273` — PASS on exact security candidate `b1a099b8570ff2ba07eefd7aef51f5e066b27a96`. Current head is documentation/workflow-only descendant.
+- **Vercel/Supabase state:** permanent production remains protected; no production promotion or database mutation was performed in this block. Previous verified checkpoint recorded clean production runtime and both connected Supabase projects ACTIVE_HEALTHY.
+- **Rework/failures/blockers:** the prior heartbeat had not landed. During repair, a direct whole-file update accidentally replaced the progress log; the erroneous commit was immediately removed by restoring the branch ref to the exact prior head before any further work. No product source or production state was affected. J3 still requires qualified legal review; R1–R18 require authorised real-school operators/data; L1–L6 require an isolated non-production acceptance tenant; leaked-password protection remains a final security blocker.
+- **Active section completion:** Section J remains **4/5 = 80%**.
+- **Overall Phase 1 percentage:** **96/129 = 74.4% verified**.
+- **Exact next action:** confirm this canonical heartbeat append, then provision/identify an isolated non-production Evidara acceptance Supabase environment; apply and verify the staged `create_institute` anonymous-execute revocation there, execute L1–L6 with synthetic identities and predeclared budgets, while J3 legal and R1–R18 real-school acceptance proceed independently.
+
