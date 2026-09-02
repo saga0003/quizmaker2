@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const preflight = readFileSync(new URL('./phase1-acceptance-preflight.mjs', import.meta.url), 'utf8');
 const addendum = readFileSync(new URL('../PHASE1_SAME_PROJECT_ACCEPTANCE_ADDENDUM.md', import.meta.url), 'utf8');
+const protocol = readFileSync(new URL('../PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md', import.meta.url), 'utf8');
 
 const assertions = [
   ['same-project mode is explicit', preflight.includes("const SAME_PROJECT_MODE = 'same-project-isolated-tenant'")],
@@ -20,6 +21,11 @@ const assertions = [
   ['addendum requires preview web target', addendum.includes('READY `phase1-hardening` Vercel preview/acceptance deployment')],
   ['addendum preserves R/L evidence requirement', addendum.includes('does not itself satisfy any R or L checklist item')],
   ['addendum preserves legal sign-off', addendum.includes('J3 legal review remains independently required')],
+  ['protocol uses Evidara School synthetic acceptance', protocol.includes('Acceptance institution: **Evidara School**') && protocol.includes('synthetic acceptance identities and data')],
+  ['protocol forbids future-client data', protocol.includes("Do not use St. Mary's or any future client institution data")],
+  ['protocol keeps actual R execution mandatory', protocol.includes('does **not** by itself satisfy any R item') && protocol.includes('actual product path')],
+  ['protocol keeps permanent production protected', protocol.includes('Permanent production remains protected')],
+  ['protocol binds shared backend to addendum', protocol.includes('PHASE1_SAME_PROJECT_ACCEPTANCE_ADDENDUM.md')],
 ];
 
 const failures = assertions.filter(([, ok]) => !ok);
