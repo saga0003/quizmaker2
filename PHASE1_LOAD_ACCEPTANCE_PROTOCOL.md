@@ -19,6 +19,9 @@ Before any load command:
 - Use a dedicated acceptance institution and synthetic identities only.
 - Require an explicit `EVIDARA_LOAD_ACCEPTANCE=YES_I_UNDERSTAND_NON_PRODUCTION_ONLY` acknowledgement.
 - Refuse known permanent production hosts/domains and refuse a target URL that cannot be positively identified as preview/acceptance.
+- Bind every executable L4–L6 config to the exact 40-character candidate SHA and a stable workload ID before requests are sent.
+- Declare the allowable failure rate plus p95/p99 latency budget before each final acceptance run. Do not loosen thresholds after seeing results; a changed budget requires a fresh run and rationale in the manifest.
+- Cap individual response-body consumption in the harness so a pathological response cannot exhaust runner memory or distort the workload.
 - Never embed service-role keys, passwords, access tokens or student data in repository files, workflow logs or screenshots.
 - Keep concurrency generators bounded and abort on sustained error growth rather than continuing to overload a failing dependency.
 - Capture server/database health before, during and after the run.
@@ -30,7 +33,7 @@ Store raw load output outside the public repository when it contains identifiers
 
 Suggested bundle:
 
-- `00-load-manifest.md` — date, SHA, deployment ID, Supabase project/ref, dataset seed/version, operators.
+- `00-load-manifest.md` — date, exact candidate SHA, deployment ID/hostname, Supabase project/ref, dataset seed/version, operators, workload IDs and predeclared budgets.
 - `01-dataset-summary.json` — exact L1–L3 row counts, generation seed and integrity hashes.
 - `02-search-results.md` — L2 search latency/response-size/correctness samples.
 - `03-start-load.json` — L4 aggregate timings/errors/correctness.
@@ -39,6 +42,10 @@ Suggested bundle:
 - `06-db-observability.md` — connection/CPU/latency/lock/error evidence available from Supabase/Vercel.
 - `load-acceptance-results.csv` — item, pass/fail, evidence reference, timestamp, notes.
 
+Executable L4–L6 aggregate evidence must be schema-versioned and include at least: scenario, workload ID, exact candidate SHA, target origin, start/end timestamps, attempted/successful/failed counts, failure rate, HTTP status distribution, p50/p95/p99/max latency, response-byte total, categorized harness/network errors, the predeclared budget, whether that budget passed, the enforced response-size cap, and explicit `secretsIncluded=false` / `bodiesIncluded=false` markers.
+
+A dry run, fixture generation, harness unit/regression test or preview deployment **never** counts as an L4–L6 execution. It may establish tooling readiness only.
+
 ## Global measurements
 
 For every workload capture at minimum:
@@ -46,14 +53,16 @@ For every workload capture at minimum:
 - attempted operations;
 - successful operations;
 - rejected/failed operations by category;
+- failure rate;
 - p50, p95 and p99 end-to-end latency;
 - maximum observed latency;
 - HTTP/RPC status distribution where applicable;
+- total response bytes and any response-cap violations;
 - duplicate/idempotency anomalies;
 - database/API/runtime errors during the window;
 - recovery state after the workload ends.
 
-A run is invalid if the harness itself drops results, silently retries without accounting, or cannot distinguish intended authorization rejection from infrastructure/application failure.
+A run is invalid if the harness itself drops results, silently retries without accounting, cannot distinguish intended authorization rejection from infrastructure/application failure, is not bound to the exact candidate SHA, or lacks a predeclared acceptance budget.
 
 ## L1 — 2,000 students/institution test dataset
 
@@ -113,7 +122,7 @@ Pass criteria:
 - Authorization/licence/audience rules remain enforced.
 - No sustained production-like 5xx/error surge occurs in the acceptance deployment.
 - Database/API remain healthy after the ramp and recover to baseline.
-- Latency/error measurements are captured and reviewed against a predeclared operational threshold.
+- Latency/error measurements are captured and reviewed against the predeclared budget embedded in the workload config/evidence.
 
 Evidence: start workload summary, authoritative attempt count, duplicate-count query, Vercel/Supabase health evidence.
 
@@ -133,7 +142,7 @@ Pass criteria:
 - Retry/idempotency behavior does not duplicate or corrupt responses.
 - Stale/conflicting saves follow the defined server contract rather than silently overwriting newer confirmed state.
 - Submission remains blocked where required while saves are unresolved.
-- Error/latency metrics are captured and database/runtime health returns to baseline.
+- Error/latency metrics are captured against the predeclared budget and database/runtime health returns to baseline.
 
 Evidence: workload summary, deterministic expected-vs-authoritative verification, anomaly count and runtime/database health.
 
@@ -155,6 +164,7 @@ Pass criteria:
 - Aggregate result counts equal authoritative submitted-attempt counts.
 - Analytics/result visibility remains consistent with release mode.
 - Runtime/database health returns to baseline after the finishing window.
+- The predeclared failure-rate and p95/p99 latency budget passes without post-hoc relaxation.
 
 Evidence: submission workload summary, receipt/idempotency checks, authoritative submitted count, result count and Vercel/Supabase health.
 
@@ -173,14 +183,14 @@ If any L item fails:
 
 ## Completion matrix
 
-| Item | Result | Evidence reference | Dataset/workload ID | Timestamp | Notes |
-|---|---|---|---|---|---|
-| L1 | Pending | | | | |
-| L2 | Pending | | | | |
-| L3 | Pending | | | | |
-| L4 | Pending | | | | |
-| L5 | Pending | | | | |
-| L6 | Pending | | | | |
+| Item | Result | Evidence reference | Dataset/workload ID | Candidate SHA | Timestamp | Notes |
+|---|---|---|---|---|---|---|
+| L1 | Pending | | | | | |
+| L2 | Pending | | | | | |
+| L3 | Pending | | | | | |
+| L4 | Pending | | | | | |
+| L5 | Pending | | | | | |
+| L6 | Pending | | | | | |
 
 ## Post-load release rule
 
