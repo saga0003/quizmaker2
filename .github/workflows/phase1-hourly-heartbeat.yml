@@ -1,0 +1,50 @@
+name: Phase1 Hourly Heartbeat Recorder
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/phase1-hourly-heartbeat.yml
+
+permissions:
+  contents: write
+
+jobs:
+  append-heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Append progress heartbeat
+        shell: bash
+        run: |
+          cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
+
+          ## 2026-09-02 14:01:45–14:09:01 IST — Release acceptance safety-contract repair
+
+          - **Run start/end:** 2026-09-02 14:01:45 IST → 2026-09-02 14:09:01 IST.
+          - **Active engineering minutes / best observable engineering span:** approximately **7m 16s** of repository/CI/Vercel/Supabase inspection, acceptance-contract diagnosis, implementation and verification. The requested 45–50 minute target was **not met because the available execution/tool window ended materially earlier**; no idle time was padded.
+          - **Section worked:** release acceptance readiness / R1–R18 safety tooling, after Section J engineering completion.
+          - **Checklist items completed:** none. J3 remains pending qualified legal approval. R1–R18 remain 0/18 because authenticated rendered role-path acceptance has not yet been executed. L1–L6 and final production sign-off remain pending.
+          - **Substantial implementation:** fixed an internal acceptance-evidence contract mismatch: `phase1-acceptance-preflight.mjs` emitted `productionWebProtected`, while the acceptance tooling smoke test and contract require `productionProtected`. The preflight now emits the canonical `productionProtected: true` evidence field without weakening any production-host, tenant-isolation, database-ceiling, acknowledgement or destructive-action guard.
+          - **Branch head / functional commit:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40` (`fix(acceptance): align preflight production protection evidence`).
+          - **Commits created:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40`, plus this temporary heartbeat-recorder commit and its subsequent recorder-generated/cleanup commits.
+          - **CI / release gate:** exact-candidate Acceptance Tooling Contract run `33609667104` **PASS**; Same-Project Acceptance Contract run `33609667045` **PASS**. Full release-gate run `33609667025` was still **in progress** at handoff; all completed hardening/security steps observed in its job were passing, so no checklist item was promoted on an incomplete gate.
+          - **Vercel state:** permanent production remains protected and unchanged. Production runtime-error query for the preceding 24 hours returned **no runtime errors**. No production promotion was attempted.
+          - **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is **ACTIVE_HEALTHY**. The isolated `Evidara School` acceptance tenant (`evidara-school-acceptance`) still exists with `is_demo=true`. Fresh database size is **216,403,091 bytes**, safely below the same-project 450 MiB hard ceiling. No database mutation was performed.
+          - **Rework/failures/blockers:** acceptance evidence-field mismatch was found and repaired. The current execution surface still does not expose a usable authenticated School Admin/Teacher/Student browser session for genuine R1–R18 rendered acceptance; database/API inspection alone is not being substituted for those checks. J3 remains an external qualified-legal-review gate. Permanent production stays protected.
+          - **Active section completion:** real-school/synthetic guarded rendered acceptance remains **0/18 = 0%** verified.
+          - **Overall Phase 1:** remains **96/129 = 74.4% verified**.
+          - **Exact next action:** verify the exact-candidate full release gate completes green, then execute R1→R18 through an authenticated rendered browser against the isolated Evidara School tenant on a non-production hardening preview, capturing evidence for each role flow. Once R passes, immediately execute guarded L1→L6 load acceptance, then complete Z2–Z8 production sign-off; do not promote permanent production before all gates pass.
+          EOF
+      - name: Commit heartbeat
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PHASE1_PROGRESS_LOG.md
+          git commit -m "chore(progress): record 14:01 acceptance safety run"
+          git push origin HEAD:phase1-hardening
