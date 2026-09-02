@@ -8,7 +8,9 @@ on:
     paths:
       - scripts/phase1-generate-load-fixtures.mjs
       - scripts/phase1-acceptance-preflight.mjs
+      - scripts/phase1-run-load-scenario.mjs
       - scripts/phase1-acceptance-tooling-smoke.mjs
+      - scripts/phase1-load-runner-guards-smoke.mjs
       - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
       - .github/workflows/phase1-acceptance-tooling-contract.yml
   pull_request:
@@ -17,7 +19,9 @@ on:
     paths:
       - scripts/phase1-generate-load-fixtures.mjs
       - scripts/phase1-acceptance-preflight.mjs
+      - scripts/phase1-run-load-scenario.mjs
       - scripts/phase1-acceptance-tooling-smoke.mjs
+      - scripts/phase1-load-runner-guards-smoke.mjs
       - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
       - .github/workflows/phase1-acceptance-tooling-contract.yml
 
@@ -39,3 +43,6 @@ jobs:
 
       - name: Verify synthetic fixture and non-production preflight contract
         run: node scripts/phase1-acceptance-tooling-smoke.mjs
+
+      - name: Verify load runner bounds and circuit-breaker contract
+        run: node scripts/phase1-load-runner-guards-smoke.mjs
