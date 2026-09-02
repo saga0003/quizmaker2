@@ -1,0 +1,38 @@
+name: R11 Record Progress
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/r11-record-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Record verified R11 acceptance
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = path.read_text()
+          old = '- [ ] R11 Submit and verify authoritative marks manually.'
+          new = '- [x] R11 Submit and verify authoritative marks manually — verified 3 Sep 2026 using only the isolated synthetic `Evidara School` tenant. A fresh canonical attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` on the 20-question Physics acceptance paper was started through authenticated student RPCs, two canonical answers were saved, and the rendered Student final-submit flow displayed authoritative `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`. Supabase independently matched the submitted attempt exactly. The run also proved a `score_only` result no longer opens or offers post-test reflection, with zero post-submit console/page errors and zero failed responses. Product fix `02ea9f2cc211ca7f5d85cb3784c07384ef63eee8`, rendered R11 workflow `33692795379`, and complete release gate `33693066355` passed; permanent production remained protected.'
+          if old not in text:
+              raise SystemExit('Unchecked R11 checklist line not found; refusing duplicate or ambiguous record')
+          path.write_text(text.replace(old, new, 1))
+      - name: Commit checklist evidence
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md
+          git commit -m 'docs: record verified R11 acceptance [skip ci]'
+          git push origin HEAD:phase1-hardening
