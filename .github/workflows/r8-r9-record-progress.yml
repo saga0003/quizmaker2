@@ -24,9 +24,9 @@ jobs:
           from pathlib import Path
           p = Path('PHASE1_RELEASE_CHECKLIST.md')
           text = p.read_text()
-          r10 = '- [ ] R10 Physically disconnect network, answer, reconnect and verify recovery/sync.'
+          r10 = '- [ ] R10 Disconnect network, answer, reconnect and verify recovery/sync.'
           assert r10 in text
-          text = text.replace(r10, '- [x] R10 Physically disconnect network, answer, reconnect and verify recovery/sync — verified 3 Sep 2026 on branch checkpoint `7930f460925fdcb8778ce8850acc11041d55179e` using only the isolated synthetic `Evidara School` tenant. The rendered acceptance physically switched Chromium offline, observed the `Internet disconnected` state, answered question `1a35b63a-423d-4dac-8b52-4d9ed8279c01`, proved the attempt-scoped local pending queue held exactly one answer, restored connectivity, observed `All answers saved`, and proved the queue automatically cleared with zero unexpected console/page errors. Supabase independently confirmed the synthetic server response `response=["A"]` persisted at `2026-09-02 21:23:01.436052+00`. R10 workflow `33684626548` and complete release gate `33684626556` both passed. Permanent production remained protected.')
+          text = text.replace(r10, '- [x] R10 Disconnect network, answer, reconnect and verify recovery/sync — verified 3 Sep 2026 on branch checkpoint `7930f460925fdcb8778ce8850acc11041d55179e` using only the isolated synthetic `Evidara School` tenant. The rendered acceptance physically switched Chromium offline, observed the `Internet disconnected` state, answered question `1a35b63a-423d-4dac-8b52-4d9ed8279c01`, proved the attempt-scoped local pending queue held exactly one answer, restored connectivity, observed `All answers saved`, and proved the queue automatically cleared with zero unexpected console/page errors. Supabase independently confirmed the synthetic server response `response=["A"]` persisted at `2026-09-02 21:23:01.436052+00`. R10 workflow `33684626548` and complete release gate `33684626556` both passed. Permanent production remained protected.')
           p.write_text(text)
       - name: Commit checklist evidence
         shell: bash
