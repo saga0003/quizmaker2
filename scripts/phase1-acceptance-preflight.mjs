@@ -132,7 +132,7 @@ async function main() {
     ok: true,
     mode: 'preflight-only',
     target: target.origin,
-    productionWebProtected: true,
+    productionProtected: true,
     destructiveActionsPerformed: false,
     acknowledgement: 'present',
     acceptanceEnvironment,
