@@ -499,8 +499,9 @@ export function LiveExam() {
       return;
     }
     persistPending(payload.attempt_id, {});
-    setResult(data as AttemptResult);
-    setReflectionOpen(true);
+    const submittedResult = data as AttemptResult;
+    setResult(submittedResult);
+    setReflectionOpen(submittedResult.answers_released === true);
     setSubmitting(false);
     if (automatic) setSaveText('Time completed');
   }
@@ -552,7 +553,7 @@ export function LiveExam() {
           </div>
           <div className="post-test-result-actions">
             <a className="rm-btn-primary" href="/student/results/">View my results</a>
-            {!reflectionOpen && (
+            {result.answers_released === true && !reflectionOpen && (
               <button
                 type="button"
                 className="rm-btn-secondary"
@@ -568,7 +569,7 @@ export function LiveExam() {
           {reflectionNotice && <p className="post-test-result-notice" role="status">{reflectionNotice}</p>}
         </div>
 
-        {reflectionOpen && (
+        {result.answers_released === true && reflectionOpen && (
           <PostTestErrorClassification
             attemptId={result.attempt_id}
             onComplete={({ completed, total }) => {

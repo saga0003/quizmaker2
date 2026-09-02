@@ -231,17 +231,19 @@ export function StudentResultsView() {
                             <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
                               Submitted
                             </p>
-                            <button
-                              type="button"
-                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline"
-                              onClick={() => {
-                                setReflectionNotice('');
-                                setReflectionAttemptId(result.attempt_id);
-                              }}
-                            >
-                              <ListChecks className="h-3.5 w-3.5" />
-                              {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}
-                            </button>
+                            {result.answers_released === true && (
+                              <button
+                                type="button"
+                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline"
+                                onClick={() => {
+                                  setReflectionNotice('');
+                                  setReflectionAttemptId(result.attempt_id);
+                                }}
+                              >
+                                <ListChecks className="h-3.5 w-3.5" />
+                                {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}
+                              </button>
+                            )}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-sm text-[var(--muted-foreground)]">
                             {formatDate(result.submitted_at)}
