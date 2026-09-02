@@ -1,0 +1,57 @@
+name: Phase 1 Auth Readiness Run Once
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/phase1-auth-readiness-run-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-kptrnrxw6-saga0003s-projects.vercel.app
+      EVIDARA_ACCEPTANCE_DB_BYTES: '216403091'
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+      EVIDARA_ACCEPTANCE_TEACHER_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_TEACHER_EMAIL }}
+      EVIDARA_ACCEPTANCE_TEACHER_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_TEACHER_PASSWORD }}
+      EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/auth-readiness
+    steps:
+      - name: Check out verified functional candidate
+        uses: actions/checkout@v4
+        with:
+          ref: b7b09ea4e3094c9311f8071e6e9c17c9f31940c3
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install application dependencies
+        run: npm ci
+      - name: Run same-project safety preflight
+        run: node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+      - name: Install Playwright runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Run authenticated rendered-browser readiness
+        run: node scripts/phase1-authenticated-acceptance-readiness.mjs
+      - name: Upload redacted readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-authenticated-readiness-${{ github.sha }}
+          path: acceptance-evidence/auth-readiness
+          if-no-files-found: warn
+          retention-days: 14
