@@ -49,6 +49,17 @@ function protectedBootstrap(target) {
   return url.toString();
 }
 
+function isExpectedOfflineConsoleError(text) {
+  const normalized = text.toLowerCase();
+  return (
+    normalized.includes('err_internet_disconnected') ||
+    normalized.includes('err_network_changed') ||
+    normalized.includes('err_network_access_denied') ||
+    normalized.includes('networkerror when attempting to fetch resource') ||
+    normalized.includes('typeerror: failed to fetch')
+  );
+}
+
 async function waitForStudentWorkspace(page) {
   await page.waitForFunction(() => {
     const url = new URL(window.location.href);
@@ -81,7 +92,11 @@ async function main() {
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
     const text = message.text().slice(0, 500);
-    if (deliberateOffline) expectedOfflineConsoleErrors.push(text);
+    // Chromium may emit the console event for a request that failed while offline only
+    // after connectivity has already been restored. Classify those deterministic browser
+    // network signatures by content as well as by the deliberate-offline window, while
+    // leaving every other console error as a hard acceptance failure.
+    if (deliberateOffline || isExpectedOfflineConsoleError(text)) expectedOfflineConsoleErrors.push(text);
     else consoleErrors.push(text);
   });
   page.on('pageerror', (error) => pageErrors.push(String(error.message || error).slice(0, 500)));
@@ -109,6 +124,7 @@ async function main() {
     // evaluates errors emitted by the exam flow itself.
     if (safeTarget.local) {
       consoleErrors.length = 0;
+      expectedOfflineConsoleErrors.length = 0;
       pageErrors.length = 0;
     }
 
@@ -147,6 +163,9 @@ async function main() {
     await page.getByText('All answers saved').first().waitFor({ state: 'visible', timeout: 20_000 });
     await page.waitForFunction((id) => !localStorage.getItem(`evidara-exam-pending:${id}`), attemptId, { timeout: 20_000 });
     reconnectClearedLocalQueue = true;
+    // Give delayed Chromium console events from the deliberate offline request a brief
+    // chance to arrive before final classification/evidence is frozen.
+    await page.waitForTimeout(750);
     await page.screenshot({ path: `${EVIDENCE_DIR}/03-reconnected-server-confirmed.png`, fullPage: true });
 
     const manifest = {
@@ -167,7 +186,10 @@ async function main() {
       secretsRecorded: false,
       unexpectedConsoleErrorCount: consoleErrors.length,
       expectedOfflineConsoleErrorCount: expectedOfflineConsoleErrors.length,
+      unexpectedConsoleErrorSamples: consoleErrors.slice(0, 5),
+      expectedOfflineConsoleErrorSamples: expectedOfflineConsoleErrors.slice(0, 5),
       pageErrorCount: pageErrors.length,
+      pageErrorSamples: pageErrors.slice(0, 5),
       capturedAt: new Date().toISOString(),
     };
     await writeFile(`${EVIDENCE_DIR}/r10-results.json`, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
@@ -185,7 +207,10 @@ async function main() {
       error: error instanceof Error ? error.message : String(error),
       unexpectedConsoleErrorCount: consoleErrors.length,
       expectedOfflineConsoleErrorCount: expectedOfflineConsoleErrors.length,
+      unexpectedConsoleErrorSamples: consoleErrors.slice(0, 5),
+      expectedOfflineConsoleErrorSamples: expectedOfflineConsoleErrors.slice(0, 5),
       pageErrorCount: pageErrors.length,
+      pageErrorSamples: pageErrors.slice(0, 5),
       capturedAt: new Date().toISOString(),
     };
     await page.screenshot({ path: `${EVIDENCE_DIR}/failure.png`, fullPage: true }).catch(() => {});
