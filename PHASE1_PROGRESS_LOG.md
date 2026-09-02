@@ -733,3 +733,20 @@ This log records each production-hardening run with observable implementation an
 - **Active section complete:** R acceptance remains **0/18 formally**; fixture readiness materially advanced.
 - **Overall Phase 1:** **96/129 = 74.4%**.
 - **Exact next action:** verify release-gate attempt 2 is green, then execute `Phase 1 Authenticated Acceptance Readiness` against the exact READY hardening preview as soon as the six acceptance credential secrets and protected-preview share secret are available; if all three rendered logins pass, execute R1→R18 in order and continue directly to L1→L6.
+
+## 2026-09-02 20:43–20:50 IST — hourly hardening heartbeat
+
+- **Run start/end:** 20:43 IST / 20:50 IST.
+- **Active engineering span:** ~7 minutes observable in this environment; the requested 45–50 minute target was not reached because the automation execution window ended materially earlier. No time was padded.
+- **Section worked:** Release acceptance R1–R18, with focus on authenticated readiness and R1–R5 acceptance prerequisites.
+- **Checklist items completed this run:** none checked. R1/R2/R3/R5 prerequisites are now durably evidenced, but no R checkmark was awarded before the exact evidence-recording commit completes the full release gate. R4 remains genuinely incomplete at 2/100 active synthetic students.
+- **Items still pending:** J3 legal review; R1–R18 formal acceptance (R4 bulk roster is next; then R6–R18); L1–L6 load acceptance; Z2–Z8 production sign-off.
+- **Branch head at handoff:** `cd8ae324f7306ef4df9ba2a261c1af38ada4549a` (`docs(acceptance): record authenticated readiness and R1-R5 preconditions`). Previous cleanup head was `109a96c70300257c49e16905b21cf57b038b8eca`.
+- **Commits created:** `cd8ae324f7306ef4df9ba2a261c1af38ada4549a` acceptance evidence; this trigger commit will be followed by the heartbeat recorder's `[skip ci]` append commit.
+- **CI / release gate:** authenticated rendered-browser readiness run `33645773392` on candidate `b063e32fee2332011b5d2223f09f3841168f9c80` passed in ~2m05s: School Admin, Teacher and Student all authenticated into the correct rendered workspaces with zero captured console/page errors. The complete release gate on that candidate also passed (`33645773588`, ~3m30s). Current evidence-recording commit `cd8ae324...` started its complete release gate and Vercel preview verification; it was still in progress at heartbeat handoff, so no new R item was checked.
+- **Vercel state:** permanent production remains protected; no production runtime errors were reported in the latest 24-hour check. Hardening previews are READY, and authenticated readiness succeeded against the protected `phase1-hardening` branch alias.
+- **Supabase state:** SMIS QP `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; database size `216411283` bytes. Isolated synthetic `Evidara School` tenant is active/demo with an active 100-seat annual ₹199/student licence (2026-09-02 to 2027-09-02), active School Admin/Teacher fixtures, 2 active synthetic students, and active Grade 11/A Physics teacher assignment. No St. Mary's or future-client data was used.
+- **Rework/failures/blockers:** prior Vercel share-origin mismatch is resolved; authenticated readiness is green. Current acceptance blocker is R4: the synthetic tenant must reach exactly 100 active students through the canonical product lifecycle without exceeding the 100-seat licence. J3 remains an independent external legal-review blocker.
+- **Active section progress:** R formally 0/18 checked (0%); 4 early-item prerequisites (R1/R2/R3/R5) have live evidence awaiting exact-commit release-gate completion and checklist recording. Overall Phase 1 remains 96/129 = 74.4% until valid checkmarks are recorded.
+- **Exact next action:** confirm `cd8ae324...` complete release gate and preview are green; then build/execute the canonical synthetic R4 bulk-roster path from 2 to exactly 100 active acceptance students, verify licence enforcement and account lifecycle evidence, record only legitimately satisfied R1/R2/R3/R4/R5 items, and continue directly into R6 question import.
+
