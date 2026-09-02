@@ -11,7 +11,11 @@ on:
       - scripts/phase1-run-load-scenario.mjs
       - scripts/phase1-acceptance-tooling-smoke.mjs
       - scripts/phase1-load-runner-guards-smoke.mjs
+      - scripts/phase1-authenticated-acceptance-readiness.mjs
+      - scripts/phase1-authenticated-acceptance-readiness-smoke.mjs
       - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
+      - PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md
+      - .github/workflows/phase1-authenticated-acceptance-readiness.yml
       - .github/workflows/phase1-acceptance-tooling-contract.yml
   pull_request:
     branches:
@@ -22,7 +26,11 @@ on:
       - scripts/phase1-run-load-scenario.mjs
       - scripts/phase1-acceptance-tooling-smoke.mjs
       - scripts/phase1-load-runner-guards-smoke.mjs
+      - scripts/phase1-authenticated-acceptance-readiness.mjs
+      - scripts/phase1-authenticated-acceptance-readiness-smoke.mjs
       - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
+      - PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md
+      - .github/workflows/phase1-authenticated-acceptance-readiness.yml
       - .github/workflows/phase1-acceptance-tooling-contract.yml
 
 permissions:
@@ -46,3 +54,6 @@ jobs:
 
       - name: Verify load runner bounds and circuit-breaker contract
         run: node scripts/phase1-load-runner-guards-smoke.mjs
+
+      - name: Verify authenticated rendered-browser readiness safety contract
+        run: node scripts/phase1-authenticated-acceptance-readiness-smoke.mjs
