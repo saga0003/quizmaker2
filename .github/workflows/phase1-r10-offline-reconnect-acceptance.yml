@@ -19,7 +19,7 @@ jobs:
       EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
-      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-f5sdk5vi7-saga0003s-projects.vercel.app
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
       EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
       EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
