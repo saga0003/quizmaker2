@@ -1,0 +1,15 @@
+## 2026-09-03 01:13:24 IST — R8/R9 acceptance evidence checkpoint
+
+- **Run start:** 2026-09-03 01:13:24 IST.
+- **Run end / observable handoff:** 2026-09-03 01:16:20 IST.
+- **Active engineering/review span:** approximately 3 minutes in this automation execution window; the 45–50 minute target was not met because the tool execution window ended early. No time was padded.
+- **Section worked:** Release acceptance R8–R10 frontier.
+- **Starting branch head:** `d2617255c602143803a39bc29c445c91bddb1bf1`.
+- **Starting inspection:** `PHASE1_RELEASE_CHECKLIST.md` still had R8/R9 unchecked; prior acceptance checkpoint release gate `33664610356` on `a9ac84d8e19da7a2811af57d8d7598027f21fa9f` was confirmed **PASS**. Vercel production runtime errors for the preceding 24 hours were empty; latest visible `phase1-hardening` previews were READY. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`; fresh database size was `219278483` bytes.
+- **Live acceptance re-verification:** isolated synthetic organization `Evidara School` (`evidara-school-acceptance`) exists. R8 paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` is `published`, has 20 questions and an assignment profile for academic year 2026-27, Grade 11, NEET and the acceptance section with `assigned_count=100`. R9 attempt `d970d756-f56c-4e9a-9057-f2c775658719` remains `in_progress`, proving the synthetic acceptance Student started the assigned paper and preserving the R10 recovery fixture.
+- **Commits created:** `6e51dcc30d5da3eec05fb8abb2ba8c7ff5d88c0c` adds a guarded R8/R9 checklist-recording workflow. The workflow had not yet produced its bot checklist commit by handoff, so R8/R9 were not falsely claimed as newly checked in this run.
+- **CI/release-gate:** prior evidence gate `33664610356` confirmed PASS (2m24s wall-clock from 18:00:56Z to 18:03:20Z). A new full gate was not yet available for the just-created workflow commit at handoff.
+- **Vercel/Supabase state:** production protected and unchanged; no Vercel runtime errors found in the latest 24-hour query; Supabase ACTIVE_HEALTHY; no separate/paid project created; only the synthetic acceptance tenant was queried.
+- **Rework/failures/blockers:** the new one-shot checklist recorder did not immediately emit its expected bot commit before this execution window ended. This is a CI-trigger/observation limitation, not acceptance-data failure. R10 still requires the physical disconnect → answer → reconnect → server-sync proof and remains unchecked.
+- **Section progress:** acceptance R = 7/18 formally checked (38.9%); R8/R9 have green evidence and live re-verification but await durable checklist recording. Overall formally checked Phase 1 remains 103/129 = 79.8% until those records land.
+- **Exact next action:** confirm/repair the R8/R9 recorder, ensure its descendant complete release gate is green, then run R10 on the preserved in-progress synthetic Student attempt and verify the offline answer is persisted after reconnect before moving to R11.
