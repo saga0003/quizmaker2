@@ -2,11 +2,17 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { createClient } from '@supabase/supabase-js';
 
 const REQUIRED_ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
 const EXPECTED_ORG = 'evidara-school-acceptance';
 const LOCAL_ACK = 'YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY';
-const EXPECTED_ATTEMPT = '9739cf8e-df9d-49a9-8318-6a66fd919098';
+const EXPECTED_PAPER = 'e5801a88-1e7f-4b4f-a715-ad44ce2b3c43';
+const EXPECTED_PAPER_TITLE = 'Phase 1 R8 Physics Acceptance Test';
+const SEEDED_RESPONSES = [
+  ['1a35b63a-423d-4dac-8b52-4d9ed8279c01', ['A']],
+  ['182c2554-713c-493c-9c7d-6e95663d115b', ['A']],
+];
 const EVIDENCE_DIR = process.env.EVIDARA_ACCEPTANCE_EVIDENCE_DIR || 'acceptance-evidence/r11-submit-marks-v2';
 
 function requireEnv(name) {
@@ -25,6 +31,58 @@ function assertSafeLocalTarget(rawTarget) {
   return url.origin;
 }
 
+async function prepareCanonicalAttempt(email, password) {
+  const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const publishableKey = requireEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  const client = createClient(supabaseUrl, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+
+  const { error: authError } = await client.auth.signInWithPassword({ email, password });
+  if (authError) throw new Error(`Synthetic R11 setup login failed: ${authError.message}`);
+
+  try {
+    const { data: available, error: availableError } = await client.rpc('list_available_papers');
+    if (availableError) throw new Error(`Unable to verify synthetic R11 paper availability: ${availableError.message}`);
+    const paper = (Array.isArray(available) ? available : []).find((item) => item?.id === EXPECTED_PAPER);
+    if (!paper || paper.title !== EXPECTED_PAPER_TITLE) {
+      throw new Error(`R11 refuses to start anything except the isolated ${EXPECTED_PAPER_TITLE} paper.`);
+    }
+
+    const { data: attemptData, error: startError } = await client.rpc('start_exam_attempt', {
+      p_paper_id: EXPECTED_PAPER,
+      p_access_code: null,
+    });
+    if (startError) throw new Error(`Unable to start fresh synthetic R11 attempt: ${startError.message}`);
+    const attemptId = String(attemptData || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(attemptId)) throw new Error(`Unexpected R11 attempt identifier: ${attemptId || '(empty)'}`);
+
+    for (const [paperQuestionId, response] of SEEDED_RESPONSES) {
+      const { error: saveError } = await client.rpc('save_exam_response', {
+        p_attempt_id: attemptId,
+        p_paper_question_id: paperQuestionId,
+        p_response: response,
+        p_marked_for_review: false,
+        p_time_spent_seconds: 5,
+      });
+      if (saveError) throw new Error(`Unable to seed canonical R11 answer ${paperQuestionId}: ${saveError.message}`);
+    }
+
+    const { data: payload, error: payloadError } = await client.rpc('get_exam_attempt_payload', { p_attempt_id: attemptId });
+    if (payloadError) throw new Error(`Unable to verify fresh R11 attempt payload: ${payloadError.message}`);
+    if (payload?.paper?.id !== EXPECTED_PAPER || payload?.paper?.result_mode !== 'score_only') {
+      throw new Error('Fresh R11 attempt is not the isolated score-only acceptance paper.');
+    }
+    const saved = Array.isArray(payload?.responses)
+      ? payload.responses.filter((row) => SEEDED_RESPONSES.some(([questionId]) => questionId === row.paper_question_id) && Array.isArray(row.response) && row.response[0] === 'A').length
+      : 0;
+    if (saved !== SEEDED_RESPONSES.length) throw new Error(`Expected ${SEEDED_RESPONSES.length} seeded server responses, found ${saved}.`);
+    return attemptId;
+  } finally {
+    await client.auth.signOut().catch(() => {});
+  }
+}
+
 async function waitForStudentWorkspace(page) {
   await page.waitForFunction(() => {
     const url = new URL(window.location.href);
@@ -36,13 +94,12 @@ async function waitForStudentWorkspace(page) {
 async function main() {
   if (process.env.EVIDARA_LOAD_ACCEPTANCE !== REQUIRED_ACK) throw new Error('R11 acceptance acknowledgement missing.');
   if ((process.env.EVIDARA_ACCEPTANCE_ORG_SLUG || '').trim() !== EXPECTED_ORG) throw new Error(`R11 is restricted to ${EXPECTED_ORG}.`);
-  const attemptId = requireEnv('EVIDARA_ACCEPTANCE_ATTEMPT_ID');
-  if (attemptId !== EXPECTED_ATTEMPT) throw new Error('R11 refuses any attempt other than the dedicated synthetic R11 attempt.');
   const target = assertSafeLocalTarget(requireEnv('EVIDARA_ACCEPTANCE_URL'));
   const email = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
   const password = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_PASSWORD');
   await mkdir(EVIDENCE_DIR, { recursive: true });
 
+  const attemptId = await prepareCanonicalAttempt(email, password);
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   const page = await context.newPage();
@@ -72,9 +129,6 @@ async function main() {
     await page.getByText(/Question 1 of \d+/).waitFor({ state: 'visible', timeout: 30_000 });
     await page.getByText('All answers saved').first().waitFor({ state: 'visible', timeout: 20_000 });
 
-    // Local branch-checkout shell probes can legitimately fail without server-only secrets.
-    // Establish the acceptance error baseline only after the exam surface is fully loaded,
-    // so R11 remains strict about failures caused by the actual final-submission operation.
     await page.waitForTimeout(4_500);
     consoleErrors.length = 0;
     pageErrors.length = 0;
@@ -100,13 +154,20 @@ async function main() {
     for (const label of ['Score', 'Percentage', 'Correct', 'Incorrect', 'Unanswered']) {
       if (!rendered[label]) throw new Error(`Rendered authoritative result is missing ${label}.`);
     }
+    if (rendered.Score !== '8/80' || rendered.Percentage !== '10%' || rendered.Correct !== '2' || rendered.Incorrect !== '0' || rendered.Unanswered !== '18') {
+      throw new Error(`Rendered authoritative result did not match the known synthetic acceptance scoring contract: ${JSON.stringify(rendered)}`);
+    }
+    if (await page.getByRole('button', { name: /Continue optional reflection/ }).count()) {
+      throw new Error('Score-only result incorrectly exposed the post-test reflection action.');
+    }
     await page.screenshot({ path: `${EVIDENCE_DIR}/03-authoritative-result.png`, fullPage: true });
-    await page.waitForTimeout(750);
+    await page.waitForTimeout(1_000);
 
     const manifest = {
       result: 'PASS', acceptanceItem: 'R11', target, executionSurface: 'branch-checkout-localhost', organizationSlug: EXPECTED_ORG,
-      attemptId, renderedSubmissionConfirmationObserved: true, renderedAuthoritativeResultObserved: true, rendered,
-      requiresIndependentSupabaseComparison: true, productionProtected: true, secretsRecorded: false,
+      paperId: EXPECTED_PAPER, attemptId, seededResponses: SEEDED_RESPONSES.length,
+      renderedSubmissionConfirmationObserved: true, renderedAuthoritativeResultObserved: true, rendered,
+      scoreOnlyReflectionSuppressed: true, requiresIndependentSupabaseComparison: true, productionProtected: true, secretsRecorded: false,
       unexpectedConsoleErrorCount: consoleErrors.length, unexpectedConsoleErrorSamples: consoleErrors.slice(0, 5),
       pageErrorCount: pageErrors.length, pageErrorSamples: pageErrors.slice(0, 5),
       failedResponseCount: failedResponses.length, failedResponseSamples: failedResponses.slice(0, 5), capturedAt: new Date().toISOString(),
