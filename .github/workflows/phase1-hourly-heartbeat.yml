@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
 
+# This workflow is temporary and exists only to append the current hardening heartbeat.
 jobs:
   append-heartbeat:
     runs-on: ubuntu-latest
