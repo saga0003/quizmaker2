@@ -152,6 +152,16 @@ jobs:
         run: node scripts/i5-i7-operations-smoke.mjs
       - name: J privacy governance checks
         run: node scripts/j1-j5-privacy-governance-smoke.mjs
+      - name: Same-project acceptance safety checks
+        run: node scripts/phase1-same-project-acceptance-smoke.mjs
+      - name: Same-project acceptance preflight contract
+        env:
+          EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+          EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+          EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+          EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+          EVIDARA_ACCEPTANCE_DB_BYTES: '216394899'
+        run: node scripts/phase1-acceptance-preflight.mjs --target https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app --dry-run
 
       - name: TypeScript
         run: npm run typecheck -- --incremental false
