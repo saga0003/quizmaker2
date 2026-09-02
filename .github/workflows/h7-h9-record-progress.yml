@@ -16,36 +16,35 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Append acceptance-prep heartbeat once
+      - name: Append load-runner safety heartbeat once
         shell: bash
         run: |
-          if grep -Fq '## 2026-09-02 06:01:10–06:11:22 IST — J3 blocker / real-school and load acceptance preparation' PHASE1_PROGRESS_LOG.md; then
+          if grep -Fq '## 2026-09-02 07:07:19–07:12:11 IST — Load acceptance runner safety hardening' PHASE1_PROGRESS_LOG.md; then
             echo 'Heartbeat already recorded; nothing to do.'
             exit 0
           fi
           cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
 
-## 2026-09-02 06:01:10–06:11:22 IST — J3 blocker / real-school and load acceptance preparation
+## 2026-09-02 07:07:19–07:12:11 IST — Load acceptance runner safety hardening
 
-- **Run start:** 2026-09-02 06:01:10 IST.
-- **Run end:** 2026-09-02 06:11:22 IST.
-- **Active engineering minutes / best observable engineering span:** approximately **10m12s** from initial branch/CI/production/database inspection through acceptance-tooling implementation, safety regression setup and final recorder staging. The requested 45–50 minute target was **not met because this execution window ended materially earlier**; no time was artificially padded.
-- **Section worked:** J3 external legal sign-off blocker, followed by preparation for real-school acceptance and load acceptance while J3 remains externally blocked.
+- **Run start:** 2026-09-02 07:07:19 IST.
+- **Run end:** 2026-09-02 07:12:11 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **4m52s** from branch/checklist/CI/production/database inspection through load-runner safety review, implementation, permanent regression, CI verification and heartbeat staging. The requested 45–50 minute target was **not met because this execution window ended materially earlier**; no time was artificially padded.
+- **Section worked:** J3 external legal-sign-off blocker remained open; productive work continued on load-acceptance tooling for L4–L6 without executing load or touching production.
 - **Checklist items completed:** none. J3 remains intentionally unchecked pending qualified legal approval; R1–R18 and L1–L6 remain unexecuted and unchecked.
-- **Items still pending:** J3; R1–R18 real-school acceptance; L1–L6 load acceptance; Z2–Z8 production sign-off.
-- **Branch head at run start:** `8ab586edb457e0e131e7e1e3e0779b9b68bacdf3`.
-- **Commits created:** `dffdd04356464d29d6eee74e4472fd4a6947701c` deterministic L1–L3 synthetic fixture generator; `030c48f81f377b2ce5a8f51dbd0e8c9608f89629` fail-closed non-production acceptance preflight; acceptance tooling smoke regression; `a1894fb7e3e9fe4e8ea98f2ab1d21453ee6e4cc1` permanent Acceptance Tooling Contract workflow; plus `PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md`. Temporary recorder experiments were removed/restored without product or production mutation.
-- **CI run and duration/result:** parent complete release gate `33571729592` is confirmed **PASS** on the last fully verified product candidate. Fresh full release gates were triggered by acceptance-tooling/recorder commits but were still running or superseded during this short execution window, so no new checklist credit is claimed. The Acceptance Tooling Contract must be confirmed green before treating the tooling itself as release-ready.
-- **Vercel state:** permanent production remained protected and unchanged. Production `error`/`fatal` runtime inspection for the preceding 24 hours was clean at run start; no production promotion was attempted.
-- **Supabase state:** connected projects `quizmaker` (`xzfozpnzvznqrvcsoail`) and `Final Viva Project` (`jjkixgpddjognznrnqja`) remained `ACTIVE_HEALTHY`; no database mutation occurred. Security Advisor surfaced leaked-password protection as disabled plus existing SECURITY DEFINER/compatibility-RPC warnings. The RPC warnings require authorization-context review rather than blanket revocation because Phase-1 compatibility RPCs are intentional; leaked-password protection remains an explicit security follow-up before final production sign-off.
-- **Rework/failures/blockers:** J3 remains an external qualified-counsel blocker. R1–R18 require an authorised real institution dataset/operators; L1–L6 require a dedicated non-production acceptance tenant and actual measured execution. Production was not used for load testing.
-- **Acceptance preparation delivered:** `PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md` defines fail-closed evidence and pass criteria for L1–L6; deterministic synthetic fixtures generate exactly 2,000 students, 50,000 questions and 1,000 papers without PII; the acceptance preflight refuses known production/main hosts and requires explicit non-production acknowledgement; a permanent smoke regression checks those safety contracts.
+- **Items still pending:** J3; R1–R18 real-school acceptance; L1–L6 load acceptance; Z2–Z8 production sign-off; Supabase leaked-password protection before final security sign-off.
+- **Branch head at run start:** `49c72a846134e885634fef907d5ecc7b05e3321d`.
+- **Commits created:** `ca8bdfe0dc8640b1c900db5ec0f41035cd3ce07f` prevents custom operation headers from overriding the validated bearer/content/transport headers and hardens relative-path origin validation; `c80de5e044b9b757977be8ffbb49d4a3a92c8ece` adds permanent dry-run regression coverage for safe configs, Authorization/Host override rejection, and scheme-relative path rejection.
+- **CI run and duration/result:** Acceptance Tooling Contract `33580240292` **PASS** on exact functional candidate `c80de5e044b9b757977be8ffbb49d4a3a92c8ece`; complete release gate `33580240248` **PASS**, created 01:39:16Z and completed 01:41:52Z (approximately **2m36s** elapsed). No checklist credit is claimed because L4–L6 still require actual measured execution in a dedicated non-production acceptance tenant.
+- **Vercel state:** production remained protected and unchanged; preceding-24-hour runtime error/fatal inspection was clean at run start; no promotion was attempted.
+- **Supabase state:** connected projects `SMIS QP` (`xzfozpnzvznqrvcsoail`) and `NatSciX Online Test` (`hngvpirypezmypderovr`) were `ACTIVE_HEALTHY`; no database mutation occurred. Fresh Security Advisor still reports leaked-password protection disabled, plus existing RLS/function/SECURITY DEFINER advisories requiring scoped review rather than blanket mutation.
+- **Rework/failures/blockers:** safety review found a real fail-open defect in the newly added L4–L6 load runner: `op.headers.authorization` could override the bearer token after validation. This was fixed before any load execution. J3 remains an external qualified-counsel blocker; R1–R18 require authorised school operators/data; L1–L6 require a dedicated non-production acceptance tenant and per-actor synthetic sessions.
 - **Active section completion:** Section J remains **4/5 = 80%** verified; real-school acceptance remains **0/18**; load acceptance remains **0/6**.
 - **Overall Phase 1:** remains **96/129 = 74.4%** verified.
-- **Exact next action:** confirm the complete release gate and Acceptance Tooling Contract on the exact acceptance-tooling head; record qualified counsel approval against `PHASE1_LEGAL_REVIEW_PACKET.md` without weakening J3; when authorised operators/data are available execute R1–R18 exactly per `PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md`; then provision a dedicated non-production load tenant, run the fail-closed preflight and deterministic fixtures, execute L1–L6 with measured evidence, re-run the complete release gate, resolve leaked-password protection before final security sign-off, and only then proceed through Z2–Z8 production sign-off.
+- **Exact next action:** keep J3 open pending qualified counsel; provision/identify a dedicated non-production acceptance tenant and synthetic per-actor sessions, run fail-closed preflight, then execute L1–L6 with measured evidence while R1–R18 await authorised school operators; resolve leaked-password protection and scoped security-advisor findings before Z security sign-off; re-run complete release gate before any production promotion.
 EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PHASE1_PROGRESS_LOG.md
-          git commit -m "docs: record acceptance-prep heartbeat [skip ci]"
+          git commit -m "docs: record load-runner safety heartbeat [skip ci]"
           git push origin HEAD:phase1-hardening
