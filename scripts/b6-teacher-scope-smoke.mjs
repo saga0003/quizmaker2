@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const migration = fs.readFileSync('supabase/migrations/20260831111000_phase1_teacher_subject_scope.sql', 'utf8');
 const analyticsMigration = fs.readFileSync('supabase/migrations/20260831112500_phase1_teacher_analytics_subject_scope.sql', 'utf8');
+const schoolAdminRoleFix = fs.readFileSync('supabase/migrations/20260902190000_phase1_school_admin_teacher_assignment_role_fix.sql', 'utf8');
 
 const checks = [
   ['canonical scope helper exists', migration, /create or replace function public\.is_evidara_teacher_for_scope/i],
@@ -30,6 +31,10 @@ const checks = [
   ['teacher analytics keeps school admin section-wide view', analyticsMigration, /analytics_is_school_admin_v10\(student\.organization_id\)/i],
   ['teacher analytics keeps platform admin section-wide view', analyticsMigration, /analytics_is_platform_admin_v10\(\)/i],
   ['teacher analytics RPC is not anonymous', analyticsMigration, /revoke all on function public\.get_teacher_analytics_overview_v10\(uuid,date,date\) from public, anon/i],
+  ['legacy analytics helper recognizes canonical school_admin', schoolAdminRoleFix, /member\.member_role in \('institute_owner', 'institute_admin', 'school_admin'\)/i],
+  ['legacy analytics helper still requires active membership', schoolAdminRoleFix, /member\.organization_id = p_organization_id[\s\S]*member\.user_id = auth\.uid\(\)[\s\S]*member\.is_active = true/i],
+  ['legacy analytics helper retains platform-admin override', schoolAdminRoleFix, /analytics_is_platform_admin_v10\(\)/i],
+  ['role fix does not introduce unsupported school_owner enum', schoolAdminRoleFix, /^(?![\s\S]*'school_owner')[\s\S]*$/i],
 ];
 
 let failed = 0;
