@@ -799,3 +799,15 @@ This log records each production-hardening run with observable implementation an
 - **Section progress:** acceptance R = 7/18 formally checked (38.9%); R8/R9 have green evidence and live re-verification but await durable checklist recording. Overall formally checked Phase 1 remains 103/129 = 79.8% until those records land.
 - **Exact next action:** confirm/repair the R8/R9 recorder, ensure its descendant complete release gate is green, then run R10 on the preserved in-progress synthetic Student attempt and verify the offline answer is persisted after reconnect before moving to R11.
 
+
+### 3 Sep 2026 — 04:14 IST Phase 1 hardening heartbeat
+
+- Start checkpoint inspected: `PHASE1_RELEASE_CHECKLIST.md`, `PHASE1_PROGRESS_LOG.md`, `phase1-hardening` branch state, CI/release gate, Vercel production/preview health, and Supabase `SMIS QP`.
+- Production remained protected and healthy: Vercel production had no error/fatal runtime logs in the fresh 24-hour check; fixed-code `phase1-hardening` previews were READY. Supabase project `xzfozpnzvznqrvcsoail` (`SMIS QP`) remained `ACTIVE_HEALTHY`; database size measured 219,278,483 bytes at run start.
+- Highest-priority unchecked item R11 was completed using only the isolated synthetic `Evidara School` tenant (`evidara-school-acceptance`). Fixed the score-only post-submit reflection defect in `02ea9f2cc211ca7f5d85cb3784c07384ef63eee8`: reflection UI/RPC paths now require `answers_released === true`; backend result-release authorization was not weakened.
+- Updated R11 acceptance to create a fresh canonical synthetic student attempt and save two canonical responses before rendered final submission. Run `33692795379` passed with attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e`, rendered `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`, score-only reflection suppressed, and zero console/page/failed-response errors. Supabase independently matched the authoritative submitted result exactly.
+- Complete release gate initially exposed a stale E6 source-contract regex after the safe result alias refactor; the smoke was corrected without changing submission semantics in `3781a9d26bc78dee2198bbc186fd5d8b2baa132e`. Complete gate `33693066355` then passed all checks, TypeScript, lint, regressions and production build.
+- R11 was formally recorded verified in checklist commit `88771ac6d5b70e66ecd920ccdd1e3830d93a9976`; permanent production was not promoted or changed.
+- Active engineering span: approximately 22 minutes in this execution window; the requested 45–50 minute target was not reached before the verified R11 checkpoint was complete.
+- Exact next action: execute R12 against the same isolated tenant by proving hidden/held and released result modes through authenticated rendered Student behavior plus independent Supabase checks, then run the complete release gate before checking R12.
+
