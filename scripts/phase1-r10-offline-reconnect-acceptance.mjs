@@ -68,6 +68,7 @@ async function main() {
   const bootstrap = safeTarget.local ? null : protectedBootstrap(target);
   const email = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
   const password = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_PASSWORD');
+  const attemptId = requireEnv('EVIDARA_ACCEPTANCE_ATTEMPT_ID');
   await mkdir(EVIDENCE_DIR, { recursive: true });
 
   const browser = await chromium.launch({ headless: true });
@@ -78,7 +79,6 @@ async function main() {
   page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text().slice(0, 500)); });
   page.on('pageerror', (error) => pageErrors.push(String(error.message || error).slice(0, 500)));
 
-  let attemptId = null;
   let paperQuestionId = null;
   let localPendingObserved = false;
   let reconnectClearedLocalQueue = false;
@@ -97,14 +97,13 @@ async function main() {
     await page.getByRole('button', { name: /^Sign In$/ }).click();
     await waitForStudentWorkspace(page);
 
-    await page.goto(`${target}/?view=student-tests`, { waitUntil: 'networkidle', timeout: 45_000 });
-    await page.getByRole('heading', { name: 'Available Tests' }).waitFor({ state: 'visible', timeout: 20_000 });
-    const card = page.locator('div').filter({ has: page.getByRole('heading', { name: PAPER_TITLE }) }).last();
-    await card.getByRole('button', { name: 'Start / Resume' }).click();
-    await page.waitForURL(/\/student\/tests\/take\/?\?attempt=/, { timeout: 30_000 });
-    attemptId = new URL(page.url()).searchParams.get('attempt');
-    if (!attemptId) throw new Error('R10 could not capture the canonical attempt ID.');
-
+    // R9 already proved assignment discovery + canonical start. R10 deliberately reuses
+    // that preserved synthetic attempt so the acceptance exercise measures only the
+    // required physical network disconnect -> local queue -> reconnect -> server sync.
+    await page.goto(`${target}/student/tests/take/?attempt=${encodeURIComponent(attemptId)}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    });
     await page.getByText(/Question 1 of \d+/).waitFor({ state: 'visible', timeout: 30_000 });
     await page.getByText('All answers saved').first().waitFor({ state: 'visible', timeout: 20_000 });
     await page.screenshot({ path: `${EVIDENCE_DIR}/01-online-before-disconnect.png`, fullPage: true });
