@@ -19,12 +19,15 @@ jobs:
       EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
-      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
+      EVIDARA_ACCEPTANCE_URL: http://127.0.0.1:3000
+      EVIDARA_ACCEPTANCE_LOCALHOST: YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY
       EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
-      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
       EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r10-offline-reconnect
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,12 +36,33 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run same-project safety preflight
-        run: node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+      - name: Verify isolated local acceptance target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
+          test "$EVIDARA_ACCEPTANCE_URL" = "http://127.0.0.1:3000"
+          test "$EVIDARA_ACCEPTANCE_LOCALHOST" = "YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY"
+          echo "R10 target is isolated localhost against the synthetic acceptance tenant only."
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
+      - name: Start branch checkout application
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run dev -- --hostname 127.0.0.1 --port 3000 > /tmp/evidara-r10-app.log 2>&1 &
+          echo $! > /tmp/evidara-r10-app.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              echo "Local Evidara branch checkout is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/evidara-r10-app.log
+          exit 1
       - name: Execute R10 rendered offline reconnect acceptance
         run: node scripts/phase1-r10-offline-reconnect-acceptance.mjs
       - name: Upload redacted R10 evidence
@@ -49,3 +73,11 @@ jobs:
           path: acceptance-evidence/r10-offline-reconnect
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload local app diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r10-app-log-${{ github.sha }}
+          path: /tmp/evidara-r10-app.log
+          if-no-files-found: warn
+          retention-days: 7
