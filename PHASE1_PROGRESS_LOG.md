@@ -750,3 +750,19 @@ This log records each production-hardening run with observable implementation an
 - **Active section progress:** R formally 0/18 checked (0%); 4 early-item prerequisites (R1/R2/R3/R5) have live evidence awaiting exact-commit release-gate completion and checklist recording. Overall Phase 1 remains 96/129 = 74.4% until valid checkmarks are recorded.
 - **Exact next action:** confirm `cd8ae324...` complete release gate and preview are green; then build/execute the canonical synthetic R4 bulk-roster path from 2 to exactly 100 active acceptance students, verify licence enforcement and account lifecycle evidence, record only legitimately satisfied R1/R2/R3/R4/R5 items, and continue directly into R6 question import.
 
+## 2026-09-02 21:09 IST — R1-R5 synthetic acceptance / R4 licence-boundary execution
+
+- **Run start/end:** 2026-09-02 21:09:54 IST → 2026-09-02 21:32:22 IST.
+- **Active engineering/review span:** approximately **22 minutes** of live acceptance-tenant verification, canonical lifecycle execution, licence-overflow proof, release-gate verification, evidence recording, recorder rework/cleanup and R6 import-path review. The 45–50 minute target was not artificially padded.
+- **Section worked:** Release acceptance R1–R6.
+- **Checklist items completed:** **R1–R5**. R4 reached exactly 100/100 active synthetic students through the canonical lifecycle; a 101st activation was rejected by the existing licence guard with SQLSTATE `23514`, and the failed overflow account did not persist.
+- **Items still pending:** J3 qualified legal review; R6–R18; L1–L6; Z2–Z8 final production sign-off. Permanent production remains protected.
+- **Branch / commits:** run-start checkpoint `27eacfb4f8d21d542a457ee9a4df2c5ac0ab605c`; R4 evidence commit `1a1127e1ba4089cdba791fa6899e294aa10792dd`; temporary recorder experiments were removed by restoring the branch to the exact green evidence checkpoint before this final recorder sequence.
+- **CI / release gate:** exact R4 evidence release gate `33651043425` **PASS**, 2026-09-02 15:49:28Z–15:51:47Z (~2m19s), including hardening checks, TypeScript, lint, all required regressions, production build and final enforcement. The final checklist/heartbeat commit must also complete the full release gate before R6 is credited.
+- **Vercel:** permanent `main` application probe returned HTTP 200; project runtime errors were zero in the preceding 24 hours; hardening previews remained READY. No permanent production promotion occurred.
+- **Supabase:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained `ACTIVE_HEALTHY`; post-R4 database size **216,624,275 bytes**; isolated `Evidara School` tenant remained exactly **100 active students** under the 100-seat annual licence.
+- **Rework/failures/blockers:** the first attempt to create the 100th synthetic user and membership in one data-changing CTE rolled back because the lifecycle RPC could not see the trigger-created profile in that same statement snapshot; sequential canonical lifecycle statements then passed. Several temporary recorder-workflow experiments failed before useful jobs ran; those commits were removed from the branch before this final record. No St. Mary’s/future-client data was touched.
+- **Acceptance-section completion:** **5/18 = 27.8%**.
+- **Overall Phase 1:** **101/129 = 78.3% verified** after R1–R5.
+- **Exact next action:** after the full release gate on this record commit is green, execute R6 in the same isolated tenant using a synthetic CSV of at least 500 questions; intentionally surface invalid rows, correct/retry them, scrutinize exact-duplicate handling, persist evidence, and only then check R6.
+

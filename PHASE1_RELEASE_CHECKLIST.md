@@ -152,11 +152,11 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 # Release acceptance test — real-school path
 
-- [ ] R1 Create Test School A as a real institution.
-- [ ] R2 Create a 100-seat annual licence at ₹199/student.
-- [ ] R3 Create School Admin and Teacher accounts.
-- [ ] R4 Import 100 real student accounts.
-- [ ] R5 Assign teacher to Physics/section scope.
+- [x] R1 Create Test School A as a real institution — verified 2 Sep 2026 using the isolated synthetic acceptance institution `Evidara School` (`evidara-school-acceptance`); no St. Mary’s or future-client data was used. Evidence: `PHASE1_ACCEPTANCE_R1_R5_EVIDENCE.md`.
+- [x] R2 Create a 100-seat annual licence at ₹199/student — verified 2 Sep 2026 in the isolated acceptance tenant: active annual licence, 100 seats, ₹199/student/year. Evidence: `PHASE1_ACCEPTANCE_R1_R5_EVIDENCE.md`.
+- [x] R3 Create School Admin and Teacher accounts — verified 2 Sep 2026: School Admin, Teacher and Student acceptance credentials authenticated successfully in rendered-browser readiness run `33645773392`. Evidence: `PHASE1_ACCEPTANCE_R1_R5_EVIDENCE.md`.
+- [x] R4 Import 100 real student accounts — verified 2 Sep 2026 with isolated synthetic acceptance accounts only: canonical lifecycle reached exactly 100/100 active students; a 101st activation was blocked by licence enforcement with SQLSTATE `23514`, leaving 100 active students and no persisted overflow account. Evidence: `PHASE1_ACCEPTANCE_R1_R5_EVIDENCE.md`.
+- [x] R5 Assign teacher to Physics/section scope — verified 2 Sep 2026: active Physics assignment for Grade 11 / Section A in the isolated acceptance tenant. Evidence: `PHASE1_ACCEPTANCE_R1_R5_EVIDENCE.md`.
 - [ ] R6 Import at least 500 questions and resolve invalid rows.
 - [ ] R7 Approve questions.
 - [ ] R8 Create Physics test and assign Grade 11 section/programme.
