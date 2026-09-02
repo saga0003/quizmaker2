@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,9 +25,31 @@ function lineCount(path) {
   return content.endsWith('\n') ? content.split('\n').length - 1 : content.split('\n').length;
 }
 
+function makeRunnerConfig(overrides = {}) {
+  const operations = Array.from({ length: 500 }, (_, index) => ({
+    actorId: `synthetic-student-${String(index + 1).padStart(4, '0')}`,
+    path: '/api/acceptance/noop',
+    method: 'POST',
+    authorization: `Bearer synthetic-session-${index + 1}`,
+    body: { synthetic: true },
+  }));
+  return {
+    target: 'https://quizmaker2-git-phase1-hardening-example.vercel.app',
+    syntheticOnly: true,
+    containsPersonalData: false,
+    scenario: 'start',
+    operations,
+    concurrency: 50,
+    rampMs: 1000,
+    timeoutMs: 1000,
+    ...overrides,
+  };
+}
+
 const root = process.cwd();
 const generator = join(root, 'scripts', 'phase1-generate-load-fixtures.mjs');
 const preflight = join(root, 'scripts', 'phase1-acceptance-preflight.mjs');
+const runner = join(root, 'scripts', 'phase1-run-load-scenario.mjs');
 const temp = mkdtempSync(join(tmpdir(), 'evidara-acceptance-tooling-'));
 const runA = join(temp, 'run-a');
 const runB = join(temp, 'run-b');
@@ -69,6 +91,50 @@ try {
   assert(safePayload.productionProtected === true, 'safe preflight must report production protection');
   assert(safePayload.destructiveActionsPerformed === false, 'preflight must remain non-destructive');
   assert(safePayload.mode === 'preflight-only', 'preflight must not masquerade as load execution');
+
+  const validRunnerConfigPath = join(temp, 'runner-valid.json');
+  writeFileSync(validRunnerConfigPath, JSON.stringify(makeRunnerConfig()));
+  const safeRunner = runNode(
+    runner,
+    ['--scenario', 'start', '--config', validRunnerConfigPath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(safeRunner.status === 0, `load runner safe config must pass dry-run: ${safeRunner.stderr}`);
+  assert(JSON.parse(safeRunner.stdout).requestsSent === 0, 'load runner dry-run must send zero requests');
+
+  const authOverride = makeRunnerConfig();
+  authOverride.operations[0].headers = { authorization: 'Bearer service_role_override' };
+  const authOverridePath = join(temp, 'runner-auth-override.json');
+  writeFileSync(authOverridePath, JSON.stringify(authOverride));
+  const authOverrideRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', authOverridePath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(authOverrideRun.status === 2, 'load runner must refuse custom Authorization header overrides');
+  assert(authOverrideRun.stderr.includes('protected header: authorization'), 'authorization override refusal must name the protected header');
+
+  const hostOverride = makeRunnerConfig();
+  hostOverride.operations[0].headers = { Host: 'evidara.in' };
+  const hostOverridePath = join(temp, 'runner-host-override.json');
+  writeFileSync(hostOverridePath, JSON.stringify(hostOverride));
+  const hostOverrideRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', hostOverridePath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(hostOverrideRun.status === 2, 'load runner must refuse Host header overrides');
+
+  const unsafePath = makeRunnerConfig();
+  unsafePath.operations[0].path = '//evidara.in/api/acceptance/noop';
+  const unsafePathFile = join(temp, 'runner-unsafe-path.json');
+  writeFileSync(unsafePathFile, JSON.stringify(unsafePath));
+  const unsafePathRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', unsafePathFile, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(unsafePathRun.status === 2, 'load runner must refuse scheme-relative paths');
 
   execFileSync(process.execPath, [generator, '--out', runA, '--seed', '424242'], { stdio: 'pipe' });
   execFileSync(process.execPath, [generator, '--out', runB, '--seed', '424242'], { stdio: 'pipe' });
