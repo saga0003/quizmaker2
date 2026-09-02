@@ -1,0 +1,18 @@
+### 2026-09-02 18:57 IST — hourly production-hardening heartbeat
+
+- **Run start/end:** 18:57:05 IST → ~19:05 IST.
+- **Active engineering span:** ~8 minutes best observable span; environment/tool execution ended materially before the 45–50 minute target, so the target was not met and no time was padded.
+- **Section worked:** Real-school acceptance readiness (R1–R18), with production authorization repair required by R5.
+- **Checklist items completed:** none newly checked; R1–R18 remain evidence-gated.
+- **Substantial implementation:** discovered that `assign_teacher_section_v10` rejected canonical `school_admin` because legacy `analytics_is_school_admin_v10` only recognized institute roles. First migration draft included unsupported `school_owner` enum and failed safely; corrected migration was applied. Versioned `20260902190000_phase1_school_admin_teacher_assignment_role_fix.sql`, and expanded B6 regression coverage to enforce canonical school-admin authorization plus active-member/auth.uid/platform-admin protections.
+- **Acceptance topology:** using the synthetic Evidara School tenant and School Admin auth context, successfully provisioned the synthetic Teacher membership, Grade 11/A academic section, active Student membership through `add_school_student_membership_v13`, and Physics Teacher assignment through `assign_teacher_section_v10`. Audit evidence confirms membership/student/teacher-assignment events by the School Admin actor. No St. Mary's or future-client data used.
+- **Items pending:** J3 qualified legal review; authenticated rendered R1–R18; L1–L6 load acceptance; Z2–Z8 final sign-off.
+- **Functional candidate / branch head:** `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` before this heartbeat trigger.
+- **Commits created:** `16d1e94d1a0b0338e96844412cc32799da2d9d42` (authorization migration), `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` (B6 regression).
+- **CI:** release-gate run `33636255040` on `3fad2d9f...` still in progress at handoff; observed hardening steps including B6 passed. H7 Responsive Contract on the same head passed. Do not treat release gate as complete until final conclusion is green.
+- **Vercel:** permanent production healthy with no error/fatal runtime entries in preceding 24h and not promoted/modified. Preview for `16d1e94d...` READY; exact `3fad2d9f...` preview was BUILDING at final observation.
+- **Supabase:** `SMIS QP` ACTIVE_HEALTHY; acceptance org `evidara-school-acceptance` remains `is_demo=true`; DB remains approximately 216,403,091 bytes. Security advisor was re-run after DDL and reports existing INFO/WARN advisory debt; the new helper retains explicit `search_path`, scoped auth checks, and no anonymous-role expansion was introduced by this fix.
+- **Rework/failures/blockers:** first migration attempt failed safely on invalid `school_owner` enum and was corrected. Remaining rendered-browser blocker is availability/configuration of synthetic role credentials + protected-preview access in the authenticated acceptance workflow; do not substitute DB/API evidence for R acceptance.
+- **Active section complete:** R acceptance 0/18 formally (fixture/readiness materially improved).
+- **Overall Phase 1:** 96/129 = 74.4%.
+- **Exact next action:** wait for the `3fad2d9f...` full release gate and exact Vercel preview to be green/READY; then run authenticated readiness for School Admin, Teacher, and Student against that preview and execute R1→R18 in order, beginning with rendered School Admin onboarding/assignment evidence. Move directly into L1→L6 once R passes.
