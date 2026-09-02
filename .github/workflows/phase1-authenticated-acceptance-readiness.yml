@@ -33,7 +33,7 @@ jobs:
       EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
-      EVIDARA_ACCEPTANCE_URL: ${{ inputs.target_url || 'https://quizmaker2-f5sdk5vi7-saga0003s-projects.vercel.app' }}
+      EVIDARA_ACCEPTANCE_URL: ${{ inputs.target_url || 'https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app' }}
       EVIDARA_ACCEPTANCE_DB_BYTES: ${{ inputs.database_bytes || '216411283' }}
       EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
       EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
