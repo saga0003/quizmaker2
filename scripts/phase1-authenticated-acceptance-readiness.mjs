@@ -31,6 +31,19 @@ function assertSafePreview(rawTarget) {
   return url.origin;
 }
 
+function optionalProtectedPreviewBootstrap(target) {
+  const raw = (process.env.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL || '').trim();
+  if (!raw) return null;
+  const url = new URL(raw);
+  if (url.protocol !== 'https:' || url.origin !== target) {
+    throw new Error('Protected-preview bootstrap URL must use HTTPS and exactly match the acceptance preview origin.');
+  }
+  if (!url.searchParams.get('_vercel_share')) {
+    throw new Error('Protected-preview bootstrap URL is missing the Vercel share token parameter.');
+  }
+  return url.toString();
+}
+
 function roleConfig() {
   return [
     {
@@ -79,7 +92,7 @@ async function waitForAuthenticatedWorkspace(page, config) {
   );
 }
 
-async function verifyRole(browser, target, config) {
+async function verifyRole(browser, target, protectedPreviewBootstrap, config) {
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
   const page = await context.newPage();
   const consoleErrors = [];
@@ -91,7 +104,14 @@ async function verifyRole(browser, target, config) {
   page.on('pageerror', (error) => pageErrors.push(String(error.message || error).slice(0, 500)));
 
   try {
+    if (protectedPreviewBootstrap) {
+      await page.goto(protectedPreviewBootstrap, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      await page.waitForTimeout(500);
+    }
     await page.goto(`${target}/?view=login`, { waitUntil: 'networkidle', timeout: 45_000 });
+    if (new URL(page.url()).hostname === 'vercel.com') {
+      throw new Error('Acceptance preview is protected by Vercel SSO; configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL as a GitHub Actions secret.');
+    }
     await page.locator('#email').waitFor({ state: 'visible', timeout: 20_000 });
     await page.locator('#password').waitFor({ state: 'visible', timeout: 20_000 });
     await page.locator('#email').fill(config.email);
@@ -144,6 +164,7 @@ async function main() {
   }
 
   const target = assertSafePreview(requireEnv('EVIDARA_ACCEPTANCE_URL'));
+  const protectedPreviewBootstrap = optionalProtectedPreviewBootstrap(target);
   const configs = roleConfig();
   await mkdir(EVIDENCE_DIR, { recursive: true });
 
@@ -151,7 +172,7 @@ async function main() {
   let results;
   try {
     results = [];
-    for (const config of configs) results.push(await verifyRole(browser, target, config));
+    for (const config of configs) results.push(await verifyRole(browser, target, protectedPreviewBootstrap, config));
   } finally {
     await browser.close();
   }
@@ -159,6 +180,7 @@ async function main() {
   const manifest = {
     target,
     productionProtected: true,
+    protectedPreviewBootstrapUsed: Boolean(protectedPreviewBootstrap),
     secretsRecorded: false,
     purpose: 'R1-R18 authenticated rendered-browser readiness only; this does not satisfy an R item.',
     results,
