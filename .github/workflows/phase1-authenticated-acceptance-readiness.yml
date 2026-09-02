@@ -1,0 +1,72 @@
+name: Phase 1 Authenticated Acceptance Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: Exact READY phase1-hardening Vercel preview URL
+        required: true
+        type: string
+      database_bytes:
+        description: Fresh pg_database_size(current_database()) measurement
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase1-authenticated-acceptance-readiness
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: ${{ inputs.target_url }}
+      EVIDARA_ACCEPTANCE_DB_BYTES: ${{ inputs.database_bytes }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+      EVIDARA_ACCEPTANCE_TEACHER_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_TEACHER_EMAIL }}
+      EVIDARA_ACCEPTANCE_TEACHER_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_TEACHER_PASSWORD }}
+      EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/auth-readiness
+
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Run same-project safety preflight
+        run: node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+
+      - name: Install Playwright runner without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run authenticated rendered-browser readiness
+        run: node scripts/phase1-authenticated-acceptance-readiness.mjs
+
+      - name: Upload redacted readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-authenticated-readiness-${{ github.sha }}
+          path: acceptance-evidence/auth-readiness
+          if-no-files-found: warn
+          retention-days: 14
