@@ -1,4 +1,4 @@
-name: Record verified R8 R9 acceptance
+name: Record verified acceptance progress
 
 on:
   push:
@@ -18,17 +18,15 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Record R8 and R9
+      - name: Record verified R10
         shell: python
         run: |
           from pathlib import Path
           p = Path('PHASE1_RELEASE_CHECKLIST.md')
           text = p.read_text()
-          r8 = '- [ ] R8 Create Physics test and assign Grade 11 section/programme.'
-          r9 = '- [ ] R9 Login using a real student account and start assigned test.'
-          assert r8 in text and r9 in text
-          text = text.replace(r8, '- [x] R8 Create Physics test and assign Grade 11 section/programme — verified 2 Sep 2026 in the isolated synthetic `Evidara School` tenant. Published paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` (`Phase 1 R8 Physics Acceptance Test`) contains 20 approved Physics questions and is materialized to exactly 100 Grade 11 / Section A / NEET synthetic students for academic year 2026-27. The acceptance evidence checkpoint passed complete release gate `33664610356`.')
-          text = text.replace(r9, '- [x] R9 Login using a real student account and start assigned test — verified 2 Sep 2026 with the synthetic acceptance Student credential against the protected `phase1-hardening` preview. The assigned R8 paper started successfully through the canonical student path, creating in-progress attempt `d970d756-f56c-4e9a-9057-f2c775658719`; the learner payload contained the 20 assigned questions and did not expose correct answers. The acceptance evidence checkpoint passed complete release gate `33664610356`.')
+          r10 = '- [ ] R10 Physically disconnect network, answer, reconnect and verify recovery/sync.'
+          assert r10 in text
+          text = text.replace(r10, '- [x] R10 Physically disconnect network, answer, reconnect and verify recovery/sync — verified 3 Sep 2026 on branch checkpoint `7930f460925fdcb8778ce8850acc11041d55179e` using only the isolated synthetic `Evidara School` tenant. The rendered acceptance physically switched Chromium offline, observed the `Internet disconnected` state, answered question `1a35b63a-423d-4dac-8b52-4d9ed8279c01`, proved the attempt-scoped local pending queue held exactly one answer, restored connectivity, observed `All answers saved`, and proved the queue automatically cleared with zero unexpected console/page errors. Supabase independently confirmed the synthetic server response `response=["A"]` persisted at `2026-09-02 21:23:01.436052+00`. R10 workflow `33684626548` and complete release gate `33684626556` both passed. Permanent production remained protected.')
           p.write_text(text)
       - name: Commit checklist evidence
         shell: bash
@@ -36,5 +34,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add PHASE1_RELEASE_CHECKLIST.md
-          git commit -m 'docs(acceptance): record verified R8 R9 [skip ci]'
+          git commit -m 'docs(acceptance): record verified R10 [skip ci]'
           git push origin HEAD:phase1-hardening
