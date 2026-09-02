@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 
 const REQUIRED_ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
 const EXPECTED_ORG = 'evidara-school-acceptance';
+const LOCAL_ACK = 'YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY';
 const PAPER_TITLE = 'Phase 1 R8 Physics Acceptance Test';
 const EVIDENCE_DIR = process.env.EVIDARA_ACCEPTANCE_EVIDENCE_DIR || 'acceptance-evidence/r10-offline-reconnect';
 const KNOWN_PRODUCTION_HOSTS = new Set([
@@ -20,16 +21,23 @@ function requireEnv(name) {
   return value;
 }
 
-function assertSafePreview(rawTarget) {
+function assertSafeTarget(rawTarget) {
   const url = new URL(rawTarget);
   const host = url.hostname.toLowerCase();
+  const isLocal = (host === '127.0.0.1' || host === 'localhost') && url.protocol === 'http:';
+  if (isLocal) {
+    if (process.env.EVIDARA_ACCEPTANCE_LOCALHOST !== LOCAL_ACK) {
+      throw new Error('Local R10 acceptance requires the explicit synthetic-local acknowledgement.');
+    }
+    return { origin: url.origin, local: true };
+  }
   if (url.protocol !== 'https:' || KNOWN_PRODUCTION_HOSTS.has(host) || host.includes('git-main')) {
     throw new Error(`R10 acceptance refuses production-like target: ${url.origin}`);
   }
   if (!host.endsWith('.vercel.app') || !host.includes('quizmaker2')) {
-    throw new Error(`R10 target must be an Evidara Vercel preview: ${url.origin}`);
+    throw new Error(`R10 target must be an Evidara Vercel preview or explicit localhost acceptance server: ${url.origin}`);
   }
-  return url.origin;
+  return { origin: url.origin, local: false };
 }
 
 function protectedBootstrap(target) {
@@ -55,8 +63,9 @@ async function main() {
     throw new Error(`R10 is restricted to ${EXPECTED_ORG}.`);
   }
 
-  const target = assertSafePreview(requireEnv('EVIDARA_ACCEPTANCE_URL'));
-  const bootstrap = protectedBootstrap(target);
+  const safeTarget = assertSafeTarget(requireEnv('EVIDARA_ACCEPTANCE_URL'));
+  const target = safeTarget.origin;
+  const bootstrap = safeTarget.local ? null : protectedBootstrap(target);
   const email = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
   const password = requireEnv('EVIDARA_ACCEPTANCE_STUDENT_PASSWORD');
   await mkdir(EVIDENCE_DIR, { recursive: true });
@@ -75,10 +84,14 @@ async function main() {
   let reconnectClearedLocalQueue = false;
 
   try {
-    await page.goto(bootstrap, { waitUntil: 'domcontentloaded', timeout: 45_000 });
-    await page.waitForTimeout(500);
+    if (bootstrap) {
+      await page.goto(bootstrap, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+      await page.waitForTimeout(500);
+    }
     await page.goto(`${target}/?view=login`, { waitUntil: 'networkidle', timeout: 45_000 });
-    if (new URL(page.url()).hostname === 'vercel.com') throw new Error('Vercel protected preview bootstrap did not establish access.');
+    if (!safeTarget.local && new URL(page.url()).hostname === 'vercel.com') {
+      throw new Error('Vercel protected preview bootstrap did not establish access.');
+    }
     await page.locator('#email').fill(email);
     await page.locator('#password').fill(password);
     await page.getByRole('button', { name: /^Sign In$/ }).click();
@@ -124,6 +137,7 @@ async function main() {
       result: 'PASS',
       acceptanceItem: 'R10',
       target,
+      executionSurface: safeTarget.local ? 'branch-checkout-localhost' : 'protected-preview',
       organizationSlug: EXPECTED_ORG,
       paperTitle: PAPER_TITLE,
       attemptId,
@@ -144,7 +158,9 @@ async function main() {
     if (consoleErrors.length || pageErrors.length) throw new Error(`R10 rendered flow captured ${consoleErrors.length} console and ${pageErrors.length} page errors.`);
   } catch (error) {
     const failure = {
-      result: 'FAIL', acceptanceItem: 'R10', target, organizationSlug: EXPECTED_ORG,
+      result: 'FAIL', acceptanceItem: 'R10', target,
+      executionSurface: safeTarget.local ? 'branch-checkout-localhost' : 'protected-preview',
+      organizationSlug: EXPECTED_ORG,
       attemptId, paperQuestionId, localPendingObserved, reconnectClearedLocalQueue,
       productionProtected: true, secretsRecorded: false,
       error: error instanceof Error ? error.message : String(error),
