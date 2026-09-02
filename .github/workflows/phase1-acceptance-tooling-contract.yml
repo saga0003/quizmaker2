@@ -1,0 +1,41 @@
+name: Evidara Phase 1 Acceptance Tooling Contract
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+      - main
+    paths:
+      - scripts/phase1-generate-load-fixtures.mjs
+      - scripts/phase1-acceptance-preflight.mjs
+      - scripts/phase1-acceptance-tooling-smoke.mjs
+      - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
+      - .github/workflows/phase1-acceptance-tooling-contract.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - scripts/phase1-generate-load-fixtures.mjs
+      - scripts/phase1-acceptance-preflight.mjs
+      - scripts/phase1-acceptance-tooling-smoke.mjs
+      - PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md
+      - .github/workflows/phase1-acceptance-tooling-contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance-tooling-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify synthetic fixture and non-production preflight contract
+        run: node scripts/phase1-acceptance-tooling-smoke.mjs
