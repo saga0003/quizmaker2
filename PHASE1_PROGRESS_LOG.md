@@ -715,3 +715,21 @@ This log records each production-hardening run with observable implementation an
 - **Overall Phase 1:** 96/129 = 74.4%.
 - **Exact next action:** wait for the `3fad2d9f...` full release gate and exact Vercel preview to be green/READY; then run authenticated readiness for School Admin, Teacher, and Student against that preview and execute R1→R18 in order, beginning with rendered School Admin onboarding/assignment evidence. Move directly into L1→L6 once R passes.
 
+
+## 2026-09-02 19:13:05 IST — Authenticated acceptance fixture provisioning / hourly heartbeat
+
+- **Run start/end:** 19:13:05 IST → approximately 19:18 IST.
+- **Active engineering/review span:** approximately **5 minutes** of repository/CI/Vercel/Supabase inspection, synthetic fixture provisioning, verification and release-gate rerun initiation. The requested 45–50 minute target was **not met because this automation runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** Real-school acceptance readiness (R1–R18).
+- **Checklist items completed:** none newly checked; R1–R18 remain rendered-evidence gated.
+- **Items still pending:** J3 qualified legal review; authenticated rendered R1–R18; L1–L6 load acceptance; Z2–Z8 final production sign-off.
+- **Starting branch head:** `c8956c5bdca9dda8dfa9fe7dd23b79e1ebd7152a`.
+- **Commits created:** this heartbeat trigger only; no product-code commit was required.
+- **CI:** release-gate run `33636255040` for exact functional candidate `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` had been cancelled by later concurrency after every observed gate step individually succeeded; job rerun attempt 2 was explicitly started in this run and was queued at handoff. Do not claim a clean full-gate PASS until attempt 2 concludes success.
+- **Vercel:** permanent production has no runtime errors in the preceding 24h. Current branch head `c8956c5b...` has a READY preview; exact functional candidates `16d1e94d...` and `3fad2d9f...` also have READY previews. Permanent production was not promoted.
+- **Supabase:** `SMIS QP` remains ACTIVE_HEALTHY; database size is 216,411,283 bytes. `Evidara School` (`evidara-school-acceptance`) remains `is_demo=true`.
+- **Substantial work:** confirmed all three newly created acceptance Auth users are email-confirmed. Provisioned `acceptance.admin@demo.evidara.app` as active `school_admin`, `acceptance.teacher@demo.evidara.app` as active `school_teacher`/teacher member, and `acceptance.student@demo.evidara.app` as an active Grade 11/A ISC NEET student through `add_school_student_membership_v13`. Assigned the acceptance Teacher to Grade 11/A Physics through `assign_teacher_section_v10`. No St. Mary's or future-client data was used.
+- **Rework/failures/blockers:** initial read-only topology queries used stale guessed column names (`role`, `section`, `created_at`) and failed without mutation; schema was inspected and corrected. Remaining blocker for rendered acceptance is the GitHub Actions secret configuration / authenticated readiness execution; secret values cannot be read through the connected GitHub API. Database topology is now ready for those credentials.
+- **Active section complete:** R acceptance remains **0/18 formally**; fixture readiness materially advanced.
+- **Overall Phase 1:** **96/129 = 74.4%**.
+- **Exact next action:** verify release-gate attempt 2 is green, then execute `Phase 1 Authenticated Acceptance Readiness` against the exact READY hardening preview as soon as the six acceptance credential secrets and protected-preview share secret are available; if all three rendered logins pass, execute R1→R18 in order and continue directly to L1→L6.
