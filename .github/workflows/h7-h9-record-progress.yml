@@ -2,49 +2,54 @@ name: Record Phase 1 hourly heartbeat
 
 on:
   push:
-    branches: [phase1-hardening]
-    paths: ['.github/workflows/h7-h9-record-progress.yml']
+    branches:
+      - phase1-hardening
+    paths:
+      - .phase1-heartbeat-trigger.b64
 
 permissions:
   contents: write
 
+concurrency:
+  group: phase1-heartbeat-recorder
+  cancel-in-progress: false
+
 jobs:
   record:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout hardening branch
+        uses: actions/checkout@v4
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Append load-runner safety heartbeat once
+
+      - name: Decode and append heartbeat once
         shell: bash
         run: |
-          if grep -Fq '## 2026-09-02 07:07:19–07:12:11 IST — Load acceptance runner safety hardening' PHASE1_PROGRESS_LOG.md; then
-            echo 'Heartbeat already recorded; nothing to do.'
+          set -euo pipefail
+          base64 --decode .phase1-heartbeat-trigger.b64 > /tmp/phase1-heartbeat.md
+          marker="$(head -n 1 /tmp/phase1-heartbeat.md)"
+          test -n "$marker"
+          if grep -Fqx "$marker" PHASE1_PROGRESS_LOG.md; then
+            echo "Heartbeat already recorded: $marker"
             exit 0
           fi
-          cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
+          printf '\n' >> PHASE1_PROGRESS_LOG.md
+          cat /tmp/phase1-heartbeat.md >> PHASE1_PROGRESS_LOG.md
+          printf '\n' >> PHASE1_PROGRESS_LOG.md
 
-## 2026-09-02 07:07:19–07:12:11 IST — Load acceptance runner safety hardening
-
-- **Run start:** 2026-09-02 07:07:19 IST.
-- **Run end:** 2026-09-02 07:12:11 IST.
-- **Active engineering minutes / best observable engineering span:** approximately **4m52s** from branch/checklist/CI/production/database inspection through load-runner safety review, implementation, permanent regression, CI verification and heartbeat staging. The requested 45–50 minute target was **not met because this execution window ended materially earlier**; no time was artificially padded.
-- **Section worked:** J3 external legal-sign-off blocker remained open; productive work continued on load-acceptance tooling for L4–L6 without executing load or touching production.
-- **Checklist items completed:** none. J3 remains intentionally unchecked pending qualified legal approval; R1–R18 and L1–L6 remain unexecuted and unchecked.
-- **Items still pending:** J3; R1–R18 real-school acceptance; L1–L6 load acceptance; Z2–Z8 production sign-off; Supabase leaked-password protection before final security sign-off.
-- **Branch head at run start:** `49c72a846134e885634fef907d5ecc7b05e3321d`.
-- **Commits created:** `ca8bdfe0dc8640b1c900db5ec0f41035cd3ce07f` prevents custom operation headers from overriding the validated bearer/content/transport headers and hardens relative-path origin validation; `c80de5e044b9b757977be8ffbb49d4a3a92c8ece` adds permanent dry-run regression coverage for safe configs, Authorization/Host override rejection, and scheme-relative path rejection.
-- **CI run and duration/result:** Acceptance Tooling Contract `33580240292` **PASS** on exact functional candidate `c80de5e044b9b757977be8ffbb49d4a3a92c8ece`; complete release gate `33580240248` **PASS**, created 01:39:16Z and completed 01:41:52Z (approximately **2m36s** elapsed). No checklist credit is claimed because L4–L6 still require actual measured execution in a dedicated non-production acceptance tenant.
-- **Vercel state:** production remained protected and unchanged; preceding-24-hour runtime error/fatal inspection was clean at run start; no promotion was attempted.
-- **Supabase state:** connected projects `SMIS QP` (`xzfozpnzvznqrvcsoail`) and `NatSciX Online Test` (`hngvpirypezmypderovr`) were `ACTIVE_HEALTHY`; no database mutation occurred. Fresh Security Advisor still reports leaked-password protection disabled, plus existing RLS/function/SECURITY DEFINER advisories requiring scoped review rather than blanket mutation.
-- **Rework/failures/blockers:** safety review found a real fail-open defect in the newly added L4–L6 load runner: `op.headers.authorization` could override the bearer token after validation. This was fixed before any load execution. J3 remains an external qualified-counsel blocker; R1–R18 require authorised school operators/data; L1–L6 require a dedicated non-production acceptance tenant and per-actor synthetic sessions.
-- **Active section completion:** Section J remains **4/5 = 80%** verified; real-school acceptance remains **0/18**; load acceptance remains **0/6**.
-- **Overall Phase 1:** remains **96/129 = 74.4%** verified.
-- **Exact next action:** keep J3 open pending qualified counsel; provision/identify a dedicated non-production acceptance tenant and synthetic per-actor sessions, run fail-closed preflight, then execute L1–L6 with measured evidence while R1–R18 await authorised school operators; resolve leaked-password protection and scoped security-advisor findings before Z security sign-off; re-run complete release gate before any production promotion.
-EOF
+      - name: Commit progress log if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- PHASE1_PROGRESS_LOG.md; then
+            echo 'No progress-log change required.'
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add PHASE1_PROGRESS_LOG.md
-          git commit -m "docs: record load-runner safety heartbeat [skip ci]"
+          git commit -m "docs: append Phase 1 hourly heartbeat [skip ci]"
           git push origin HEAD:phase1-hardening
