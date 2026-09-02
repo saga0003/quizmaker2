@@ -17,7 +17,7 @@ const checks = [
   ['authenticated execution is explicitly granted', /grant execute on function public\.submit_exam_attempt\(uuid\) to authenticated;/i.test(migration)],
   ['client flushes pending answers before final submit', /const synced = await flushPending\(payload\.attempt_id\);/i.test(exam)],
   ['client calls authoritative submit RPC', /rpc\('submit_exam_attempt'/i.test(exam)],
-  ['client only enters result state from server response', /setResult\(data as AttemptResult\);/i.test(exam)],
+  ['client only enters result state from server response', /(?:setResult\(data as AttemptResult\);|const submittedResult = data as AttemptResult;[\s\S]*?setResult\(submittedResult\);)/i.test(exam)],
   ['student receives clear confirmed-submission screen', /<h1>Test submitted<\/h1>[\s\S]*?authoritative result have been stored/i.test(exam)],
 ];
 
