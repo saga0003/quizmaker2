@@ -12,6 +12,18 @@ const PRODUCTION_HOSTS = new Set([
   'evidara.in',
   'www.evidara.in',
 ]);
+const FORBIDDEN_OPERATION_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'host',
+  'content-type',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'user-agent',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+]);
 
 function fail(message) {
   console.error(`LOAD ACCEPTANCE REFUSED: ${message}`);
@@ -41,6 +53,19 @@ function assertSafeTarget(raw) {
   return url.origin;
 }
 
+function validateOperationHeaders(headers, index) {
+  if (headers === undefined) return;
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) throw new Error(`operation ${index} headers must be an object`);
+  const entries = Object.entries(headers);
+  if (entries.length > 20) throw new Error(`operation ${index} may contain at most 20 custom headers`);
+  for (const [rawName, value] of entries) {
+    const name = rawName.trim().toLowerCase();
+    if (!name || name !== rawName.toLowerCase()) throw new Error(`operation ${index} contains an invalid header name`);
+    if (FORBIDDEN_OPERATION_HEADERS.has(name)) throw new Error(`operation ${index} may not override protected header: ${name}`);
+    if (typeof value !== 'string' || value.length > 2048 || /[\r\n]/.test(value)) throw new Error(`operation ${index} contains an invalid header value for ${name}`);
+  }
+}
+
 function validateConfig(config, scenario) {
   if (!config || typeof config !== 'object') throw new Error('config must be a JSON object');
   const target = assertSafeTarget(config.target);
@@ -54,10 +79,13 @@ function validateConfig(config, scenario) {
     if (typeof op.actorId !== 'string' || !op.actorId.startsWith('synthetic-')) throw new Error(`operation ${index} actorId must be visibly synthetic`);
     if (actorIds.has(op.actorId)) throw new Error(`duplicate actorId: ${op.actorId}`);
     actorIds.add(op.actorId);
-    if (typeof op.path !== 'string' || !op.path.startsWith('/')) throw new Error(`operation ${index} path must be relative`);
+    if (typeof op.path !== 'string' || !op.path.startsWith('/') || op.path.startsWith('//') || op.path.includes('\\')) throw new Error(`operation ${index} path must be a safe relative path`);
+    const resolved = new URL(op.path, `${target}/`);
+    if (resolved.origin !== target) throw new Error(`operation ${index} path may not change target origin`);
     if (!['POST', 'PUT', 'PATCH'].includes(op.method)) throw new Error(`operation ${index} method must be POST/PUT/PATCH`);
     if (typeof op.authorization !== 'string' || !op.authorization.startsWith('Bearer ')) throw new Error(`operation ${index} must carry its own bearer session`);
     if (op.authorization.includes('service_role')) throw new Error(`operation ${index} may not use a service-role token`);
+    validateOperationHeaders(op.headers, index);
   }
   const concurrency = Number(config.concurrency ?? 50);
   const rampMs = Number(config.rampMs ?? 30_000);
@@ -85,10 +113,10 @@ async function executeOperation(target, op, timeoutMs) {
       signal: controller.signal,
       redirect: 'manual',
       headers: {
+        ...(op.headers ?? {}),
         'content-type': 'application/json',
         authorization: op.authorization,
         'user-agent': 'evidara-phase1-load-acceptance/1',
-        ...(op.headers ?? {}),
       },
       body: op.body === undefined ? undefined : JSON.stringify(op.body),
     });
