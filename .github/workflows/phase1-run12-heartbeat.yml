@@ -1,0 +1,36 @@
+name: Record Phase 1 acceptance prep heartbeat
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/phase1-run12-heartbeat.yml
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Append heartbeat
+        run: echo 'CiMjIDIwMjYtMDktMDIgMDY6MDE6MTAgSVNUIOKAlCBKMyBibG9ja2VyIC8gcmVhbC1zY2hvb2wgYW5kIGxvYWQgYWNjZXB0YW5jZSBwcmVwYXJhdGlvbgoKLSAqKlJ1biBzdGFydDoqKiAyMDI2LTA5LTAyIDA2OjAxOjEwIElTVC4KLSAqKlJ1biBlbmQ6KiogMjAyNi0wOS0wMiAwNjowODo0OSBJU1QuCi0gKipBY3RpdmUgZW5naW5lZXJpbmcgbWludXRlcyAvIGJlc3Qgb2JzZXJ2YWJsZSBlbmdpbmVlcmluZyBzcGFuOioqIGFwcHJveGltYXRlbHkgKio3bSAzOXMqKiBmcm9tIHJ1bi1zdGFydCBpbnNwZWN0aW9uIHRocm91Z2ggZmluYWwgYWNjZXB0YW5jZS10b29saW5nL0NJIHJldmlldy4gVGhlIGF2YWlsYWJsZSBleGVjdXRpb24gd2luZG93IGVuZGVkIG1hdGVyaWFsbHkgZWFybGllciB0aGFuIHRoZSByZXF1ZXN0ZWQgNDXigJM1MCBtaW51dGUgcHJvZHVjdGl2ZSB0YXJnZXQsIHNvIHRoZSB0YXJnZXQgd2FzIG5vdCBtZXQgYW5kIG5vIHRpbWUgd2FzIGFydGlmaWNpYWxseSBwYWRkZWQuCi0gKipTZWN0aW9uIHdvcmtlZDoqKiBKMyBleHRlcm5hbCBsZWdhbCBzaWduLW9mZiBibG9ja2VyLCB0aGVuIHByZXBhcmF0aW9uIGZvciByZWFsLXNjaG9vbCBhY2NlcHRhbmNlIGFuZCBsb2FkIGFjY2VwdGFuY2UuCi0gKipDaGVja2xpc3QgaXRlbXMgY29tcGxldGVkOioqIG5vbmUuIEozIHJlbWFpbnMgaW50ZW50aW9uYWxseSB1bmNoZWNrZWQgcGVuZGluZyBxdWFsaWZpZWQgbGVnYWwgYXBwcm92YWw7IFIx4oCTUjE4IGFuZCBMMfCTTDYgcmVtYWluIHVuZXhlY3V0ZWQgYW5kIHVuY2hlY2tlZC4KLSAqKkl0ZW1zIHN0aWxsIHBlbmRpbmc6KiogSjM7IFIx4oCTUjE4IHJlYWwtc2Nob29sIGFjY2VwdGFuY2U7IEwx4oCTTDYgbG9hZCBhY2NlcHRhbmNlOyBaMuKAk1o4IGZpbmFsIHByb2R1Y3Rpb24gc2lnbi1vZmYuCi0gKipCcmFuY2ggaGVhZCBhdCBydW4gc3RhcnQ6KiogYDhhYjU4NmVkYjQ1N2UwZTEzMWU3ZTFlM2UwNzc5YjliNjhiYWNkZjNgLgotICoqRnVuY3Rpb25hbC9wcmVwYXJhdGlvbiBjb21taXRzIGNyZWF0ZWQ6KiogbG9hZC1hY2NlcHRhbmNlIHByb3RvY29sOyBgZGZmZGQwNDM1NjQ2NGQyOWQ2ZWVlNzRlNDQ3MmZkNGE2OTQ3NzAxY2AgZGV0ZXJtaW5pc3RpYyBMMfCTTDMgc3ludGhldGljIGZpeHR1cmUgZ2VuZXJhdG9yOyBgMDMwYzQ4ZjgxZjM3N2IyY2U1YThmNTFkYmQwZThjOTYwOGY4OTYyOWAgZmFpbC1jbG9zZWQgbm9uLXByb2R1Y3Rpb24gYWNjZXB0YW5jZSBwcmVmbGlnaHQ7IGFjY2VwdGFuY2UtdG9vbGluZyBzbW9rZSByZWdyZXNzaW9uOyBgYTE4OTRmYjdlM2U5ZmU0ZThlYTk4ZjJhYjFkMjE0NTNlZTZlNGNjMWAgcGVybWFuZW50IEFjY2VwdGFuY2UgVG9vbGluZyBDb250cmFjdCB3b3JrZmxvdy4KLSAqKkNJIHJ1biBhbmQgZHVyYXRpb24vcmVzdWx0OioqIHByZXZpb3VzbHkgcGVuZGluZyBydW4gYDMzNTcxNjE4MzQ5YCB3YXMgc3VwZXJzZWRlZDsgdGhlIHBhcmVudCBjb21wbGV0ZSBQaGFzZSAxIHJlbGVhc2UgZ2F0ZSBgMzM1NzE3Mjk1OTJgIGlzIGNvbmZpcm1lZCAqKlBBU1MqKi4gRnJlc2ggcmVsZWFzZS1nYXRlIHZlcmlmaWNhdGlvbiBmb3IgdGhlIG5ldyBhY2NlcHRhbmNlLXRvb2xpbmcgY29tbWl0cyB3YXMgdHJpZ2dlcmVkIGJ1dCBoYWQgbm90IHJlYWNoZWQgYSBmaW5hbCBncmVlbiBzdGF0ZSBhdCBmaW5hbCBpbnNwZWN0aW9uLCBzbyBubyBjaGVja2xpc3QgY3JlZGl0IGlzIGNsYWltZWQgZnJvbSB0aGlzIHByZXBhcmF0aW9uIHdvcmsuIFRoZSBuZXcgQWNjZXB0YW5jZSBUb29saW5nIENvbnRyYWN0IHdhcyBhbHNvIHRyaWdnZXJlZCBmb3IgdGhlIGN1cnJlbnQgYWNjZXB0YW5jZS10b29saW5nIGhlYWQ7IGl0cyBmaW5hbCByZXN1bHQgbXVzdCBiZSBjb25maXJtZWQgYmVmb3JlIHRyZWF0aW5nIHRoZSB0b29saW5nIGl0c2VsZiBhcyB2ZXJpZmllZC4KLSAqKlZlcmNlbC9TdXBhYmFzZSBzdGF0ZToqKiBwZXJtYW5lbnQgcHJvZHVjdGlvbiByZW1haW5lZCB1bmNoYW5nZWQgYW5kIHByb3RlY3RlZC4gVmVyY2VsIHByb2R1Y3Rpb24gZXJyb3IvZmF0YWwgbG9ncyBmb3IgdGhlIHByZWNlZGluZyAyNCBob3VycyB3ZXJlIGNsZWFuIGF0IHJ1biBzdGFydDsgaGFyZGVuaW5nIHByZXZpZXdzIHdlcmUgaW5zcGVjdGVkIGFuZCBubyBwcm9kdWN0aW9uIHByb21vdGlvbiB3YXMgYXR0ZW1wdGVkLiBTdXBhYmFzZSBwcm9qZWN0cyBgcXVpem1ha2VyYCBhbmQgYEZpbmFsIFZpdmEgUHJvamVjdGAgcmVtYWluZWQgYEFDVElWRV9IRUFMVEhZYDs= ' | base64 -d >> PHASE1_PROGRESS_LOG.md
+      - name: Append heartbeat tail
+        run: cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
+- **Supabase security follow-up:** no database mutation occurred. Security Advisor surfaced leaked-password protection as disabled plus existing SECURITY DEFINER/compatibility-RPC warnings; RPC warnings require authorization-context review rather than blanket revocation, while leaked-password protection remains an explicit final security follow-up before production sign-off.
+- **Rework/failures/blockers:** no product regression was falsely converted into a pass. J3 remains an external qualified-counsel blocker. R1–R18 still require an authorised real institution dataset/operators. L1–L6 require a dedicated non-production acceptance tenant and actual measured execution. A stale H7/H9 workflow continues to create skipped CI noise but is not a product failure. Production was not used for load testing.
+- **Acceptance preparation delivered:** `PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md` now defines fail-closed evidence and pass criteria for L1–L6; deterministic synthetic fixtures generate exactly 2,000 students, 50,000 questions and 1,000 papers without PII; the preflight refuses known production/main hosts and requires explicit non-production acknowledgement; a permanent smoke regression checks those safety contracts.
+- **Active section completion:** Section J remains **4/5 = 80%** verified; real-school acceptance remains **0/18**; load acceptance remains **0/6**.
+- **Overall Phase 1:** remains **96/129 = 74.4%** verified.
+- **Exact next action:** confirm the complete release gate and Acceptance Tooling Contract on the exact acceptance-tooling head; record qualified counsel approval against `PHASE1_LEGAL_REVIEW_PACKET.md` without weakening J3; when authorised operators/data are available execute R1–R18 exactly per the real-school protocol; then provision a dedicated non-production load tenant, run the acceptance preflight and deterministic fixtures, execute L1–L6 with measured evidence, re-run the complete release gate, resolve the leaked-password-protection security advisor before final security sign-off, and only then proceed through Z2–Z8 production sign-off.
+EOF
+      - name: Commit heartbeat and remove recorder
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git rm -f .github/workflows/phase1-run12-heartbeat.yml
+          git add PHASE1_PROGRESS_LOG.md
+          git commit -m "docs: record acceptance-prep heartbeat [skip ci]"
+          git push origin HEAD:phase1-hardening
