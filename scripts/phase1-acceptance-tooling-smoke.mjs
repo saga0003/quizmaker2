@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
+const CANDIDATE_SHA = 'c80de5e044b9b757977be8ffbb49d4a3a92c8ece';
 let assertions = 0;
 
 function assert(condition, message) {
@@ -38,6 +39,9 @@ function makeRunnerConfig(overrides = {}) {
     syntheticOnly: true,
     containsPersonalData: false,
     scenario: 'start',
+    candidateSha: CANDIDATE_SHA,
+    workloadId: 'phase1-start-acceptance-001',
+    budget: { maxFailureRate: 0.01, maxP95Ms: 3000, maxP99Ms: 5000 },
     operations,
     concurrency: 50,
     rampMs: 1000,
@@ -100,7 +104,30 @@ try {
     { EVIDARA_LOAD_ACCEPTANCE: ACK },
   );
   assert(safeRunner.status === 0, `load runner safe config must pass dry-run: ${safeRunner.stderr}`);
-  assert(JSON.parse(safeRunner.stdout).requestsSent === 0, 'load runner dry-run must send zero requests');
+  const safeRunnerPayload = JSON.parse(safeRunner.stdout);
+  assert(safeRunnerPayload.requestsSent === 0, 'load runner dry-run must send zero requests');
+  assert(safeRunnerPayload.candidateSha === CANDIDATE_SHA, 'dry-run evidence must bind to exact candidate SHA');
+  assert(safeRunnerPayload.workloadId === 'phase1-start-acceptance-001', 'dry-run evidence must carry workload ID');
+  assert(safeRunnerPayload.budget.maxP95Ms === 3000, 'dry-run must expose the predeclared latency budget');
+  assert(safeRunnerPayload.maxResponseBytesPerOperation === 1048576, 'runner must expose a one-megabyte response cap');
+
+  const missingSha = makeRunnerConfig({ candidateSha: '' });
+  const missingShaPath = join(temp, 'runner-missing-sha.json');
+  writeFileSync(missingShaPath, JSON.stringify(missingSha));
+  const missingShaRun = runNode(runner, ['--scenario', 'start', '--config', missingShaPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(missingShaRun.status === 2, 'load runner must refuse evidence not bound to an exact candidate SHA');
+
+  const missingBudget = makeRunnerConfig({ budget: undefined });
+  const missingBudgetPath = join(temp, 'runner-missing-budget.json');
+  writeFileSync(missingBudgetPath, JSON.stringify(missingBudget));
+  const missingBudgetRun = runNode(runner, ['--scenario', 'start', '--config', missingBudgetPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(missingBudgetRun.status === 2, 'load runner must refuse execution without a predeclared budget');
+
+  const invalidBudget = makeRunnerConfig({ budget: { maxFailureRate: 0.5, maxP95Ms: 3000, maxP99Ms: 5000 } });
+  const invalidBudgetPath = join(temp, 'runner-invalid-budget.json');
+  writeFileSync(invalidBudgetPath, JSON.stringify(invalidBudget));
+  const invalidBudgetRun = runNode(runner, ['--scenario', 'start', '--config', invalidBudgetPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(invalidBudgetRun.status === 2, 'load runner must reject permissive post-hoc-like failure budgets');
 
   const authOverride = makeRunnerConfig();
   authOverride.operations[0].headers = { authorization: 'Bearer service_role_override' };
