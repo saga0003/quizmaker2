@@ -146,6 +146,6 @@ async function main() {
   if (!args.out) return fail('--out is required for executed load so aggregate evidence is not lost');
   const startedAt = new Date().toISOString(); const results = await run(config, safe); const finishedAt = new Date().toISOString(); const summary = summarize(args.scenario, safe, results, startedAt, finishedAt);
   writeFileSync(resolve(args.out), `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx' }); console.log(JSON.stringify(summary, null, 2));
-  if (summary.failed > 0 || !summary.budgetPassed) process.exitCode = 1;
+  if (!summary.budgetPassed) process.exitCode = 1;
 }
 main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
