@@ -1,4 +1,4 @@
-name: Record H7-H9 completion
+name: Record Phase 1 hourly heartbeat
 
 on:
   push:
@@ -16,47 +16,36 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Record verified H7-H9 and heartbeat
+      - name: Append acceptance-prep heartbeat once
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('PHASE1_RELEASE_CHECKLIST.md')
-          text = p.read_text()
-          for key in ('H7', 'H8', 'H9'):
-              lines = text.splitlines()
-              matched = False
-              for i, line in enumerate(lines):
-                  if f'**{key}**' in line:
-                      lines[i] = line.replace('- [ ]', '- [x]', 1)
-                      matched = True
-                      break
-              if not matched:
-                  raise SystemExit(f'Could not find checklist item {key}')
-              text = '\n'.join(lines) + ('\n' if text.endswith('\n') else '')
-          p.write_text(text)
-          PY
+          if grep -Fq '## 2026-09-02 06:01:10–06:11:22 IST — J3 blocker / real-school and load acceptance preparation' PHASE1_PROGRESS_LOG.md; then
+            echo 'Heartbeat already recorded; nothing to do.'
+            exit 0
+          fi
           cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
 
-## 2026-09-02 01:58:31–02:13:00 IST — Section H rendered acceptance closure
-- **Run start/end:** 2026-09-02 01:58:31 IST → 2026-09-02 02:13:00 IST.
-- **Active engineering span:** approximately 14.5 minutes of continuous implementation/review/CI observation in the available execution window; the requested 45–50 minute target was not met because the automation execution window was materially shorter.
-- **Section worked:** H — UI / UX / responsive / accessibility.
-- **Checklist items completed:** H7 responsive rendered QA, H8 mobile table/card treatment, H9 accessibility baseline. Section H is now 9/9 verified (100%).
-- **Substantial implementation:** repaired the rendered H9 harness so axe runs in an explicit Playwright browser context and the isolated QA route is a client component; then fixed the real 40px touch-target defect by raising shared Button/Input/Phase1FilterBar/global interactive controls to the 44px baseline. No acceptance criterion was weakened.
-- **Rendered evidence:** H7 run 33556565485 PASS at the required viewport matrix; H9 run 33556565780 PASS with 0 serious/critical axe violations, 0 unnamed controls, no undersized tested controls, visible keyboard focus, meaningful status/alert live regions, and measured Button/Input/Select controls at 44px height. H8 exact-candidate contract run 33556565528 PASS; H7 contract run 33556565622 PASS; H9 contract run 33556565527 PASS.
-- **Exact verified functional candidate:** 8874b3d3933160d5c9483669e5b9eb766da92af4.
-- **Commits created during engineering block:** 80aa4012591dc00156bfaa955682a980a194a0c6, 93e7c7096073f34d3a4bfa68549b5008bb58445e, aade093376a4ea9e63c17e8cf44d678f1b6974ad, c30a01dac4a93cc72e90257a2195ac9dc4787f4f, 186d82d987c9ca1c5f90fe4e80171c4dfbc68423, 21f2e6e96fd9a66ee85c3168dd22c42c2066ca87, 9e39ea46cd7b1343b093eb0e7b1105ad2e9abbaa, debf854dadde30feac95604d0a50c90c4002497a, 8874b3d3933160d5c9483669e5b9eb766da92af4.
-- **Complete CI / release gate:** GitHub Actions run 33556565584 PASS; 20:39:08Z → 20:42:25Z, approximately 3m17s. TypeScript, lint, all Phase 1 hardening/regressions, production build and final gate enforcement passed.
-- **Vercel state:** permanent production remained protected and unchanged; production error/fatal runtime-log query for the preceding 24 hours returned no matching logs. No promotion was performed.
-- **Supabase state:** SMIS QP and NatSciX Online Test both ACTIVE_HEALTHY; no database mutation performed.
-- **Rework/failures/blockers:** first rendered H9 attempt exposed two QA-harness defects (axe context and server/client event-handler boundary); after repairing those, rendered acceptance exposed genuine 40px touch targets. Shared controls and global CSS were corrected to 44px; the final browser and full-gate runs passed. No remaining Section H blocker.
-- **Progress:** Section H 9/9 = 100%; overall Phase 1 86/129 = 66.7% verified.
-- **Exact next action:** begin I1 by implementing/verifying the School Admin Audit & Health workspace; continue directly into I2 deployment/database/storage/import/exam health statuses and I3 PostgreSQL-side usage counts, each with permanent regression coverage and the complete release gate before checkmarking.
+## 2026-09-02 06:01:10–06:11:22 IST — J3 blocker / real-school and load acceptance preparation
+
+- **Run start:** 2026-09-02 06:01:10 IST.
+- **Run end:** 2026-09-02 06:11:22 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **10m12s** from initial branch/CI/production/database inspection through acceptance-tooling implementation, safety regression setup and final recorder staging. The requested 45–50 minute target was **not met because this execution window ended materially earlier**; no time was artificially padded.
+- **Section worked:** J3 external legal sign-off blocker, followed by preparation for real-school acceptance and load acceptance while J3 remains externally blocked.
+- **Checklist items completed:** none. J3 remains intentionally unchecked pending qualified legal approval; R1–R18 and L1–L6 remain unexecuted and unchecked.
+- **Items still pending:** J3; R1–R18 real-school acceptance; L1–L6 load acceptance; Z2–Z8 production sign-off.
+- **Branch head at run start:** `8ab586edb457e0e131e7e1e3e0779b9b68bacdf3`.
+- **Commits created:** `dffdd04356464d29d6eee74e4472fd4a6947701c` deterministic L1–L3 synthetic fixture generator; `030c48f81f377b2ce5a8f51dbd0e8c9608f89629` fail-closed non-production acceptance preflight; acceptance tooling smoke regression; `a1894fb7e3e9fe4e8ea98f2ab1d21453ee6e4cc1` permanent Acceptance Tooling Contract workflow; plus `PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md`. Temporary recorder experiments were removed/restored without product or production mutation.
+- **CI run and duration/result:** parent complete release gate `33571729592` is confirmed **PASS** on the last fully verified product candidate. Fresh full release gates were triggered by acceptance-tooling/recorder commits but were still running or superseded during this short execution window, so no new checklist credit is claimed. The Acceptance Tooling Contract must be confirmed green before treating the tooling itself as release-ready.
+- **Vercel state:** permanent production remained protected and unchanged. Production `error`/`fatal` runtime inspection for the preceding 24 hours was clean at run start; no production promotion was attempted.
+- **Supabase state:** connected projects `quizmaker` (`xzfozpnzvznqrvcsoail`) and `Final Viva Project` (`jjkixgpddjognznrnqja`) remained `ACTIVE_HEALTHY`; no database mutation occurred. Security Advisor surfaced leaked-password protection as disabled plus existing SECURITY DEFINER/compatibility-RPC warnings. The RPC warnings require authorization-context review rather than blanket revocation because Phase-1 compatibility RPCs are intentional; leaked-password protection remains an explicit security follow-up before final production sign-off.
+- **Rework/failures/blockers:** J3 remains an external qualified-counsel blocker. R1–R18 require an authorised real institution dataset/operators; L1–L6 require a dedicated non-production acceptance tenant and actual measured execution. Production was not used for load testing.
+- **Acceptance preparation delivered:** `PHASE1_LOAD_ACCEPTANCE_PROTOCOL.md` defines fail-closed evidence and pass criteria for L1–L6; deterministic synthetic fixtures generate exactly 2,000 students, 50,000 questions and 1,000 papers without PII; the acceptance preflight refuses known production/main hosts and requires explicit non-production acknowledgement; a permanent smoke regression checks those safety contracts.
+- **Active section completion:** Section J remains **4/5 = 80%** verified; real-school acceptance remains **0/18**; load acceptance remains **0/6**.
+- **Overall Phase 1:** remains **96/129 = 74.4%** verified.
+- **Exact next action:** confirm the complete release gate and Acceptance Tooling Contract on the exact acceptance-tooling head; record qualified counsel approval against `PHASE1_LEGAL_REVIEW_PACKET.md` without weakening J3; when authorised operators/data are available execute R1–R18 exactly per `PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md`; then provision a dedicated non-production load tenant, run the fail-closed preflight and deterministic fixtures, execute L1–L6 with measured evidence, re-run the complete release gate, resolve leaked-password protection before final security sign-off, and only then proceed through Z2–Z8 production sign-off.
 EOF
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md
-          git commit -m "docs: record H7-H9 verification" || exit 0
+          git add PHASE1_PROGRESS_LOG.md
+          git commit -m "docs: record acceptance-prep heartbeat [skip ci]"
           git push origin HEAD:phase1-hardening
-# trigger registered recorder
