@@ -119,10 +119,12 @@ async function main() {
     await page.getByRole('button', { name: /^Sign In$/ }).click();
     await waitForStudentWorkspace(page);
 
-    // Local acceptance lacks the server-only account-security secret by design. Clear
-    // login-shell diagnostics before entering the standalone exam surface so R10 only
-    // evaluates errors emitted by the exam flow itself.
+    // Local acceptance intentionally lacks the server-only account-security secret. The
+    // dashboard starts two security probes that settle as expected 503s after login. Wait
+    // for those shell-only requests to finish before clearing diagnostics so delayed
+    // console delivery cannot contaminate the standalone exam acceptance surface.
     if (safeTarget.local) {
+      await page.waitForTimeout(4_500);
       consoleErrors.length = 0;
       expectedOfflineConsoleErrors.length = 0;
       pageErrors.length = 0;
