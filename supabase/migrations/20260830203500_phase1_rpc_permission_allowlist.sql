@@ -28,9 +28,9 @@ end
 $$;
 
 -- Intentionally anonymous compatibility surface.
--- Public catalogue reads are read-only and retained only until the Phase 1 navigation
--- permanently removes those legacy surfaces. create_institute is the existing public
--- institution-interest/lead RPC; is_username_available supports pre-auth account setup.
+-- These legacy catalogue reads are read-only and retained only until the Phase 1
+-- navigation permanently removes those surfaces. is_username_available supports
+-- pre-auth account setup. Institution creation is intentionally NOT anonymous.
 do $$
 declare
   r record;
@@ -43,7 +43,6 @@ begin
     where n.nspname = 'public'
       and p.prosecdef
       and p.proname = any(array[
-        'create_institute',
         'is_username_available',
         'get_public_paper_v15',
         'get_public_product_v15',
@@ -60,4 +59,4 @@ end
 $$;
 
 comment on function public.create_institute(text,text,text,text,text,text) is
-  'P0.11 anonymous allowlist: public institution-interest lead submission. Review/remove when public lead flow is replaced.';
+  'P0.11 authenticated institution onboarding RPC; anonymous execution is intentionally excluded.';
