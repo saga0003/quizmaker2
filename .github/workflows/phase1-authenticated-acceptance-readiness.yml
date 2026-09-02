@@ -82,6 +82,28 @@ jobs:
           fi
           echo "All required acceptance credential secrets are configured."
 
+      - name: Record non-secret protected-preview origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDARA_ACCEPTANCE_EVIDENCE_DIR"
+          node - <<'NODE'
+          const fs = require('fs');
+          const out = process.env.EVIDARA_ACCEPTANCE_EVIDENCE_DIR + '/protected-preview-origin.json';
+          const raw = (process.env.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL || '').trim();
+          let origin = null;
+          let parseResult = 'MISSING';
+          if (raw) {
+            try {
+              origin = new URL(raw).origin;
+              parseResult = 'PARSED';
+            } catch {
+              parseResult = 'INVALID_URL';
+            }
+          }
+          fs.writeFileSync(out, JSON.stringify({ parseResult, origin, secretsRecorded: false }, null, 2) + '\n');
+          NODE
+
       - name: Install Playwright runner without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
