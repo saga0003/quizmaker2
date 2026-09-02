@@ -1,1 +1,1 @@
-Triggered 2026-09-02 20:20 IST against verified preview quizmaker2-f5sdk5vi7-saga0003s-projects.vercel.app with fresh database size 216411283 bytes after safe bootstrap diagnostic hardening.
+Triggered 2026-09-02 20:25 IST to capture only the non-secret protected-preview origin and rerun authenticated readiness safely.
