@@ -44,6 +44,14 @@ function optionalProtectedPreviewBootstrap(target) {
   return url.toString();
 }
 
+function classifyBootstrapError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('missing the Vercel share token parameter')) return 'MISSING_VERCEL_SHARE_TOKEN';
+  if (message.includes('exactly match the acceptance preview origin')) return 'VERCEL_SHARE_ORIGIN_MISMATCH';
+  if (message.includes('Invalid URL')) return 'INVALID_VERCEL_SHARE_URL';
+  return 'VERCEL_SHARE_VALIDATION_FAILED';
+}
+
 function roleConfig() {
   return [
     {
@@ -164,10 +172,27 @@ async function main() {
   }
 
   const target = assertSafePreview(requireEnv('EVIDARA_ACCEPTANCE_URL'));
-  const protectedPreviewBootstrap = optionalProtectedPreviewBootstrap(target);
-  const configs = roleConfig();
   await mkdir(EVIDENCE_DIR, { recursive: true });
 
+  let protectedPreviewBootstrap;
+  try {
+    protectedPreviewBootstrap = optionalProtectedPreviewBootstrap(target);
+  } catch (error) {
+    const diagnostic = {
+      result: 'FAIL',
+      stage: 'protected-preview-bootstrap-validation',
+      code: classifyBootstrapError(error),
+      target,
+      secretsRecorded: false,
+      productionProtected: true,
+      capturedAt: new Date().toISOString(),
+    };
+    await writeFile(`${EVIDENCE_DIR}/bootstrap-validation.json`, `${JSON.stringify(diagnostic, null, 2)}\n`, 'utf8');
+    console.error(JSON.stringify(diagnostic, null, 2));
+    throw error;
+  }
+
+  const configs = roleConfig();
   const browser = await chromium.launch({ headless: true });
   let results;
   try {
