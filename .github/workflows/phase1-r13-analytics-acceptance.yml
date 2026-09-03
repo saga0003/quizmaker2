@@ -27,6 +27,7 @@ jobs:
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r13-analytics
       NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,13 +45,19 @@ jobs:
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
           test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R13 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
+          test -n "${SUPABASE_SECRET_KEY:-}" || { echo '::error title=R13 server key missing::Configure SUPABASE_SECRET_KEY for guarded synthetic release-mode control.'; exit 1; }
           node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+      - name: Release detailed analytics for isolated synthetic paper
+        run: node scripts/phase1-r13-result-mode.mjs in_depth_analytics
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Execute R13 rendered analytics reconciliation
         run: node scripts/phase1-r13-analytics-acceptance.mjs
+      - name: Restore isolated synthetic paper to score-only
+        if: always()
+        run: node scripts/phase1-r13-result-mode.mjs score_only
       - name: Upload redacted R13 evidence
         if: always()
         uses: actions/upload-artifact@v4
