@@ -822,3 +822,15 @@ This log records each production-hardening run with observable implementation an
 - Active engineering span: ~22 minutes; no time padding.
 - Exact next action: make the R12 rendered harness navigate Results without triggering the localhost account-security reload (or supply the same safe security prerequisites used by the authenticated acceptance surface), obtain green held + released evidence, run the complete Phase 1 release gate, then and only then check off R12 and proceed to R13.
 
+
+## 2026-09-03 06:15 IST — R12 held/released result acceptance
+
+- **Run start:** 2026-09-03 06:11:53 IST.
+- **Checklist item:** R12 — verify held/hidden versus released result modes through authenticated rendered Student behavior.
+- **Starting checkpoint:** `4bef97511d024a188fc1d68bdb0251573d536e32`; prior complete release gate `33697568412` was PASS.
+- **Health:** Vercel production runtime error/fatal query for the preceding 24 hours returned no entries; latest phase1-hardening previews were READY. Supabase `SMIS QP` remained ACTIVE_HEALTHY; measured database size was 219,278,483 bytes. Acceptance work remained restricted to `evidara-school-acceptance`.
+- **Engineering:** Diagnosed localhost Results navigation 503 to the authenticated `/api/account/security` route requiring the server-side Supabase secret. Updated the isolated R12 workflow in commit `41a99e8674a50cd63a128bc85698bb3c6a8d59a7` to provide `SUPABASE_SECRET_KEY` from the repository's server-key secret (with legacy service-role fallback) and to fail explicitly if neither secret is configured. This preserves the production security contract rather than bypassing account-security verification.
+- **Verification:** R12 rendered acceptance run `33700819122` and complete release gate `33700819183` were started for the fix and were still in progress at heartbeat creation; R12 remains unchecked until both held/released rendered evidence and the complete gate are green.
+- **Production protection:** Permanent production was not promoted or mutated. No client/future-client data was used and no separate/paid Supabase project was created.
+- **Next action:** resolve R12 run `33700819122`; if green, execute the released `score_only` half, independently confirm Supabase release-level values, run the complete gate, and only then check R12 before moving to R13.
+
