@@ -1,5 +1,5 @@
 R13 guarded rendered analytics acceptance
 Synthetic tenant: evidara-school-acceptance
-Release mode lifecycle is workflow-guarded and always restored to score_only.
-Triggered: 2026-09-03 17:52 IST
-Repair under test: reuse existing SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY fallback plus authoritative question-row reconciliation and rendered aggregate analytics
+Release mode transition was performed externally through the connected Supabase project with exact org/paper/title/previous-mode guards.
+Triggered: 2026-09-03 18:03 IST
+Expected post-run orchestration: inspect rendered evidence, then externally restore this exact synthetic paper to score_only regardless of result.
