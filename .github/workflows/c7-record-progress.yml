@@ -1,4 +1,4 @@
-name: Record Phase 1 authenticated acceptance readiness heartbeat
+name: Record Phase 1 R12 protected-preview heartbeat
 on:
   push:
     branches:
@@ -21,29 +21,26 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           log = Path('PHASE1_PROGRESS_LOG.md')
-          marker = '## 2026-09-02 14:57:56 IST — authenticated acceptance readiness engineering block'
+          marker = '## 2026-09-03 07:19 IST — R12 protected-preview release-mode acceptance block'
           body = log.read_text(encoding='utf-8')
           if marker not in body:
               entry = '''
-## 2026-09-02 14:57:56 IST — authenticated acceptance readiness engineering block
+## 2026-09-03 07:19 IST — R12 protected-preview release-mode acceptance block
 
-- **Run start/end:** 2026-09-02 14:57:56 IST → approximately 15:11 IST.
-- **Active engineering/review span:** approximately **13 minutes** of repository/checklist/progress inspection, CI and deployment verification, live Supabase safety-state verification, acceptance-protocol review, authenticated browser runner implementation, workflow hardening, regression-contract implementation and final verification. The requested 45–50 minute productive target was **not met because the available automation execution window was materially shorter**; no artificial padding was added.
-- **Section worked:** real-school acceptance readiness (R1–R18), after completed product-engineering sections C–J except externally gated J3 legal approval.
-- **Checklist items completed:** **none**. R1–R18 remain pending actual product-path evidence; readiness tooling is deliberately non-crediting.
-- **Items still pending:** J3 qualified legal approval; R1–R18 authenticated rendered acceptance; L1–L6 guarded load acceptance; Z2–Z8 final production sign-off.
-- **Starting branch head:** `631fb63b32281d82c2673292c0d0c7a9340c7261`.
-- **Engineering candidate head:** `b7b09ea4e3094c9311f8071e6e9c17c9f31940c3`.
-- **Commits created:** `ff1eb80378390adbee8c7c69b233829775c1d2fa` authenticated Chromium readiness runner; `7522f335a105c70281b1fb6ed5c163f2276a29c7` guarded manual readiness workflow; `9cf466b60658c29db9195aba3371259b52b008a7` readiness safety regression; `b7b09ea4e3094c9311f8071e6e9c17c9f31940c3` acceptance-tooling release-contract wiring; plus this heartbeat recorder trigger and its bot-authored progress commit.
-- **CI:** Acceptance Tooling Contract run `33615135046` on `b7b09e...` **PASS** in approximately **10s**. Complete Phase 1 release-gate run `33615134826` was still in progress during final heartbeat capture; all observed hardening steps through the inspected point were passing, so no new checklist item was credited from that run.
-- **Vercel state:** exact `b7b09e...` phase1-hardening preview `dpl_B5qojxYDptnvhsmLPA3Q8iET8zwn` is **READY**. Permanent production remains protected and unchanged; production error/fatal runtime inspection for the preceding 24 hours returned no entries.
-- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is **ACTIVE_HEALTHY**; `pg_database_size(current_database()) = 216403091` bytes. Fresh read-only verification confirmed organization `Evidara School`, slug `evidara-school-acceptance`, `is_demo=true`. No database mutation occurred.
-- **Implementation result:** added a production-denying, rendered Chromium acceptance-readiness runner for separate School Admin, Teacher and Student synthetic identities. It requires explicit non-production acknowledgement, accepts only the Evidara Vercel preview family, rejects permanent/git-main hosts, consumes credentials only from private workflow secrets, verifies each role reaches its expected workspace, captures redacted screenshots/JSON evidence, and explicitly states that readiness does not satisfy any R item. A manual-only workflow runs the canonical same-project preflight before browser execution and uploads evidence artifacts; a permanent static regression now gates these safety properties.
-- **Rework/failures/blockers:** no functional tooling regression failure. The repository still does not expose authenticated synthetic School Admin/Teacher/Student credentials to this tool runtime, and the available runtime has no usable interactive browser session; therefore the actual R1–R18 rendered product paths were not falsely claimed. Existing `c7-record-progress` was repurposed only to append this required heartbeat. A read-only exploratory query against nonexistent `public.institutions` returned PostgreSQL 42P01 before the correct `public.organizations` table was identified; no mutation resulted.
-- **Active section completion:** R acceptance remains **0/18 = 0% verified**.
-- **Overall Phase 1 percentage:** **96/129 = 74.4% verified**.
-- **Permanent production protection:** maintained; no promotion occurred.
-- **Exact next action:** run the guarded authenticated readiness workflow against the exact READY hardening preview once the three synthetic acceptance credentials are available as repository secrets; then extend/execute the rendered browser sequence R1→R18 with evidence, awarding checkmarks only after each real product path and the complete release gate pass. Move immediately to L1→L6 once R passes.
+- **Run start/end:** 2026-09-03 07:19 IST → approximately 07:34 IST.
+- **Active engineering/review span:** approximately **15 minutes** of checkpoint inspection, live Vercel/Supabase health verification, CI diagnosis, protected-preview harness hardening, isolated release-mode mutation/restore and rendered acceptance execution. The requested 45–50 minute productive target was **not reached within this execution window**; no artificial padding was added.
+- **Section worked:** R12 held/hidden versus released result-mode acceptance on the same-project synthetic `Evidara School` tenant only.
+- **Checklist items completed:** **none**. R12 remains unchecked because rendered held-mode proof did not complete successfully.
+- **Starting state:** prior R12 localhost rerun `33700819122` had failed because the localhost account-security route correctly lacked the required server-side Supabase secret; companion complete gate `33700819183` was cancelled.
+- **Production/deployment health:** Vercel production runtime-error inspection for the preceding 24 hours returned no errors; phase1-hardening previews remained READY. Permanent production was not promoted or mutated.
+- **Supabase health:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**; final `pg_database_size(current_database()) = 219278483` bytes. All mutations were guarded to organization slug `evidara-school-acceptance`; no St. Mary's or future-client data was touched.
+- **Engineering changes:** commit `ceb6722ad9a7a6113414fbf1aad3f1b8140bea8d` moved the R12 held browser harness to the protected branch preview with strict production-host denial and redacted evidence; commit `41b5ff8a38b213bd222366de204694a12b3e364a` updated the held workflow to the protected branch alias. A later trigger commit `38a128e15da22146d67e11c5ed61bf425ae4e261` reran held acceptance after safely setting only the synthetic acceptance paper to `hidden`. Additional commits added the corresponding protected-preview `score_only` acceptance runner/workflow; current engineering head before this heartbeat was `1ac4a43466ad3248ff172fe6f4cb79b587c401d2`.
+- **Acceptance evidence:** the first protected-preview run `33705636374` reached the backend contract and independently confirmed the synthetic attempt's released `score_only` values: release level `score`, released=true, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, answers_released=false and analytics_released=false. It stopped before browser execution because the paper had not yet been switched to hidden.
+- **Held-mode rerun:** run `33705794097` passed the isolated Supabase contract and target/preflight stages after the paper was set to `hidden`, but the rendered browser stage failed with `Protected preview bootstrap failed`. The configured GitHub `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` is present but stale/invalid for the current protected branch alias. Vercel itself can issue fresh protected-preview access, confirming this is CI credential drift rather than a production outage; no access token/share secret was committed or logged into repository evidence.
+- **Fixture restoration:** after diagnosis, the isolated paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was restored to its normal `score_only` state, again guarded by `evidara-school-acceptance`.
+- **Release-gate rule:** R12 was deliberately not checked off and no release-mode acceptance credit was awarded without the rendered held+released proof and a complete descendant Phase 1 release gate.
+- **Permanent production protection:** maintained throughout.
+- **Exact next action:** securely refresh the Actions protected-preview share credential (or use an existing secure Vercel-token path if one becomes available), rerun the held rendered proof, restore/verify `score_only` and run the released rendered proof, then run the complete Phase 1 release gate. Only after both rendered modes and the descendant gate are green should R12 be checked off; proceed directly to R13 afterward.
 '''
               log.write_text(body.rstrip() + '\n\n' + entry.lstrip(), encoding='utf-8')
           PY
@@ -57,5 +54,5 @@ jobs:
             echo "Heartbeat already recorded."
             exit 0
           fi
-          git commit -m "docs(phase1): record authenticated acceptance readiness heartbeat"
+          git commit -m "docs(phase1): record R12 protected-preview heartbeat"
           git push origin HEAD:phase1-hardening
