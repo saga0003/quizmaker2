@@ -29,6 +29,7 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,6 +45,7 @@ jobs:
           test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
           test "$EVIDARA_ACCEPTANCE_URL" = "http://127.0.0.1:3000"
           test "$EVIDARA_ACCEPTANCE_LOCALHOST" = "YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY"
+          test -n "${SUPABASE_SECRET_KEY:-}" || { echo '::error title=R12 server auth key missing::Configure SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY as a GitHub Actions secret for localhost authenticated API acceptance.'; exit 1; }
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
