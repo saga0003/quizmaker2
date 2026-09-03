@@ -1,0 +1,11 @@
+## 2026-09-03 09:13:00 IST — R12 protected-preview acceptance blocked on Actions credential
+
+- **Checklist item:** R12 — held/hidden versus released result modes.
+- **Run start:** 2026-09-03 09:13:00 IST.
+- **Repository/CI inspection:** `phase1-hardening` started at `d28ba2527686605858e5f8ccf09b2533729ad85d`; R12 remains unchecked. The current branch workflow requires `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` for the protected branch alias and fails closed when it is absent/stale.
+- **Deployment health:** Vercel production runtime errors for the preceding 24 hours were clean. Current branch-head preview `dpl_QuY297FR1DArZUun9KYvLjFKMHtB` is READY. Permanent production was not changed or promoted.
+- **Supabase health/isolation:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is `ACTIVE_HEALTHY`; database size remains `219278483` bytes. The isolated synthetic tenant `Evidara School` / `evidara-school-acceptance` exists and remains the only permitted acceptance tenant.
+- **R12 investigation:** A fresh temporary protected-preview share credential can be issued successfully through Vercel, confirming the preview/protection service is healthy. The GitHub Actions workflow can only consume the repository secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`; the connected GitHub interface deliberately does not expose repository-secret mutation. The fresh credential was not committed or printed into repository content.
+- **Verification status:** R12 remains intentionally unchecked. No security control, Vercel protection, Supabase authorization, or production setting was weakened to bypass the credential boundary.
+- **Blocker:** Securely refresh the GitHub Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` secret using a secret-capable channel; current connected GitHub tools cannot mutate repository secrets.
+- **Next action:** Once the Actions secret is refreshed, rerun rendered held-result acceptance, restore and run `score_only` rendered acceptance, independently verify release levels in Supabase, run the complete Phase 1 release gate, and only then check R12 before proceeding to R13.
