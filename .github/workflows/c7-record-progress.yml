@@ -1,10 +1,8 @@
-name: Record Phase 1 R12 protected-preview heartbeat
+name: Phase1 Progress Heartbeat
 on:
   push:
-    branches:
-      - phase1-hardening
-    paths:
-      - .github/workflows/c7-record-progress.yml
+    branches: [phase1-hardening]
+    paths: [.github/workflows/c7-record-progress.yml]
 permissions:
   contents: write
 jobs:
@@ -15,44 +13,41 @@ jobs:
         with:
           ref: phase1-hardening
           fetch-depth: 0
-      - name: Append hourly heartbeat
+      - name: Append heartbeat
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          log = Path('PHASE1_PROGRESS_LOG.md')
-          marker = '## 2026-09-03 07:19 IST — R12 protected-preview release-mode acceptance block'
-          body = log.read_text(encoding='utf-8')
-          if marker not in body:
-              entry = '''
+          set -euo pipefail
+          marker='## 2026-09-03 07:19 IST — R12 protected-preview release-mode acceptance block'
+          if grep -Fq "$marker" PHASE1_PROGRESS_LOG.md; then
+            exit 0
+          fi
+          cat >> PHASE1_PROGRESS_LOG.md <<'EOF'
+
 ## 2026-09-03 07:19 IST — R12 protected-preview release-mode acceptance block
 
 - **Run start/end:** 2026-09-03 07:19 IST → approximately 07:34 IST.
-- **Active engineering/review span:** approximately **15 minutes** of checkpoint inspection, live Vercel/Supabase health verification, CI diagnosis, protected-preview harness hardening, isolated release-mode mutation/restore and rendered acceptance execution. The requested 45–50 minute productive target was **not reached within this execution window**; no artificial padding was added.
+- **Active engineering/review span:** approximately **15 minutes** of checkpoint inspection, Vercel/Supabase health verification, CI diagnosis, protected-preview harness hardening, isolated result-mode mutation/restore, and rendered acceptance execution. The requested 45–50 minute target was not reached within this execution window; no artificial padding was added.
 - **Section worked:** R12 held/hidden versus released result-mode acceptance on the same-project synthetic `Evidara School` tenant only.
-- **Checklist items completed:** **none**. R12 remains unchecked because rendered held-mode proof did not complete successfully.
-- **Starting state:** prior R12 localhost rerun `33700819122` had failed because the localhost account-security route correctly lacked the required server-side Supabase secret; companion complete gate `33700819183` was cancelled.
+- **Checklist items completed:** **none**. R12 remains unchecked because the rendered held-mode proof did not complete successfully.
 - **Production/deployment health:** Vercel production runtime-error inspection for the preceding 24 hours returned no errors; phase1-hardening previews remained READY. Permanent production was not promoted or mutated.
-- **Supabase health:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**; final `pg_database_size(current_database()) = 219278483` bytes. All mutations were guarded to organization slug `evidara-school-acceptance`; no St. Mary's or future-client data was touched.
-- **Engineering changes:** commit `ceb6722ad9a7a6113414fbf1aad3f1b8140bea8d` moved the R12 held browser harness to the protected branch preview with strict production-host denial and redacted evidence; commit `41b5ff8a38b213bd222366de204694a12b3e364a` updated the held workflow to the protected branch alias. A later trigger commit `38a128e15da22146d67e11c5ed61bf425ae4e261` reran held acceptance after safely setting only the synthetic acceptance paper to `hidden`. Additional commits added the corresponding protected-preview `score_only` acceptance runner/workflow; current engineering head before this heartbeat was `1ac4a43466ad3248ff172fe6f4cb79b587c401d2`.
-- **Acceptance evidence:** the first protected-preview run `33705636374` reached the backend contract and independently confirmed the synthetic attempt's released `score_only` values: release level `score`, released=true, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, answers_released=false and analytics_released=false. It stopped before browser execution because the paper had not yet been switched to hidden.
-- **Held-mode rerun:** run `33705794097` passed the isolated Supabase contract and target/preflight stages after the paper was set to `hidden`, but the rendered browser stage failed with `Protected preview bootstrap failed`. The configured GitHub `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` is present but stale/invalid for the current protected branch alias. Vercel itself can issue fresh protected-preview access, confirming this is CI credential drift rather than a production outage; no access token/share secret was committed or logged into repository evidence.
-- **Fixture restoration:** after diagnosis, the isolated paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was restored to its normal `score_only` state, again guarded by `evidara-school-acceptance`.
-- **Release-gate rule:** R12 was deliberately not checked off and no release-mode acceptance credit was awarded without the rendered held+released proof and a complete descendant Phase 1 release gate.
+- **Supabase health:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**; final database size was **219278483 bytes**. All mutations were guarded to `evidara-school-acceptance`; no St. Mary's or future-client data was touched.
+- **Engineering changes:** `ceb6722ad9a7a6113414fbf1aad3f1b8140bea8d` moved the R12 held browser harness to the protected branch preview with production-host denial and redacted evidence; `41b5ff8a38b213bd222366de204694a12b3e364a` updated the held workflow to the protected branch alias; `38a128e15da22146d67e11c5ed61bf425ae4e261` reran held acceptance after safely changing only the synthetic paper to hidden. Protected-preview score-only acceptance tooling was also added; engineering head before this heartbeat was `1ac4a43466ad3248ff172fe6f4cb79b587c401d2`.
+- **Acceptance evidence:** protected-preview run `33705636374` independently confirmed the synthetic attempt's released `score_only` contract: release level `score`, released=true, score 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, answers_released=false, analytics_released=false. It stopped before browser execution because the paper was not yet hidden.
+- **Held-mode rerun:** `33705794097` passed the isolated Supabase contract and target/preflight stages with the paper hidden, but rendered browser execution failed with `Protected preview bootstrap failed`. The configured Actions preview-share credential is present but stale for the current protected branch alias. Vercel itself can issue fresh protected-preview access, so this is CI credential drift rather than a production outage. No access token/share secret was committed or logged.
+- **Fixture restoration:** synthetic paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was restored to normal `score_only`, guarded by `evidara-school-acceptance`.
+- **Release-gate rule:** R12 was deliberately not checked off. Descendant complete release gate `33706252506` was still running when this heartbeat was recorded.
 - **Permanent production protection:** maintained throughout.
-- **Exact next action:** securely refresh the Actions protected-preview share credential (or use an existing secure Vercel-token path if one becomes available), rerun the held rendered proof, restore/verify `score_only` and run the released rendered proof, then run the complete Phase 1 release gate. Only after both rendered modes and the descendant gate are green should R12 be checked off; proceed directly to R13 afterward.
-'''
-              log.write_text(body.rstrip() + '\n\n' + entry.lstrip(), encoding='utf-8')
-          PY
+- **Exact next action:** securely refresh the Actions protected-preview share credential (or use an existing secure Vercel-token path if available), rerun held rendered proof, restore/verify `score_only`, run released rendered proof, then run the complete Phase 1 release gate. Check R12 only after both modes and the descendant gate are green; proceed directly to R13 afterward.
+EOF
       - name: Commit heartbeat
         shell: bash
         run: |
-          git config user.name "Evidara Hardening Bot"
-          git config user.email "sagar@smis.edu.in"
+          set -euo pipefail
+          git config user.name 'Evidara Hardening Bot'
+          git config user.email 'sagar@smis.edu.in'
           git add PHASE1_PROGRESS_LOG.md
           if git diff --cached --quiet; then
-            echo "Heartbeat already recorded."
             exit 0
           fi
-          git commit -m "docs(phase1): record R12 protected-preview heartbeat"
+          git commit -m 'docs(phase1): record R12 protected-preview heartbeat'
           git push origin HEAD:phase1-hardening
