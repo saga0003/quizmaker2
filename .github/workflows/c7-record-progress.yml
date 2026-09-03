@@ -21,22 +21,25 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           log = Path('PHASE1_PROGRESS_LOG.md')
-          marker = '## 2026-09-03 07:19 IST — R12 protected-preview acceptance block'
+          marker = '## 2026-09-03 08:11 IST — R12 protected-preview credential block / R13 preflight'
           body = log.read_text(encoding='utf-8')
           if marker not in body:
               lines = [
                   '',
                   marker,
                   '',
-                  '- **Run start/end:** 2026-09-03 07:19 IST → approximately 07:35 IST.',
-                  '- **Active engineering/review span:** approximately **16 minutes**. The requested 45–50 minute productive target was not reached within this execution window; no padding was added.',
-                  '- **Section worked:** R12 held/hidden versus released result-mode acceptance, isolated to `evidara-school-acceptance`.',
-                  '- **Checklist items completed:** **none**. R12 remains unchecked pending rendered held+released proof and a complete descendant release gate.',
-                  '- **Health:** Vercel production runtime errors for the preceding 24 hours were clean and hardening previews remained READY. `SMIS QP` remained **ACTIVE_HEALTHY**, final database size **219278483 bytes**. Permanent production was not promoted or mutated.',
-                  '- **Changes:** protected-preview R12 held and score-only runners/workflows were added. Held run `33705794097` passed the isolated Supabase held contract and preflight but failed browser bootstrap because the configured Actions Vercel share credential is stale for the current protected branch alias. Earlier run `33705636374` independently confirmed the released score-only contract: release level `score`, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, with answers/analytics still unreleased.',
-                  '- **Safety:** all database mutations were guarded to `evidara-school-acceptance`; no St. Mary’s or future-client data was touched. The synthetic paper was restored to `score_only` after the held probe. No preview token/share URL was committed or logged.',
-                  '- **Blocker:** refresh the secure Actions protected-preview share credential (or use an existing secure Vercel-token path); this is CI credential drift, not a production outage.',
-                  '- **Exact next action:** rerun rendered held proof, restore/verify `score_only`, run released rendered proof, then run the complete Phase 1 release gate. Check R12 only after both modes and the descendant gate are green; proceed to R13 immediately afterward.',
+                  '- **Run start/end:** 2026-09-03 08:11 IST → approximately 08:15 IST.',
+                  '- **Active engineering/review span:** approximately **4 minutes** in this execution window; no time was padded.',
+                  '- **Section worked:** R12 held/released result acceptance, with safe R13 analytics preflight while the rendered R12 credential path remains externally blocked.',
+                  '- **Checklist items completed:** **none**. R12 remains unchecked; no later acceptance item was credited out of order.',
+                  '- **Starting branch head:** `8685b1c5e1d399ae2e87f1f778380322a9a111d8`.',
+                  '- **Health:** Vercel production runtime-error aggregation for the preceding 24 hours returned no errors; recent `phase1-hardening` previews were READY. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`, and `Evidara School` (`evidara-school-acceptance`) remained the isolated demo acceptance organization. Permanent production was not promoted or mutated.',
+                  '- **R12 investigation:** rerun evidence for workflow `33705794097` confirms the synthetic held contract and protected-preview preflight passed, but browser bootstrap failed because the stored Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` no longer grants the branch alias. A fresh temporary protected-preview share URL can still be issued successfully through Vercel, proving the preview itself is healthy; the fresh URL/token was not committed or logged.',
+                  '- **Execution constraint:** a local independent browser rerun could not be used because this runtime container has no external DNS access to clone/install the repository. No production security control was weakened to bypass Vercel protection.',
+                  '- **R13 preflight:** the authoritative R11 synthetic attempt remains submitted at 8/80 (10%, 2 correct, 0 incorrect, 18 unanswered) and the R8 paper is safely restored to `score_only`. The live student analytics RPC deliberately refuses self-analytics until `analytics_released` is true, so R13 must be exercised only after a controlled analytics-release mode is enabled; this is expected release-policy behavior, not a defect.',
+                  '- **Safety:** all database reads/mutations remain scoped to the existing same-project synthetic acceptance tenant; no St. Mary’s/future-client data and no separate/paid Supabase project were used.',
+                  '- **Blocker:** securely refresh the GitHub Actions protected-preview share credential. The connected GitHub API cannot read or update repository secrets, so the fresh temporary Vercel share token cannot be propagated into Actions without exposing it, which is intentionally not done.',
+                  '- **Exact next action:** refresh the secure Actions protected-preview credential, rerun rendered held R12, restore/verify `score_only`, run rendered released R12 and the complete release gate; only then check R12 and switch the synthetic paper to an analytics-released mode for R13 student subject/chapter/topic/question analytics verification.',
                   ''
               ]
               log.write_text(body.rstrip() + '\n' + '\n'.join(lines), encoding='utf-8')
@@ -51,5 +54,5 @@ jobs:
             echo "Heartbeat already recorded."
             exit 0
           fi
-          git commit -m "docs(phase1): record R12 acceptance heartbeat"
+          git commit -m "docs(phase1): record 08:11 R12 heartbeat"
           git push origin HEAD:phase1-hardening
