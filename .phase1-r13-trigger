@@ -1,0 +1,4 @@
+R13 guarded rendered analytics acceptance
+Synthetic tenant: evidara-school-acceptance
+Release mode staged externally to in_depth_analytics and must be restored to score_only immediately after this run.
+Triggered: 2026-09-03 16:54 IST
