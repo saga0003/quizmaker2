@@ -27,7 +27,7 @@ jobs:
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r13-analytics
       NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
-      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +45,7 @@ jobs:
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
           test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R13 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
-          test -n "${SUPABASE_SECRET_KEY:-}" || { echo '::error title=R13 server key missing::Configure SUPABASE_SECRET_KEY for guarded synthetic release-mode control.'; exit 1; }
+          test -n "${SUPABASE_SECRET_KEY:-}" || { echo '::error title=R13 server key missing::Configure SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY for guarded synthetic release-mode control.'; exit 1; }
           node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
       - name: Release detailed analytics for isolated synthetic paper
         run: node scripts/phase1-r13-result-mode.mjs in_depth_analytics
