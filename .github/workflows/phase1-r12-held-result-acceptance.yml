@@ -20,16 +20,14 @@ jobs:
       EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
-      EVIDARA_ACCEPTANCE_URL: http://127.0.0.1:3000
-      EVIDARA_ACCEPTANCE_LOCALHOST: YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
       EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
+      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
       EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r12-held-result
-      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
-      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,29 +36,20 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Verify isolated R12 target
+      - name: Verify isolated protected-preview R12 target
         shell: bash
         run: |
           set -euo pipefail
           test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
-          test "$EVIDARA_ACCEPTANCE_URL" = "http://127.0.0.1:3000"
-          test "$EVIDARA_ACCEPTANCE_LOCALHOST" = "YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY"
-          test -n "${SUPABASE_SECRET_KEY:-}" || { echo '::error title=R12 server auth key missing::Configure SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY as a GitHub Actions secret for localhost authenticated API acceptance.'; exit 1; }
+          test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
+          test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
+          test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
+          test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R12 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
+          node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Start branch checkout application
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run dev -- --hostname 127.0.0.1 --port 3000 > /tmp/evidara-r12-app.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat /tmp/evidara-r12-app.log
-          exit 1
       - name: Execute R12 held-result rendered acceptance
         run: node scripts/phase1-r12-held-result-acceptance-v3.mjs
       - name: Upload redacted R12 evidence
@@ -71,11 +60,3 @@ jobs:
           path: acceptance-evidence/r12-held-result
           if-no-files-found: warn
           retention-days: 14
-      - name: Upload local app diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase1-r12-held-app-log-${{ github.sha }}
-          path: /tmp/evidara-r12-app.log
-          if-no-files-found: warn
-          retention-days: 7
