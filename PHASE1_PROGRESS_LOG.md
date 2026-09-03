@@ -889,3 +889,17 @@ This log records each production-hardening run with observable implementation an
 - **Commits created:** `aad86562ba04babe92198fba7e23bfb0373160ee` (score-only acceptance trigger), `0765c30d5efbdbe49267f2368219b81742d819d4` (add fresh database-size guard), plus this heartbeat trigger/recorder commit.
 - **Exact next action:** refresh repository secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` with one fresh protected-preview share URL and do not regenerate that URL afterward; rerun R12 score-only rendered acceptance `33727428759` (or trigger a fresh run), independently reconcile its displayed score/release level with Supabase, then check R12 only after green rendered evidence and a complete release gate; proceed to R13.
 
+
+## 2026-09-03 15:47 IST — R12 held/released result modes verified
+
+- **Checklist item:** R12 — Verify held/released result modes.
+- **Run start:** 2026-09-03 15:47 IST.
+- **Run end/record time:** 2026-09-03 15:53:05 IST.
+- **Acceptance evidence:** Held-result workflow `33705794097` attempt 3 — **PASS**. Score-only workflow `33727428759` attempt 2 — **PASS**.
+- **Independent Supabase reconciliation:** isolated tenant `evidara-school-acceptance`; acceptance paper remains `score_only`; submitted attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` = `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`. No St. Mary's or future-client data used.
+- **Complete release gate:** `33727428783` on exact R12 workflow candidate `0765c30d5efbdbe49267f2368219b81742d819d4` — **PASS**.
+- **Deployment/health:** Vercel production 24h runtime-error check clean; permanent production unchanged/protected. Supabase `SMIS QP` `ACTIVE_HEALTHY`.
+- **Automation:** hourly `Evidara Phase 1 Hardening` schedule re-enabled after protected-preview credential refresh.
+- **Progress after R12:** acceptance R = 12/19; overall checklist = 108/129 (83.7%).
+- **Rework/blockers:** protected-preview credential drift was resolved by refreshing `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`; no security protection was weakened.
+- **Exact next action:** R13 — release analytics only on the isolated synthetic paper in a controlled acceptance step, verify rendered Student subject/chapter/topic/question analytics against authoritative Supabase evidence, restore the intended safe paper state, then run the complete release gate before checking R13.
