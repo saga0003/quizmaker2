@@ -903,3 +903,16 @@ This log records each production-hardening run with observable implementation an
 - **Progress after R12:** acceptance R = 12/19; overall checklist = 108/129 (83.7%).
 - **Rework/blockers:** protected-preview credential drift was resolved by refreshing `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`; no security protection was weakened.
 - **Exact next action:** R13 — release analytics only on the isolated synthetic paper in a controlled acceptance step, verify rendered Student subject/chapter/topic/question analytics against authoritative Supabase evidence, restore the intended safe paper state, then run the complete release gate before checking R13.
+
+## 2026-09-03 16:02 IST — R13 student analytics reconciliation (in progress)
+
+- **Checklist item:** R13 — Verify student subject/chapter/topic/question analytics.
+- **Run start:** 2026-09-03 16:02 IST.
+- **Run end/record time:** 2026-09-03 16:04:44 IST.
+- **Repository/CI inspection:** branch checkpoint before this heartbeat was `5e75cc93d7ae651bd03b4567427a334c55695632`; complete Phase 1 release gate `33744056911` on that exact checkpoint — **PASS**. R12 remains verified; R13 remains intentionally unchecked.
+- **Production/deployment health:** Vercel production 24-hour runtime-error check returned no errors; permanent production was not changed.
+- **Supabase state:** `SMIS QP` acceptance database remained healthy for read verification; database size observed at 219,335,827 bytes. Only isolated tenant `evidara-school-acceptance` was queried. Acceptance paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` remains `score_only`.
+- **R13 authoritative baseline:** canonical submitted attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` remains `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`. All 20 paper questions have frozen taxonomy snapshots at test time: Subject `Physics`, Chapter `Kinematics`, Topic `Motion in One Dimension`. Questions 1 and 2 have stored responses `A`, `is_correct=true`, `marks_awarded=4` each; questions 3–20 have no stored response. This independently establishes the expected aggregate analytics as 20 questions / 2 correct / 18 unanswered / 10% question accuracy for the single frozen subject/chapter/topic bucket, plus question-level correctness matching those two responses.
+- **Implementation changes:** none to product or database schema in this continuation; discovery and independent evidence only. No RLS or result-release protection was weakened.
+- **Verification status:** R13 is **not eligible for checkoff yet** because authenticated rendered Student analytics must still be exercised under a controlled `in_depth_analytics` release and reconciled to this independent baseline.
+- **Exact next action:** add an isolated protected-preview R13 acceptance workflow/script modeled on R12, guard exact tenant/paper/attempt/database size, temporarily set only the synthetic paper to `in_depth_analytics`, authenticate as the synthetic Student, assert rendered Physics/Kinematics/Motion-in-One-Dimension and question-level analytics match the frozen-response baseline, restore `score_only` in guaranteed cleanup, run the complete release gate, and only then check R13.
