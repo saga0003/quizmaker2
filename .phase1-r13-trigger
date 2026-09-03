@@ -1,5 +1,5 @@
 R13 guarded rendered analytics acceptance
 Synthetic tenant: evidara-school-acceptance
-Release mode staged externally to in_depth_analytics and must be restored to score_only immediately after this run.
-Triggered: 2026-09-03 17:07 IST
-Repair under test: release-state compatibility adapter plus three-attempt aggregate reconciliation
+Release mode lifecycle is now workflow-guarded and always restored to score_only.
+Triggered: 2026-09-03 17:18 IST
+Repair under test: authoritative question-row reconciliation plus rendered aggregate analytics
