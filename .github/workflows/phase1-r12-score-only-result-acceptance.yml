@@ -1,0 +1,61 @@
+name: Phase 1 R12 Score-only Result Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/phase1-r12-score-only-result-acceptance.yml
+      - scripts/phase1-r12-score-only-result-acceptance.mjs
+      - .phase1-r12-score-only-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  r12-score-only-result:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
+      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
+      EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r12-score-only-result
+      NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify isolated protected-preview R12 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
+          test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
+          test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
+          test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
+          test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R12 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
+          node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+      - name: Install Playwright without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Execute R12 score-only rendered acceptance
+        run: node scripts/phase1-r12-score-only-result-acceptance.mjs
+      - name: Upload redacted R12 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r12-score-only-result-${{ github.sha }}
+          path: acceptance-evidence/r12-score-only-result
+          if-no-files-found: warn
+          retention-days: 14
