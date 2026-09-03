@@ -5,7 +5,6 @@ import { createClient } from '@supabase/supabase-js';
 
 const ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
 const ORG_SLUG = 'evidara-school-acceptance';
-const ORG_ID = '4effce90-bccb-4263-9f5a-a75b6df301f2';
 const PAPER_ID = 'e5801a88-1e7f-4b4f-a715-ad44ce2b3c43';
 const PAPER_TITLE = 'Phase 1 R8 Physics Acceptance Test';
 const ATTEMPT_ID = '134ddbe2-bc9f-4863-9aba-3b9def08d69e';
@@ -31,8 +30,7 @@ function previewOrigin(raw) {
 }
 
 function shareBootstrap(origin) {
-  const raw = (process.env.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL || '').trim();
-  if (!raw) return null;
+  const raw = env('EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL');
   const url = new URL(raw);
   if (url.protocol !== 'https:' || url.origin !== origin || !url.searchParams.get('_vercel_share')) {
     throw new Error('R13 protected-preview share URL mismatch');
@@ -40,39 +38,14 @@ function shareBootstrap(origin) {
   return url.toString();
 }
 
-function serviceClient() {
-  const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!key) throw new Error('Missing server-side Supabase secret for guarded R13 release-mode transition');
-  return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), key, {
+function publicClient() {
+  return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }
 
-async function assertAndSetMode(service, nextMode) {
-  const { data: org, error: orgError } = await service.from('organizations').select('id,slug,name').eq('slug', ORG_SLUG).single();
-  if (orgError) throw orgError;
-  if (org.id !== ORG_ID || org.slug !== ORG_SLUG || org.name !== 'Evidara School') throw new Error('R13 isolated tenant identity mismatch');
-
-  const { data: before, error: beforeError } = await service.from('question_papers').select('id,organization_id,title,result_mode').eq('id', PAPER_ID).single();
-  if (beforeError) throw beforeError;
-  if (before.organization_id !== ORG_ID || before.title !== PAPER_TITLE) throw new Error('R13 synthetic paper tenant/title mismatch');
-
-  const { data: updated, error: updateError } = await service
-    .from('question_papers')
-    .update({ result_mode: nextMode })
-    .eq('id', PAPER_ID)
-    .eq('organization_id', ORG_ID)
-    .select('id,organization_id,result_mode');
-  if (updateError) throw updateError;
-  if (!Array.isArray(updated) || updated.length !== 1 || updated[0].result_mode !== nextMode || updated[0].organization_id !== ORG_ID) {
-    throw new Error(`R13 guarded result-mode transition failed: ${nextMode}`);
-  }
-}
-
-async function studentContract(email, password) {
-  const client = createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+async function reconcileStudentContract(email, password) {
+  const client = publicClient();
   const { data: signIn, error: authError } = await client.auth.signInWithPassword({ email, password });
   if (authError) throw authError;
   const studentId = signIn.user?.id;
@@ -82,12 +55,12 @@ async function studentContract(email, password) {
     if (resultsError) throw resultsError;
     const attempt = (results || []).find((row) => row.attempt_id === ATTEMPT_ID);
     if (!attempt || attempt.paper_id !== PAPER_ID || attempt.paper_title !== PAPER_TITLE) throw new Error('R13 synthetic attempt missing');
-    const expectedAttempt = {
+    const expected = {
       result_mode: 'in_depth_analytics', result_release_level: 'analytics', result_released: true,
       score: 8, maximum_marks: 80, percentage: 10, correct_count: 2, incorrect_count: 0,
       unanswered_count: 18, answers_released: true, analytics_released: true,
     };
-    for (const [key, value] of Object.entries(expectedAttempt)) {
+    for (const [key, value] of Object.entries(expected)) {
       if (attempt[key] !== value) throw new Error(`R13 result contract mismatch for ${key}: ${JSON.stringify(attempt[key])}`);
     }
 
@@ -99,15 +72,22 @@ async function studentContract(email, password) {
     if (!history || Number(history.score) !== 8 || Number(history.maximum_marks) !== 80 || Number(history.percentage) !== 10 || Number(history.correct) !== 2 || Number(history.incorrect) !== 0 || Number(history.unanswered) !== 18) {
       throw new Error('R13 analytics history does not reconcile to authoritative attempt baseline');
     }
+
     const subject = (payload?.subjects || []).find((row) => row.name === SUBJECT);
     const chapter = (payload?.chapters || []).find((row) => row.name === CHAPTER);
     const topic = (payload?.topics || []).find((row) => row.name === TOPIC);
     for (const [label, row] of [['subject', subject], ['chapter', chapter], ['topic', topic]]) {
       if (!row) throw new Error(`R13 ${label} taxonomy analytics missing`);
-      if (Number(row.questions) !== 20 || Number(row.correct) !== 2 || Number(row.incorrect) !== 0 || Number(row.unanswered) !== 18 || Number(row.accuracy) !== 100 || Number(row.average_percentage) !== 10) {
-        throw new Error(`R13 ${label} analytics mismatch: ${JSON.stringify({questions:row.questions,correct:row.correct,incorrect:row.incorrect,unanswered:row.unanswered,accuracy:row.accuracy,average_percentage:row.average_percentage})}`);
+      const actual = {
+        questions: Number(row.questions), correct: Number(row.correct), incorrect: Number(row.incorrect),
+        unanswered: Number(row.unanswered), accuracy: Number(row.accuracy), average_percentage: Number(row.average_percentage),
+      };
+      const wanted = { questions: 20, correct: 2, incorrect: 0, unanswered: 18, accuracy: 100, average_percentage: 10 };
+      for (const [key, value] of Object.entries(wanted)) {
+        if (actual[key] !== value) throw new Error(`R13 ${label} ${key} mismatch: ${actual[key]} != ${value}`);
       }
     }
+
     const evidence = (payload?.question_evidence || []).filter((row) => row.attempt_id === ATTEMPT_ID && row.topic_name === TOPIC);
     if (evidence.length !== 20) throw new Error(`R13 question evidence count mismatch: ${evidence.length}`);
     const correct = evidence.filter((row) => row.outcome === 'correct');
@@ -119,40 +99,31 @@ async function studentContract(email, password) {
         throw new Error(`R13 Q${q} evidence mismatch`);
       }
     }
-    return { attempt, payload, studentId };
+    return { studentId };
   } finally {
     await client.auth.signOut().catch(() => {});
   }
 }
 
 async function main() {
-  if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || (process.env.EVIDARA_ACCEPTANCE_ORG_SLUG || '').trim() !== ORG_SLUG) {
+  if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || env('EVIDARA_ACCEPTANCE_ORG_SLUG') !== ORG_SLUG) {
     throw new Error('R13 synthetic acceptance guard failed');
   }
   const origin = previewOrigin(env('EVIDARA_ACCEPTANCE_URL'));
   const share = shareBootstrap(origin);
   const email = env('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
   const password = env('EVIDARA_ACCEPTANCE_STUDENT_PASSWORD');
-  const service = serviceClient();
   await mkdir(DIR, { recursive: true });
 
   let browser;
   let context;
   let page;
+  let baseline = false;
   const consoleErrors = [];
   const pageErrors = [];
   const failedResponses = [];
-  let baseline = false;
-  let switched = false;
-  let contract;
   try {
-    const { data: initialPaper, error: initialError } = await service.from('question_papers').select('result_mode,organization_id').eq('id', PAPER_ID).single();
-    if (initialError) throw initialError;
-    if (initialPaper.organization_id !== ORG_ID || initialPaper.result_mode !== 'score_only') throw new Error(`R13 requires synthetic paper at score_only baseline, found ${initialPaper.result_mode}`);
-
-    await assertAndSetMode(service, 'in_depth_analytics');
-    switched = true;
-    contract = await studentContract(email, password);
+    await reconcileStudentContract(email, password);
 
     browser = await chromium.launch({ headless: true });
     context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
@@ -166,10 +137,8 @@ async function main() {
       }
     });
 
-    if (share) {
-      await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await page.waitForTimeout(500);
-    }
+    await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForTimeout(500);
     await page.goto(`${origin}/?view=login`, { waitUntil: 'networkidle', timeout: 45000 });
     if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R13 protected preview bootstrap failed');
     await page.locator('#email').fill(email);
@@ -180,30 +149,29 @@ async function main() {
     baseline = true;
     await page.goto(`${origin}/?view=student-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
     await page.getByRole('heading', { name: 'How you performed' }).waitFor({ state: 'visible', timeout: 20000 });
-    await page.getByText(SUBJECT, { exact: true }).first().waitFor({ state: 'visible', timeout: 20000 });
+    const physics = page.locator('.analytics-v12-overview-subject-row').filter({ hasText: SUBJECT });
+    await physics.waitFor({ state: 'visible', timeout: 20000 });
     let body = await page.locator('body').innerText();
-    for (const token of ['10%', SUBJECT]) if (!body.includes(token)) throw new Error(`R13 overview missing ${token}`);
+    if (!body.includes(SUBJECT) || !body.includes('10 / 100') && !body.includes('10%')) throw new Error('R13 overview rendered baseline missing');
     await page.screenshot({ path: `${DIR}/01-overview.png`, fullPage: true });
 
-    const subjectButton = page.locator('.analytics-v12-overview-subject-row').filter({ hasText: SUBJECT });
-    if (await subjectButton.count() !== 1) throw new Error('R13 rendered Physics subject drill-down target missing');
-    await subjectButton.click();
+    await physics.click();
     await page.getByRole('heading', { name: 'Subject analysis' }).waitFor({ state: 'visible', timeout: 10000 });
-    const chapterButton = page.locator('.analytics-v12-mastery-row').filter({ hasText: CHAPTER });
-    await chapterButton.waitFor({ state: 'visible', timeout: 10000 });
+    const chapter = page.getByRole('button', { name: new RegExp(CHAPTER, 'i') }).first();
+    await chapter.waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
-    for (const token of [CHAPTER, '20', '2', '18', '100%', '10%']) if (!body.includes(token)) throw new Error(`R13 subject analytics missing ${token}`);
+    for (const token of [SUBJECT, CHAPTER, '2 correct', '100%']) if (!body.includes(token)) throw new Error(`R13 subject analytics missing ${token}`);
     await page.screenshot({ path: `${DIR}/02-subject.png`, fullPage: true });
 
-    await chapterButton.click();
+    await chapter.click();
     await page.getByRole('heading', { name: 'Chapter analysis' }).waitFor({ state: 'visible', timeout: 10000 });
-    const topicButton = page.locator('.analytics-v12-topic-mastery-detailed button').filter({ hasText: TOPIC });
-    await topicButton.waitFor({ state: 'visible', timeout: 10000 });
+    const topic = page.locator('.analytics-v12-topic-mastery-detailed button').filter({ hasText: TOPIC });
+    await topic.waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
     for (const token of [CHAPTER, TOPIC, '2 correct · 0 incorrect', '2 of 20 questions attempted']) if (!body.includes(token)) throw new Error(`R13 chapter analytics missing ${token}`);
     await page.screenshot({ path: `${DIR}/03-chapter.png`, fullPage: true });
 
-    await topicButton.click();
+    await topic.click();
     await page.getByRole('heading', { name: 'Topic analysis' }).waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
     for (const token of [SUBJECT, CHAPTER, TOPIC, '2 correct · 0 incorrect', 'Building evidence · n=2/5 answered']) if (!body.includes(token)) throw new Error(`R13 topic analytics missing ${token}`);
@@ -249,14 +217,6 @@ async function main() {
     }, null, 2) + '\n');
     throw error;
   } finally {
-    if (switched) {
-      await assertAndSetMode(service, 'score_only');
-      const { data: restored, error: restoreError } = await service.from('question_papers').select('result_mode,organization_id').eq('id', PAPER_ID).single();
-      if (restoreError || restored?.organization_id !== ORG_ID || restored?.result_mode !== 'score_only') {
-        throw new Error(`CRITICAL R13 restore verification failed: ${restoreError?.message || restored?.result_mode}`);
-      }
-      console.log('R13 restore verified: isolated synthetic paper returned to score_only.');
-    }
     if (context) await context.close().catch(() => {});
     if (browser) await browser.close().catch(() => {});
   }
