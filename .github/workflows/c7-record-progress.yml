@@ -24,20 +24,22 @@ jobs:
           marker = '## 2026-09-03 07:19 IST — R12 protected-preview acceptance block'
           body = log.read_text(encoding='utf-8')
           if marker not in body:
-              entry = '''
-## 2026-09-03 07:19 IST — R12 protected-preview acceptance block
-
-- **Run start/end:** 2026-09-03 07:19 IST → approximately 07:35 IST.
-- **Active engineering/review span:** approximately **16 minutes**. The requested 45–50 minute productive target was not reached within this execution window; no padding was added.
-- **Section worked:** R12 held/hidden versus released result-mode acceptance, isolated to `evidara-school-acceptance`.
-- **Checklist items completed:** **none**. R12 remains unchecked pending rendered held+released proof and a complete descendant release gate.
-- **Health:** Vercel production runtime errors for the preceding 24 hours were clean and hardening previews remained READY. `SMIS QP` remained **ACTIVE_HEALTHY**, final database size **219278483 bytes**. Permanent production was not promoted or mutated.
-- **Changes:** protected-preview R12 held and score-only runners/workflows were added. Held run `33705794097` passed the isolated Supabase held contract and preflight but failed browser bootstrap because the configured Actions Vercel share credential is stale for the current protected branch alias. Earlier run `33705636374` independently confirmed the released score-only contract: release level `score`, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, with answers/analytics still unreleased.
-- **Safety:** all database mutations were guarded to `evidara-school-acceptance`; no St. Mary's or future-client data was touched. The synthetic paper was restored to `score_only` after the held probe. No preview token/share URL was committed or logged.
-- **Blocker:** refresh the secure Actions protected-preview share credential (or use an existing secure Vercel-token path); this is CI credential drift, not a production outage.
-- **Exact next action:** rerun rendered held proof, restore/verify `score_only`, run released rendered proof, then run the complete Phase 1 release gate. Check R12 only after both modes and the descendant gate are green; proceed to R13 immediately afterward.
-'''
-              log.write_text(body.rstrip() + '\n\n' + entry.lstrip(), encoding='utf-8')
+              lines = [
+                  '',
+                  marker,
+                  '',
+                  '- **Run start/end:** 2026-09-03 07:19 IST → approximately 07:35 IST.',
+                  '- **Active engineering/review span:** approximately **16 minutes**. The requested 45–50 minute productive target was not reached within this execution window; no padding was added.',
+                  '- **Section worked:** R12 held/hidden versus released result-mode acceptance, isolated to `evidara-school-acceptance`.',
+                  '- **Checklist items completed:** **none**. R12 remains unchecked pending rendered held+released proof and a complete descendant release gate.',
+                  '- **Health:** Vercel production runtime errors for the preceding 24 hours were clean and hardening previews remained READY. `SMIS QP` remained **ACTIVE_HEALTHY**, final database size **219278483 bytes**. Permanent production was not promoted or mutated.',
+                  '- **Changes:** protected-preview R12 held and score-only runners/workflows were added. Held run `33705794097` passed the isolated Supabase held contract and preflight but failed browser bootstrap because the configured Actions Vercel share credential is stale for the current protected branch alias. Earlier run `33705636374` independently confirmed the released score-only contract: release level `score`, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, with answers/analytics still unreleased.',
+                  '- **Safety:** all database mutations were guarded to `evidara-school-acceptance`; no St. Mary’s or future-client data was touched. The synthetic paper was restored to `score_only` after the held probe. No preview token/share URL was committed or logged.',
+                  '- **Blocker:** refresh the secure Actions protected-preview share credential (or use an existing secure Vercel-token path); this is CI credential drift, not a production outage.',
+                  '- **Exact next action:** rerun rendered held proof, restore/verify `score_only`, run released rendered proof, then run the complete Phase 1 release gate. Check R12 only after both modes and the descendant gate are green; proceed to R13 immediately afterward.',
+                  ''
+              ]
+              log.write_text(body.rstrip() + '\n' + '\n'.join(lines), encoding='utf-8')
           PY
       - name: Commit heartbeat
         shell: bash
