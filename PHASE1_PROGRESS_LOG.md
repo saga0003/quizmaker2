@@ -873,3 +873,19 @@ This log records each production-hardening run with observable implementation an
 - **Blocker:** Securely refresh the GitHub Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` secret using a secret-capable channel; current connected GitHub tools cannot mutate repository secrets.
 - **Next action:** Once the Actions secret is refreshed, rerun rendered held-result acceptance, restore and run `score_only` rendered acceptance, independently verify release levels in Supabase, run the complete Phase 1 release gate, and only then check R12 before proceeding to R13.
 
+
+## 2026-09-03 12:45:56–12:51:26 IST — R12 held/released result acceptance continuation
+
+- **Run start/end:** 2026-09-03 12:45:56 IST → 2026-09-03 12:51:26 IST.
+- **Active engineering/review span:** approximately **5m 30s** of checkpoint/health inspection, R12 acceptance execution, database-state restoration, workflow repair, CI review and evidence diagnosis; no idle time was padded.
+- **Section worked:** R12 — held/released result modes.
+- **Checklist items completed:** none. R12 remains intentionally unchecked until both rendered modes and the complete release gate are green.
+- **Held-mode evidence:** authenticated rendered held-result rerun in workflow run `33705794097` completed **PASS** against only `evidara-school-acceptance`; release level `none`, authoritative score/count fields withheld, rendered held state visible, score/reflection leakage absent, and permanent production protected.
+- **Synthetic state change:** only paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` belonging to organization slug `evidara-school-acceptance` was restored from `hidden` to `score_only` for the released half. No St. Mary's or future-client data was touched.
+- **Acceptance workflow rework:** initial score-only run `33727320942` failed closed in preflight because the workflow omitted the mandatory positive `EVIDARA_ACCEPTANCE_DB_BYTES` measurement. Fresh `SMIS QP` database size was independently measured as `219335827` bytes and added to the guarded score-only workflow in commit `0765c30d5efbdbe49267f2368219b81742d819d4`.
+- **Verification:** complete Phase 1 release gate run `33727428783` on `0765c30d5efbdbe49267f2368219b81742d819d4` **PASS**: all hardening checks, TypeScript, lint, every regression suite, production build and final gate enforcement passed.
+- **Remaining R12 blocker:** corrected score-only run `33727428759` cleared the isolated-tenant/database/production-protection preflight but failed only at protected-preview browser bootstrap. Redacted evidence shows the stored Actions share URL redirects to Vercel login; no browser console/page/failed-response product error was recorded. The rendered score-only assertions therefore did not execute and R12 was not checked off.
+- **Vercel/Supabase health:** Vercel production runtime-error inspection for the preceding 24 hours returned no runtime errors; permanent production remained unchanged/protected. `SMIS QP` remains `ACTIVE_HEALTHY`; measured database size `219335827` bytes. Protected preview itself remains available, but the GitHub Actions share credential must be refreshed without regenerating it afterward.
+- **Commits created:** `aad86562ba04babe92198fba7e23bfb0373160ee` (score-only acceptance trigger), `0765c30d5efbdbe49267f2368219b81742d819d4` (add fresh database-size guard), plus this heartbeat trigger/recorder commit.
+- **Exact next action:** refresh repository secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` with one fresh protected-preview share URL and do not regenerate that URL afterward; rerun R12 score-only rendered acceptance `33727428759` (or trigger a fresh run), independently reconcile its displayed score/release level with Supabase, then check R12 only after green rendered evidence and a complete release gate; proceed to R13.
+
