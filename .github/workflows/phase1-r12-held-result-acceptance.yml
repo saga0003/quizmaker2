@@ -5,7 +5,7 @@ on:
     branches: [phase1-hardening]
     paths:
       - .github/workflows/phase1-r12-held-result-acceptance.yml
-      - scripts/phase1-r12-held-result-acceptance-v2.mjs
+      - scripts/phase1-r12-held-result-acceptance-v3.mjs
       - .phase1-r12-held-trigger
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
           cat /tmp/evidara-r12-app.log
           exit 1
       - name: Execute R12 held-result rendered acceptance
-        run: node scripts/phase1-r12-held-result-acceptance-v2.mjs
+        run: node scripts/phase1-r12-held-result-acceptance-v3.mjs
       - name: Upload redacted R12 evidence
         if: always()
         uses: actions/upload-artifact@v4
