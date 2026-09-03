@@ -4,8 +4,6 @@ on:
   push:
     branches: [phase1-hardening]
     paths:
-      - .github/workflows/phase1-r13-analytics-acceptance.yml
-      - scripts/phase1-r13-analytics-acceptance.mjs
       - .phase1-r13-trigger
   workflow_dispatch:
 
@@ -27,8 +25,6 @@ jobs:
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
       EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r13-analytics
-      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
     steps:
@@ -48,10 +44,6 @@ jobs:
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
           test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R13 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
-          if [ -z "${SUPABASE_SECRET_KEY:-}" ] && [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
-            echo '::error title=R13 server credential missing::Configure SUPABASE_SECRET_KEY or the legacy SUPABASE_SERVICE_ROLE_KEY GitHub secret.'
-            exit 1
-          fi
           node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
       - name: Install Playwright without changing lockfile
         run: |
