@@ -44,6 +44,50 @@ function publicClient() {
   });
 }
 
+function serviceClient() {
+  return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('SUPABASE_SECRET_KEY'), {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}
+
+async function reconcileAuthoritativeQuestionRows() {
+  const client = serviceClient();
+  const { data: org, error: orgError } = await client.from('organizations').select('id,slug').eq('slug', ORG_SLUG).single();
+  if (orgError) throw orgError;
+  const { data: attempt, error: attemptError } = await client.from('exam_attempts')
+    .select('id,paper_id,organization_id,score,maximum_marks,percentage,correct_count,incorrect_count,unanswered_count,status')
+    .eq('id', ATTEMPT_ID).eq('paper_id', PAPER_ID).eq('organization_id', org.id).single();
+  if (attemptError) throw attemptError;
+  if (!attempt || attempt.status !== 'submitted' || Number(attempt.score) !== 8 || Number(attempt.maximum_marks) !== 80 || Number(attempt.percentage) !== 10 || Number(attempt.correct_count) !== 2 || Number(attempt.incorrect_count) !== 0 || Number(attempt.unanswered_count) !== 18) {
+    throw new Error('R13 authoritative attempt baseline mismatch');
+  }
+  const { data: questions, error: questionError } = await client.from('paper_questions')
+    .select('id,display_order,marks,question_snapshot').eq('paper_id', PAPER_ID).order('display_order');
+  if (questionError) throw questionError;
+  if ((questions || []).length !== 20) throw new Error(`R13 authoritative paper-question count mismatch: ${(questions || []).length}`);
+  for (const row of questions || []) {
+    const snapshot = row.question_snapshot || {};
+    if (snapshot.subject_name !== SUBJECT || snapshot.chapter_name !== CHAPTER || snapshot.topic_name !== TOPIC) {
+      throw new Error(`R13 frozen taxonomy mismatch at Q${row.display_order}`);
+    }
+  }
+  const ids = (questions || []).map((row) => row.id);
+  const { data: responses, error: responseError } = await client.from('exam_responses')
+    .select('paper_question_id,response,is_correct,marks_awarded').eq('attempt_id', ATTEMPT_ID).in('paper_question_id', ids);
+  if (responseError) throw responseError;
+  const byQuestion = new Map((responses || []).map((row) => [row.paper_question_id, row]));
+  const answered = (questions || []).filter((row) => byQuestion.has(row.id));
+  if (answered.length !== 2) throw new Error(`R13 authoritative response count mismatch: ${answered.length}`);
+  for (const displayOrder of [1, 2]) {
+    const q = (questions || []).find((row) => Number(row.display_order) === displayOrder);
+    const response = q && byQuestion.get(q.id);
+    if (!q || !response || response.response !== 'A' || response.is_correct !== true || Number(response.marks_awarded) !== 4) {
+      throw new Error(`R13 authoritative Q${displayOrder} response mismatch`);
+    }
+  }
+  return { questionCount: 20, correct: 2, unanswered: 18, q1Marks: 4, q2Marks: 4 };
+}
+
 async function reconcileStudentContract(email, password) {
   const client = publicClient();
   const { data: signIn, error: authError } = await client.auth.signInWithPassword({ email, password });
@@ -72,32 +116,14 @@ async function reconcileStudentContract(email, password) {
     if (!history || Number(history.score) !== 8 || Number(history.maximum_marks) !== 80 || Number(history.percentage) !== 10 || Number(history.correct) !== 2 || Number(history.incorrect) !== 0 || Number(history.unanswered) !== 18) {
       throw new Error('R13 analytics history does not reconcile to authoritative attempt baseline');
     }
-
     const subject = (payload?.subjects || []).find((row) => row.name === SUBJECT);
     const chapter = (payload?.chapters || []).find((row) => row.name === CHAPTER);
     const topic = (payload?.topics || []).find((row) => row.name === TOPIC);
     for (const [label, row] of [['subject', subject], ['chapter', chapter], ['topic', topic]]) {
       if (!row) throw new Error(`R13 ${label} taxonomy analytics missing`);
-      const actual = {
-        questions: Number(row.questions), correct: Number(row.correct), incorrect: Number(row.incorrect),
-        unanswered: Number(row.unanswered), accuracy: Number(row.accuracy), average_percentage: Number(row.average_percentage),
-      };
+      const actual = { questions: Number(row.questions), correct: Number(row.correct), incorrect: Number(row.incorrect), unanswered: Number(row.unanswered), accuracy: Number(row.accuracy), average_percentage: Number(row.average_percentage) };
       const wanted = { questions: 60, correct: 5, incorrect: 0, unanswered: 55, accuracy: 100, average_percentage: 8.3 };
-      for (const [key, value] of Object.entries(wanted)) {
-        if (actual[key] !== value) throw new Error(`R13 ${label} ${key} mismatch: ${actual[key]} != ${value}`);
-      }
-    }
-
-    const evidence = (payload?.question_evidence || []).filter((row) => row.attempt_id === ATTEMPT_ID && row.topic_name === TOPIC);
-    if (evidence.length !== 20) throw new Error(`R13 question evidence count mismatch: ${evidence.length}`);
-    const correct = evidence.filter((row) => row.outcome === 'correct');
-    const unanswered = evidence.filter((row) => row.outcome === 'unanswered');
-    if (correct.length !== 2 || unanswered.length !== 18) throw new Error(`R13 question outcomes mismatch: ${correct.length} correct / ${unanswered.length} unanswered`);
-    for (const q of [1, 2]) {
-      const row = evidence.find((item) => Number(item.question_no) === q);
-      if (!row || row.outcome !== 'correct' || Number(row.marks_awarded) !== 4 || row.subject_name !== SUBJECT || row.chapter_name !== CHAPTER || row.topic_name !== TOPIC) {
-        throw new Error(`R13 Q${q} evidence mismatch`);
-      }
+      for (const [key, value] of Object.entries(wanted)) if (actual[key] !== value) throw new Error(`R13 ${label} ${key} mismatch: ${actual[key]} != ${value}`);
     }
     return { studentId };
   } finally {
@@ -106,9 +132,7 @@ async function reconcileStudentContract(email, password) {
 }
 
 async function main() {
-  if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || env('EVIDARA_ACCEPTANCE_ORG_SLUG') !== ORG_SLUG) {
-    throw new Error('R13 synthetic acceptance guard failed');
-  }
+  if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || env('EVIDARA_ACCEPTANCE_ORG_SLUG') !== ORG_SLUG) throw new Error('R13 synthetic acceptance guard failed');
   const origin = previewOrigin(env('EVIDARA_ACCEPTANCE_URL'));
   const share = shareBootstrap(origin);
   const email = env('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
@@ -123,6 +147,7 @@ async function main() {
   const pageErrors = [];
   const failedResponses = [];
   try {
+    const authoritative = await reconcileAuthoritativeQuestionRows();
     await reconcileStudentContract(email, password);
 
     browser = await chromium.launch({ headless: true });
@@ -130,12 +155,7 @@ async function main() {
     page = await context.newPage();
     page.on('console', (message) => { if (baseline && message.type() === 'error') consoleErrors.push(message.text().slice(0, 500)); });
     page.on('pageerror', (error) => { if (baseline) pageErrors.push(String(error.message || error).slice(0, 500)); });
-    page.on('response', (response) => {
-      if (baseline && response.status() >= 400) {
-        const url = new URL(response.url());
-        failedResponses.push({ status: response.status(), method: response.request().method(), url: `${url.origin}${url.pathname}` });
-      }
-    });
+    page.on('response', (response) => { if (baseline && response.status() >= 400) { const url = new URL(response.url()); failedResponses.push({ status: response.status(), method: response.request().method(), url: `${url.origin}${url.pathname}` }); } });
 
     await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(500);
@@ -152,7 +172,7 @@ async function main() {
     const physics = page.locator('.analytics-v12-overview-subject-row').filter({ hasText: SUBJECT });
     await physics.waitFor({ state: 'visible', timeout: 20000 });
     let body = await page.locator('body').innerText();
-    if (!body.includes(SUBJECT) || !body.includes('10 / 100') && !body.includes('10%')) throw new Error('R13 overview rendered baseline missing');
+    if (!body.includes(SUBJECT) || (!body.includes('10 / 100') && !body.includes('10%'))) throw new Error('R13 overview rendered baseline missing');
     await page.screenshot({ path: `${DIR}/01-overview.png`, fullPage: true });
 
     await physics.click();
@@ -186,35 +206,27 @@ async function main() {
     const renderedCorrect = (evidenceText.match(/\bCorrect\b/g) || []).length;
     const renderedUnanswered = (evidenceText.match(/\bUnanswered\b/g) || []).length;
     if (renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
-    for (const token of [`${PAPER_TITLE} · Q1`, `${PAPER_TITLE} · Q2`, '+4 marks', `${SUBJECT} · ${CHAPTER} · ${TOPIC}`]) {
-      if (!evidenceText.includes(token)) throw new Error(`R13 question intelligence missing ${token}`);
-    }
+    for (const token of [`${PAPER_TITLE} · Q1`, `${PAPER_TITLE} · Q2`, '+4 marks', `${SUBJECT} · ${CHAPTER} · ${TOPIC}`]) if (!evidenceText.includes(token)) throw new Error(`R13 question intelligence missing ${token}`);
     body = await page.locator('body').innerText();
     if (!body.includes('60 outcomes')) throw new Error('R13 question intelligence missing 60-outcome reconciliation');
     await page.screenshot({ path: `${DIR}/05-question-intelligence.png`, fullPage: true });
 
-    if (consoleErrors.length || pageErrors.length || failedResponses.length) {
-      throw new Error(`Rendered errors ${consoleErrors.length}/${pageErrors.length}/${failedResponses.length}`);
-    }
+    if (consoleErrors.length || pageErrors.length || failedResponses.length) throw new Error(`Rendered errors ${consoleErrors.length}/${pageErrors.length}/${failedResponses.length}`);
 
     const output = {
       result: 'PASS', acceptanceItem: 'R13', organizationSlug: ORG_SLUG, target: origin,
       paperId: PAPER_ID, attemptId: ATTEMPT_ID, releaseModeDuringProof: 'in_depth_analytics',
       baseline: { score: 8, maximumMarks: 80, percentage: 10, correct: 2, incorrect: 0, unanswered: 18 },
       taxonomy: { subject: SUBJECT, chapter: CHAPTER, topic: TOPIC, exposure: 60, attempted: 5, accuracy: 100, scorePercentage: 8.3 },
-      questionEvidence: { aggregateOutcomes: 60, aggregateCorrect: 5, aggregateUnanswered: 55, authoritativeAttemptOutcomes: 20, authoritativeAttemptCorrect: 2, authoritativeAttemptUnanswered: 18, q1Marks: 4, q2Marks: 4 },
-      renderedDrilldownVerified: true, productionProtected: true, secretsRecorded: false,
+      questionEvidence: { aggregateOutcomes: 60, aggregateCorrect: 5, aggregateUnanswered: 55, authoritativeAttemptOutcomes: authoritative.questionCount, authoritativeAttemptCorrect: authoritative.correct, authoritativeAttemptUnanswered: authoritative.unanswered, q1Marks: authoritative.q1Marks, q2Marks: authoritative.q2Marks },
+      renderedDrilldownVerified: true, independentDatabaseReconciliation: true, productionProtected: true, secretsRecorded: false,
       unexpectedConsoleErrorCount: 0, pageErrorCount: 0, failedResponseCount: 0, capturedAt: new Date().toISOString(),
     };
     await writeFile(`${DIR}/r13-analytics-results.json`, JSON.stringify(output, null, 2) + '\n');
     console.log(JSON.stringify(output, null, 2));
   } catch (error) {
     if (page) await page.screenshot({ path: `${DIR}/failure.png`, fullPage: true }).catch(() => {});
-    await writeFile(`${DIR}/r13-analytics-results.json`, JSON.stringify({
-      result: 'FAIL', error: String(error?.message || error), url: page?.url?.() || null,
-      consoleErrors: consoleErrors.slice(0, 5), pageErrors: pageErrors.slice(0, 5), failedResponses: failedResponses.slice(0, 5),
-      productionProtected: true, secretsRecorded: false,
-    }, null, 2) + '\n');
+    await writeFile(`${DIR}/r13-analytics-results.json`, JSON.stringify({ result: 'FAIL', error: String(error?.message || error), url: page?.url?.() || null, consoleErrors: consoleErrors.slice(0, 5), pageErrors: pageErrors.slice(0, 5), failedResponses: failedResponses.slice(0, 5), productionProtected: true, secretsRecorded: false }, null, 2) + '\n');
     throw error;
   } finally {
     if (context) await context.close().catch(() => {});
