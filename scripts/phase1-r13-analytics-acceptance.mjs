@@ -82,7 +82,7 @@ async function reconcileStudentContract(email, password) {
         questions: Number(row.questions), correct: Number(row.correct), incorrect: Number(row.incorrect),
         unanswered: Number(row.unanswered), accuracy: Number(row.accuracy), average_percentage: Number(row.average_percentage),
       };
-      const wanted = { questions: 20, correct: 2, incorrect: 0, unanswered: 18, accuracy: 100, average_percentage: 10 };
+      const wanted = { questions: 60, correct: 5, incorrect: 0, unanswered: 55, accuracy: 100, average_percentage: 8.3 };
       for (const [key, value] of Object.entries(wanted)) {
         if (actual[key] !== value) throw new Error(`R13 ${label} ${key} mismatch: ${actual[key]} != ${value}`);
       }
@@ -160,7 +160,7 @@ async function main() {
     const chapter = page.getByRole('button', { name: new RegExp(CHAPTER, 'i') }).first();
     await chapter.waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
-    for (const token of [SUBJECT, CHAPTER, '2 correct', '100%']) if (!body.includes(token)) throw new Error(`R13 subject analytics missing ${token}`);
+    for (const token of [SUBJECT, CHAPTER, '5 correct', '100%']) if (!body.includes(token)) throw new Error(`R13 subject analytics missing ${token}`);
     await page.screenshot({ path: `${DIR}/02-subject.png`, fullPage: true });
 
     await chapter.click();
@@ -168,13 +168,13 @@ async function main() {
     const topic = page.locator('.analytics-v12-topic-mastery-detailed button').filter({ hasText: TOPIC });
     await topic.waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
-    for (const token of [CHAPTER, TOPIC, '2 correct · 0 incorrect', '2 of 20 questions attempted']) if (!body.includes(token)) throw new Error(`R13 chapter analytics missing ${token}`);
+    for (const token of [CHAPTER, TOPIC, '5 correct · 0 incorrect', '5 of 60 questions attempted', 'n=5 answered']) if (!body.includes(token)) throw new Error(`R13 chapter analytics missing ${token}`);
     await page.screenshot({ path: `${DIR}/03-chapter.png`, fullPage: true });
 
     await topic.click();
     await page.getByRole('heading', { name: 'Topic analysis' }).waitFor({ state: 'visible', timeout: 10000 });
     body = await page.locator('body').innerText();
-    for (const token of [SUBJECT, CHAPTER, TOPIC, '2 correct · 0 incorrect', 'Building evidence · n=2/5 answered']) if (!body.includes(token)) throw new Error(`R13 topic analytics missing ${token}`);
+    for (const token of [SUBJECT, CHAPTER, TOPIC, '5 correct · 0 incorrect', 'n=5 answered · 60 exposed']) if (!body.includes(token)) throw new Error(`R13 topic analytics missing ${token}`);
     await page.screenshot({ path: `${DIR}/04-topic.png`, fullPage: true });
 
     await page.getByRole('button', { name: /Open question intelligence/ }).click();
@@ -185,12 +185,12 @@ async function main() {
     const evidenceText = await evidence.innerText();
     const renderedCorrect = (evidenceText.match(/\bCorrect\b/g) || []).length;
     const renderedUnanswered = (evidenceText.match(/\bUnanswered\b/g) || []).length;
-    if (renderedCorrect !== 2 || renderedUnanswered !== 18) throw new Error(`R13 rendered question outcomes mismatch: ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
+    if (renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
     for (const token of [`${PAPER_TITLE} · Q1`, `${PAPER_TITLE} · Q2`, '+4 marks', `${SUBJECT} · ${CHAPTER} · ${TOPIC}`]) {
       if (!evidenceText.includes(token)) throw new Error(`R13 question intelligence missing ${token}`);
     }
     body = await page.locator('body').innerText();
-    if (!body.includes('20 outcomes')) throw new Error('R13 question intelligence missing 20-outcome reconciliation');
+    if (!body.includes('60 outcomes')) throw new Error('R13 question intelligence missing 60-outcome reconciliation');
     await page.screenshot({ path: `${DIR}/05-question-intelligence.png`, fullPage: true });
 
     if (consoleErrors.length || pageErrors.length || failedResponses.length) {
@@ -201,8 +201,8 @@ async function main() {
       result: 'PASS', acceptanceItem: 'R13', organizationSlug: ORG_SLUG, target: origin,
       paperId: PAPER_ID, attemptId: ATTEMPT_ID, releaseModeDuringProof: 'in_depth_analytics',
       baseline: { score: 8, maximumMarks: 80, percentage: 10, correct: 2, incorrect: 0, unanswered: 18 },
-      taxonomy: { subject: SUBJECT, chapter: CHAPTER, topic: TOPIC, exposure: 20, attempted: 2, accuracy: 100, scorePercentage: 10 },
-      questionEvidence: { outcomes: 20, correct: 2, unanswered: 18, q1Marks: 4, q2Marks: 4 },
+      taxonomy: { subject: SUBJECT, chapter: CHAPTER, topic: TOPIC, exposure: 60, attempted: 5, accuracy: 100, scorePercentage: 8.3 },
+      questionEvidence: { aggregateOutcomes: 60, aggregateCorrect: 5, aggregateUnanswered: 55, authoritativeAttemptOutcomes: 20, authoritativeAttemptCorrect: 2, authoritativeAttemptUnanswered: 18, q1Marks: 4, q2Marks: 4 },
       renderedDrilldownVerified: true, productionProtected: true, secretsRecorded: false,
       unexpectedConsoleErrorCount: 0, pageErrorCount: 0, failedResponseCount: 0, capturedAt: new Date().toISOString(),
     };
