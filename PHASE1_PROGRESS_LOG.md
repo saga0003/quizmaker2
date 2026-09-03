@@ -811,3 +811,14 @@ This log records each production-hardening run with observable implementation an
 - Active engineering span: approximately 22 minutes in this execution window; the requested 45–50 minute target was not reached before the verified R11 checkpoint was complete.
 - Exact next action: execute R12 against the same isolated tenant by proving hidden/held and released result modes through authenticated rendered Student behavior plus independent Supabase checks, then run the complete release gate before checking R12.
 
+
+### 2026-09-03 05:14–05:36 IST — R12 held/released result hardening
+- Start inspection completed: reviewed `PHASE1_RELEASE_CHECKLIST.md`, `PHASE1_PROGRESS_LOG.md`, `phase1-hardening` head/checks, latest release-gate state, Vercel production/preview health, and Supabase `SMIS QP` state.
+- Production remained protected and Vercel's fresh 24-hour runtime-error check was clean; Supabase project `xzfozpnzvznqrvcsoail` remained `ACTIVE_HEALTHY` at 219,278,483 bytes.
+- Work remained strictly inside synthetic tenant `Evidara School` (`evidara-school-acceptance`); no St. Mary's/future-client data and no separate Supabase project were used.
+- R12 exposed a real Student Results defect: held/hidden result rows returned NULL score/count fields correctly from the backend, while the frontend still assumed released numeric values. Patched `StudentResultsView` to render an explicit `Result held` state, suppress score/accuracy/question details, and keep reflection unavailable until release.
+- Added guarded R12 held/released browser acceptance harnesses. Backend held-mode contract was proven against synthetic attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e`: `result_release_level=none`, all score/count fields NULL, answers/analytics unreleased. Rendered held verification is not yet green because the localhost Student workspace navigation re-enters `Verifying account security…` and `/api/account/security/` returns 503 on the test surface; no R12 checkmark was awarded.
+- The synthetic paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was restored to its normal `score_only` mode before handoff.
+- Active engineering span: ~22 minutes; no time padding.
+- Exact next action: make the R12 rendered harness navigate Results without triggering the localhost account-security reload (or supply the same safe security prerequisites used by the authenticated acceptance surface), obtain green held + released evidence, run the complete Phase 1 release gate, then and only then check off R12 and proceed to R13.
+
