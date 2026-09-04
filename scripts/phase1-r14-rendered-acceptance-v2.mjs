@@ -80,17 +80,33 @@ async function requireBodyToken(page, token, role, level) {
   return body;
 }
 
-async function openHierarchyRow(page, label) {
-  await page.getByText(label, { exact: true }).first().waitFor({ state: 'visible', timeout: 15000 });
-
-  const row = page.getByRole('row').filter({ has: page.getByText(label, { exact: true }) }).last();
-  if (await row.isVisible().catch(() => false)) {
-    await row.click();
-  } else {
-    const button = page.getByRole('button', { name: label, exact: true }).first();
-    if (await button.isVisible().catch(() => false)) await button.click();
-    else await page.getByText(label, { exact: true }).last().click();
+async function clickFirstVisible(locator) {
+  const count = await locator.count();
+  for (let i = 0; i < count; i += 1) {
+    const candidate = locator.nth(i);
+    if (await candidate.isVisible().catch(() => false)) {
+      await candidate.click();
+      return true;
+    }
   }
+  return false;
+}
+
+async function openHierarchyRow(page, label) {
+  const rows = page.getByRole('row').filter({ hasText: label });
+  if (await clickFirstVisible(rows)) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
+  const buttons = page.getByRole('button', { name: label, exact: true });
+  if (await clickFirstVisible(buttons)) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
+  const exactTexts = page.getByText(label, { exact: true });
+  if (!(await clickFirstVisible(exactTexts))) throw new Error(`R14 could not find a visible hierarchy control for ${label}`);
   await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 }
 
