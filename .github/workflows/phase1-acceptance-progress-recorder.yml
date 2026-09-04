@@ -1,0 +1,64 @@
+name: Phase 1 Acceptance Progress Recorder
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .phase1-acceptance-progress-trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase1-acceptance-progress-recorder
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+
+      - name: Record verified acceptance item and heartbeat
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          trigger = Path('.phase1-acceptance-progress-trigger')
+          payload = json.loads(trigger.read_text(encoding='utf-8'))
+          item = payload['item']
+          expected = payload['expected_line']
+          replacement = payload['replacement_line']
+          heartbeat = payload['heartbeat'].rstrip() + '\n'
+
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          text = checklist.read_text(encoding='utf-8')
+          if expected not in text:
+              if replacement not in text:
+                  raise SystemExit(f'Expected unchecked line for {item} not found and replacement is absent')
+          else:
+              text = text.replace(expected, replacement, 1)
+              checklist.write_text(text, encoding='utf-8')
+
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          with log.open('a', encoding='utf-8') as fh:
+              fh.write('\n' + heartbeat)
+
+          trigger.unlink()
+
+      - name: Commit verified acceptance progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md PHASE1_PROGRESS_LOG.md .phase1-acceptance-progress-trigger
+          git commit -m "docs: record verified Phase 1 acceptance progress [skip ci]"
+          git push origin HEAD:phase1-hardening
