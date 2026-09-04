@@ -50,28 +50,28 @@ function totp(secret, now = Date.now()) {
   return String(binary % 1_000_000).padStart(6, '0');
 }
 
-async function satisfyMfaIfRequired(page) {
+async function satisfyMfaIfRequired(page, mfaState) {
   const body = await page.locator('body').innerText().catch(() => '');
   if (!body.includes('Multi-factor verification required')) return false;
   const match = body.match(/setup key:\s*([A-Z2-7\s]+)/i);
-  if (!match?.[1]) throw new Error('R14 synthetic MFA gate did not expose a setup key');
-  const secret = match[1].replace(/\s+/g, '');
+  if (match?.[1]) mfaState.secret = match[1].replace(/\s+/g, '');
+  if (!mfaState.secret) throw new Error('R14 synthetic MFA challenge has no in-memory setup key');
   const codeInput = page.getByLabel(/6-digit authenticator code/i).or(page.locator('input[inputmode="numeric"]')).first();
   await codeInput.waitFor({ state: 'visible', timeout: 10000 });
-  await codeInput.fill(totp(secret));
+  await codeInput.fill(totp(mfaState.secret));
   await page.getByRole('button', { name: /Verify and unlock Evidara/i }).click();
   await page.waitForFunction(() => !document.body.innerText.includes('Multi-factor verification required'), null, { timeout: 20000 });
   return true;
 }
 
-async function login(page, origin, email, password) {
+async function login(page, origin, email, password, mfaState) {
   await page.goto(`${origin}/?view=login`, { waitUntil: 'networkidle', timeout: 45000 });
   if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /^Sign In$/ }).click();
   await page.waitForFunction(() => !document.body.innerText.includes('Sign in to Evidara') && new URL(location.href).searchParams.get('view')?.startsWith('school-'), null, { timeout: 30000 });
-  await satisfyMfaIfRequired(page);
+  await satisfyMfaIfRequired(page, mfaState);
 }
 
 async function requireBodyToken(page, token, role, level) {
@@ -135,6 +135,7 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
   const pageErrors = [];
   const failedResponses = [];
   const analyticsPayloads = [];
+  const mfaState = { secret: null };
   let baseline = false;
   let stage = 'bootstrap';
 
@@ -159,11 +160,11 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
 
     stage = 'login';
-    await login(page, origin, email, password);
+    await login(page, origin, email, password, mfaState);
 
     stage = 'school-overview-navigation';
     await page.goto(`${origin}/?view=school-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
-    await satisfyMfaIfRequired(page);
+    await satisfyMfaIfRequired(page, mfaState);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     stage = 'school-overview-ready';
@@ -239,6 +240,7 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     }, null, 2) + '\n');
     throw new Error(`R14 ${role} failed at ${stage}: ${error?.message || error}`);
   } finally {
+    mfaState.secret = null;
     await context.close();
   }
 }
