@@ -58,6 +58,7 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
   const failedResponses = [];
   const analyticsPayloads = [];
   let baseline = false;
+  let stage = 'bootstrap';
   page.on('console', (m) => { if (baseline && m.type() === 'error') consoleErrors.push(m.text().slice(0, 500)); });
   page.on('pageerror', (e) => { if (baseline) pageErrors.push(String(e.message || e).slice(0, 500)); });
   page.on('response', async (response) => {
@@ -68,30 +69,46 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
   });
 
   try {
+    stage = 'preview-bootstrap';
     await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
     if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
+    stage = 'login';
     await login(page, email, password);
     baseline = true;
+    stage = 'school-overview-navigation';
     await page.goto(`${origin}/?view=school-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
+    stage = `school-token:${PROGRAMME}`;
     let body = await requireBodyToken(page, PROGRAMME, role, 'school');
     if (!body.toLowerCase().includes('programme')) throw new Error(`R14 ${role} school view missing programme context`);
     await page.screenshot({ path: `${DIR}/${role}-01-school.png`, fullPage: true });
 
+    stage = `programme-button:${PROGRAMME}`;
     await openNamedButton(page, PROGRAMME);
+    stage = `programme-token:${GRADE}`;
     body = await requireBodyToken(page, GRADE, role, 'programme');
+    stage = `grade-button:${GRADE}`;
     await openNamedButton(page, GRADE);
+    stage = `grade-token:${SECTION}`;
     body = await requireBodyToken(page, SECTION, role, 'grade');
+    stage = `section-button:${SECTION}`;
     await openNamedButton(page, SECTION);
+    stage = `section-token:${SUBJECT}`;
     body = await requireBodyToken(page, SUBJECT, role, 'section');
     await page.screenshot({ path: `${DIR}/${role}-02-section.png`, fullPage: true });
 
+    stage = `subject-button:${SUBJECT}`;
     await openNamedButton(page, SUBJECT);
+    stage = `subject-token:${CHAPTER}`;
     body = await requireBodyToken(page, CHAPTER, role, 'subject');
+    stage = `chapter-button:${CHAPTER}`;
     await openNamedButton(page, CHAPTER);
+    stage = `chapter-token:${TOPIC}`;
     body = await requireBodyToken(page, TOPIC, role, 'chapter');
+    stage = `topic-button:${TOPIC}`;
     await openNamedButton(page, TOPIC);
     await page.screenshot({ path: `${DIR}/${role}-03-topic.png`, fullPage: true });
 
+    stage = 'payload-scope-verification';
     const scoped = analyticsPayloads.filter((p) => p?.school?.id === ORG_ID || p?.actor?.organizationId === ORG_ID);
     if (scoped.length < 6) throw new Error(`R14 ${role} captured only ${scoped.length} scoped analytics payloads`);
     if (scoped.some((p) => p?.school?.id && p.school.id !== ORG_ID)) throw new Error(`R14 ${role} received cross-school analytics payload`);
@@ -104,6 +121,11 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     }
     if (consoleErrors.length || pageErrors.length || failedResponses.length) throw new Error(`R14 ${role} rendered errors ${consoleErrors.length}/${pageErrors.length}/${failedResponses.length}`);
     return { role, result: 'PASS', actorRole: actor.role, organizationId: actor.organizationId, capturedPayloads: analyticsPayloads.length, scopedPayloads: scoped.length, hierarchy: [PROGRAMME, GRADE, SECTION, SUBJECT, CHAPTER, TOPIC], consoleErrorCount: 0, pageErrorCount: 0, failedResponseCount: 0 };
+  } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '');
+    await page.screenshot({ path: `${DIR}/${role}-FAIL.png`, fullPage: true }).catch(() => {});
+    await writeFile(`${DIR}/${role}-failure.json`, JSON.stringify({ role, stage, url: page.url(), error: String(error?.message || error), bodyExcerpt: body.slice(0, 4000), capturedPayloads: analyticsPayloads.length, consoleErrors, pageErrors, failedResponses }, null, 2) + '\n');
+    throw new Error(`R14 ${role} failed at ${stage}: ${error?.message || error}`);
   } finally { await context.close(); }
 }
 
