@@ -81,48 +81,61 @@ async function requireBodyToken(page, token, role, level) {
   return body;
 }
 
-async function clickFirstVisible(locator) {
-  const count = await locator.count();
-  for (let i = 0; i < count; i += 1) {
-    const candidate = locator.nth(i);
-    if (await candidate.isVisible().catch(() => false)) {
-      await candidate.click();
-      return true;
-    }
+async function waitForHierarchyTransition(page, nextToken, timeout = 6000) {
+  if (!nextToken) {
+    await page.waitForTimeout(800);
+    return true;
   }
+  return page.waitForFunction((value) => document.body.innerText.includes(value), nextToken, { timeout }).then(() => true).catch(() => false);
+}
+
+async function tryHierarchyClick(page, locator, nextToken) {
+  if (!locator || !(await locator.isVisible().catch(() => false))) return false;
+  await locator.click().catch(() => {});
+  if (await waitForHierarchyTransition(page, nextToken)) return true;
   return false;
 }
 
-async function openHierarchyRow(page, label) {
-  // Prefer a hierarchy table row identified by an exact cell before any generic
-  // named button. Short hierarchy labels (notably section "A") can collide with
-  // unrelated controls such as the School Admin avatar button named "A".
+async function openHierarchyRow(page, label, nextToken) {
+  // Bind the label to its actual hierarchy table row. This avoids short labels
+  // (notably section "A") colliding with unrelated controls such as the avatar.
   const exactCell = page.getByRole('cell', { name: label, exact: true });
   const exactRows = page.getByRole('row').filter({ has: exactCell });
   const rowCount = await exactRows.count();
   for (let i = 0; i < rowCount; i += 1) {
     const row = exactRows.nth(i);
     if (!(await row.isVisible().catch(() => false))) continue;
-    await row.click();
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
+
+    // The visible table row owns the React onClick handler. Exercise both its
+    // explicit drilldown/chevron cell and the row itself, accepting neither path
+    // unless the next hierarchy token really renders.
+    const drilldownCell = row.getByRole('cell').last();
+    if (await tryHierarchyClick(page, drilldownCell, nextToken)) return;
+    if (await tryHierarchyClick(page, row, nextToken)) return;
+
+    // Last deterministic fallback: dispatch the same bubbling click React handles.
+    await row.evaluate((element) => element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))).catch(() => {});
+    if (await waitForHierarchyTransition(page, nextToken)) return;
   }
 
-  // Mobile hierarchy cards are actual buttons, so use an exact button only after
-  // the desktop hierarchy-row path has been exhausted.
-  const buttons = page.getByRole('button', { name: label, exact: true });
-  if (await clickFirstVisible(buttons)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
-  }
-
+  // Mobile cards are buttons whose accessible name includes metrics; identify
+  // the card from its exact visible title and then activate its containing button.
   const exactTexts = page.getByText(label, { exact: true });
-  if (await clickFirstVisible(exactTexts)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
+  const textCount = await exactTexts.count();
+  for (let i = 0; i < textCount; i += 1) {
+    const text = exactTexts.nth(i);
+    if (!(await text.isVisible().catch(() => false))) continue;
+    const button = text.locator('xpath=ancestor::button[1]');
+    if ((await button.count()) && await tryHierarchyClick(page, button.first(), nextToken)) return;
   }
 
-  throw new Error(`R14 could not find a visible hierarchy control for ${label}`);
+  const buttons = page.getByRole('button', { name: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`, 'i') });
+  const buttonCount = await buttons.count();
+  for (let i = 0; i < buttonCount; i += 1) {
+    if (await tryHierarchyClick(page, buttons.nth(i), nextToken)) return;
+  }
+
+  throw new Error(`R14 hierarchy control ${label} did not render ${nextToken || 'the next level'} after all valid click paths`);
 }
 
 async function verifyRole(browser, origin, bypassSecret, role, email, password) {
@@ -183,10 +196,10 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     const levels = ['programme', 'grade', 'section', 'subject', 'chapter', 'topic'];
     for (let i = 0; i < HIERARCHY.length; i += 1) {
       const label = HIERARCHY[i];
+      const next = i < HIERARCHY.length - 1 ? HIERARCHY[i + 1] : null;
       stage = `${levels[i]}-row:${label}`;
-      await openHierarchyRow(page, label);
-      if (i < HIERARCHY.length - 1) {
-        const next = HIERARCHY[i + 1];
+      await openHierarchyRow(page, label, next);
+      if (next) {
         stage = `${levels[i]}-token:${next}`;
         body = await requireBodyToken(page, next, role, levels[i]);
       }
