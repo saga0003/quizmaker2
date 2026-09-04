@@ -4,6 +4,8 @@ on:
   push:
     branches: [phase1-hardening]
     paths:
+      - .github/workflows/phase1-r13-analytics-acceptance.yml
+      - scripts/phase1-r13-rendered-acceptance.mjs
       - .phase1-r13-trigger
   workflow_dispatch:
 
@@ -21,7 +23,7 @@ jobs:
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
       EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
       EVIDARA_ACCEPTANCE_DB_BYTES: '219344019'
-      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
       EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
       EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r13-analytics
@@ -43,8 +45,11 @@ jobs:
           test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_EMAIL:-}"
           test -n "${EVIDARA_ACCEPTANCE_STUDENT_PASSWORD:-}"
-          test -n "${EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL:-}" || { echo '::error title=R13 preview bootstrap missing::Configure EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL for the phase1-hardening branch alias.'; exit 1; }
-          node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL"
+          test -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" || { echo '::error title=R13 automation bypass missing::Configure VERCEL_AUTOMATION_BYPASS_SECRET in GitHub Actions.'; exit 1; }
+          node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL" --dry-run
+          curl --fail --silent --show-error --output /dev/null \
+            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            "$EVIDARA_ACCEPTANCE_URL/"
       - name: Install Playwright without changing lockfile
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
