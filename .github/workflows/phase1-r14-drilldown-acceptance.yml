@@ -22,7 +22,7 @@ jobs:
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
       EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
-      EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL: ${{ secrets.EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
       EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
       EVIDARA_ACCEPTANCE_TEACHER_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_TEACHER_EMAIL }}
@@ -42,10 +42,13 @@ jobs:
           set -euo pipefail
           test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
           test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
-          for name in EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD EVIDARA_ACCEPTANCE_TEACHER_EMAIL EVIDARA_ACCEPTANCE_TEACHER_PASSWORD EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL; do
+          for name in EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD EVIDARA_ACCEPTANCE_TEACHER_EMAIL EVIDARA_ACCEPTANCE_TEACHER_PASSWORD VERCEL_AUTOMATION_BYPASS_SECRET; do
             test -n "${!name:-}" || { echo "::error title=R14 secret missing::$name is not configured"; exit 1; }
           done
           node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL" --dry-run
+          curl --fail --silent --show-error --output /dev/null \
+            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            "$EVIDARA_ACCEPTANCE_URL/"
           node scripts/f8-institution-drilldown-smoke.mjs
           node scripts/f9-teacher-needs-attention-smoke.mjs
       - name: Install Playwright without changing lockfile
