@@ -94,27 +94,24 @@ async function clickFirstVisible(locator) {
 }
 
 async function openHierarchyRow(page, label) {
-  // Prefer an exact named control first. The analytics hierarchy normally renders
-  // the row itself as the click target with a decorative trailing chevron, so when
-  // an exact cell identifies the intended row, click that row before falling back
-  // to nested controls. This preserves exact-match safety for short labels such as A.
-  const buttons = page.getByRole('button', { name: label, exact: true });
-  if (await clickFirstVisible(buttons)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
-  }
-
+  // Prefer a hierarchy table row identified by an exact cell before any generic
+  // named button. Short hierarchy labels (notably section "A") can collide with
+  // unrelated controls such as the School Admin avatar button named "A".
   const exactCell = page.getByRole('cell', { name: label, exact: true });
   const exactRows = page.getByRole('row').filter({ has: exactCell });
   const rowCount = await exactRows.count();
   for (let i = 0; i < rowCount; i += 1) {
     const row = exactRows.nth(i);
     if (!(await row.isVisible().catch(() => false))) continue;
-
-    // Primary path: the production table attaches drilldown navigation to <tr>.
-    // Clicking only the last data cell can miss that handler in Chromium when the
-    // chevron is decorative, which previously left the harness on Grade 11 sections.
     await row.click();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
+  // Mobile hierarchy cards are actual buttons, so use an exact button only after
+  // the desktop hierarchy-row path has been exhausted.
+  const buttons = page.getByRole('button', { name: label, exact: true });
+  if (await clickFirstVisible(buttons)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     return;
   }
