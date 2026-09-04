@@ -94,9 +94,9 @@ async function clickFirstVisible(locator) {
 }
 
 async function openHierarchyRow(page, label) {
-  // Prefer an exact interactive control. For table drilldowns click the row containing
-  // the exact matching cell, because the row owns the navigation handler. This avoids
-  // both the earlier broad "A" header match and the no-op exact-cell click.
+  // Prefer an exact named control first. Table drilldowns render an unlabeled chevron
+  // inside the matching row, so resolve the row via an exact cell then follow its
+  // actual action control. This remains exact-match safe for short labels such as "A".
   const buttons = page.getByRole('button', { name: label, exact: true });
   if (await clickFirstVisible(buttons)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -105,9 +105,29 @@ async function openHierarchyRow(page, label) {
 
   const exactCell = page.getByRole('cell', { name: label, exact: true });
   const exactRows = page.getByRole('row').filter({ has: exactCell });
-  if (await clickFirstVisible(exactRows)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
+  const rowCount = await exactRows.count();
+  for (let i = 0; i < rowCount; i += 1) {
+    const row = exactRows.nth(i);
+    if (!(await row.isVisible().catch(() => false))) continue;
+
+    const actionControls = row.locator('button, a[href], [role="button"]');
+    if (await clickFirstVisible(actionControls)) {
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      return;
+    }
+
+    // Some rows attach the handler to a trailing SVG/icon wrapper rather than exposing
+    // a semantic button. Use the last visible cell as the narrowly scoped fallback.
+    const cells = row.getByRole('cell');
+    const cellCount = await cells.count();
+    for (let j = cellCount - 1; j >= 0; j -= 1) {
+      const cell = cells.nth(j);
+      if (await cell.isVisible().catch(() => false)) {
+        await cell.click();
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        return;
+      }
+    }
   }
 
   const exactTexts = page.getByText(label, { exact: true });
