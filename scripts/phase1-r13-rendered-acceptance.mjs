@@ -29,14 +29,6 @@ function previewOrigin(raw) {
   return url.origin;
 }
 
-function shareBootstrap(origin) {
-  const url = new URL(env('EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL'));
-  if (url.protocol !== 'https:' || url.origin !== origin || !url.searchParams.get('_vercel_share')) {
-    throw new Error('R13 protected-preview share URL mismatch');
-  }
-  return url.toString();
-}
-
 function publicClient() {
   return createClient(env('NEXT_PUBLIC_SUPABASE_URL'), env('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -88,7 +80,7 @@ async function reconcileStudentContract(email, password) {
 async function main() {
   if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || env('EVIDARA_ACCEPTANCE_ORG_SLUG') !== ORG_SLUG) throw new Error('R13 synthetic acceptance guard failed');
   const origin = previewOrigin(env('EVIDARA_ACCEPTANCE_URL'));
-  const share = shareBootstrap(origin);
+  const bypass = env('VERCEL_AUTOMATION_BYPASS_SECRET');
   const email = env('EVIDARA_ACCEPTANCE_STUDENT_EMAIL');
   const password = env('EVIDARA_ACCEPTANCE_STUDENT_PASSWORD');
   await mkdir(DIR, { recursive: true });
@@ -103,16 +95,17 @@ async function main() {
   try {
     await reconcileStudentContract(email, password);
     browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+    context = await browser.newContext({
+      viewport: { width: 1366, height: 900 },
+      extraHTTPHeaders: { 'x-vercel-protection-bypass': bypass },
+    });
     page = await context.newPage();
     page.on('console', (message) => { if (baseline && message.type() === 'error') consoleErrors.push(message.text().slice(0, 500)); });
     page.on('pageerror', (error) => { if (baseline) pageErrors.push(String(error.message || error).slice(0, 500)); });
     page.on('response', (response) => { if (baseline && response.status() >= 400) { const url = new URL(response.url()); failedResponses.push({ status: response.status(), method: response.request().method(), url: `${url.origin}${url.pathname}` }); } });
 
-    await page.goto(share, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(500);
     await page.goto(`${origin}/?view=login`, { waitUntil: 'networkidle', timeout: 45000 });
-    if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R13 protected preview bootstrap failed');
+    if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R13 protected preview automation bypass failed');
     await page.locator('#email').fill(email);
     await page.locator('#password').fill(password);
     await page.getByRole('button', { name: /^Sign In$/ }).click();
