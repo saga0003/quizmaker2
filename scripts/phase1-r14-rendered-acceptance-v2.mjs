@@ -94,9 +94,10 @@ async function clickFirstVisible(locator) {
 }
 
 async function openHierarchyRow(page, label) {
-  // Prefer an exact named control first. Table drilldowns render an unlabeled chevron
-  // inside the matching row, so resolve the row via an exact cell then follow its
-  // actual action control. This remains exact-match safe for short labels such as "A".
+  // Prefer an exact named control first. The analytics hierarchy normally renders
+  // the row itself as the click target with a decorative trailing chevron, so when
+  // an exact cell identifies the intended row, click that row before falling back
+  // to nested controls. This preserves exact-match safety for short labels such as A.
   const buttons = page.getByRole('button', { name: label, exact: true });
   if (await clickFirstVisible(buttons)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -110,24 +111,12 @@ async function openHierarchyRow(page, label) {
     const row = exactRows.nth(i);
     if (!(await row.isVisible().catch(() => false))) continue;
 
-    const actionControls = row.locator('button, a[href], [role="button"]');
-    if (await clickFirstVisible(actionControls)) {
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-      return;
-    }
-
-    // Some rows attach the handler to a trailing SVG/icon wrapper rather than exposing
-    // a semantic button. Use the last visible cell as the narrowly scoped fallback.
-    const cells = row.getByRole('cell');
-    const cellCount = await cells.count();
-    for (let j = cellCount - 1; j >= 0; j -= 1) {
-      const cell = cells.nth(j);
-      if (await cell.isVisible().catch(() => false)) {
-        await cell.click();
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-        return;
-      }
-    }
+    // Primary path: the production table attaches drilldown navigation to <tr>.
+    // Clicking only the last data cell can miss that handler in Chromium when the
+    // chevron is decorative, which previously left the harness on Grade 11 sections.
+    await row.click();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
   }
 
   const exactTexts = page.getByText(label, { exact: true });
