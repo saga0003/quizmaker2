@@ -1003,3 +1003,14 @@ This log records each production-hardening run with observable implementation an
 - **Blockers:** no user action required. Current blocker is internal verification of the corrected R14 harness.
 - **Exact next action:** inspect R14 run `33878291814` and exact-candidate release gate; if green, record R14 evidence/checklist completion and immediately begin R15 Excel result/analytics export acceptance; if red, diagnose the first real functional assertion and fix/rerun without weakening tenant/scope/error checks.
 
+
+## 2026-09-04 20:00 IST — R14 corrected drilldown acceptance rerun
+
+- **Checklist position:** R1–R13 verified; R14 in progress; R15–R18, L1–L6 and Z2–Z8 pending. J3 remains external legal-review gate.
+- **What changed:** Diagnosed that the prior corrected R14 candidate never completed because the subsequent heartbeat push cancelled its release gate before verification. Created `.phase1-r14-trigger` in commit `4a8a5f971ccf83230a8b947e07ec9da9ca2ff0c5` to rerun the corrected rendered drilldown proof without weakening assertions.
+- **Verification:** R14 workflow run `33884166696` is in progress on `4a8a5f971ccf83230a8b947e07ec9da9ca2ff0c5`. Exact-candidate Phase 1 release gate run `33884166673` is also in progress. R14 remains unchecked until both are green.
+- **Preview/production/Supabase:** Vercel checks are healthy on the candidate; permanent production remains protected and unchanged. Acceptance remains restricted to `evidara-school-acceptance` in existing SMIS QP; fresh guarded DB size remains 219,344,019 bytes (~209 MB). No St. Mary's/future-client data and no new paid project.
+- **Blockers:** No user action required. Current wait is internal CI/browser execution only.
+- **Overall verified:** 108/127 (~85.0%) until R14 earns evidence.
+- **Exact next action:** Inspect R14 run `33884166696`; if green, require a complete green release gate, record R14 complete, then immediately begin R15 Excel result/analytics export acceptance. If it fails, diagnose the exact rendered assertion and fix/retest.
+
