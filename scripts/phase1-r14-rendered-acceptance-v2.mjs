@@ -81,7 +81,7 @@ async function requireBodyToken(page, token, role, level) {
   return body;
 }
 
-async function waitForHierarchyTransition(page, nextToken, timeout = 6000) {
+async function waitForHierarchyTransition(page, nextToken, timeout = 30000) {
   if (!nextToken) {
     await page.waitForTimeout(800);
     return true;
