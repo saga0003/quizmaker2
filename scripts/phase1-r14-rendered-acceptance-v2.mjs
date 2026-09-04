@@ -94,21 +94,33 @@ async function clickFirstVisible(locator) {
 }
 
 async function openHierarchyRow(page, label) {
-  const rows = page.getByRole('row').filter({ hasText: label });
-  if (await clickFirstVisible(rows)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
-  }
-
+  // Prefer exact interactive controls/cells. A broad hasText row match is unsafe for
+  // short labels such as Section "A" because it can match the table header (e.g. RANK).
   const buttons = page.getByRole('button', { name: label, exact: true });
   if (await clickFirstVisible(buttons)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     return;
   }
 
+  const exactCells = page.getByRole('cell', { name: label, exact: true });
+  if (await clickFirstVisible(exactCells)) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
   const exactTexts = page.getByText(label, { exact: true });
-  if (!(await clickFirstVisible(exactTexts))) throw new Error(`R14 could not find a visible hierarchy control for ${label}`);
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  if (await clickFirstVisible(exactTexts)) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
+  const rows = page.getByRole('row').filter({ has: page.getByText(label, { exact: true }) });
+  if (await clickFirstVisible(rows)) {
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    return;
+  }
+
+  throw new Error(`R14 could not find a visible hierarchy control for ${label}`);
 }
 
 async function verifyRole(browser, origin, bypassSecret, role, email, password) {
