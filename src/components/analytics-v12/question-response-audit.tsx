@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { AnalyticsQuestionEvidenceRow, AnalyticsV12Payload } from '@/types/analytics-v12';
+import type { AnalyticsQuestionEvidenceRow } from '@/types/analytics-v12';
 
 type OutcomeFilter = 'all' | 'correct' | 'incorrect' | 'unanswered';
 
@@ -41,20 +41,14 @@ export function QuestionResponseAudit({ studentId, defaultOpen = false }: { stud
     setLoading(true);
     void (async () => {
       try {
-        const { data, error: rpcError } = await supabase.rpc('get_student_analytics_v12', {
-          p_student_id: studentId,
-          p_product_id: null,
-          p_date_from: null,
-          p_date_to: null,
-        });
+        const { data, error: rpcError } = await supabase.rpc('get_student_own_question_evidence_v12');
         if (cancelled) return;
         if (rpcError) {
           setError(rpcError.message);
           setRows([]);
           return;
         }
-        const payload = (data || {}) as AnalyticsV12Payload;
-        const evidence = Array.isArray(payload.question_evidence) ? payload.question_evidence : [];
+        const evidence = Array.isArray(data) ? data as AnalyticsQuestionEvidenceRow[] : [];
         setRows(evidence);
         setError('');
         if (evidence.length) document.documentElement.classList.add('demo-question-evidence-ready');
