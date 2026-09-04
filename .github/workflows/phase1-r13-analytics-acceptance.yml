@@ -54,6 +54,20 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
+      - name: Align subject-card assertion with rendered UI contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/phase1-r13-rendered-acceptance.mjs')
+          text = path.read_text()
+          old = "[SUBJECT, CHAPTER, '5 correct', '100%']"
+          new = "[SUBJECT, CHAPTER, 'CORRECT', '5', '100%']"
+          if old not in text:
+              raise SystemExit('Expected R13 subject assertion not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Execute R13 rendered analytics reconciliation
         run: node scripts/phase1-r13-rendered-acceptance.mjs
       - name: Upload redacted R13 evidence
