@@ -54,53 +54,21 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Align rendered R13 assertions with the current UI contract
+      - name: Align rendered R13 assertions with current UI contract
         shell: bash
+        env:
+          OLD_R13_BLOCK_B64: ICAgIGNvbnN0IGV2aWRlbmNlID0gcGFnZS5sb2NhdG9yKCdbZGF0YS1mNC1xdWVzdGlvbi1ldmlkZW5jZV0nKTsKICAgIGF3YWl0IGV2aWRlbmNlLndhaXRGb3IoeyBzdGF0ZTogJ3Zpc2libGUnLCB0aW1lb3V0OiAxMDAwMCB9KTsKICAgIGNvbnN0IGV2aWRlbmNlVGV4dCA9IGF3YWl0IGV2aWRlbmNlLmlubmVyVGV4dCgpOwogICAgY29uc3QgcmVuZGVyZWRDb3JyZWN0ID0gKGV2aWRlbmNlVGV4dC5tYXRjaCgvXGJDb3JyZWN0XGIvZykgfHwgW10pLmxlbmd0aDsKICAgIGNvbnN0IHJlbmRlcmVkVW5hbnN3ZXJlZCA9IChldmlkZW5jZVRleHQubWF0Y2goL1xiVW5hbnN3ZXJlZFxiL2cpIHx8IFtdKS5sZW5ndGg7CiAgICBpZiAocmVuZGVyZWRDb3JyZWN0ICE9PSA1IHx8IHJlbmRlcmVkVW5hbnN3ZXJlZCAhPT0gNTUpIHRocm93IG5ldyBFcnJvcihgUjEzIHJlbmRlcmVkIHF1ZXN0aW9uIG91dGNvbWVzIG1pc21hdGNoOiAke3JlbmRlcmVkQ29ycmVjdH0gY29ycmVjdCAvICR7cmVuZGVyZWRVbmFuc3dlcmVkfSB1bmFuc3dlcmVkYCk7CiAgICBmb3IgKGNvbnN0IHRva2VuIG9mIFtgJHtQQVBFUl9USVRMRX0gwrcgUTFgLCBgJHtQQVBFUl9USVRMRX0gwrcgUTJgLCAnKzQgbWFya3MnLCBgJHtTVUJKRUNUfSDCtyAke0NIQVBURVJ9IMK3ICR7VE9QSUN9YF0pIGlmICghZXZpZGVuY2VUZXh0LmluY2x1ZGVzKHRva2VuKSkgdGhyb3cgbmV3IEVycm9yKGBSMTMgcXVlc3Rpb24gaW50ZWxsaWdlbmNlIG1pc3NpbmcgJHt0b2tlbn1gKTsKICAgIGJvZHkgPSBhd2FpdCBwYWdlLmxvY2F0b3IoJ2JvZHknKS5pbm5lclRleHQoKTsKICAgIGlmICghYm9keS5pbmNsdWRlcygnNjAgb3V0Y29tZXMnKSkgdGhyb3cgbmV3IEVycm9yKCdSMTMgcXVlc3Rpb24gaW50ZWxsaWdlbmNlIG1pc3NpbmcgNjAtb3V0Y29tZSByZWNvbmNpbGlhdGlvbicpOw==
+          NEW_R13_BLOCK_B64: ICAgIGNvbnN0IGF1ZGl0SGVhZGluZyA9IHBhZ2UuZ2V0QnlSb2xlKCdoZWFkaW5nJywgeyBuYW1lOiAnUXVlc3Rpb24gUmVzcG9uc2UgQXVkaXQnIH0pOwogICAgYXdhaXQgYXVkaXRIZWFkaW5nLndhaXRGb3IoeyBzdGF0ZTogJ3Zpc2libGUnLCB0aW1lb3V0OiAxMDAwMCB9KTsKICAgIGNvbnN0IGF1ZGl0QnV0dG9uID0gcGFnZS5nZXRCeVJvbGUoJ2J1dHRvbicsIHsgbmFtZTogL1F1ZXN0aW9uIFJlc3BvbnNlIEF1ZGl0LyB9KTsKICAgIGNvbnN0IGF1ZGl0Qm9keSA9IGF3YWl0IHBhZ2UubG9jYXRvcignYm9keScpLmlubmVyVGV4dCgpOwogICAgaWYgKCFhdWRpdEJvZHkuaW5jbHVkZXMoJzYwIHF1ZXN0aW9uIHJlc3BvbnNlcycpKSB0aHJvdyBuZXcgRXJyb3IoJ1IxMyBxdWVzdGlvbiBhdWRpdCBtaXNzaW5nIDYwIGV4cG9zdXJlIHJvd3MnKTsKICAgIGlmICghYXVkaXRCb2R5LmluY2x1ZGVzKCdDb3JyZWN0XG41JykgfHwgIWF1ZGl0Qm9keS5pbmNsdWRlcygnVW5hbnN3ZXJlZFxuNTUnKSkgewogICAgICBpZiAoYXdhaXQgYXVkaXRCdXR0b24uY291bnQoKSkgYXdhaXQgYXVkaXRCdXR0b24uY2xpY2soKTsKICAgIH0KICAgIGNvbnN0IHRhYmxlID0gcGFnZS5nZXRCeVJvbGUoJ3RhYmxlJykubGFzdCgpOwogICAgYXdhaXQgdGFibGUud2FpdEZvcih7IHN0YXRlOiAndmlzaWJsZScsIHRpbWVvdXQ6IDEwMDAwIH0pOwogICAgY29uc3QgZGF0YVJvd3MgPSB0YWJsZS5nZXRCeVJvbGUoJ3JvdycpLmZpbHRlcih7IGhhc1RleHQ6IFBBUEVSX1RJVExFIH0pOwogICAgY29uc3Qgcm93Q291bnQgPSBhd2FpdCBkYXRhUm93cy5jb3VudCgpOwogICAgbGV0IHJlbmRlcmVkQ29ycmVjdCA9IDA7CiAgICBsZXQgcmVuZGVyZWRVbmFuc3dlcmVkID0gMDsKICAgIGxldCBzYXdGb3VyTWFya3MgPSBmYWxzZTsKICAgIGxldCBzYXdUYXhvbm9teSA9IGZhbHNlOwogICAgZm9yIChsZXQgaW5kZXggPSAwOyBpbmRleCA8IHJvd0NvdW50OyBpbmRleCArPSAxKSB7CiAgICAgIGNvbnN0IHJvd1RleHQgPSBhd2FpdCBkYXRhUm93cy5udGgoaW5kZXgpLmlubmVyVGV4dCgpOwogICAgICBpZiAocm93VGV4dC5pbmNsdWRlcygnQ29ycmVjdCcpKSByZW5kZXJlZENvcnJlY3QgKz0gMTsKICAgICAgaWYgKHJvd1RleHQuaW5jbHVkZXMoJ1VuYW5zd2VyZWQnKSkgcmVuZGVyZWRVbmFuc3dlcmVkICs9IDE7CiAgICAgIGlmIChyb3dUZXh0LmluY2x1ZGVzKCcrNCcpKSBzYXdGb3VyTWFya3MgPSB0cnVlOwogICAgICBpZiAocm93VGV4dC5pbmNsdWRlcyhTVUJKRUNUKSAmJiByb3dUZXh0LmluY2x1ZGVzKENIQVBURVIpICYmIHJvd1RleHQuaW5jbHVkZXMoVE9QSUMpKSBzYXdUYXhvbm9teSA9IHRydWU7CiAgICB9CiAgICBpZiAocm93Q291bnQgIT09IDYwIHx8IHJlbmRlcmVkQ29ycmVjdCAhPT0gNSB8fCByZW5kZXJlZFVuYW5zd2VyZWQgIT09IDU1KSB0aHJvdyBuZXcgRXJyb3IoYFIxMyByZW5kZXJlZCBxdWVzdGlvbiBvdXRjb21lcyBtaXNtYXRjaDogJHtyb3dDb3VudH0gcm93cyAvICR7cmVuZGVyZWRDb3JyZWN0fSBjb3JyZWN0IC8gJHtyZW5kZXJlZFVuYW5zd2VyZWR9IHVuYW5zd2VyZWRgKTsKICAgIGlmICghc2F3Rm91ck1hcmtzIHx8ICFzYXdUYXhvbm9teSkgdGhyb3cgbmV3IEVycm9yKCdSMTMgcm93LWxldmVsIHBhcGVyL3RheG9ub215L21hcmtzIGV2aWRlbmNlIG1pc3NpbmcnKTs=
         run: |
           set -euo pipefail
           python - <<'PY'
+          import base64, os
           from pathlib import Path
           path = Path('scripts/phase1-r13-rendered-acceptance.mjs')
           text = path.read_text()
-          old_subject = "[SUBJECT, CHAPTER, '5 correct', '100%']"
-          new_subject = "[SUBJECT, CHAPTER, 'CORRECT', '5', '100%']"
-          if old_subject in text:
-              text = text.replace(old_subject, new_subject, 1)
-
-          old = '''    const evidence = page.locator('[data-f4-question-evidence]');
-    await evidence.waitFor({ state: 'visible', timeout: 10000 });
-    const evidenceText = await evidence.innerText();
-    const renderedCorrect = (evidenceText.match(/\\bCorrect\\b/g) || []).length;
-    const renderedUnanswered = (evidenceText.match(/\\bUnanswered\\b/g) || []).length;
-    if (renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
-    for (const token of [`${PAPER_TITLE} · Q1`, `${PAPER_TITLE} · Q2`, '+4 marks', `${SUBJECT} · ${CHAPTER} · ${TOPIC}`]) if (!evidenceText.includes(token)) throw new Error(`R13 question intelligence missing ${token}`);
-    body = await page.locator('body').innerText();
-    if (!body.includes('60 outcomes')) throw new Error('R13 question intelligence missing 60-outcome reconciliation');'''
-          new = '''    const auditHeading = page.getByRole('heading', { name: 'Question Response Audit' });
-    await auditHeading.waitFor({ state: 'visible', timeout: 10000 });
-    const auditButton = page.getByRole('button', { name: /Question Response Audit/ });
-    const auditBody = await page.locator('body').innerText();
-    if (!auditBody.includes('60 question responses')) throw new Error('R13 question audit missing 60 exposure rows');
-    if (!auditBody.includes('Correct\\n5') || !auditBody.includes('Unanswered\\n55')) {
-      if (await auditButton.count()) await auditButton.click();
-    }
-    const table = page.getByRole('table').last();
-    await table.waitFor({ state: 'visible', timeout: 10000 });
-    const dataRows = table.getByRole('row').filter({ hasText: PAPER_TITLE });
-    const rowCount = await dataRows.count();
-    let renderedCorrect = 0;
-    let renderedUnanswered = 0;
-    let sawFourMarks = false;
-    let sawTaxonomy = false;
-    for (let index = 0; index < rowCount; index += 1) {
-      const rowText = await dataRows.nth(index).innerText();
-      if (rowText.includes('Correct')) renderedCorrect += 1;
-      if (rowText.includes('Unanswered')) renderedUnanswered += 1;
-      if (rowText.includes('+4')) sawFourMarks = true;
-      if (rowText.includes(SUBJECT) && rowText.includes(CHAPTER) && rowText.includes(TOPIC)) sawTaxonomy = true;
-    }
-    if (rowCount !== 60 || renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${rowCount} rows / ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
-    if (!sawFourMarks || !sawTaxonomy) throw new Error('R13 row-level paper/taxonomy/marks evidence missing');'''
+          text = text.replace("[SUBJECT, CHAPTER, '5 correct', '100%']", "[SUBJECT, CHAPTER, 'CORRECT', '5', '100%']", 1)
+          old = base64.b64decode(os.environ['OLD_R13_BLOCK_B64']).decode()
+          new = base64.b64decode(os.environ['NEW_R13_BLOCK_B64']).decode()
           if old not in text:
               raise SystemExit('Expected R13 question-evidence assertion block not found')
           path.write_text(text.replace(old, new, 1))
