@@ -94,28 +94,24 @@ async function clickFirstVisible(locator) {
 }
 
 async function openHierarchyRow(page, label) {
-  // Prefer exact interactive controls/cells. A broad hasText row match is unsafe for
-  // short labels such as Section "A" because it can match the table header (e.g. RANK).
+  // Prefer an exact interactive control. For table drilldowns click the row containing
+  // the exact matching cell, because the row owns the navigation handler. This avoids
+  // both the earlier broad "A" header match and the no-op exact-cell click.
   const buttons = page.getByRole('button', { name: label, exact: true });
   if (await clickFirstVisible(buttons)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     return;
   }
 
-  const exactCells = page.getByRole('cell', { name: label, exact: true });
-  if (await clickFirstVisible(exactCells)) {
+  const exactCell = page.getByRole('cell', { name: label, exact: true });
+  const exactRows = page.getByRole('row').filter({ has: exactCell });
+  if (await clickFirstVisible(exactRows)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     return;
   }
 
   const exactTexts = page.getByText(label, { exact: true });
   if (await clickFirstVisible(exactTexts)) {
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    return;
-  }
-
-  const rows = page.getByRole('row').filter({ has: page.getByText(label, { exact: true }) });
-  if (await clickFirstVisible(rows)) {
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     return;
   }
