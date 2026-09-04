@@ -5,7 +5,7 @@ on:
     branches: [phase1-hardening]
     paths:
       - .github/workflows/phase1-r14-drilldown-acceptance.yml
-      - scripts/phase1-r14-rendered-acceptance.mjs
+      - scripts/phase1-r14-rendered-acceptance-v2.mjs
       - .phase1-r14-trigger
   workflow_dispatch:
 
@@ -58,7 +58,7 @@ jobs:
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Execute R14 rendered Teacher and School Admin drilldowns
-        run: node scripts/phase1-r14-rendered-acceptance.mjs
+        run: node scripts/phase1-r14-rendered-acceptance-v2.mjs
       - name: Upload redacted R14 evidence
         if: always()
         uses: actions/upload-artifact@v4
