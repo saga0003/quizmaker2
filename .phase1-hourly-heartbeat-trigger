@@ -1,0 +1,11 @@
+### 2026-09-04 16:59-17:xx IST — Phase 1 hourly heartbeat
+
+- Active item: **R14 — Teacher and School Admin drill-down analytics acceptance**.
+- What changed: diagnosed the prior R14 failure as a protected-preview credential/bootstrap mismatch before browser execution; aligned the R14 workflow and rendered harness with the proven `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` bootstrap used by the green R13 path.
+- Functional candidate: `3efc18aab74f707dd5e31c841627e3017cbd43fd` (`fix(r14): bootstrap protected preview with share URL`).
+- Verification: the exact candidate's complete **Evidara Phase 1 Release Gate** run `33868399540` completed **SUCCESS**. R14 rendered two-role browser acceptance run `33868399562` is still **in progress**; at the latest observation it remained in dependency installation and had not yet reached the rendered assertions, so R14 is intentionally not checked yet.
+- Checklist position: **R1-R13 verified; R14 active; R15-R18 pending; L1-L6 pending; Z1 verified; Z2-Z8 pending; J3 external legal review remains un-certified**.
+- Health: Vercel protected preview HTTP 200; permanent production HTTP 200 and unchanged; Supabase project `SMIS QP` (`xzfozpnzvznqrvcsoail`) `ACTIVE_HEALTHY`. Only the isolated synthetic `evidara-school-acceptance` acceptance context is authorized; no St. Mary's/future-client data was used and no new paid project was created.
+- Verified overall progress remains **108/127 (~85.0%)** until R14's rendered evidence passes.
+- Blockers: no user-side blocker. Current wait is internal CI execution only; the earlier R14 bootstrap defect has been fixed.
+- Exact next action: inspect run `33868399562`; if green, inspect/uploaded R14 evidence, check R14 only after proof, then immediately execute R15 Excel result/analytics export acceptance. If it fails, diagnose the first failing rendered assertion and patch/re-run against the isolated synthetic tenant.
