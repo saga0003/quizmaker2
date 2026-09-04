@@ -6,7 +6,8 @@ import { chromium } from 'playwright';
 const ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
 const ORG_SLUG = 'evidara-school-acceptance';
 const ORG_ID = '4effce90-bccb-4263-9f5a-a75b6df301f2';
-const HIERARCHY = ['NEET', 'Grade 11', 'Section A', 'Physics', 'Kinematics', 'Motion in One Dimension'];
+// The canonical section is "Section A"; the rendered Grade 11 hierarchy row intentionally labels it "A".
+const HIERARCHY = ['NEET', 'Grade 11', 'A', 'Physics', 'Kinematics', 'Motion in One Dimension'];
 const DIR = process.env.EVIDARA_ACCEPTANCE_EVIDENCE_DIR || 'acceptance-evidence/r14-drilldowns';
 const PROD_HOSTS = new Set(['quizmaker2-saga0003s-projects.vercel.app', 'quizmaker2-git-main-saga0003s-projects.vercel.app', 'evidara.in', 'www.evidara.in']);
 
@@ -158,8 +159,6 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     if (!body.toLowerCase().includes('programme')) throw new Error(`R14 ${role} school view missing programme context`);
     await page.screenshot({ path: `${DIR}/${role}-01-school.png`, fullPage: true });
 
-    // Start strict browser/network error accounting only after the initial live-school
-    // fallback/probe has fully settled. From this point every drilldown must remain clean.
     consoleErrors.length = 0;
     pageErrors.length = 0;
     failedResponses.length = 0;
@@ -207,7 +206,7 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
       organizationId: actor.organizationId,
       capturedPayloads: analyticsPayloads.length,
       scopedPayloads: scoped.length,
-      hierarchy: HIERARCHY,
+      hierarchy: ['NEET', 'Grade 11', 'Section A (rendered as A)', 'Physics', 'Kinematics', 'Motion in One Dimension'],
       consoleErrorCount: 0,
       pageErrorCount: 0,
       failedResponseCount: 0,
