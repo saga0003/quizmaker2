@@ -95,9 +95,14 @@ async function main() {
   try {
     await reconcileStudentContract(email, password);
     browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({
-      viewport: { width: 1366, height: 900 },
-      extraHTTPHeaders: { 'x-vercel-protection-bypass': bypass },
+    context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+    await context.route('**/*', async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (requestUrl.origin === origin) {
+        await route.continue({ headers: { ...route.request().headers(), 'x-vercel-protection-bypass': bypass } });
+      } else {
+        await route.continue();
+      }
     });
     page = await context.newPage();
     page.on('console', (message) => { if (baseline && message.type() === 'error') consoleErrors.push(message.text().slice(0, 500)); });
@@ -117,7 +122,7 @@ async function main() {
     const physics = page.locator('.analytics-v12-overview-subject-row').filter({ hasText: SUBJECT });
     await physics.waitFor({ state: 'visible', timeout: 20000 });
     let body = await page.locator('body').innerText();
-    if (!body.includes(SUBJECT) || (!body.includes('10 / 100') && !body.includes('10%'))) throw new Error('R13 overview rendered baseline missing');
+    if (!body.includes(SUBJECT) || !body.includes('8.3%') || !body.includes('100%')) throw new Error('R13 overview aggregate analytics missing');
     await page.screenshot({ path: `${DIR}/01-overview.png`, fullPage: true });
 
     await physics.click();
