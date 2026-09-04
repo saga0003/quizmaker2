@@ -1,3 +1,3 @@
-R14 synthetic MFA reset rerun — 2026-09-04 23:36 IST
-candidate: 13aacde139b77213e79f70176ad008830b682c5b
-reason: reset only acceptance.admin synthetic TOTP factor so real enrollment can be proven
+R14 bounded analytics transition rerun — 2026-09-05 03:18 IST
+candidate: 52b074d794eca616d533397773cc1b73190d9f45
+reason: wait up to 30s for legitimate in-flight Calculating analytics transition; no repeated clicks or weakened scope checks
