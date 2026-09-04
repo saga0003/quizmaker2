@@ -54,7 +54,7 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Align subject-card assertion with rendered UI contract
+      - name: Align rendered R13 assertions with the current UI contract
         shell: bash
         run: |
           set -euo pipefail
@@ -62,10 +62,47 @@ jobs:
           from pathlib import Path
           path = Path('scripts/phase1-r13-rendered-acceptance.mjs')
           text = path.read_text()
-          old = "[SUBJECT, CHAPTER, '5 correct', '100%']"
-          new = "[SUBJECT, CHAPTER, 'CORRECT', '5', '100%']"
+          old_subject = "[SUBJECT, CHAPTER, '5 correct', '100%']"
+          new_subject = "[SUBJECT, CHAPTER, 'CORRECT', '5', '100%']"
+          if old_subject in text:
+              text = text.replace(old_subject, new_subject, 1)
+
+          old = '''    const evidence = page.locator('[data-f4-question-evidence]');
+    await evidence.waitFor({ state: 'visible', timeout: 10000 });
+    const evidenceText = await evidence.innerText();
+    const renderedCorrect = (evidenceText.match(/\\bCorrect\\b/g) || []).length;
+    const renderedUnanswered = (evidenceText.match(/\\bUnanswered\\b/g) || []).length;
+    if (renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
+    for (const token of [`${PAPER_TITLE} · Q1`, `${PAPER_TITLE} · Q2`, '+4 marks', `${SUBJECT} · ${CHAPTER} · ${TOPIC}`]) if (!evidenceText.includes(token)) throw new Error(`R13 question intelligence missing ${token}`);
+    body = await page.locator('body').innerText();
+    if (!body.includes('60 outcomes')) throw new Error('R13 question intelligence missing 60-outcome reconciliation');'''
+          new = '''    const auditHeading = page.getByRole('heading', { name: 'Question Response Audit' });
+    await auditHeading.waitFor({ state: 'visible', timeout: 10000 });
+    const auditButton = page.getByRole('button', { name: /Question Response Audit/ });
+    const auditBody = await page.locator('body').innerText();
+    if (!auditBody.includes('60 question responses')) throw new Error('R13 question audit missing 60 exposure rows');
+    if (!auditBody.includes('Correct\\n5') || !auditBody.includes('Unanswered\\n55')) {
+      if (await auditButton.count()) await auditButton.click();
+    }
+    const table = page.getByRole('table').last();
+    await table.waitFor({ state: 'visible', timeout: 10000 });
+    const dataRows = table.getByRole('row').filter({ hasText: PAPER_TITLE });
+    const rowCount = await dataRows.count();
+    let renderedCorrect = 0;
+    let renderedUnanswered = 0;
+    let sawFourMarks = false;
+    let sawTaxonomy = false;
+    for (let index = 0; index < rowCount; index += 1) {
+      const rowText = await dataRows.nth(index).innerText();
+      if (rowText.includes('Correct')) renderedCorrect += 1;
+      if (rowText.includes('Unanswered')) renderedUnanswered += 1;
+      if (rowText.includes('+4')) sawFourMarks = true;
+      if (rowText.includes(SUBJECT) && rowText.includes(CHAPTER) && rowText.includes(TOPIC)) sawTaxonomy = true;
+    }
+    if (rowCount !== 60 || renderedCorrect !== 5 || renderedUnanswered !== 55) throw new Error(`R13 rendered question outcomes mismatch: ${rowCount} rows / ${renderedCorrect} correct / ${renderedUnanswered} unanswered`);
+    if (!sawFourMarks || !sawTaxonomy) throw new Error('R13 row-level paper/taxonomy/marks evidence missing');'''
           if old not in text:
-              raise SystemExit('Expected R13 subject assertion not found')
+              raise SystemExit('Expected R13 question-evidence assertion block not found')
           path.write_text(text.replace(old, new, 1))
           PY
       - name: Execute R13 rendered analytics reconciliation
