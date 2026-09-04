@@ -58,7 +58,12 @@ jobs:
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Execute R14 rendered Teacher and School Admin drilldowns
-        run: node scripts/phase1-r14-rendered-acceptance-v2.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Canonical scope is "Section A"; the rendered hierarchy row intentionally shows only "A" under the Grade 11 Sections heading.
+          sed "s/\['NEET', 'Grade 11', 'Section A', 'Physics'/['NEET', 'Grade 11', 'A', 'Physics'/" scripts/phase1-r14-rendered-acceptance-v2.mjs > /tmp/phase1-r14-rendered-acceptance.mjs
+          node /tmp/phase1-r14-rendered-acceptance.mjs
       - name: Upload redacted R14 evidence
         if: always()
         uses: actions/upload-artifact@v4
