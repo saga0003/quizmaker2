@@ -20,6 +20,7 @@ jobs:
       EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
       EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
       EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_DB_BYTES: 219344019
       EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
       EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -42,6 +43,7 @@ jobs:
           set -euo pipefail
           test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
           test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
+          test "$EVIDARA_ACCEPTANCE_DB_BYTES" = "219344019"
           for name in EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD EVIDARA_ACCEPTANCE_TEACHER_EMAIL EVIDARA_ACCEPTANCE_TEACHER_PASSWORD VERCEL_AUTOMATION_BYPASS_SECRET; do
             test -n "${!name:-}" || { echo "::error title=R14 secret missing::$name is not configured"; exit 1; }
           done
