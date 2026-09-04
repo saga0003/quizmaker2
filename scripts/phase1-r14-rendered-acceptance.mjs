@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, writeFile } from 'node:fs/promises';
+import { createHmac } from 'node:crypto';
 import { chromium } from 'playwright';
 
 const ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
@@ -26,6 +27,44 @@ function previewOrigin(raw) {
   return url.origin;
 }
 
+function decodeBase32(value) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = String(value || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let bits = '';
+  for (const char of clean) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) throw new Error('R14 MFA setup key is not valid base32');
+    bits += index.toString(2).padStart(5, '0');
+  }
+  const bytes = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  return Buffer.from(bytes);
+}
+
+function totp(secret, now = Date.now()) {
+  const counter = Math.floor(now / 30000);
+  const message = Buffer.alloc(8);
+  message.writeBigUInt64BE(BigInt(counter));
+  const digest = createHmac('sha1', decodeBase32(secret)).update(message).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary = ((digest[offset] & 0x7f) << 24) | ((digest[offset + 1] & 0xff) << 16) | ((digest[offset + 2] & 0xff) << 8) | (digest[offset + 3] & 0xff);
+  return String(binary % 1_000_000).padStart(6, '0');
+}
+
+async function satisfyMfaIfRequired(page) {
+  const body = await page.locator('body').innerText().catch(() => '');
+  if (!body.includes('Multi-factor verification required')) return false;
+  const match = body.match(/setup key:\s*([A-Z2-7\s]+)/i);
+  if (!match?.[1]) throw new Error('R14 synthetic MFA gate did not expose a setup key');
+  const secret = match[1].replace(/\s+/g, '');
+  const codeInput = page.getByLabel(/6-digit authenticator code/i).or(page.locator('input[inputmode="numeric"]')).first();
+  await codeInput.waitFor({ state: 'visible', timeout: 10000 });
+  await codeInput.fill(totp(secret));
+  await page.getByRole('button', { name: /Verify and unlock Evidara/i }).click();
+  await page.waitForFunction(() => !document.body.innerText.includes('Multi-factor verification required'), null, { timeout: 20000 });
+  return true;
+}
+
 async function login(page, email, password) {
   await page.goto(`${page._r14Origin}/?view=login`, { waitUntil: 'networkidle', timeout: 45000 });
   if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
@@ -33,6 +72,7 @@ async function login(page, email, password) {
   await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /^Sign In$/ }).click();
   await page.waitForFunction(() => !document.body.innerText.includes('Sign in to Evidara') && new URL(location.href).searchParams.get('view')?.startsWith('school-'), null, { timeout: 30000 });
+  await satisfyMfaIfRequired(page);
 }
 
 async function openNamedButton(page, label) {
@@ -74,9 +114,12 @@ async function verifyRole(browser, origin, bypassSecret, role, email, password) 
     if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
     stage = 'login';
     await login(page, email, password);
+    stage = 'mfa-post-login';
+    await satisfyMfaIfRequired(page);
     baseline = true;
     stage = 'school-overview-navigation';
     await page.goto(`${origin}/?view=school-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
+    await satisfyMfaIfRequired(page);
     stage = `school-token:${PROGRAMME}`;
     let body = await requireBodyToken(page, PROGRAMME, role, 'school');
     if (!body.toLowerCase().includes('programme')) throw new Error(`R14 ${role} school view missing programme context`);
