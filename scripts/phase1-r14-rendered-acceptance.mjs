@@ -25,10 +25,17 @@ function previewOrigin(raw) {
   if (url.protocol !== 'https:' || PROD_HOSTS.has(host) || host.includes('git-main') || !host.endsWith('.vercel.app') || !host.includes('quizmaker2')) throw new Error(`R14 preview guard failed: ${host}`);
   return url.origin;
 }
+function protectedPreviewBootstrap(origin) {
+  const raw = env('EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL');
+  const url = new URL(raw);
+  if (url.protocol !== 'https:' || url.origin !== origin) throw new Error('R14 protected-preview share URL origin mismatch');
+  if (!url.searchParams.get('_vercel_share')) throw new Error('R14 protected-preview share URL missing token');
+  return url.toString();
+}
 
 async function login(page, email, password) {
   await page.goto(`${page._r14Origin}/?view=login`, { waitUntil: 'networkidle', timeout: 45000 });
-  if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview automation bypass failed');
+  if (new URL(page.url()).hostname === 'vercel.com') throw new Error('R14 protected preview bootstrap failed');
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /^Sign In$/ }).click();
@@ -42,13 +49,8 @@ async function openNamedButton(page, label, expectedHeading) {
   if (expectedHeading) await page.getByRole('heading', { name: expectedHeading }).waitFor({ state: 'visible', timeout: 15000 });
 }
 
-async function verifyRole(browser, origin, bypass, role, email, password) {
+async function verifyRole(browser, origin, bootstrap, role, email, password) {
   const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
-  await context.route('**/*', async (route) => {
-    const u = new URL(route.request().url());
-    if (u.origin === origin) await route.continue({ headers: { ...route.request().headers(), 'x-vercel-protection-bypass': bypass } });
-    else await route.continue();
-  });
   const page = await context.newPage();
   page._r14Origin = origin;
   const consoleErrors = [];
@@ -68,6 +70,8 @@ async function verifyRole(browser, origin, bypass, role, email, password) {
   });
 
   try {
+    await page.goto(bootstrap, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForTimeout(500);
     await login(page, email, password);
     baseline = true;
     await page.goto(`${origin}/?view=school-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
@@ -116,12 +120,12 @@ async function verifyRole(browser, origin, bypass, role, email, password) {
 async function main() {
   if (process.env.EVIDARA_LOAD_ACCEPTANCE !== ACK || env('EVIDARA_ACCEPTANCE_ORG_SLUG') !== ORG_SLUG) throw new Error('R14 synthetic acceptance guard failed');
   const origin = previewOrigin(env('EVIDARA_ACCEPTANCE_URL'));
-  const bypass = env('VERCEL_AUTOMATION_BYPASS_SECRET');
+  const bootstrap = protectedPreviewBootstrap(origin);
   await mkdir(DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   try {
-    const admin = await verifyRole(browser, origin, bypass, 'school_admin', env('EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL'), env('EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD'));
-    const teacher = await verifyRole(browser, origin, bypass, 'teacher', env('EVIDARA_ACCEPTANCE_TEACHER_EMAIL'), env('EVIDARA_ACCEPTANCE_TEACHER_PASSWORD'));
+    const admin = await verifyRole(browser, origin, bootstrap, 'school_admin', env('EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL'), env('EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD'));
+    const teacher = await verifyRole(browser, origin, bootstrap, 'teacher', env('EVIDARA_ACCEPTANCE_TEACHER_EMAIL'), env('EVIDARA_ACCEPTANCE_TEACHER_PASSWORD'));
     const output = { result: 'PASS', acceptanceItem: 'R14', organizationSlug: ORG_SLUG, organizationId: ORG_ID, target: origin, schoolAdmin: admin, teacher, productionProtected: true, secretsRecorded: false, capturedAt: new Date().toISOString() };
     await writeFile(`${DIR}/r14-drilldown-results.json`, JSON.stringify(output, null, 2) + '\n');
     console.log(JSON.stringify(output, null, 2));
