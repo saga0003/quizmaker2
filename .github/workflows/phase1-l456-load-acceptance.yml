@@ -84,7 +84,7 @@ jobs:
       - name: Execute 25-actor authenticated shard
         env:
           EVIDENCE_OUT: phase1-l456-shard-${{ matrix.shard }}.json
-        run: node scripts/phase1-l456-sharded-acceptance.mjs
+        run: node scripts/phase1-l456-bounded-runner.mjs
 
       - name: Upload aggregate-safe shard evidence
         if: always()
