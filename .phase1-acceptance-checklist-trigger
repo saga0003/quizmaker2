@@ -1,2 +1,0 @@
-R14 Verify Teacher and School Admin drilldowns.
-verified 5 Sep 2026 using only the isolated synthetic Evidara School tenant. Rendered acceptance workflow 33939757851 passed on exact candidate 8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef after proving School Admin and Teacher drilldowns through NEET → Grade 11 → Section A → Physics → Kinematics → Motion in One Dimension with tenant and Teacher section/subject scope assertions intact. The same exact candidate passed complete Phase 1 release gate 33939757839. Permanent production remained protected.
