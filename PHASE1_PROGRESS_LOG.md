@@ -1158,3 +1158,24 @@ Exact next action: finish gate 33961551777; if green record L1, then execute gua
 - Checklist position / overall: R1-R18 ✅ | L1-L3 ✅ | L4-L6 ⏳ | Z1 ✅ | Z2-Z8 ⏳ | J3 external. Strict verified completion remains 116/127 = 91.3%.
 - Exact next action: safely bind a shared/ephemeral credential or Auth-issued session mechanism to the existing 500 tagged synthetic L1 actors without raw password-hash mutation; rerun 500 starts / 500 answer saves / 500 submissions with aggregate-only latency/error/correctness evidence; require a complete green release gate; only then check L4-L6 and continue immediately into Z2-Z8.
 
+
+## 2026-09-06 00:27 IST — Phase 1 hardening heartbeat
+
+Completed this run:
+- Reconciled checklist/progress log and branch head before load work. R1-R18 and L1-L3 remain verified; L4-L6 remain unchecked.
+- Diagnosed L4-L6 run 33985495745: all 20 shards reached authenticated synthetic membership setup, then failed HTTP 400 on the first new actor; cleanup restored the original L1 active cohort.
+- Root cause proved in SMIS QP: all 500 phase1-l456 synthetic memberships existed suspended with promotion_locked=true from prior cleanup, while add_school_student_membership_v13 correctly rejects promotion-locked records.
+- Verified all 500 L4-L6 Auth identities have student profiles. Normalized only those exact tagged synthetic suspended acceptance memberships by clearing the fixture-only promotion lock; no St. Mary's/future-client data was touched.
+- Re-ran failed L4-L6 workflow jobs after fixture repair; attempt 2 is queued. No acceptance item was self-certified.
+
+Blockers / unchecked:
+- L4-L6 still require the complete 500-actor start/save/submit workload to finish green with aggregate evidence and a complete release gate.
+- Z2-Z8 remain protected behind load acceptance. J3 remains external legal review.
+
+Branch head before heartbeat: 3cc85d05695fa060f580ca26e6fdc03e4ae0279c
+CI/release gate: latest previously complete release gate remains green; L4-L6 run 33985495745 attempt 2 queued after exact synthetic fixture repair.
+Preview/production: Vercel status for prior load candidate f1aba0e173207a07cedb331f16206e44f3fc2ffe is success; permanent production remains unchanged/unpromoted.
+Supabase SMIS QP: healthy/reachable; evidara-school-acceptance has 2,000 active students and 2,500 total memberships (500 L4-L6 suspended); only exact tagged synthetic fixture rows were repaired.
+Overall: 116/127 (~91.3%) strictly verified.
+Exact next action: finish L4-L6 attempt 2; if workload is green, persist aggregate evidence and run the complete release gate, then check L4-L6 and proceed immediately into Z2-Z8. If it fails, inspect the first failing RPC and repair the internal acceptance/product defect without weakening isolation or production protection.
+
