@@ -11,7 +11,13 @@ const STUDENT_DOMAIN = 'evidara.invalid';
 const STUDENT_START = 101;
 const ACTORS = 500;
 const RAMP_MS = 20_000;
-const AUTH_CONCURRENCY = 40;
+// Supabase Auth /auth/v1/token is IP-rate-limited. Session acquisition is staging,
+// not the L4-L6 workload itself, so pace it conservatively while preserving the
+// actual 500-user RPC concurrency below.
+const AUTH_CONCURRENCY = 1;
+const AUTH_SPACING_MS = 2100;
+const AUTH_MAX_ATTEMPTS = 8;
+const AUTH_RETRY_BASE_MS = 2500;
 const RPC_CONCURRENCY = 100;
 const RETRY_SAMPLE = 25;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -60,14 +66,26 @@ async function mapLimit(items, limit, fn) {
 
 async function authenticateActors() {
   const actors = Array.from({length:ACTORS},(_,i)=>({ actorId:`synthetic-load-student-${String(STUDENT_START+i).padStart(4,'0')}`, email:`phase1-load-student-${String(STUDENT_START+i).padStart(4,'0')}@${STUDENT_DOMAIN}` }));
+  const authStarted = performance.now();
+  let auth429Retries = 0;
   const sessions = await mapLimit(actors, AUTH_CONCURRENCY, async (actor) => {
-    const r = await fetchMeasured(`${ORIGIN}/auth/v1/token?grant_type=password`, { method:'POST', headers:{ apikey:key,'content-type':'application/json' }, body:JSON.stringify({email:actor.email,password}) });
-    if (!r.ok) throw new Error(`auth failed for ${actor.actorId}: ${r.status}`);
-    const body = JSON.parse(r.text); if (!body.access_token || body.user?.email !== actor.email) throw new Error(`auth identity mismatch for ${actor.actorId}`);
-    return { ...actor, userId: body.user.id, token: body.access_token };
+    for (let attempt = 1; attempt <= AUTH_MAX_ATTEMPTS; attempt += 1) {
+      const r = await fetchMeasured(`${ORIGIN}/auth/v1/token?grant_type=password`, { method:'POST', headers:{ apikey:key,'content-type':'application/json' }, body:JSON.stringify({email:actor.email,password}) });
+      if (r.ok) {
+        const body = JSON.parse(r.text);
+        if (!body.access_token || body.user?.email !== actor.email) throw new Error(`auth identity mismatch for ${actor.actorId}`);
+        await sleep(AUTH_SPACING_MS);
+        return { ...actor, userId: body.user.id, token: body.access_token };
+      }
+      if (r.status !== 429 || attempt === AUTH_MAX_ATTEMPTS) throw new Error(`auth failed for ${actor.actorId}: ${r.status}`);
+      auth429Retries += 1;
+      const backoffMs = Math.min(30_000, AUTH_RETRY_BASE_MS * (2 ** (attempt - 1)));
+      await sleep(backoffMs);
+    }
+    throw new Error(`auth retry budget exhausted for ${actor.actorId}`);
   });
   if (new Set(sessions.map(x=>x.userId)).size !== ACTORS || new Set(sessions.map(x=>x.token)).size !== ACTORS) throw new Error('500 distinct authenticated sessions were not obtained');
-  return sessions;
+  return { sessions, authDurationMs: Math.round((performance.now()-authStarted)*100)/100, auth429Retries };
 }
 
 async function ramped(items, concurrency, fn) {
@@ -85,7 +103,7 @@ function summarize(name, results) {
 async function rpc(token, name, body) { return fetchMeasured(`${ORIGIN}/rest/v1/rpc/${name}`, {method:'POST',headers:headers(token),body:JSON.stringify(body)}); }
 
 async function main(){
-  assertGuards(); const startedAt=new Date().toISOString(); const sessions=await authenticateActors();
+  assertGuards(); const startedAt=new Date().toISOString(); const auth=await authenticateActors(); const sessions=auth.sessions;
   const starts=await ramped(sessions,RPC_CONCURRENCY,async(s)=>{const r=await rpc(s.token,'start_exam_attempt',{p_paper_id:PAPER_ID,p_access_code:null}); if(r.ok){try{s.attemptId=JSON.parse(r.text);}catch{r.ok=false;r.error='InvalidStartResponse';}} return r;});
   const startSummary=summarize('start',starts); if(!startSummary.budgetPassed) throw new Error(`L4 budget failed: ${JSON.stringify(startSummary)}`);
   if(sessions.some(s=>!s.attemptId)) throw new Error('L4 missing authoritative attempt ids');
@@ -108,7 +126,7 @@ async function main(){
   const retrySubmit=await mapLimit(sessions.slice(0,RETRY_SAMPLE),25,async(s)=>rpc(s.token,'submit_exam_attempt',{p_attempt_id:s.attemptId}));
   if(retrySubmit.some(r=>!r.ok)) throw new Error('L6 submission retry sample failed');
 
-  const evidence={schemaVersion:1,candidateSha,tenant:TENANT,studentCount:ACTORS,distinctAuthenticatedSessions:ACTORS,paperId:PAPER_ID,startedAt,finishedAt:new Date().toISOString(),rampMs:RAMP_MS,retrySample:RETRY_SAMPLE,start:startSummary,save:saveSummary,submit:submitSummary,authoritativeReadbackMatched:ACTORS,productionProtected:true,secretsIncluded:false,bodiesIncluded:false};
+  const evidence={schemaVersion:1,candidateSha,tenant:TENANT,studentCount:ACTORS,distinctAuthenticatedSessions:ACTORS,paperId:PAPER_ID,startedAt,finishedAt:new Date().toISOString(),authStaging:{concurrency:AUTH_CONCURRENCY,spacingMs:AUTH_SPACING_MS,durationMs:auth.authDurationMs,http429Retries:auth.auth429Retries},rampMs:RAMP_MS,retrySample:RETRY_SAMPLE,start:startSummary,save:saveSummary,submit:submitSummary,authoritativeReadbackMatched:ACTORS,productionProtected:true,secretsIncluded:false,bodiesIncluded:false};
   writeFileSync(outPath,`${JSON.stringify(evidence,null,2)}\n`,{flag:'wx'}); console.log(JSON.stringify(evidence,null,2));
 }
 
