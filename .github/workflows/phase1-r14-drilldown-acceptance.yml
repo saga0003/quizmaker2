@@ -71,6 +71,31 @@ jobs:
               1,
           )
           source = source.replace(
+              "async function waitForHierarchyTransition(page, nextToken, timeout = 30000) {\n  if (!nextToken) {\n    await page.waitForTimeout(800);\n    return true;\n  }\n  return page.waitForFunction((value) => document.body.innerText.includes(value), nextToken, { timeout }).then(() => true).catch(() => false);\n}\n",
+              "async function waitForHierarchyTransition(page, nextToken, timeout = 30000) {\n"
+              "  if (!nextToken) {\n"
+              "    await page.waitForTimeout(800);\n"
+              "    return true;\n"
+              "  }\n"
+              "  const deadline = Date.now() + timeout;\n"
+              "  while (Date.now() < deadline) {\n"
+              "    const loading = await page.getByText('Calculating analytics…', { exact: true }).isVisible().catch(() => false);\n"
+              "    if (!loading) {\n"
+              "      const target = nextToken === 'A'\n"
+              "        ? page.getByRole('cell', { name: 'A', exact: true })\n"
+              "        : page.getByText(nextToken, { exact: true });\n"
+              "      const count = await target.count();\n"
+              "      for (let i = 0; i < count; i += 1) {\n"
+              "        if (await target.nth(i).isVisible().catch(() => false)) return true;\n"
+              "      }\n"
+              "    }\n"
+              "    await page.waitForTimeout(100);\n"
+              "  }\n"
+              "  return false;\n"
+              "}\n",
+              1,
+          )
+          source = source.replace(
               "  const analyticsPayloads = [];\n",
               "  const analyticsPayloads = [];\n  const analyticsTraces = [];\n",
               1,
