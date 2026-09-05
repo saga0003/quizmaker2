@@ -1,0 +1,66 @@
+name: Phase 1 R15 Export Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/phase1-r15-export-acceptance.yml
+      - scripts/phase1-r15-export-acceptance.mjs
+      - .phase1-r15-trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  r15-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_DB_BYTES: 219344019
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+      EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r15-export
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify isolated protected-preview R15 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
+          test "$EVIDARA_ACCEPTANCE_URL" = "https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app"
+          test "$EVIDARA_ACCEPTANCE_DB_BYTES" = "219344019"
+          for name in EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD VERCEL_AUTOMATION_BYPASS_SECRET; do
+            test -n "${!name:-}" || { echo "::error title=R15 secret missing::$name is not configured"; exit 1; }
+          done
+          node scripts/phase1-acceptance-preflight.mjs --target "$EVIDARA_ACCEPTANCE_URL" --dry-run
+          curl --fail --silent --show-error --output /dev/null \
+            -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+            "$EVIDARA_ACCEPTANCE_URL/"
+          node scripts/f12-excel-export-smoke.mjs
+      - name: Install Playwright without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Execute real R15 workbook export acceptance
+        run: node scripts/phase1-r15-export-acceptance.mjs
+      - name: Upload R15 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r15-export-${{ github.sha }}
+          path: acceptance-evidence/r15-export
+          if-no-files-found: warn
+          retention-days: 14
