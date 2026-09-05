@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "candidateSha": "125f28c1f7cd527d9312c8f225b559e5db65a03a",
+  "tenant": "evidara-school-acceptance",
+  "studentCount": 500,
+  "distinctAuthenticatedSessions": 500,
+  "execution": {
+    "shards": 20,
+    "actorsPerShard": 25,
+    "sharedBarrierEpochMs": 1788648472633,
+    "maximumAllowedBarrierMissMs": 30000,
+    "independentHostedRunners": true
+  },
+  "start": {
+    "attempted": 500,
+    "successful": 500,
+    "failed": 0,
+    "failureRate": 0,
+    "statusDistribution": {
+      "200": 500
+    },
+    "latencyMs": {
+      "p50": 778.39,
+      "p95": 2038.1,
+      "p99": 4121.8,
+      "max": 5163.77
+    },
+    "budget": {
+      "maxFailureRate": 0.01,
+      "maxP95Ms": 5000,
+      "maxP99Ms": 10000
+    },
+    "budgetPassed": true
+  },
+  "save": {
+    "attempted": 500,
+    "successful": 500,
+    "failed": 0,
+    "failureRate": 0,
+    "statusDistribution": {
+      "204": 500
+    },
+    "latencyMs": {
+      "p50": 177.87,
+      "p95": 266.64,
+      "p99": 617.41,
+      "max": 684.84
+    },
+    "budget": {
+      "maxFailureRate": 0.01,
+      "maxP95Ms": 3000,
+      "maxP99Ms": 6000
+    },
+    "budgetPassed": true
+  },
+  "submit": {
+    "attempted": 500,
+    "successful": 500,
+    "failed": 0,
+    "failureRate": 0,
+    "statusDistribution": {
+      "200": 500
+    },
+    "latencyMs": {
+      "p50": 209.19,
+      "p95": 383.61,
+      "p99": 2562.67,
+      "max": 2957
+    },
+    "budget": {
+      "maxFailureRate": 0.01,
+      "maxP95Ms": 8000,
+      "maxP99Ms": 15000
+    },
+    "budgetPassed": true
+  },
+  "authoritativeReadbackMatched": 500,
+  "startIdempotencyRetriesMatched": 40,
+  "submitRetriesPassed": 40,
+  "cleanup": {
+    "allShardsRestoredOriginalL1Memberships": true
+  },
+  "productionProtected": true,
+  "secretsIncluded": false,
+  "bodiesIncluded": false,
+  "generatedAt": "2026-09-05T22:48:48.322Z"
+}
