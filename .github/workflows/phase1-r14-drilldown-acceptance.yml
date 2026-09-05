@@ -57,6 +57,48 @@ jobs:
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
+      - name: Instrument redacted R14 analytics boundary trace
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/phase1-r14-rendered-acceptance-v2.mjs')
+          source = path.read_text()
+          source = source.replace(
+              "  const analyticsPayloads = [];\n",
+              "  const analyticsPayloads = [];\n  const analyticsTraces = [];\n",
+              1,
+          )
+          source = source.replace(
+              "      try { analyticsPayloads.push(await response.json()); } catch {}\n",
+              "      try {\n"
+              "        const payload = await response.json();\n"
+              "        analyticsPayloads.push(payload);\n"
+              "        const subjects = Array.isArray(payload?.subjects) ? payload.subjects : [];\n"
+              "        const trace = {\n"
+              "          requestLevel: url.searchParams.get('level'),\n"
+              "          responseLevel: payload?.level || null,\n"
+              "          subjectCount: subjects.length,\n"
+              "          subjectNames: subjects.slice(0, 12).map((row) => String(row?.name || '')).filter(Boolean),\n"
+              "        };\n"
+              "        analyticsTraces.push(trace);\n"
+              "        console.log('[R14 boundary]', JSON.stringify(trace));\n"
+              "      } catch {}\n",
+              1,
+          )
+          source = source.replace(
+              "    analyticsPayloads.length = 0;\n    baseline = true;\n",
+              "    analyticsPayloads.length = 0;\n    analyticsTraces.length = 0;\n    baseline = true;\n",
+              1,
+          )
+          source = source.replace(
+              "      capturedPayloads: analyticsPayloads.length,\n      consoleErrors,\n",
+              "      capturedPayloads: analyticsPayloads.length,\n      analyticsTraces: analyticsTraces.slice(-12),\n      consoleErrors,\n",
+              1,
+          )
+          path.write_text(source)
+          PY
       - name: Execute R14 rendered Teacher and School Admin drilldowns
         run: node scripts/phase1-r14-rendered-acceptance-v2.mjs
       - name: Upload redacted R14 evidence
