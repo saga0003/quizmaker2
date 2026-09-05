@@ -1067,3 +1067,14 @@ This log records each production-hardening run with observable implementation an
 - Overall: 109/127 acceptance/sign-off items verified = 85.8%. Position R1-R14 ✅, R15-R18 unchecked, L1-L6 unchecked, Z1 ✅, Z2-Z8 unchecked. J3 remains external legal review.
 - Exact next action: read R15 run 33940049711 and gate 33940049690; if both green, record R15 with workbook evidence and immediately start R16 School B cross-tenant isolation. If R15 fails, diagnose the exact workbook/browser evidence and fix internally before rerun.
 
+
+### 2026-09-05 09:00 IST — Phase 1 production-hardening heartbeat
+- Completed this run: reconciled checklist/progress, branch, Vercel, Supabase and release-gate state; diagnosed R15's first rendered-export failure as a brittle `programme` overview-readiness text assertion; added failure-evidence printing to the dedicated R15 workflow; replaced the brittle assertion with the exact rendered `NEET` hierarchy readiness signal already proven by R14. No product permissions or export assertions were weakened.
+- Checklist position: R1-R14 verified; R15 in progress and not checked until real XLSX evidence plus the complete same-candidate release gate are green; R16-R18 unchecked; L1-L6 unchecked; Z1 verified; Z2-Z8 unchecked; J3 remains external legal review.
+- Blockers: no user-action blocker. Current R15 candidate `08ec4aafd0f070375b972e42f29b910daf0469d8`; dedicated R15 run `33942224297` is still executing after its isolated protected-preview preflight/F12 checks passed; same-candidate complete release gate `33942224284` is still executing. The previous R15 run `33940049711` failed before download at the obsolete overview-ready assertion and its gate was superseded/cancelled.
+- Branch head at heartbeat queue: `08ec4aafd0f070375b972e42f29b910daf0469d8` (the recorder will append this entry in a bookkeeping-only bot commit).
+- CI/release gate: latest fully verified functional release gate remains R14 run `33939757839` PASS on `8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef`; current R15 same-candidate gate `33942224284` is in progress.
+- Preview/production/Supabase: Vercel preview remains the protected `phase1-hardening` acceptance target; permanent production was not promoted or changed and Vercel reported no runtime-error clusters in the preceding 24 hours; Supabase SMIS QP `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; all acceptance remains confined to `evidara-school-acceptance`, database guard 219344019 bytes, with no St. Mary's/future-client data and no additional project created.
+- Overall verified progress: 109/127 = 85.8%.
+- Exact next action: read R15 run `33942224297` and release gate `33942224284`; if both pass, record R15 with evidence and immediately begin R16 only in a way consistent with the existing-project/synthetic-tenant safety constraints; if R15 fails, diagnose the captured workbook/browser evidence and fix internally before advancing.
+
