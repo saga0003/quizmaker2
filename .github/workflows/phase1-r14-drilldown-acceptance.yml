@@ -123,6 +123,16 @@ jobs:
               1,
           )
           source = source.replace(
+              "      if (!Array.isArray(actor.allowedSubjectLabels) || !actor.allowedSubjectLabels.some((value) => String(value).toLowerCase() === HIERARCHY[3].toLowerCase())) {\n        throw new Error('R14 teacher missing Physics subject scope');\n      }",
+              "      const assignedSubjectLabels = actor.allowedSubjectLabels && typeof actor.allowedSubjectLabels === 'object'\n"
+              "        ? Object.values(actor.allowedSubjectLabels).flatMap((value) => Array.isArray(value) ? value : [])\n"
+              "        : [];\n"
+              "      if (!assignedSubjectLabels.some((value) => String(value).toLowerCase() === HIERARCHY[3].toLowerCase())) {\n"
+              "        throw new Error('R14 teacher missing Physics subject scope');\n"
+              "      }",
+              1,
+          )
+          source = source.replace(
               "      capturedPayloads: analyticsPayloads.length,\n      consoleErrors,\n",
               "      capturedPayloads: analyticsPayloads.length,\n      analyticsTraces: analyticsTraces.slice(-12),\n      consoleErrors,\n",
               1,
