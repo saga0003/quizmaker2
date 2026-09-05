@@ -1,2 +1,0 @@
-Z4 Production build passes from exact release commit.
-Verified 6 Sep 2026. Exact release candidate `a8fd91e8f9d84ca45a53f58687037a8c2b11ede0` completed the full Phase 1 release gate in run `33997176937` with conclusion SUCCESS, including the production build and final gate enforcement. Its source tree is the accepted R1-R18/L1-L6/Z2-Z3 candidate; the subsequent checklist-only recorder commit does not alter runtime source. Matching branch preview is READY and permanent production remains unpromoted.
