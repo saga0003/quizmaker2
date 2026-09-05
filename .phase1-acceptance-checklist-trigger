@@ -1,2 +1,0 @@
-L6 500 submissions in finishing window.
-Verified 6 Sep 2026 using only isolated synthetic `evidara-school-acceptance`: 500 distinct authenticated sessions completed 500/500 canonical `submit_exam_attempt` operations with 0 failures; p95 383.61 ms and p99 2562.67 ms passed unchanged L6 budgets. All 40 sampled submission retries passed and every shard restored the original L1 membership set. `PHASE1_L456_LOAD_EVIDENCE.json`; workload run `33996734208`; pre-record complete gate `33996734171` passed. Permanent production remained protected.
