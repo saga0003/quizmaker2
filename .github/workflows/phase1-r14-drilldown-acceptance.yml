@@ -66,6 +66,11 @@ jobs:
           path = Path('scripts/phase1-r14-rendered-acceptance-v2.mjs')
           source = path.read_text()
           source = source.replace(
+              "url.pathname === '/api/institution-analytics'",
+              "url.pathname.replace(/\\/$/, '') === '/api/institution-analytics'",
+              1,
+          )
+          source = source.replace(
               "  const analyticsPayloads = [];\n",
               "  const analyticsPayloads = [];\n  const analyticsTraces = [];\n",
               1,
