@@ -1,0 +1,40 @@
+name: Phase 1 Acceptance Checklist Recorder
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .phase1-acceptance-checklist-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Record verified acceptance item
+        shell: python
+        run: |
+          from pathlib import Path
+          checklist = Path('PHASE1_RELEASE_CHECKLIST.md')
+          trigger = Path('.phase1-acceptance-checklist-trigger')
+          item, evidence = trigger.read_text().split('\n', 1)
+          line = f'- [ ] {item}'
+          if line not in checklist.read_text():
+              raise SystemExit(f'Unchecked checklist item not found: {item}')
+          text = checklist.read_text().replace(line, f'- [x] {item} — {evidence.strip()}', 1)
+          checklist.write_text(text)
+          trigger.unlink()
+      - name: Commit checklist evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_RELEASE_CHECKLIST.md .phase1-acceptance-checklist-trigger
+          git commit -m 'docs: record verified Phase 1 acceptance item [skip ci]'
+          git push origin HEAD:phase1-hardening
