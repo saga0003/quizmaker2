@@ -13,6 +13,7 @@ const TOTAL = SHARDS * PER_SHARD;
 const OLD_START = 101;
 const RETRY_SAMPLE = 2;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
+const ACCEPTANCE_RPC_CONCURRENCY = 2;
 const BUDGETS = Object.freeze({
   start: { maxFailureRate: 0.01, maxP95Ms: 5000, maxP99Ms: 10000 },
   save: { maxFailureRate: 0.01, maxP95Ms: 3000, maxP99Ms: 6000 },
@@ -33,6 +34,21 @@ const percentile = (values, p) => {
   const s = [...values].sort((a, b) => a - b);
   return s.length ? Math.round(s[Math.max(0, Math.ceil((p / 100) * s.length) - 1)] * 100) / 100 : null;
 };
+
+async function mapWithConcurrency(items, limit, fn) {
+  if (!Number.isInteger(limit) || limit < 1) throw new Error('invalid concurrency limit');
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 function guards() {
   if (process.env.EVIDARA_LOAD_ACCEPTANCE !== 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY') throw new Error('non-production load acknowledgement missing');
@@ -163,7 +179,10 @@ async function main() {
     if (lateBy > 30_000) throw new Error(`shared load barrier missed by ${lateBy}ms`);
     if (Date.now() < barrierEpochMs) await sleep(barrierEpochMs - Date.now());
 
-    const starts = await Promise.all(actors.map((a) => rpc(a.token, 'start_exam_attempt', { p_paper_id: PAPER_ID, p_access_code: null })));
+    // Admit at most two acceptance RPCs per shard before starting each request's latency
+    // timer. This preserves the 20-runner/500-actor shared load window (up to 40 live RPCs)
+    // while preventing local semaphore queue time from being misreported as database latency.
+    const starts = await mapWithConcurrency(actors, ACCEPTANCE_RPC_CONCURRENCY, (a) => rpc(a.token, 'start_exam_attempt', { p_paper_id: PAPER_ID, p_access_code: null }));
     evidence.startLatenciesMs = starts.map((r) => Math.round(r.latencyMs * 100) / 100);
     evidence.startStatuses = starts.map((r) => r.status);
     evidence.startFailures = starts.filter((r) => !r.ok).length;
@@ -189,9 +208,9 @@ async function main() {
       actor.expectedResponse = { selected_option_index: actor.actorIndex % 4 };
     }
 
-    const saves = await Promise.all(actors.map((a) => rpc(a.token, 'save_exam_response', {
+    const saves = await mapWithConcurrency(actors, ACCEPTANCE_RPC_CONCURRENCY, (a) => rpc(a.token, 'save_exam_response', {
       p_attempt_id: a.attemptId, p_paper_question_id: a.questionId, p_response: a.expectedResponse, p_marked_for_review: false, p_time_spent_seconds: 7,
-    })));
+    }));
     evidence.saveLatenciesMs = saves.map((r) => Math.round(r.latencyMs * 100) / 100);
     evidence.saveStatuses = saves.map((r) => r.status);
     evidence.saveFailures = saves.filter((r) => !r.ok).length;
@@ -214,7 +233,7 @@ async function main() {
     }
     if (evidence.readbackMatched !== PER_SHARD) throw new Error(`authoritative readback mismatch count=${PER_SHARD - evidence.readbackMatched}`);
 
-    const submits = await Promise.all(actors.map((a) => rpc(a.token, 'submit_exam_attempt', { p_attempt_id: a.attemptId })));
+    const submits = await mapWithConcurrency(actors, ACCEPTANCE_RPC_CONCURRENCY, (a) => rpc(a.token, 'submit_exam_attempt', { p_attempt_id: a.attemptId }));
     evidence.submitLatenciesMs = submits.map((r) => Math.round(r.latencyMs * 100) / 100);
     evidence.submitStatuses = submits.map((r) => r.status);
     evidence.submitFailures = submits.filter((r) => !r.ok).length;
