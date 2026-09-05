@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
+          candidate_sha="$(node <<'NODE'
           const fs = require('fs');
           const r = JSON.parse(fs.readFileSync('.github/phase1-l456-run-request.json', 'utf8'));
           if (r.tenant !== 'evidara-school-acceptance') throw new Error('wrong tenant');
@@ -43,17 +43,17 @@ jobs:
           if (!/^[0-9a-f]{40}$/.test(r.candidateSha)) throw new Error('candidate SHA invalid');
           if (r.syntheticOnly !== true || r.containsPersonalData !== false) throw new Error('synthetic guard missing');
           if (r.authorized !== 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY') throw new Error('authorization guard missing');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `candidate_sha=${r.candidateSha}\n`);
+          process.stdout.write(r.candidateSha);
           NODE
-          git merge-base --is-ancestor '${{ steps.request.outputs.candidate_sha }}' HEAD
+          )"
+          git merge-base --is-ancestor "$candidate_sha" HEAD
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
 
       - name: Set shared 500-user barrier
         id: barrier
         shell: bash
         run: |
           set -euo pipefail
-          # All 20 independent runners receive one UTC barrier. Four minutes is ample
-          # for 25 synthetic signups + membership seat swap per shard while remaining fast.
           echo "barrier_epoch_ms=$(( $(date +%s%3N) + 240000 ))" >> "$GITHUB_OUTPUT"
 
   shard:
