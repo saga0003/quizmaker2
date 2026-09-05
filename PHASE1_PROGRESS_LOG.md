@@ -1112,3 +1112,25 @@ This log records each production-hardening run with observable implementation an
 - Overall strict checklist: 113/127 ≈ 89.0% because L2/L3 are evidence-ready but remain unchecked until a complete release gate passes. R1-R18 ✅; L1-L6 ⏳; Z1 ✅; Z2-Z8 ⏳; J3 external legal gate.
 - Exact next action: verify current Vercel preview/production health and storage headroom; obtain a complete green release gate for the L2/L3 evidence checkpoint, then mark L2/L3 only if green. Build L1 with authenticated synthetic student fixtures without exceeding the database/storage guard; immediately use those sessions with the existing guarded 500-operation preview runner for L4-L6, then proceed to Z2-Z8.
 
+
+## 2026-09-05 16:00 IST — Phase 1 hardening heartbeat
+
+Completed this run:
+- Formally persisted L2 and L3 checklist verification; both retain durable scale evidence and complete release gate 33950889193 PASS.
+- Safely removed only the exact tagged L2/L3 synthetic bulk fixtures after evidence was durable (49,500 questions and 999 papers), preserving canonical acceptance data.
+- Staged L1 inside only evidara-school-acceptance: temporarily raised the synthetic acceptance licence from 100 to 2,000 seats and added 1,900 deterministic real Supabase auth-backed synthetic learners. Postflight proved 2,000 memberships, 1,900 tagged auth users, 1,900 profiles, and 1,900 identities.
+- Recorded durable L1 evidence in PHASE1_L1_LOAD_ACCEPTANCE_EVIDENCE.md at candidate ce10e80c74c47079d2c324cc8dd426b3a183d193.
+- Database size after L1 staging: 361,661,675 bytes, below the prior L2/L3 peak (~421.5 MB).
+
+Blockers / unchecked:
+- L1 evidence is complete but remains unchecked until complete Phase 1 release gate 33961551777 finishes green.
+- L4-L6 still require genuine near-concurrent start/save/submit workload evidence; no item was self-certified.
+- Z2-Z8 remain protected behind completion of all load acceptance. J3 remains external legal review.
+
+Branch head before heartbeat: ce10e80c74c47079d2c324cc8dd426b3a183d193
+CI/release gate: latest previously complete gate 33950889193 PASS; new exact L1 candidate gate 33961551777 IN PROGRESS.
+Preview/production: protected preview remains the acceptance surface; permanent production unchanged/unpromoted.
+Supabase SMIS QP: ACTIVE_HEALTHY; only evidara-school-acceptance modified; no St. Mary's/future-client data touched; no new project created.
+Strict verified completion: 115/127 (~90.6%) until L1's complete gate is green.
+Exact next action: finish gate 33961551777; if green record L1, then execute guarded 500 near-concurrent starts, 500 concurrent answer-save patterns, and 500 submissions in the finishing window; capture latency/error/database-growth evidence, require a complete green gate, clean tagged L1 fixtures/restore 100-seat synthetic licence, then proceed immediately to Z2-Z8.
+
