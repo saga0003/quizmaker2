@@ -1,2 +1,0 @@
-Z7 Phase 1 release version/tag/changelog recorded.
-Verified 6 Sep 2026. `PHASE1_RELEASE_NOTES.md` records release version `19.1.0-phase1`, production commit `cfcbade06e86d08b1019e6922b75ab479b4b630c`, deployment `dpl_Ecs2jJRVCJNqmeMTK6WpFn9FzxSV`, and release summary. Immutable annotated tag `phase1-v19.1.0` was created successfully by workflow run `33999345958`; tag object `5091fbe504735b7af82e047943dd9cc3f02ff00a` resolves exactly to production commit `cfcbade06e86d08b1019e6922b75ab479b4b630c`. J3 legal review remains external and is not self-certified.
