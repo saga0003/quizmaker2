@@ -1,0 +1,116 @@
+name: Evidara Phase 1 Z8 MFA Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/phase1-z8-mfa-run-request.json'
+      - '.github/workflows/phase1-z8-mfa-acceptance.yml'
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
+  SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+  EXPECTED_SYNTHETIC_ADMIN_ID: 73beac3b-7461-44ea-a7ff-056a13a30574
+  EXPECTED_TENANT: evidara-school-acceptance
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify real synthetic-admin TOTP AAL2 path
+        shell: bash
+        run: |
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const { createClient } = require('@supabase/supabase-js');
+
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+          const email = process.env.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL;
+          const password = process.env.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD;
+          const expectedId = process.env.EXPECTED_SYNTHETIC_ADMIN_ID;
+          if (!url || !key || !email || !password) throw new Error('required acceptance auth configuration missing');
+
+          function base32Decode(input) {
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+            let bits = '';
+            for (const raw of input.replace(/=+$/,'').toUpperCase()) {
+              const v = alphabet.indexOf(raw);
+              if (v < 0) throw new Error('invalid TOTP base32 secret');
+              bits += v.toString(2).padStart(5,'0');
+            }
+            const out=[];
+            for(let i=0;i+8<=bits.length;i+=8) out.push(parseInt(bits.slice(i,i+8),2));
+            return Buffer.from(out);
+          }
+          function totp(secret, now=Date.now()) {
+            const counter = Math.floor(now/30000);
+            const msg = Buffer.alloc(8);
+            msg.writeBigUInt64BE(BigInt(counter));
+            const h = crypto.createHmac('sha1', base32Decode(secret)).update(msg).digest();
+            const off = h[h.length-1] & 15;
+            const n = (h.readUInt32BE(off) & 0x7fffffff) % 1000000;
+            return String(n).padStart(6,'0');
+          }
+
+          (async () => {
+            const supabase = createClient(url, key, { auth: { persistSession:false, autoRefreshToken:false } });
+            let enrolledId = null;
+            try {
+              const signIn = await supabase.auth.signInWithPassword({ email, password });
+              if (signIn.error) throw signIn.error;
+              if (signIn.data.user?.id !== expectedId) throw new Error('acceptance admin identity guard failed');
+
+              const before = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+              if (before.error) throw before.error;
+              if (before.data.currentLevel !== 'aal1') throw new Error(`expected fresh privileged session at aal1, got ${before.data.currentLevel}`);
+
+              const enroll = await supabase.auth.mfa.enroll({ factorType:'totp', friendlyName:`Phase1 Z8 acceptance ${Date.now()}` });
+              if (enroll.error) throw enroll.error;
+              enrolledId = enroll.data.id;
+              const code = totp(enroll.data.totp.secret);
+              const verified = await supabase.auth.mfa.challengeAndVerify({ factorId: enrolledId, code });
+              if (verified.error) throw verified.error;
+
+              const refreshed = await supabase.auth.refreshSession();
+              if (refreshed.error) throw refreshed.error;
+              const after = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+              if (after.error) throw after.error;
+              if (after.data.currentLevel !== 'aal2') throw new Error(`TOTP verification did not elevate to aal2: ${after.data.currentLevel}`);
+
+              const manager = await supabase.rpc('is_evidara_school_manager', { p_organization_id:null });
+              if (manager.error) throw manager.error;
+              if (manager.data !== true) throw new Error('AAL2 privileged manager helper was not accepted');
+
+              console.log(JSON.stringify({
+                tenant:process.env.EXPECTED_TENANT,
+                syntheticAdminGuard:true,
+                initialAal:'aal1',
+                totpChallengeVerified:true,
+                elevatedAal:'aal2',
+                privilegedManagerAcceptedAtAal2:true,
+                secretsIncluded:false,
+                productionUserDataTouched:false
+              }));
+            } finally {
+              if (enrolledId) {
+                const rm = await supabase.auth.mfa.unenroll({ factorId: enrolledId });
+                if (rm.error) console.error('temporary factor cleanup failed without exposing secrets:', rm.error.message);
+              }
+              await supabase.auth.signOut().catch(()=>{});
+            }
+          })().catch((e)=>{ console.error(e instanceof Error ? e.message : String(e)); process.exit(1); });
+          NODE
