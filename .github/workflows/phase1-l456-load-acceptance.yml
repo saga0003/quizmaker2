@@ -13,24 +13,22 @@ concurrency:
   group: phase1-l456-load-acceptance
   cancel-in-progress: false
 
+env:
+  EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+  EVIDARA_ACCEPTANCE_TENANT: evidara-school-acceptance
+  SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+
 jobs:
-  load-acceptance:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
-      EVIDARA_ACCEPTANCE_TENANT: evidara-school-acceptance
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
-      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+    outputs:
+      candidate_sha: ${{ steps.request.outputs.candidate_sha }}
+      barrier_epoch_ms: ${{ steps.barrier.outputs.barrier_epoch_ms }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: phase1-hardening
           fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
 
       - name: Validate run request
         id: request
@@ -39,8 +37,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const p = '.github/phase1-l456-run-request.json';
-          const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const r = JSON.parse(fs.readFileSync('.github/phase1-l456-run-request.json', 'utf8'));
           if (r.tenant !== 'evidara-school-acceptance') throw new Error('wrong tenant');
           if (r.supabaseProjectRef !== 'xzfozpnzvznqrvcsoail') throw new Error('wrong Supabase project');
           if (!/^[0-9a-f]{40}$/.test(r.candidateSha)) throw new Error('candidate SHA invalid');
@@ -48,36 +45,141 @@ jobs:
           if (r.authorized !== 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY') throw new Error('authorization guard missing');
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `candidate_sha=${r.candidateSha}\n`);
           NODE
-
-      - name: Verify candidate is ancestor of request
-        shell: bash
-        run: |
-          set -euo pipefail
           git merge-base --is-ancestor '${{ steps.request.outputs.candidate_sha }}' HEAD
 
-      - name: Execute authenticated L4-L6 workload
-        env:
-          CANDIDATE_SHA: ${{ steps.request.outputs.candidate_sha }}
-          EVIDENCE_OUT: phase1-l456-aggregate.json
-        run: node scripts/phase1-l456-supabase-acceptance.mjs
-
-      - name: Record aggregate-only evidence
+      - name: Set shared 500-user barrier
+        id: barrier
         shell: bash
         run: |
           set -euo pipefail
-          test -s phase1-l456-aggregate.json
-          node -e "const e=require('./phase1-l456-aggregate.json'); if(!e.start.budgetPassed||!e.save.budgetPassed||!e.submit.budgetPassed||e.distinctAuthenticatedSessions!==500||e.secretsIncluded!==false||e.bodiesIncluded!==false) process.exit(1)"
-          cp phase1-l456-aggregate.json PHASE1_L456_LOAD_EVIDENCE.json
+          # All 20 independent runners receive one UTC barrier. Four minutes is ample
+          # for 25 synthetic signups + membership seat swap per shard while remaining fast.
+          echo "barrier_epoch_ms=$(( $(date +%s%3N) + 240000 ))" >> "$GITHUB_OUTPUT"
+
+  shard:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHARD_INDEX: ${{ matrix.shard }}
+      BARRIER_EPOCH_MS: ${{ needs.prepare.outputs.barrier_epoch_ms }}
+      CANDIDATE_SHA: ${{ needs.prepare.outputs.candidate_sha }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
+      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Execute 25-actor authenticated shard
+        env:
+          EVIDENCE_OUT: phase1-l456-shard-${{ matrix.shard }}.json
+        run: node scripts/phase1-l456-sharded-acceptance.mjs
+
+      - name: Upload aggregate-safe shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-l456-shard-${{ matrix.shard }}
+          path: phase1-l456-shard-${{ matrix.shard }}.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    needs: [prepare, shard]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.shard.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CANDIDATE_SHA: ${{ needs.prepare.outputs.candidate_sha }}
+      BARRIER_EPOCH_MS: ${{ needs.prepare.outputs.barrier_epoch_ms }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: phase1-l456-shard-*
+          path: shard-evidence
+          merge-multiple: true
+
+      - name: Validate 500-session aggregate and performance budgets
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const candidateSha = process.env.CANDIDATE_SHA;
+          const barrierEpochMs = Number(process.env.BARRIER_EPOCH_MS);
+          const files = fs.readdirSync('shard-evidence').filter(f => /^phase1-l456-shard-\d+\.json$/.test(f)).sort();
+          if (files.length !== 20) throw new Error(`expected 20 shard evidence files, got ${files.length}`);
+          const shards = files.map(f => JSON.parse(fs.readFileSync(path.join('shard-evidence', f), 'utf8'))).sort((a,b)=>a.shard-b.shard);
+          const expectedActors = new Set(Array.from({length:500}, (_,i)=>i+1));
+          const observed = new Set();
+          for (let i=0;i<20;i++) {
+            const s=shards[i];
+            if (s.shard!==i || s.candidateSha!==candidateSha || s.tenant!=='evidara-school-acceptance') throw new Error(`shard ${i} identity mismatch`);
+            if (s.barrierEpochMs!==barrierEpochMs || s.workloadPassed!==true || s.cleanupPassed!==true || s.cleanupRestoredOriginalMemberships!==true) throw new Error(`shard ${i} workload/cleanup/barrier failed`);
+            if (s.secretsIncluded!==false || s.bodiesIncluded!==false || s.productionProtected!==true) throw new Error(`shard ${i} evidence safety failed`);
+            for(let n=s.actorRange[0];n<=s.actorRange[1];n++){ if(observed.has(n)) throw new Error(`duplicate actor ${n}`); observed.add(n); }
+          }
+          if(observed.size!==500 || [...expectedActors].some(n=>!observed.has(n))) throw new Error('500 unique actor coverage failed');
+          const percentile=(v,p)=>{const s=[...v].sort((a,b)=>a-b);return Math.round(s[Math.max(0,Math.ceil(p/100*s.length)-1)]*100)/100};
+          const budgets={start:{maxFailureRate:.01,maxP95Ms:5000,maxP99Ms:10000},save:{maxFailureRate:.01,maxP95Ms:3000,maxP99Ms:6000},submit:{maxFailureRate:.01,maxP95Ms:8000,maxP99Ms:15000}};
+          const summarize=(name)=>{
+            const lat=shards.flatMap(s=>s[`${name}LatenciesMs`]);
+            const statuses=shards.flatMap(s=>s[`${name}Statuses`]);
+            const failures=shards.reduce((a,s)=>a+s[`${name}Failures`],0);
+            if(lat.length!==500||statuses.length!==500) throw new Error(`${name} operation count != 500`);
+            const statusDistribution={}; for(const x of statuses) statusDistribution[String(x)]=(statusDistribution[String(x)]??0)+1;
+            const latencyMs={p50:percentile(lat,50),p95:percentile(lat,95),p99:percentile(lat,99),max:percentile(lat,100)};
+            const failureRate=failures/500, b=budgets[name];
+            const budgetPassed=failureRate<=b.maxFailureRate&&latencyMs.p95<=b.maxP95Ms&&latencyMs.p99<=b.maxP99Ms;
+            if(!budgetPassed) throw new Error(`${name} budget failed: failures=${failures} p95=${latencyMs.p95} p99=${latencyMs.p99}`);
+            return {attempted:500,successful:500-failures,failed:failures,failureRate,statusDistribution,latencyMs,budget:b,budgetPassed};
+          };
+          const aggregate={
+            schemaVersion:2,candidateSha,tenant:'evidara-school-acceptance',studentCount:500,distinctAuthenticatedSessions:500,
+            execution:{shards:20,actorsPerShard:25,sharedBarrierEpochMs:barrierEpochMs,maximumAllowedBarrierMissMs:30000,independentHostedRunners:true},
+            start:summarize('start'),save:summarize('save'),submit:summarize('submit'),
+            authoritativeReadbackMatched:shards.reduce((a,s)=>a+s.readbackMatched,0),
+            startIdempotencyRetriesMatched:shards.reduce((a,s)=>a+s.startRetryMatched,0),
+            submitRetriesPassed:shards.reduce((a,s)=>a+s.submitRetryPassed,0),
+            cleanup:{allShardsRestoredOriginalL1Memberships:true},
+            productionProtected:true,secretsIncluded:false,bodiesIncluded:false,generatedAt:new Date().toISOString()
+          };
+          if(aggregate.authoritativeReadbackMatched!==500||aggregate.startIdempotencyRetriesMatched!==40||aggregate.submitRetriesPassed!==40) throw new Error('correctness/idempotency aggregate failed');
+          fs.writeFileSync('PHASE1_L456_LOAD_EVIDENCE.json', JSON.stringify(aggregate,null,2)+'\n');
+          console.log(JSON.stringify(aggregate,null,2));
+          NODE
+
+      - name: Commit aggregate-only evidence
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --rebase origin phase1-hardening
           git add PHASE1_L456_LOAD_EVIDENCE.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'test(load): record L4-L6 authenticated acceptance evidence [skip ci]'
+          git commit -m 'test(load): record L4-L6 500-session acceptance evidence [skip ci]'
           git push origin HEAD:phase1-hardening
 
       - name: Upload aggregate evidence
         uses: actions/upload-artifact@v4
         with:
-          name: phase1-l456-aggregate-${{ steps.request.outputs.candidate_sha }}
-          path: phase1-l456-aggregate.json
+          name: phase1-l456-aggregate-${{ needs.prepare.outputs.candidate_sha }}
+          path: PHASE1_L456_LOAD_EVIDENCE.json
           retention-days: 14
