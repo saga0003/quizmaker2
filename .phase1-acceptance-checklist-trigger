@@ -1,0 +1,2 @@
+Z2 Real-school acceptance test complete.
+Verified 6 Sep 2026 using the existing isolated synthetic real-workflow institution `Evidara School` (`evidara-school-acceptance`) only. R1-R18 are all green through authenticated/rendered acceptance, lifecycle, analytics, export, licence expiry/renewal and tenant-boundary flows; L1-L6 additionally passed scale/load acceptance with 500 distinct authenticated actors. No St. Mary's or future-client data was used. Complete pre-sign-off release gate `33996734171` passed and permanent production remained protected.
