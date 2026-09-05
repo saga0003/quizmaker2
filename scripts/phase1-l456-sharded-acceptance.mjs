@@ -137,13 +137,25 @@ async function main() {
     }
     if (actors.length !== PER_SHARD || new Set(actors.map((a) => a.userId)).size !== PER_SHARD || new Set(actors.map((a) => a.token)).size !== PER_SHARD) throw new Error('distinct session assertion failed');
 
-    // Enrol each fresh synthetic identity using the real School Admin membership RPC.
+    // Enrol each fresh synthetic identity. Interrupted prior runs leave these exact
+    // acceptance memberships suspended/promotion-locked, so reactivate those through the
+    // lifecycle RPC instead of incorrectly sending them back through the add RPC.
+    const currentRosterResult = await rpc(admin.token, 'list_school_student_lifecycle_v13', { p_organization_id: ORG_ID });
+    if (!currentRosterResult.ok) throw new Error(`current roster failed (${currentRosterResult.status})`);
+    const currentRoster = JSON.parse(currentRosterResult.text);
+    const membershipByName = new Map((currentRoster.students ?? []).map((m) => [m.name, m]));
     for (const actor of actors) {
-      const r = await rpc(admin.token, 'add_school_student_membership_v13', {
-        p_organization_id: ORG_ID, p_student_id: actor.userId, p_academic_year: '2026-27', p_grade: 11,
-        p_section: 'A', p_board: 'ISC', p_tracks: ['NEET'], p_parent_name: null, p_parent_phone: null,
-      });
-      if (!r.ok) throw new Error(`membership add failed for synthetic actor ${actor.actorIndex} (${r.status})`);
+      const actorName = `phase1-l456-student-${String(actor.actorIndex).padStart(4, '0')}`;
+      const existing = membershipByName.get(actorName);
+      const r = existing
+        ? await rpc(admin.token, 'set_school_student_lifecycle_status_v14', {
+            p_membership_id: existing.id, p_status: 'active', p_reason: `Phase 1 L4-L6 synthetic shard ${shard} seat swap`,
+          })
+        : await rpc(admin.token, 'add_school_student_membership_v13', {
+            p_organization_id: ORG_ID, p_student_id: actor.userId, p_academic_year: '2026-27', p_grade: 11,
+            p_section: 'A', p_board: 'ISC', p_tracks: ['NEET'], p_parent_name: null, p_parent_phone: null,
+          });
+      if (!r.ok) throw new Error(`membership activate failed for synthetic actor ${actor.actorIndex} (${r.status})`);
     }
     newMembershipsAdded = true;
 
