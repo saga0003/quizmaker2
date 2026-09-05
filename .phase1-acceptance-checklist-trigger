@@ -1,0 +1,2 @@
+L3 1,000 papers dataset.
+Verified 5 Sep 2026 using only isolated evidara-school-acceptance in SMIS QP: exactly 1,000 institution papers (1 canonical + 999 clearly tagged synthetic draft/unassigned rows), preserving visibility/assignment safety. Durable evidence: PHASE1_LOAD_ACCEPTANCE_EVIDENCE.md. Exact evidence checkpoint 7390047266c7cef726f42d4428c017bd9ea424ee passed complete Phase 1 release gate 33950889193. Permanent production remained protected.
