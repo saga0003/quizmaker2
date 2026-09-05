@@ -1,0 +1,2 @@
+Z3 Tenant-isolation tests pass.
+Verified 6 Sep 2026. Acceptance R16 proved authenticated School B isolation against School A student, paper, attempt and analytics records inside the same Supabase project and rolled the transient probe back cleanly; the permanent complete release gate also runs A2 tenant-isolation, A3 privileged-audit, A4 legacy-RLS and A9 active-institution controls. The full load run stayed tenant-bound to `evidara-school-acceptance`. No St. Mary's or future-client data was used.
