@@ -1,0 +1,2 @@
+L4 500 near-concurrent test starts.
+Verified 6 Sep 2026 using only isolated synthetic `evidara-school-acceptance`: 500 distinct authenticated sessions across 20×25 hosted-runner shards completed 500/500 canonical `start_exam_attempt` operations with 0 failures; p95 2038.1 ms and p99 4121.8 ms passed unchanged L4 budgets. `PHASE1_L456_LOAD_EVIDENCE.json`; workload run `33996734208`; pre-record complete gate `33996734171` passed. Permanent production remained protected.
