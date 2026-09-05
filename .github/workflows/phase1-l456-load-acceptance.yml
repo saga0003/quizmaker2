@@ -1,0 +1,83 @@
+name: Evidara Phase 1 L4-L6 Load Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/phase1-l456-run-request.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase1-l456-load-acceptance
+  cancel-in-progress: false
+
+jobs:
+  load-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_TENANT: evidara-school-acceptance
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate run request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const p = '.github/phase1-l456-run-request.json';
+          const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+          if (r.tenant !== 'evidara-school-acceptance') throw new Error('wrong tenant');
+          if (r.supabaseProjectRef !== 'xzfozpnzvznqrvcsoail') throw new Error('wrong Supabase project');
+          if (!/^[0-9a-f]{40}$/.test(r.candidateSha)) throw new Error('candidate SHA invalid');
+          if (r.syntheticOnly !== true || r.containsPersonalData !== false) throw new Error('synthetic guard missing');
+          if (r.authorized !== 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY') throw new Error('authorization guard missing');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `candidate_sha=${r.candidateSha}\n`);
+          NODE
+
+      - name: Verify candidate is ancestor of request
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor '${{ steps.request.outputs.candidate_sha }}' HEAD
+
+      - name: Execute authenticated L4-L6 workload
+        env:
+          CANDIDATE_SHA: ${{ steps.request.outputs.candidate_sha }}
+          EVIDENCE_OUT: phase1-l456-aggregate.json
+        run: node scripts/phase1-l456-supabase-acceptance.mjs
+
+      - name: Record aggregate-only evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s phase1-l456-aggregate.json
+          node -e "const e=require('./phase1-l456-aggregate.json'); if(!e.start.budgetPassed||!e.save.budgetPassed||!e.submit.budgetPassed||e.distinctAuthenticatedSessions!==500||e.secretsIncluded!==false||e.bodiesIncluded!==false) process.exit(1)"
+          cp phase1-l456-aggregate.json PHASE1_L456_LOAD_EVIDENCE.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_L456_LOAD_EVIDENCE.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'test(load): record L4-L6 authenticated acceptance evidence [skip ci]'
+          git push origin HEAD:phase1-hardening
+
+      - name: Upload aggregate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-l456-aggregate-${{ steps.request.outputs.candidate_sha }}
+          path: phase1-l456-aggregate.json
+          retention-days: 14
