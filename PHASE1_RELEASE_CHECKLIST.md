@@ -184,7 +184,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 
 - [x] Z1 All P0 items complete — verified 31 Aug 2026; P0.1 through P0.12 are checked with release-gate/live-enforcement evidence. Credential AAL2 production activation remains correctly staged under Z8 as part of coordinated cutover, not as an unchecked P0 implementation item.
 - [x] Z2 Real-school acceptance test complete. — Verified 6 Sep 2026 using the existing isolated synthetic real-workflow institution `Evidara School` (`evidara-school-acceptance`) only. R1-R18 are all green through authenticated/rendered acceptance, lifecycle, analytics, export, licence expiry/renewal and tenant-boundary flows; L1-L6 additionally passed scale/load acceptance with 500 distinct authenticated actors. No St. Mary's or future-client data was used. Complete pre-sign-off release gate `33996734171` passed and permanent production remained protected.
-- [ ] Z3 Tenant-isolation tests pass.
+- [x] Z3 Tenant-isolation tests pass. — Verified 6 Sep 2026. Acceptance R16 proved authenticated School B isolation against School A student, paper, attempt and analytics records inside the same Supabase project and rolled the transient probe back cleanly; the permanent complete release gate also runs A2 tenant-isolation, A3 privileged-audit, A4 legacy-RLS and A9 active-institution controls. The full load run stayed tenant-bound to `evidara-school-acceptance`. No St. Mary's or future-client data was used.
 - [ ] Z4 Production build passes from exact release commit.
 - [ ] Z5 Production deployment is READY and permanent domain serves the release commit.
 - [ ] Z6 Runtime error/health check is clean after deployment.
