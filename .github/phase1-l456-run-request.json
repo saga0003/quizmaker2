@@ -5,5 +5,5 @@
   "syntheticOnly": true,
   "containsPersonalData": false,
   "authorized": "YES_I_UNDERSTAND_NON_PRODUCTION_ONLY",
-  "requestNonce": "2026-09-05T22:40:00Z-latency-admission-fix"
+  "requestNonce": "2026-09-05T22:46:00Z-guarded-attempt-reset"
 }
