@@ -1,0 +1,40 @@
+name: Phase 1 Synthetic Auth Signup Probe
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - '.github/phase1-auth-signup-probe-request.json'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe synthetic signup session issuance
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const req = JSON.parse(fs.readFileSync('.github/phase1-auth-signup-probe-request.json','utf8'));
+          if (req.tenant !== 'evidara-school-acceptance' || req.projectRef !== 'xzfozpnzvznqrvcsoail' || req.syntheticOnly !== true) throw new Error('guard failed');
+          const email = `phase1-signup-probe-${Date.now()}@evidara.invalid`;
+          const res = await fetch('https://xzfozpnzvznqrvcsoail.supabase.co/auth/v1/signup', {
+            method:'POST',
+            headers:{apikey:process.env.SUPABASE_PUBLISHABLE_KEY,'content-type':'application/json'},
+            body:JSON.stringify({email,password:process.env.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD,data:{phase1_acceptance_probe:true}})
+          });
+          const body = await res.json().catch(()=>({}));
+          if (!res.ok) throw new Error(`signup HTTP ${res.status}`);
+          console.log(JSON.stringify({signupHttp:res.status,userCreated:Boolean(body.user?.id),sessionIssued:Boolean(body.access_token),userId:body.user?.id??null,emailDomain:'evidara.invalid',secretRecorded:false}));
+          if (!body.user?.id) process.exit(2);
+          if (!body.access_token) process.exit(3);
+          NODE
