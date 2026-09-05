@@ -59,7 +59,7 @@ async function mapLimit(items, limit, fn) {
 }
 
 async function authenticateActors() {
-  const actors = Array.from({length:ACTORS},(_,i)=>({ actorId:`synthetic-load-student-${String(STUDENT_START+i).padStart(4,'0')}`, email:`load-student-${String(STUDENT_START+i).padStart(4,'0')}@${STUDENT_DOMAIN}` }));
+  const actors = Array.from({length:ACTORS},(_,i)=>({ actorId:`synthetic-load-student-${String(STUDENT_START+i).padStart(4,'0')}`, email:`phase1-load-student-${String(STUDENT_START+i).padStart(4,'0')}@${STUDENT_DOMAIN}` }));
   const sessions = await mapLimit(actors, AUTH_CONCURRENCY, async (actor) => {
     const r = await fetchMeasured(`${ORIGIN}/auth/v1/token?grant_type=password`, { method:'POST', headers:{ apikey:key,'content-type':'application/json' }, body:JSON.stringify({email:actor.email,password}) });
     if (!r.ok) throw new Error(`auth failed for ${actor.actorId}: ${r.status}`);
