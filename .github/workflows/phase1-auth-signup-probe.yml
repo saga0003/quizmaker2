@@ -5,6 +5,7 @@ on:
     branches: [phase1-hardening]
     paths:
       - '.github/phase1-auth-signup-probe-request.json'
+      - '.github/workflows/phase1-auth-signup-probe.yml'
 
 permissions:
   contents: read
