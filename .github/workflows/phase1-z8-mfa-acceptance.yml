@@ -13,7 +13,7 @@ permissions:
 env:
   SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
   SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
-  EXPECTED_SYNTHETIC_ADMIN_ID: 73beac3b-7461-44ea-a7ff-056a13a30574
+  EXPECTED_SYNTHETIC_ADMIN_EMAIL: phase1-z8-admin@evidara.invalid
   EXPECTED_TENANT: evidara-school-acceptance
 
 jobs:
@@ -21,8 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL }}
-      EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,7 +29,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Verify real synthetic-admin TOTP AAL2 path
+      - name: Verify real dedicated synthetic-admin TOTP AAL2 path
         shell: bash
         run: |
           node <<'NODE'
@@ -39,10 +38,10 @@ jobs:
 
           const url = process.env.SUPABASE_URL;
           const key = process.env.SUPABASE_PUBLISHABLE_KEY;
-          const email = process.env.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_EMAIL;
-          const password = process.env.EVIDARA_ACCEPTANCE_SCHOOL_ADMIN_PASSWORD;
-          const expectedId = process.env.EXPECTED_SYNTHETIC_ADMIN_ID;
+          const email = process.env.EXPECTED_SYNTHETIC_ADMIN_EMAIL;
+          const password = process.env.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD;
           if (!url || !key || !email || !password) throw new Error('required acceptance auth configuration missing');
+          if (email !== 'phase1-z8-admin@evidara.invalid') throw new Error('dedicated synthetic identity guard failed');
 
           function base32Decode(input) {
             const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -69,14 +68,25 @@ jobs:
           (async () => {
             const supabase = createClient(url, key, { auth: { persistSession:false, autoRefreshToken:false } });
             let enrolledId = null;
+            let cleanupError = null;
             try {
-              const signIn = await supabase.auth.signInWithPassword({ email, password });
-              if (signIn.error) throw signIn.error;
-              if (signIn.data.user?.id !== expectedId) throw new Error('acceptance admin identity guard failed');
+              let auth = await supabase.auth.signInWithPassword({ email, password });
+              if (auth.error) {
+                const signup = await supabase.auth.signUp({ email, password });
+                if (signup.error) throw signup.error;
+                if (!signup.data.session) throw new Error('dedicated synthetic signup did not issue a session');
+                auth = { data: signup.data, error: null };
+              }
+              if (auth.data.user?.email !== email || !auth.data.user?.id) throw new Error('dedicated synthetic identity guard failed');
+              console.log(JSON.stringify({ syntheticBootstrapUserId: auth.data.user.id, syntheticEmailGuard:true }));
 
               const before = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
               if (before.error) throw before.error;
-              if (before.data.currentLevel !== 'aal1') throw new Error(`expected fresh privileged session at aal1, got ${before.data.currentLevel}`);
+              if (before.data.currentLevel !== 'aal1') throw new Error(`expected dedicated synthetic session at aal1, got ${before.data.currentLevel}`);
+
+              const deniedAtAal1 = await supabase.rpc('is_evidara_school_manager', { p_organization_id:null });
+              if (deniedAtAal1.error) throw deniedAtAal1.error;
+              if (deniedAtAal1.data !== false) throw new Error('privileged manager helper was not denied at aal1');
 
               const enroll = await supabase.auth.mfa.enroll({ factorType:'totp', friendlyName:`Phase1 Z8 acceptance ${Date.now()}` });
               if (enroll.error) throw enroll.error;
@@ -97,20 +107,22 @@ jobs:
 
               console.log(JSON.stringify({
                 tenant:process.env.EXPECTED_TENANT,
-                syntheticAdminGuard:true,
+                dedicatedSyntheticAdminGuard:true,
                 initialAal:'aal1',
+                privilegedManagerDeniedAtAal1:true,
                 totpChallengeVerified:true,
                 elevatedAal:'aal2',
                 privilegedManagerAcceptedAtAal2:true,
                 secretsIncluded:false,
-                productionUserDataTouched:false
+                nonSyntheticUserDataTouched:false
               }));
             } finally {
               if (enrolledId) {
                 const rm = await supabase.auth.mfa.unenroll({ factorId: enrolledId });
-                if (rm.error) console.error('temporary factor cleanup failed without exposing secrets:', rm.error.message);
+                if (rm.error) cleanupError = rm.error;
               }
               await supabase.auth.signOut().catch(()=>{});
+              if (cleanupError) throw new Error(`temporary factor cleanup failed: ${cleanupError.message}`);
             }
           })().catch((e)=>{ console.error(e instanceof Error ? e.message : String(e)); process.exit(1); });
           NODE
