@@ -1,0 +1,2 @@
+L5 500 concurrent answer-save patterns.
+Verified 6 Sep 2026 using only isolated synthetic `evidara-school-acceptance`: 500 distinct authenticated sessions completed 500/500 canonical `save_exam_response` operations with 0 failures; p95 266.64 ms and p99 617.41 ms passed unchanged L5 budgets. Authoritative read-back matched all 500 responses, including changed-answer retry probes. `PHASE1_L456_LOAD_EVIDENCE.json`; workload run `33996734208`; pre-record complete gate `33996734171` passed. Permanent production remained protected.
