@@ -147,8 +147,7 @@ async function main() {
     await login(page, origin, email, password, mfaState);
     await page.goto(`${origin}/?view=school-analytics-overview`, { waitUntil: 'networkidle', timeout: 45000 });
     await satisfyMfaIfRequired(page, mfaState);
-    const body = await page.locator('body').innerText();
-    if (!body.includes('NEET') || !body.includes('programme')) throw new Error('R15 School Admin analytics overview not ready');
+    if (!await waitForExactVisible(page, HIERARCHY[0], 30000)) throw new Error('R15 School Admin analytics hierarchy did not render NEET');
     baseline = true;
 
     await openHierarchyRow(page, HIERARCHY[0], HIERARCHY[1]);
