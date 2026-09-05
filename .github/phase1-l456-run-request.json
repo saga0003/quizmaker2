@@ -1,7 +1,7 @@
 {
   "tenant": "evidara-school-acceptance",
   "supabaseProjectRef": "xzfozpnzvznqrvcsoail",
-  "candidateSha": "16c16431ae8e6d64bd3e05ca7ea7648daeb044bc",
+  "candidateSha": "125f28c1f7cd527d9312c8f225b559e5db65a03a",
   "syntheticOnly": true,
   "containsPersonalData": false,
   "authorized": "YES_I_UNDERSTAND_NON_PRODUCTION_ONLY"
