@@ -55,7 +55,16 @@ jobs:
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Execute real R15 workbook export acceptance
-        run: node scripts/phase1-r15-export-acceptance.mjs
+        shell: bash
+        run: |
+          set +e
+          node scripts/phase1-r15-export-acceptance.mjs
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "--- R15 failure evidence ---"
+            cat acceptance-evidence/r15-export/r15-failure.json 2>/dev/null || true
+            exit "$status"
+          fi
       - name: Upload R15 evidence
         if: always()
         uses: actions/upload-artifact@v4
