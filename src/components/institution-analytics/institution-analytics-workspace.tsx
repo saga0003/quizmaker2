@@ -41,6 +41,8 @@ import {
   exportInstitutionSchoolResultsCsv,
 } from '@/lib/institutionReportPdf';
 import { useAppStore } from '@/store/use-app-store';
+import { exportInstitutionAnalyticsWorkbook } from '@/lib/institutionExcelExport';
+import type { AnalyticsV12Payload } from '@/types/analytics-v12';
 import { AnalyticsV12Workspace } from '@/components/analytics-v12/student-analytics-v12';
 import type {
   InstitutionAnalyticsActor,
@@ -48,7 +50,10 @@ import type {
   InstitutionAnalyticsPayload,
   InstitutionChapterRow,
   InstitutionClassRow,
+  InstitutionGradeRow,
+  InstitutionProgrammeRow,
   InstitutionSchoolRow,
+  InstitutionSectionRow,
   InstitutionStudentRow,
   InstitutionSubjectRow,
   InstitutionTopicRow,
@@ -60,6 +65,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { InstitutionMobileCards } from '@/components/institution-analytics/institution-mobile-cards';
 import './institution-analytics.css';
 
 const TEAL = 'var(--teal)';
@@ -75,9 +81,12 @@ type TrailItem = {
   level: InstitutionAnalyticsLevel;
   label: string;
   organizationId?: string | null;
+  programme?: string | null;
+  grade?: number | null;
   sectionId?: string | null;
   subjectId?: string | null;
   chapterId?: string | null;
+  topicId?: string | null;
   studentId?: string | null;
 };
 
@@ -91,6 +100,15 @@ function number(value: number | null | undefined) {
 
 function shortDate(value: string | null | undefined) {
   return value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+}
+
+function evidenceTime(value: number | null | undefined) {
+  if (value == null) return '—';
+  const seconds = Math.max(0, Math.round(value));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
 }
 
 function metricTone(value: number | null | undefined) {
@@ -137,12 +155,12 @@ function ScoreDistribution({ rows, title = 'Student score distribution' }: { row
 }
 
 function SubjectDonut({ subject, onClick }: { subject: InstitutionSubjectRow; onClick: () => void }) {
-  const score = Math.max(0, Math.min(100, subject.averagePercentage || 0));
+  const score = subject.averagePercentage == null ? null : Math.max(0, Math.min(100, subject.averagePercentage));
   return <button type="button" className="institution-subject-card" onClick={onClick}>
     <div className="institution-subject-donut">
-      <ResponsiveContainer width="100%" height="100%">
+      {score == null ? <span className="text-xs font-semibold text-[var(--muted-foreground)]">Not assessed</span> : <ResponsiveContainer width="100%" height="100%">
         <PieChart><Pie data={[{ value: score }, { value: 100 - score }]} dataKey="value" innerRadius={34} outerRadius={47} startAngle={90} endAngle={-270} stroke="none"><Cell fill={metricTone(score)} /><Cell fill="var(--line)" /></Pie></PieChart>
-      </ResponsiveContainer>
+      </ResponsiveContainer>}
       <strong>{percentage(score)}</strong>
     </div>
     <div><h3>{subject.name}</h3><p>{subject.studentCount} students · {subject.responseCount} responses</p><span>Highest {percentage(subject.highestPercentage)} · Lowest {percentage(subject.lowestPercentage)}</span></div>
@@ -165,6 +183,9 @@ function blankPayload(mode: 'platform' | 'school', level: InstitutionAnalyticsLe
     actor,
     generatedAt: new Date().toISOString(),
     schools: [],
+    programmes: [],
+    grades: [],
+    sections: [],
     classes: [],
     students: [],
     subjects: [],
@@ -191,9 +212,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [programme, setProgramme] = useState<string | null>(null);
+  const [grade, setGrade] = useState<number | null>(null);
   const [sectionId, setSectionId] = useState<string | null>(null);
   const [subjectId, setSubjectId] = useState<string | null>(null);
   const [chapterId, setChapterId] = useState<string | null>(null);
+  const [topicId, setTopicId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [trail, setTrail] = useState<TrailItem[]>([{ level: initialLevel, label: mode === 'platform' ? 'All schools' : 'My school' }]);
   const [search, setSearch] = useState('');
@@ -201,12 +225,16 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   const [sort, setSort] = useState<SortState>({ key: mode === 'platform' ? 'rank' : 'grade', direction: 'asc' });
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [bulkDownloading, setBulkDownloading] = useState<'pdf' | 'csv' | null>(null);
+  const [excelDownloading, setExcelDownloading] = useState(false);
 
   const load = useCallback(async (nextLevel: InstitutionAnalyticsLevel, params?: Partial<TrailItem>) => {
     const nextOrganizationId = params?.organizationId ?? organizationId;
+    const nextProgramme = params?.programme ?? programme;
+    const nextGrade = params?.grade ?? grade;
     const nextSectionId = params?.sectionId ?? sectionId;
     const nextSubjectId = params?.subjectId ?? subjectId;
     const nextChapterId = params?.chapterId ?? chapterId;
+    const nextTopicId = params?.topicId ?? topicId;
     const nextStudentId = params?.studentId ?? studentId;
     setLoading(true);
     setError('');
@@ -217,9 +245,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
       if (!token) throw new Error('Your Evidara session has expired. Sign in again.');
       const query = new URLSearchParams({ level: nextLevel });
       if (nextOrganizationId) query.set('organizationId', nextOrganizationId);
+      if (nextProgramme) query.set('programme', nextProgramme);
+      if (nextGrade != null) query.set('grade', String(nextGrade));
       if (nextSectionId) query.set('sectionId', nextSectionId);
       if (nextSubjectId) query.set('subjectId', nextSubjectId);
       if (nextChapterId) query.set('chapterId', nextChapterId);
+      if (nextTopicId) query.set('topicId', nextTopicId);
       if (nextStudentId) query.set('studentId', nextStudentId);
       const response = await fetch(`/api/institution-analytics?${query.toString()}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
       const result = await response.json() as InstitutionAnalyticsPayload & { error?: string };
@@ -227,9 +258,12 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
       setPayload(result);
       setLevel(nextLevel);
       setOrganizationId(result.school?.id || nextOrganizationId || null);
-      setSectionId(result.class?.id || nextSectionId || null);
+      setProgramme(result.programme?.id || nextProgramme || null);
+      setGrade(result.grade?.grade ?? nextGrade ?? null);
+      setSectionId(result.section?.id || result.class?.id || nextSectionId || null);
       setSubjectId(result.subject?.id || nextSubjectId || null);
       setChapterId(result.chapter?.id || nextChapterId || null);
+      setTopicId(result.topic?.id || nextTopicId || null);
       setStudentId(result.studentDetail?.student.id || nextStudentId || null);
       setSelectedStudents(new Set());
       setSearch('');
@@ -242,7 +276,7 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     } finally {
       setLoading(false);
     }
-  }, [chapterId, mode, organizationId, sectionId, studentId, subjectId]);
+  }, [chapterId, grade, mode, organizationId, programme, sectionId, studentId, subjectId, topicId]);
 
   useEffect(() => { void load(initialLevel); }, [initialLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -277,6 +311,10 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     });
     return [...rows].sort((a, b) => compare(a[sort.key as keyof InstitutionSchoolRow], b[sort.key as keyof InstitutionSchoolRow], sort.direction));
   }, [filter, payload.schools, search, sort]);
+
+  const programmes = useMemo(() => [...(payload.programmes || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionProgrammeRow], b[sort.key as keyof InstitutionProgrammeRow], sort.direction)), [payload.programmes, sort]);
+  const grades = useMemo(() => [...(payload.grades || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionGradeRow], b[sort.key as keyof InstitutionGradeRow], sort.direction)), [payload.grades, sort]);
+  const sections = useMemo(() => [...(payload.sections || [])].sort((a, b) => compare(a[sort.key as keyof InstitutionSectionRow], b[sort.key as keyof InstitutionSectionRow], sort.direction)), [payload.sections, sort]);
 
   const classes = useMemo(() => {
     const rows = (payload.classes || []).filter((row) => {
@@ -318,6 +356,43 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     exportInstitutionResultsCsv({ schoolName: payload.school?.name || 'Evidara School', classRow: payload.class, students: chosen });
   }
 
+  async function downloadExcel() {
+    const chosen = selectedStudents.size ? (payload.students || []).filter((row) => selectedStudents.has(row.id)) : students;
+    if (!chosen.length || !(payload.section || payload.class) || excelDownloading) return;
+    if (!supabase) { setError('Supabase is not configured on this device.'); return; }
+    setExcelDownloading(true);
+    setError('');
+    try {
+      const analytics: AnalyticsV12Payload[] = [];
+      const client = supabase;
+      const batchSize = 5;
+      for (let offset = 0; offset < chosen.length; offset += batchSize) {
+        const batch = chosen.slice(offset, offset + batchSize);
+        const results = await Promise.all(batch.map(async (student) => {
+          const { data, error: analyticsError } = await client.rpc('get_student_analytics_v12', {
+            p_student_id: student.id,
+            p_product_id: null,
+            p_date_from: null,
+            p_date_to: null,
+          });
+          if (analyticsError) throw new Error(`${student.name}: ${analyticsError.message}`);
+          return data as AnalyticsV12Payload;
+        }));
+        analytics.push(...results);
+      }
+      await exportInstitutionAnalyticsWorkbook({
+        schoolName: payload.school?.name || 'Evidara School',
+        classRow: (payload.section || payload.class)!,
+        students: chosen,
+        analytics,
+      });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to create the Excel analytics workbook.');
+    } finally {
+      setExcelDownloading(false);
+    }
+  }
+
   async function downloadSchoolResults(kind: 'pdf' | 'csv') {
     if (!classes.length || bulkDownloading) return;
     setBulkDownloading(kind);
@@ -350,17 +425,20 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
   }
 
   const title = level === 'schools' ? 'School performance analytics'
-    : level === 'school' ? `${payload.school?.name || 'School'} analytics`
-      : level === 'class' ? `${payload.class?.name || 'Class'} performance`
-        : level === 'subject' ? `${payload.subject?.name || 'Subject'} chapter analysis`
-          : level === 'chapter' ? `${payload.chapter?.name || 'Chapter'} topic analysis`
-            : `${payload.studentDetail?.student.name || 'Student'} performance`;
+    : level === 'school' ? `${payload.school?.name || 'School'} programmes`
+      : level === 'programme' ? `${payload.programme?.name || 'Programme'} grades`
+        : level === 'grade' ? `${payload.grade?.name || 'Grade'} sections`
+          : level === 'section' || level === 'class' ? `${payload.section?.name || payload.class?.name || 'Section'} performance`
+            : level === 'subject' ? `${payload.subject?.name || 'Subject'} chapter analysis`
+              : level === 'chapter' ? `${payload.chapter?.name || 'Chapter'} topic analysis`
+                : level === 'topic' ? `${payload.topic?.name || 'Topic'} student evidence`
+                  : `${payload.studentDetail?.student.name || 'Student'} performance`;
 
   return <div className="institution-analytics">
     <header className="institution-page-header">
       <div className="institution-title-row">
         {trail.length > 1 && <Button variant="outline" size="icon" onClick={goBack} aria-label="Go back"><ArrowLeft /></Button>}
-        <div><span className="institution-kicker">{mode === 'platform' ? 'Evidara intelligence' : user?.accessRole === 'school_teacher' ? 'Assigned class intelligence' : 'School intelligence'}</span><h1>{title}</h1><p>Drill down from institution to class, subject, chapter, topic and individual student evidence.</p></div>
+        <div><span className="institution-kicker">{mode === 'platform' ? 'Evidara intelligence' : user?.accessRole === 'school_teacher' ? 'Assigned class intelligence' : 'School intelligence'}</span><h1>{title}</h1><p>Drill down from school to programme, grade, section, subject, chapter, topic and individual student evidence.</p></div>
       </div>
       <div className="institution-breadcrumbs">{trail.map((item, index) => <button type="button" key={`${item.level}-${index}`} onClick={() => goTrail(item, index)} className={index === trail.length - 1 ? 'active' : ''}>{item.label}{index < trail.length - 1 && <ChevronRight />}</button>)}</div>
     </header>
@@ -370,10 +448,13 @@ export function InstitutionAnalyticsWorkspace({ mode }: { mode: 'platform' | 'sc
     {loading && <div className="institution-loading"><LoaderCircle /><span>Calculating analytics…</span></div>}
 
     {!loading && level === 'schools' && <SchoolsView rows={schools} allRows={payload.schools || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} onOpen={(school) => navigate('school', school.name, { organizationId: school.id })} />}
-    {!loading && level === 'school' && <ClassesView rows={classes} allRows={payload.classes || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} onOpen={(row) => navigate('class', row.name, { organizationId: payload.school?.id, sectionId: row.id })} bulkDownloading={bulkDownloading} onDownloadPdf={() => void downloadSchoolResults('pdf')} onDownloadCsv={() => void downloadSchoolResults('csv')} />}
-    {!loading && level === 'class' && payload.class && <ClassView classRow={payload.class} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} />}
-    {!loading && level === 'subject' && payload.subject && <SubjectView subject={payload.subject} chapters={payload.chapters || []} bands={payload.scoreBands || []} onChapter={(row) => navigate('chapter', row.name, { organizationId: payload.school?.id, sectionId: payload.class?.id, subjectId: payload.subject?.id, chapterId: row.id })} />}
-    {!loading && level === 'chapter' && payload.chapter && <ChapterView chapter={payload.chapter} topics={payload.topics || []} bands={payload.scoreBands || []} />}
+    {!loading && level === 'school' && <HierarchyScopeView title="Programmes" rows={programmes} empty="No active programmes are assigned to students in this school." onOpen={(row) => navigate('programme', row.name, { organizationId: payload.school?.id, programme: row.id })} />}
+    {!loading && level === 'programme' && <HierarchyScopeView title="Grades" rows={grades} empty="No active grades are assigned to this programme." onOpen={(row) => navigate('grade', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: row.grade })} />}
+    {!loading && level === 'grade' && <HierarchyScopeView title="Sections" rows={sections} empty="No active sections are assigned to this grade and programme." onOpen={(row) => navigate('section', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id, grade: payload.grade?.grade, sectionId: row.id })} />}
+    {!loading && (level === 'section' || level === 'class') && (payload.section || payload.class) && <ClassView classRow={payload.section || payload.class!} students={students} allStudents={payload.students || []} subjects={payload.subjects || []} bands={payload.scoreBands || []} search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} sort={sort} onSort={updateSort} selected={selectedStudents} setSelected={setSelectedStudents} allVisibleSelected={allVisibleSelected} toggleAll={toggleAllStudents} onSubject={(row) => navigate('subject', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, subjectId: row.id })} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme: payload.programme?.id || programme, grade: payload.section?.grade || grade, sectionId: payload.section?.id || payload.class?.id, studentId: row.id })} onDownloadReports={downloadReportCards} onDownloadCsv={downloadCsv} onDownloadExcel={downloadExcel} excelDownloading={excelDownloading} />}
+    {!loading && level === 'subject' && payload.subject && <SubjectView subject={payload.subject} chapters={payload.chapters || []} bands={payload.scoreBands || []} onChapter={(row) => navigate('chapter', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: row.id })} />}
+    {!loading && level === 'chapter' && payload.chapter && <ChapterView chapter={payload.chapter} topics={payload.topics || []} bands={payload.scoreBands || []} onTopic={(row) => navigate('topic', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId: payload.subject?.id, chapterId: payload.chapter?.id, topicId: row.id } as Partial<TrailItem>)} />}
+    {!loading && level === 'topic' && payload.topic && <TopicView topic={payload.topic} students={students} onStudent={(row) => navigate('student', row.name, { organizationId: payload.school?.id, programme, grade, sectionId: payload.section?.id || payload.class?.id, subjectId, chapterId, studentId: row.id })} />}
     {!loading && level === 'student' && payload.studentDetail && <StudentView detail={payload.studentDetail} />}
   </div>;
 }
@@ -386,10 +467,19 @@ function SchoolsView({ rows, allRows, search, setSearch, filter, setFilter, sort
   const weightedAverage = assessedStudents ? allRows.reduce((sum, row) => sum + (row.averagePercentage || 0) * row.totalStudents, 0) / assessedStudents : null;
   const boards = [...new Set(allRows.map((row) => row.board).filter(Boolean))] as string[];
   return <>
-    <div className="institution-stat-grid"><StatCard icon={School} label="Schools" value={allRows.length} note="Ranked by average performance" /><StatCard icon={Users} label="Total students" value={totalStudents.toLocaleString('en-IN')} note={`${allRows.reduce((sum, row) => sum + row.totalClasses, 0)} classes`} tone={BLUE} /><StatCard icon={BookOpenCheck} label="Submitted tests" value={totalTests.toLocaleString('en-IN')} note={`${number(totalStudents ? totalTests / totalStudents : 0)} per student`} tone={AMBER} /><StatCard icon={Trophy} label="Best performing school" value={best?.name || '—'} note={best ? `${percentage(best.averagePercentage)} average` : 'Awaiting evidence'} tone={GREEN} /><StatCard icon={BarChart3} label="Network average" value={percentage(weightedAverage)} note="Weighted by student strength" tone={TEAL} /></div>
+    <div className="institution-stat-grid"><StatCard icon={School} label="Schools" value={allRows.length} note="Ranked by average performance" /><StatCard icon={Users} label="Total students" value={totalStudents.toLocaleString('en-IN')} note={`${allRows.reduce((sum, row) => sum + row.totalClasses, 0)} classes`} tone={BLUE} /><StatCard icon={BookOpenCheck} label="Submitted tests" value={totalTests.toLocaleString('en-IN')} note={`${number(totalStudents ? totalTests / totalStudents : null)} per student`} tone={AMBER} /><StatCard icon={Trophy} label="Best performing school" value={best?.name || '—'} note={best ? `${percentage(best.averagePercentage)} average` : 'Awaiting evidence'} tone={GREEN} /><StatCard icon={BarChart3} label="Network average" value={percentage(weightedAverage)} note="Weighted by student strength" tone={TEAL} /></div>
     <DataToolbar search={search} setSearch={setSearch} placeholder="Search school, city, board or state" filter={filter} setFilter={setFilter} options={boards.map((board) => ({ value: board, label: board }))} filterLabel="All boards" count={rows.length} />
-    <Card className="institution-table-card"><Table className="min-w-[1180px]"><TableHeader><TableRow><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="School" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} /><SortHeader label="Students" sortKey="totalStudents" sort={sort} onSort={onSort} /><SortHeader label="Classes" sortKey="totalClasses" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Tests / student" sortKey="averageTestsPerStudent" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Participation" sortKey="participation" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} onClick={() => onOpen(row)} className="institution-clickable-row"><TableCell><span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span></TableCell><TableCell><strong>{row.name}</strong><small>{row.city}, {row.state} · {row.board}</small></TableCell><TableCell><Badge variant={row.status === 'active' ? 'default' : 'outline'}>{row.status || 'pending'}</Badge></TableCell><TableCell>{row.totalStudents}</TableCell><TableCell>{row.totalClasses}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{number(row.averageTestsPerStudent)}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={12}><InstitutionEmptyState title="No live schools found" copy="Create or activate a school organization to begin platform analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
+    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, subtitle: `${row.city || 'Location pending'} · ${row.board || 'Board pending'}`, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.totalStudents }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage="No live schools found." />
+    <Card className="institution-table-card hidden md:block"><Table className="min-w-[1180px]"><TableHeader><TableRow><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="School" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Status" sortKey="status" sort={sort} onSort={onSort} /><SortHeader label="Students" sortKey="totalStudents" sort={sort} onSort={onSort} /><SortHeader label="Classes" sortKey="totalClasses" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Tests / student" sortKey="averageTestsPerStudent" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Participation" sortKey="participation" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} onClick={() => onOpen(row)} className="institution-clickable-row"><TableCell><span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span></TableCell><TableCell><strong>{row.name}</strong><small>{row.city}, {row.state} · {row.board}</small></TableCell><TableCell><Badge variant={row.status === 'active' ? 'default' : 'outline'}>{row.status || 'pending'}</Badge></TableCell><TableCell>{row.totalStudents}</TableCell><TableCell>{row.totalClasses}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{number(row.averageTestsPerStudent)}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={12}><InstitutionEmptyState title="No live schools found" copy="Create or activate a school organization to begin platform analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
   </>;
+}
+
+function HierarchyScopeView<T extends InstitutionProgrammeRow | InstitutionGradeRow | InstitutionSectionRow>({ title, rows, empty, onOpen }: { title: string; rows: T[]; empty: string; onOpen: (row: T) => void }) {
+  return <section className="institution-section">
+    <div className="institution-section-heading"><div><h2>{title}</h2><p>Open a row to continue through the institution hierarchy using live roster and submitted assessment evidence.</p></div><Badge variant="outline">{rows.length} records</Badge></div>
+    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.studentCount }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage={empty} />
+    <Card className="institution-table-card hidden md:block"><Table className="min-w-[960px]"><TableHeader><TableRow><TableHead>Rank</TableHead><TableHead>{title.slice(0, -1)}</TableHead><TableHead>Students</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead>Participation</TableHead><TableHead>Last test</TableHead><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} className="institution-clickable-row" onClick={() => onOpen(row)}><TableCell>{row.rank}</TableCell><TableCell><strong>{row.name}</strong></TableCell><TableCell>{row.studentCount}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={9}><InstitutionEmptyState title={`No ${title.toLowerCase()} found`} copy={empty} /></TableCell></TableRow>}</TableBody></Table></Card>
+  </section>;
 }
 
 function ClassesView({ rows, allRows, search, setSearch, filter, setFilter, sort, onSort, onOpen, bulkDownloading, onDownloadPdf, onDownloadCsv }: { rows: InstitutionClassRow[]; allRows: InstitutionClassRow[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; onOpen: (row: InstitutionClassRow) => void; bulkDownloading: 'pdf' | 'csv' | null; onDownloadPdf: () => void; onDownloadCsv: () => void }) {
@@ -398,19 +488,33 @@ function ClassesView({ rows, allRows, search, setSearch, filter, setFilter, sort
     <div className="institution-stat-grid"><StatCard icon={GraduationCap} label="Classes" value={allRows.length} /><StatCard icon={Users} label="Students" value={allRows.reduce((sum, row) => sum + row.studentCount, 0)} tone={BLUE} /><StatCard icon={BookOpenCheck} label="Submitted tests" value={allRows.reduce((sum, row) => sum + row.completedTests, 0)} tone={AMBER} /><StatCard icon={Trophy} label="Best class" value={allRows.find((row) => row.averagePercentage !== null)?.name || 'Awaiting results'} note={percentage(allRows.find((row) => row.averagePercentage !== null)?.averagePercentage)} tone={GREEN} /></div>
     <DataToolbar search={search} setSearch={setSearch} placeholder="Search grade, section or code" filter={filter} setFilter={setFilter} options={grades.map((grade) => ({ value: String(grade), label: `Grade ${grade}` }))} filterLabel="All grades" count={rows.length} />
     <div className="institution-download-row"><span>Downloads use the current grade and search filters.</span><Button variant="outline" onClick={onDownloadCsv} disabled={!rows.length || Boolean(bulkDownloading)}>{bulkDownloading === 'csv' ? <LoaderCircle className="institution-button-spinner" /> : <FileDown />}Filtered school CSV</Button><Button onClick={onDownloadPdf} disabled={!rows.length || Boolean(bulkDownloading)}>{bulkDownloading === 'pdf' ? <LoaderCircle className="institution-button-spinner" /> : <Download />}Filtered report cards</Button></div>
-    <Card className="institution-table-card"><Table className="min-w-[1120px]"><TableHeader><TableRow><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="Class" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Students" sortKey="studentCount" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Tests / student" sortKey="averageTestsPerStudent" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Participation" sortKey="participation" sort={sort} onSort={onSort} /><SortHeader label="Highest" sortKey="highestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Lowest" sortKey="lowestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} onClick={() => onOpen(row)} className="institution-clickable-row"><TableCell><span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span></TableCell><TableCell><strong>{row.name}</strong><small>{row.academicYear} · {row.code || 'No class code'}</small></TableCell><TableCell>{row.studentCount}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{number(row.averageTestsPerStudent)}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{percentage(row.highestPercentage)}</TableCell><TableCell>{percentage(row.lowestPercentage)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={12}><InstitutionEmptyState title="No classes found" copy="Create an academic section and attach active students to it." /></TableCell></TableRow>}</TableBody></Table></Card>
+    <InstitutionMobileCards rows={rows.map((row) => ({ id: row.id, title: row.name, subtitle: `${row.academicYear} · ${row.code || 'No class code'}`, badge: `#${row.rank}`, metrics: [{ label: 'Students', value: row.studentCount }, { label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Participation', value: percentage(row.participation) }], onOpen: () => onOpen(row) }))} emptyMessage="No classes found." />
+    <Card className="institution-table-card hidden md:block"><Table className="min-w-[1120px]"><TableHeader><TableRow><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="Class" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Students" sortKey="studentCount" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Tests / student" sortKey="averageTestsPerStudent" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Participation" sortKey="participation" sort={sort} onSort={onSort} /><SortHeader label="Highest" sortKey="highestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Lowest" sortKey="lowestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{rows.length ? rows.map((row) => <TableRow key={row.id} onClick={() => onOpen(row)} className="institution-clickable-row"><TableCell><span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span></TableCell><TableCell><strong>{row.name}</strong><small>{row.academicYear} · {row.code || 'No class code'}</small></TableCell><TableCell>{row.studentCount}</TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{number(row.averageTestsPerStudent)}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.participation)}</TableCell><TableCell>{percentage(row.highestPercentage)}</TableCell><TableCell>{percentage(row.lowestPercentage)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={12}><InstitutionEmptyState title="No classes found" copy="Create an academic section and attach active students to it." /></TableCell></TableRow>}</TableBody></Table></Card>
   </>;
 }
 
-function ClassView(props: { classRow: InstitutionClassRow; students: InstitutionStudentRow[]; allStudents: InstitutionStudentRow[]; subjects: InstitutionSubjectRow[]; bands: ScoreBand[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; selected: Set<string>; setSelected: Dispatch<SetStateAction<Set<string>>>; allVisibleSelected: boolean; toggleAll: (checked: boolean) => void; onSubject: (row: InstitutionSubjectRow) => void; onStudent: (row: InstitutionStudentRow) => void; onDownloadReports: () => void; onDownloadCsv: () => void }) {
-  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv } = props;
+function ClassView(props: { classRow: InstitutionClassRow; students: InstitutionStudentRow[]; allStudents: InstitutionStudentRow[]; subjects: InstitutionSubjectRow[]; bands: ScoreBand[]; search: string; setSearch: (value: string) => void; filter: string; setFilter: (value: string) => void; sort: SortState; onSort: (key: string) => void; selected: Set<string>; setSelected: Dispatch<SetStateAction<Set<string>>>; allVisibleSelected: boolean; toggleAll: (checked: boolean) => void; onSubject: (row: InstitutionSubjectRow) => void; onStudent: (row: InstitutionStudentRow) => void; onDownloadReports: () => void; onDownloadCsv: () => void; onDownloadExcel: () => void; excelDownloading: boolean }) {
+  const { classRow, students, allStudents, subjects, bands, search, setSearch, filter, setFilter, sort, onSort, selected, setSelected, allVisibleSelected, toggleAll, onSubject, onStudent, onDownloadReports, onDownloadCsv, onDownloadExcel, excelDownloading } = props;
+  const leaderboard = allStudents
+    .filter((row) => row.averagePercentage !== null)
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 5);
   return <>
     <div className="institution-stat-grid"><StatCard icon={Users} label="Students" value={classRow.studentCount} /><StatCard icon={BookOpenCheck} label="Average tests" value={number(classRow.averageTestsPerStudent)} tone={BLUE} /><StatCard icon={BarChart3} label="Class average" value={percentage(classRow.averagePercentage)} tone={metricTone(classRow.averagePercentage)} /><StatCard icon={Trophy} label="Highest / lowest" value={`${percentage(classRow.highestPercentage)} / ${percentage(classRow.lowestPercentage)}`} tone={AMBER} /><StatCard icon={Check} label="Participation" value={percentage(classRow.participation)} tone={GREEN} /></div>
     <section className="institution-section"><div className="institution-section-heading"><div><h2>Subject overview</h2><p>Click a subject to compare highest, class average and lowest performance across chapters.</p></div></div><div className="institution-subject-grid">{subjects.length ? subjects.map((subject) => <SubjectDonut key={subject.id} subject={subject} onClick={() => onSubject(subject)} />) : <InstitutionEmptyState title="No submitted subject evidence yet" copy="Subject, chapter and topic analysis will populate automatically after this class submits assessments containing taxonomy-linked questions." />}</div></section>
     <div className="institution-two-column"><ScoreDistribution rows={bands} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Class performance range</h3><p>Quick evidence for intervention planning.</p></div></div><div className="institution-range-list"><div><span>Strong performers</span><strong>{allStudents.filter((row) => row.averagePercentage !== null && row.averagePercentage >= 75).length}</strong><small>75% and above</small></div><div><span>Developing</span><strong>{allStudents.filter((row) => row.averagePercentage !== null && row.averagePercentage >= 60 && row.averagePercentage < 75).length}</strong><small>60–74%</small></div><div><span>Needs support</span><strong>{allStudents.filter((row) => row.averagePercentage !== null && row.averagePercentage >= 40 && row.averagePercentage < 60).length}</strong><small>40–59%</small></div><div><span>Urgent intervention</span><strong>{allStudents.filter((row) => row.averagePercentage !== null && row.averagePercentage < 40).length}</strong><small>Below 40%</small></div><div><span>Awaiting evidence</span><strong>{allStudents.filter((row) => row.averagePercentage === null).length}</strong><small>No submitted test</small></div></div></CardContent></Card></div>
-    <section className="institution-section"><div className="institution-section-heading report-heading"><div><h2>Student performance</h2><p>Filter, select specific students, then download report cards or the results sheet.</p></div><div><Button variant="outline" onClick={onDownloadCsv} disabled={!students.length}><FileDown />Download CSV</Button><Button onClick={onDownloadReports} disabled={!selected.size}><Download />Report cards ({selected.size})</Button></div></div>
+    <section className="institution-section institution-leaderboard-section"><div className="institution-section-heading"><div><h2>Class leaderboard</h2><p>Ranked only from submitted assessment percentages. Students without measured evidence are excluded.</p></div><Badge variant="outline">{leaderboard.length} assessed</Badge></div>
+      {leaderboard.length ? <div className="institution-leaderboard">{leaderboard.map((row) => <article key={row.id} className="institution-leaderboard-card">
+        <span className={`institution-rank rank-${Math.min(row.rank, 3)}`}>{row.rank}</span>
+        <div><strong>{row.name}</strong><small>{row.completedTests} submitted test{row.completedTests === 1 ? '' : 's'} · {percentage(row.accuracy)} accuracy</small></div>
+        <b style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</b>
+        <button type="button" onClick={() => onStudent(row)}>Click to Analyse <ChevronRight /></button>
+      </article>)}</div> : <InstitutionEmptyState title="Leaderboard awaiting evidence" copy="Ranks will appear after students submit measured assessments. No synthetic or placeholder scores are used." />}
+    </section>
+    <section className="institution-section"><div className="institution-section-heading report-heading"><div><h2>Student performance</h2><p>Filter, select specific students, then download report cards or the results sheet.</p></div><div><Button variant="outline" onClick={onDownloadExcel} disabled={!students.length || excelDownloading}>{excelDownloading ? <LoaderCircle className="institution-button-spinner" /> : <FileDown />}Download Excel</Button><Button variant="outline" onClick={onDownloadCsv} disabled={!students.length}><FileDown />Download CSV</Button><Button onClick={onDownloadReports} disabled={!selected.size}><Download />Report cards ({selected.size})</Button></div></div>
       <DataToolbar search={search} setSearch={setSearch} placeholder="Search student" filter={filter} setFilter={setFilter} options={[{ value: 'strong', label: 'Strong · 75%+' }, { value: 'developing', label: 'Developing · 60–74%' }, { value: 'support', label: 'Needs support · 40–59%' }, { value: 'critical', label: 'Urgent · below 40%' }, { value: 'no-data', label: 'No evidence' }]} filterLabel="All performance" count={students.length} />
-      <Card className="institution-table-card"><Table className="min-w-[1050px]"><TableHeader><TableRow><TableHead className="institution-check-column"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleAll(checked === true)} aria-label="Select all filtered students" /></TableHead><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Highest" sortKey="highestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Lowest" sortKey="lowestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{students.length ? students.map((row) => <TableRow key={row.id} className={selected.has(row.id) ? 'institution-selected-row' : ''}><TableCell className="institution-check-column" onClick={(event) => event.stopPropagation()}><Checkbox checked={selected.has(row.id)} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); checked ? next.add(row.id) : next.delete(row.id); return next; })} /></TableCell><TableCell>{row.rank}</TableCell><TableCell onClick={() => onStudent(row)} className="institution-student-link"><strong>{row.name}</strong><small>{row.sectionName}</small></TableCell><TableCell>{row.completedTests}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.highestPercentage)}</TableCell><TableCell>{percentage(row.lowestPercentage)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><button type="button" onClick={() => onStudent(row)} className="institution-row-arrow"><ChevronRight /></button></TableCell></TableRow>) : <TableRow><TableCell colSpan={10}><InstitutionEmptyState title="No students in this class" copy="Add active student memberships to this academic section to begin class analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
+      <InstitutionMobileCards rows={students.map((row) => ({ id: row.id, title: row.name, subtitle: row.sectionName, badge: row.rank ? `#${row.rank}` : undefined, metrics: [{ label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Accuracy', value: percentage(row.accuracy) }, { label: 'Last test', value: shortDate(row.lastTestAt) }], onOpen: () => onStudent(row) }))} emptyMessage="No students in this class." />
+      <Card className="institution-table-card hidden md:block"><Table className="min-w-[1050px]"><TableHeader><TableRow><TableHead className="institution-check-column"><Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleAll(checked === true)} aria-label="Select all filtered students" /></TableHead><SortHeader label="Rank" sortKey="rank" sort={sort} onSort={onSort} /><SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} /><SortHeader label="Tests" sortKey="completedTests" sort={sort} onSort={onSort} /><SortHeader label="Average" sortKey="averagePercentage" sort={sort} onSort={onSort} /><SortHeader label="Accuracy" sortKey="accuracy" sort={sort} onSort={onSort} /><SortHeader label="Highest" sortKey="highestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Lowest" sortKey="lowestPercentage" sort={sort} onSort={onSort} /><SortHeader label="Last test" sortKey="lastTestAt" sort={sort} onSort={onSort} /><TableHead className="w-12" /></TableRow></TableHeader><TableBody>{students.length ? students.map((row) => <TableRow key={row.id} className={selected.has(row.id) ? 'institution-selected-row' : ''}><TableCell className="institution-check-column" onClick={(event) => event.stopPropagation()}><Checkbox checked={selected.has(row.id)} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); checked ? next.add(row.id) : next.delete(row.id); return next; })} aria-label={`Select ${row.name}`} /></TableCell><TableCell>{row.rank}</TableCell><TableCell onClick={() => onStudent(row)} className="institution-student-link"><strong>{row.name}</strong><small>{row.sectionName}</small></TableCell><TableCell>{row.completedTests}</TableCell><TableCell><strong style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</strong></TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell>{percentage(row.highestPercentage)}</TableCell><TableCell>{percentage(row.lowestPercentage)}</TableCell><TableCell>{shortDate(row.lastTestAt)}</TableCell><TableCell><button type="button" onClick={() => onStudent(row)} className="institution-analyse-button">Click to Analyse <ChevronRight /></button></TableCell></TableRow>) : <TableRow><TableCell colSpan={10}><InstitutionEmptyState title="No students in this class" copy="Add active student memberships to this academic section to begin class analytics." /></TableCell></TableRow>}</TableBody></Table></Card>
     </section>
   </>;
 }
@@ -419,16 +523,24 @@ function SubjectView({ subject, chapters, bands, onChapter }: { subject: Institu
   const chartRows = chapters.map((row) => ({ name: row.name, highest: row.highestPercentage, average: row.averagePercentage, lowest: row.lowestPercentage }));
   return <><div className="institution-stat-grid"><StatCard icon={Users} label="Students assessed" value={subject.studentCount} /><StatCard icon={BarChart3} label="Subject average" value={percentage(subject.averagePercentage)} tone={metricTone(subject.averagePercentage)} /><StatCard icon={Trophy} label="Highest" value={percentage(subject.highestPercentage)} tone={GREEN} /><StatCard icon={TrendingDown} label="Lowest" value={percentage(subject.lowestPercentage)} tone={RED} /><StatCard icon={BookOpenCheck} label="Responses" value={subject.responseCount} tone={BLUE} /></div>
     <Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Chapter performance spread</h3><p>Highest mark, class average and lowest mark for every chapter.</p></div></div><div className="institution-chart institution-chart-large"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartRows} margin={{ top: 12, right: 12, left: -12, bottom: 55 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" /><XAxis dataKey="name" angle={-28} textAnchor="end" height={75} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><Tooltip formatter={(value) => percentage(Number(value))} /><Legend /><Bar dataKey="average" name="Class average" fill={TEAL} radius={[6, 6, 0, 0]} /><Line type="monotone" dataKey="highest" name="Highest" stroke={GREEN} strokeWidth={2.5} dot={{ r: 4 }} /><Line type="monotone" dataKey="lowest" name="Lowest" stroke={RED} strokeWidth={2.5} dot={{ r: 4 }} /></ComposedChart></ResponsiveContainer></div></CardContent></Card>
-    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${subject.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Chapter table</h3><p>Click a chapter for topic-level evidence.</p></div></div><div className="institution-compact-list">{chapters.map((row) => <button key={row.id} type="button" onClick={() => onChapter(row)}><span><strong>{row.name}</strong><small>{row.responseCount} responses · {row.studentCount} students</small></span><b style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</b><ChevronRight /></button>)}</div></CardContent></Card></div>
+    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${subject.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Chapter table</h3><p>Click a chapter for topic-level evidence.</p></div></div><div className="institution-compact-list">{chapters.map((row) => <button key={row.id} type="button" onClick={() => onChapter(row)}><span><strong>{row.name}</strong><small>{row.responseCount} responses · {row.studentCount} students · Accuracy {percentage(row.accuracy)} · Avg time {evidenceTime(row.averageSeconds)}</small></span><b style={{ color: metricTone(row.averagePercentage) }}>{percentage(row.averagePercentage)}</b><ChevronRight /></button>)}</div></CardContent></Card></div>
   </>;
 }
 
-function ChapterView({ chapter, topics, bands }: { chapter: InstitutionChapterRow; topics: InstitutionTopicRow[]; bands: ScoreBand[] }) {
+function ChapterView({ chapter, topics, bands, onTopic }: { chapter: InstitutionChapterRow; topics: InstitutionTopicRow[]; bands: ScoreBand[]; onTopic: (row: InstitutionTopicRow) => void }) {
   const chartRows = topics.map((row) => ({ name: row.name, highest: row.highestPercentage, average: row.averagePercentage, lowest: row.lowestPercentage, students: row.studentCount }));
   return <><div className="institution-stat-grid"><StatCard icon={Users} label="Students assessed" value={chapter.studentCount} /><StatCard icon={BarChart3} label="Chapter average" value={percentage(chapter.averagePercentage)} tone={metricTone(chapter.averagePercentage)} /><StatCard icon={Trophy} label="Highest" value={percentage(chapter.highestPercentage)} tone={GREEN} /><StatCard icon={TrendingDown} label="Lowest" value={percentage(chapter.lowestPercentage)} tone={RED} /><StatCard icon={BookOpenCheck} label="Responses" value={chapter.responseCount} tone={BLUE} /></div>
     <Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic performance</h3><p>Identify whether a weak result is isolated to a few students or affects the whole class.</p></div></div><div className="institution-chart institution-chart-large"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartRows} margin={{ top: 12, right: 12, left: -12, bottom: 55 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" /><XAxis dataKey="name" angle={-24} textAnchor="end" height={75} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }} /><Tooltip formatter={(value) => percentage(Number(value))} /><Legend /><Bar dataKey="average" name="Class average" fill={TEAL} radius={[6, 6, 0, 0]} /><Line type="monotone" dataKey="highest" name="Highest" stroke={GREEN} strokeWidth={2.5} /><Line type="monotone" dataKey="lowest" name="Lowest" stroke={RED} strokeWidth={2.5} /></ComposedChart></ResponsiveContainer></div></CardContent></Card>
-    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${chapter.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic diagnosis</h3><p>Statistical view of class-level strengths and gaps.</p></div></div><div className="institution-topic-diagnosis">{topics.map((row) => <div key={row.id}><div><strong>{row.name}</strong><small>{row.studentCount} students · {row.responseCount} responses</small></div><div className="institution-topic-track"><i style={{ width: `${row.averagePercentage || 0}%`, backgroundColor: metricTone(row.averagePercentage) }} /></div><b>{percentage(row.averagePercentage)}</b><span>{row.scoreBands.filter((band) => band.max <= 40).reduce((sum, band) => sum + band.students, 0)} below 40%</span></div>)}</div></CardContent></Card></div>
+    <div className="institution-two-column"><ScoreDistribution rows={bands} title={`${chapter.name} score distribution`} /><Card className="institution-panel"><CardContent><div className="institution-panel-heading"><div><h3>Topic diagnosis</h3><p>Statistical view of class-level strengths and gaps.</p></div></div><div className="institution-topic-diagnosis">{topics.map((row) => <div key={row.id} role="button" tabIndex={0} onClick={() => onTopic(row)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onTopic(row); }}><div><strong>{row.name}</strong><small>{row.studentCount} students · {row.responseCount} responses · Accuracy {percentage(row.accuracy)} · Avg time {evidenceTime(row.averageSeconds)}</small></div><div className="institution-topic-track">{row.averagePercentage == null ? null : <i style={{ width: `${row.averagePercentage}%`, backgroundColor: metricTone(row.averagePercentage) }} />}</div><b>{percentage(row.averagePercentage)}</b><span>{row.scoreBands.filter((band) => band.max <= 40).reduce((sum, band) => sum + band.students, 0)} below 40%</span></div>)}</div></CardContent></Card></div>
   </>;
+}
+
+function TopicView({ topic, students, onStudent }: { topic: InstitutionTopicRow; students: InstitutionStudentRow[]; onStudent: (row: InstitutionStudentRow) => void }) {
+  return <section className="institution-section"><div className="institution-stat-grid"><StatCard icon={Users} label="Students assessed" value={topic.studentCount} /><StatCard icon={BarChart3} label="Topic average" value={percentage(topic.averagePercentage)} tone={metricTone(topic.averagePercentage)} /><StatCard icon={BookOpenCheck} label="Responses" value={topic.responseCount} tone={BLUE} /></div>
+    <div className="institution-section-heading"><div><h2>Students</h2><p>Continue to an individual student to inspect their authorised evidence in the selected section context.</p></div></div>
+    <InstitutionMobileCards rows={students.map((row) => ({ id: row.id, title: row.name, subtitle: row.sectionName, metrics: [{ label: 'Tests', value: row.completedTests }, { label: 'Average', value: percentage(row.averagePercentage) }, { label: 'Accuracy', value: percentage(row.accuracy) }], onOpen: () => onStudent(row) }))} emptyMessage="No students in scope." />
+    <Card className="institution-table-card hidden md:block"><Table><TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Tests</TableHead><TableHead>Average</TableHead><TableHead>Accuracy</TableHead><TableHead /></TableRow></TableHeader><TableBody>{students.length ? students.map((row) => <TableRow key={row.id} className="institution-clickable-row" onClick={() => onStudent(row)}><TableCell><strong>{row.name}</strong><small>{row.sectionName}</small></TableCell><TableCell>{row.completedTests}</TableCell><TableCell>{percentage(row.averagePercentage)}</TableCell><TableCell>{percentage(row.accuracy)}</TableCell><TableCell><ChevronRight /></TableCell></TableRow>) : <TableRow><TableCell colSpan={5}><InstitutionEmptyState title="No students in scope" copy="The selected topic has no student roster available in this section." /></TableCell></TableRow>}</TableBody></Table></Card>
+  </section>;
 }
 
 function StudentView({ detail }: { detail: NonNullable<InstitutionAnalyticsPayload['studentDetail']> }) {
@@ -439,5 +551,5 @@ function StudentView({ detail }: { detail: NonNullable<InstitutionAnalyticsPaylo
 }
 
 function DataToolbar({ search, setSearch, placeholder, filter, setFilter, options, filterLabel, count }: { search: string; setSearch: (value: string) => void; placeholder: string; filter: string; setFilter: (value: string) => void; options: Array<{ value: string; label: string }>; filterLabel: string; count: number }) {
-  return <div className="institution-toolbar"><div className="institution-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} /></div><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">{filterLabel}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span>{count} matching record{count === 1 ? '' : 's'}</span></div>;
+  return <div className="institution-toolbar"><div className="institution-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} aria-label={placeholder} /></div><select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label={filterLabel}><option value="all">{filterLabel}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span>{count} matching record{count === 1 ? '' : 's'}</span></div>;
 }

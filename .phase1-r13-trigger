@@ -1,0 +1,5 @@
+R13 guarded rendered analytics acceptance
+Synthetic tenant: evidara-school-acceptance
+Release mode transition was performed externally through the connected Supabase project with exact org/paper/title/previous-mode guards.
+Triggered: 2026-09-04 13:02 IST
+Expected post-run orchestration: inspect rendered evidence, then externally restore this exact synthetic paper to score_only regardless of result.

@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { defaultViewForRole, useAppStore } from '@/store/use-app-store';
+import { evidaraRoleLabel } from '@/lib/roles';
 import { useModuleAccess } from '@/hooks/use-module-access';
 import { canOpenAppView, parseAppView } from '@/lib/workspaceViews';
 import { AppSidebar } from '@/components/evidara/app-sidebar';
 import { MobileTopBar } from '@/components/evidara/mobile-top-bar';
 import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
+import { CredentialSecurityGate } from '@/components/evidara/credential-security-gate';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
 import { StudentResultsView, StudentResourcesView } from '@/components/evidara/student-live-views';
 import {
@@ -22,8 +24,10 @@ import {
   AdminProductsView,
 } from '@/components/evidara/admin-views';
 import { AdminSchoolControlView } from '@/components/evidara/admin-school-control';
+import { AdminAuditHealthView } from '@/components/evidara/admin-audit-health';
 import { LiveQuestionBank } from '@/components/evidara/live-question-bank';
 import { LivePaperCatalogue } from '@/components/evidara/live-paper-catalogue';
+import { PaperAssignmentCenter } from '@/components/evidara/paper-assignment-center';
 import { LiveStudentTests } from '@/components/evidara/live-student-tests';
 import { SchoolQuestionReview } from '@/components/evidara/school-question-review';
 import { AccessControlView } from '@/components/evidara/access-control-view';
@@ -64,7 +68,12 @@ function PaperWorkspace({ kind }: { kind: 'admin' | 'school' }) {
     setOpenRequestedPaper(params.has('id') || params.get('create') === '1');
   }, []);
 
-  return <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />;
+  return (
+    <div className="space-y-6">
+      <LivePaperCatalogue kind={kind} startInCreate={openRequestedPaper} />
+      {kind === 'school' && <PaperAssignmentCenter />}
+    </div>
+  );
 }
 
 function ViewRouter() {
@@ -110,15 +119,17 @@ function ViewRouter() {
   if (view === 'admin-resources') return <AdminResourcesView />;
   if (view === 'admin-referrals') return <ReferralSettingsView />;
   if (view === 'admin-self-assessment') return <AdminSelfAssessmentView />;
+  if (view === 'admin-audit-health') return <AdminAuditHealthView />;
   if (view === 'admin-access') return <AccessControlView kind="admin" />;
 
   return null;
 }
 
 export default function Home() {
-  const { view, user, sidebarOpen, setSidebarOpen, authReady } = useAppStore();
+  const { view, user, baseUser, impersonatingAs, sidebarOpen, setSidebarOpen, authReady } = useAppStore();
   const { access } = useModuleAccess();
   const [isMobile, setIsMobile] = useState(false);
+  const readOnlyPreview = baseUser?.accessRole === 'super_admin' && Boolean(impersonatingAs);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -190,7 +201,26 @@ export default function Home() {
           }`}
         >
           <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
-            <ViewRouter />
+            {readOnlyPreview && impersonatingAs && (
+              <div className="sticky top-2 z-40 mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">Super Admin · Read-only View As</p>
+                    <p className="mt-0.5 text-xs leading-5 text-amber-800">Viewing the {evidaraRoleLabel(impersonatingAs)} workspace. All page controls are disabled; use the sidebar to inspect other permitted screens.</p>
+                  </div>
+                  <span className="rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900">No writes allowed</span>
+                </div>
+              </div>
+            )}
+            <div
+              inert={readOnlyPreview || undefined}
+              aria-disabled={readOnlyPreview || undefined}
+              className={readOnlyPreview ? 'pointer-events-none select-none opacity-[0.98]' : undefined}
+            >
+              <CredentialSecurityGate>
+                <ViewRouter />
+              </CredentialSecurityGate>
+            </div>
           </div>
         </main>
       </div>

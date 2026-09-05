@@ -1,0 +1,46 @@
+name: Phase 1 Hourly Heartbeat Recorder
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .phase1-hourly-heartbeat-trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase1-hourly-heartbeat-recorder
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+
+      - name: Append heartbeat and consume trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .phase1-hourly-heartbeat-trigger
+          printf '\n' >> PHASE1_PROGRESS_LOG.md
+          cat .phase1-hourly-heartbeat-trigger >> PHASE1_PROGRESS_LOG.md
+          printf '\n' >> PHASE1_PROGRESS_LOG.md
+          rm .phase1-hourly-heartbeat-trigger
+
+      - name: Commit heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PHASE1_PROGRESS_LOG.md .phase1-hourly-heartbeat-trigger
+          git commit -m 'docs: append Phase 1 hourly heartbeat [skip ci]'
+          git push origin HEAD:phase1-hardening

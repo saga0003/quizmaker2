@@ -10,6 +10,7 @@ ChevronDown,
 ChevronUp,
 CircleStop,
 Clock3,
+CopyPlus,
 Edit3,
 Eraser,
 Eye,
@@ -42,6 +43,7 @@ import { normalizeEvidaraRole } from '@/lib/roles';
 import { useQuestionScope } from '@/components/questions/useQuestionScope';
 import { QuestionBulkImportDialog } from '@/components/evidara/question-bulk-import-dialog';
 import { PaperFileImportDialog } from '@/components/evidara/paper-file-import-dialog';
+import { PaperAssignmentCenter } from '@/components/evidara/paper-assignment-center';
 import { PyqPaperManager } from '@/components/evidara/pyq-paper-manager';
 import { useAssessmentOptions } from '@/components/evidara/use-assessment-options';
 import type {
@@ -126,6 +128,16 @@ const normal = (value: unknown) => String(value || '').trim().toLowerCase().repl
 const statusLabel = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 const toLocal = (value?: string | null) => value ? new Date(value).toISOString().slice(0, 16) : '';
 const toIso = (value: string) => value ? new Date(value).toISOString() : undefined;
+function formatAttemptDuration(seconds: number | null) {
+if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return '—';
+const roundedSeconds = Math.round(seconds);
+const hours = Math.floor(roundedSeconds / 3600);
+const minutes = Math.floor((roundedSeconds % 3600) / 60);
+const remaining = roundedSeconds % 60;
+if (hours) return `${hours}h ${minutes}m`;
+if (minutes) return `${minutes}m ${remaining}s`;
+return `${remaining}s`;
+}
 const sanitize = (value: string) => value
 .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
 .replace(/\son\w+="[^"]*"/gi, '')
@@ -187,6 +199,11 @@ return true;
 return subjectAliases(subject).some((value) => name.includes(value) || code.includes(value) || tags.includes(value));
 }
 type Selected = PaperQuestionInput & { question: QuestionRow };
+type PublishReadinessCheck = { code: string; label: string; ok: boolean; message: string };
+type PublishReadiness = { paper_id: string; ready: boolean; checks: PublishReadinessCheck[] };
+type PaperAttemptSummary = { id: string; student_id: string; student_name: string; rank: number | null; attempt_number: number; status: string; score: number | null; maximum_marks: number | null; percentage: number | null; accuracy: number | null; duration_seconds: number | null; correct_count: number; incorrect_count: number; unanswered_count: number; started_at: string | null; submitted_at: string | null; created_at: string };
+type IntegrityEvent = { id: number; attempt_id: string; event_type: string; metadata: Record<string, unknown>; created_at: string };
+type PaperActionMode = 'results' | 'analytics' | 'integrity' | null;
 type Builder = {
 id: string | null;
 title: string;
@@ -316,11 +333,22 @@ const [chapters, setChapters] = useState<TaxonomyChapter[]>([]);
 const [topics, setTopics] = useState<TaxonomyTopic[]>([]);
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
+const [readinessLoading, setReadinessLoading] = useState(false);
+const [publishReadiness, setPublishReadiness] = useState<PublishReadiness | null>(null);
+const [readinessFingerprint, setReadinessFingerprint] = useState('');
+const [readinessPaperId, setReadinessPaperId] = useState('');
+const [cloningPaperId, setCloningPaperId] = useState('');
+const [actionPaper, setActionPaper] = useState<PaperListRow | null>(null);
+const [actionMode, setActionMode] = useState<PaperActionMode>(null);
+const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);
+const [integrityEvents, setIntegrityEvents] = useState<IntegrityEvent[]>([]);
+const [actionLoading, setActionLoading] = useState(false);
 const [error, setError] = useState('');
 const [message, setMessage] = useState('');
 const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] = useState('all');
 const [builderOpen, setBuilderOpen] = useState(false);
+const [builderStep, setBuilderStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 const [previewOpen, setPreviewOpen] = useState(false);
 const [importOpen, setImportOpen] = useState(false);
 const [paperFileImportOpen, setPaperFileImportOpen] = useState(false);
@@ -339,7 +367,8 @@ const [deleteTarget, setDeleteTarget] = useState<PaperListRow | null>(null);
 const [rejectTarget, setRejectTarget] = useState<PaperListRow | null>(null);
 const [rejectionReason, setRejectionReason] = useState('');
 const routeHandled = useRef(false);
-const draftBase = useMemo(() => `evidara-v8-paper:${user?.id || 'anonymous'}:${kind}`, [kind, user?.id]);
+const draftScope = kind === 'admin' ? 'platform' : organizationId || 'no-institution';
+const draftBase = useMemo(() => `evidara-v8-paper:${user?.id || 'anonymous'}:${kind}:${draftScope}`, [draftScope, kind, user?.id]);
 const draftKey = `${draftBase}:${builder.id || 'new'}`;
 const load = useCallback(async () => {
 if (!supabase || !configured) {
@@ -449,10 +478,17 @@ const canDeletePaper = role === 'super_admin' || (kind === 'school' && role === 
 const submitStatus: PaperStatus = canApprove ? 'published' : 'under_review';
 const totalMarks = selected.reduce((sum, item) => sum + Number(item.marks || 0), 0);
 const selectedInActive = selected.filter((item) => item.section_client_id === active?.client_id).length;
+const publishFingerprint = useMemo(() => JSON.stringify({
+  builder: { ...builder, id: undefined },
+  sections: sections.map(({ id: _id, ...section }) => section),
+  questions: selected.map(({ question: _question, ...item }) => item),
+}), [builder, sections, selected]);
+const releaseCheckCurrent = Boolean(publishReadiness?.ready && readinessFingerprint === publishFingerprint && readinessPaperId);
 const distributionTotal = active
 ? DIFFICULTIES.reduce((sum, difficulty) => sum + Number(active.difficulty_distribution?.[difficulty] || 0), 0)
 : 0;
 function resetBuilder() {
+setBuilderStep(1);
 const section = emptySection(0, 'manual', subjectNames);
 setBuilder(emptyBuilder());
 setSections([section]);
@@ -461,6 +497,9 @@ setSelected([]);
 setQuestionSearch('');
 setDifficultyFilter('all');
 setAutosave('Autosave ready');
+setPublishReadiness(null);
+setReadinessFingerprint('');
+setReadinessPaperId('');
 }
 function openCreate() {
 resetBuilder();
@@ -488,7 +527,8 @@ localStorage.removeItem(`${draftBase}:new`);
 setBuilderOpen(true);
 }
 async function openEdit(paper: PaperListRow) {
-if (!supabase) return;
+if (!supabase) return false;
+setBuilderStep(1);
 setBuilderOpen(true);
 setSaving(true);
 setError('');
@@ -500,7 +540,7 @@ supabase.from('paper_questions').select('question_id,section_id,display_order,ma
 if (p.error || s.error || i.error || !p.data) {
 setError(p.error?.message || s.error?.message || i.error?.message || 'Unable to open paper.');
 setSaving(false);
-return;
+return false;
 }
 const row = p.data as Record<string, any>;
 const loadedSections = (s.data || []).map((section: Record<string, any>, index) => ({
@@ -561,6 +601,7 @@ setSections(sectionsReady);
 setActiveSection(sectionsReady[0].client_id);
 setSelected(loadedItems);
 setSaving(false);
+return true;
 }
 useEffect(() => {
 if (!startInCreate || loading || routeHandled.current) return;
@@ -694,7 +735,7 @@ return `${section.title}: difficulty counts must equal its question target.`;
 }
 return '';
 }
-async function savePaper(status: PaperStatus) {
+async function savePaper(status: PaperStatus, paperIdOverride?: string) {
 if (!supabase) return;
 const validation = validate(status);
 if (validation) {
@@ -733,15 +774,15 @@ is_mandatory: item.is_mandatory,
 };
 setSaving(true);
 setError('');
-const wasNew = !builder.id;
+const wasNew = !(paperIdOverride || builder.id);
 const key = draftKey;
 const { data, error: saveError } = await supabase.rpc('save_question_paper', {
-p_paper_id: builder.id,
+p_paper_id: paperIdOverride || builder.id,
 p_organization_id: kind === 'admin' ? null : organizationId,
 p_payload: payload,
 });
 if (!saveError && kind === 'admin' && role === 'super_admin') {
-  const savedPaperId = String(data || builder.id || '');
+  const savedPaperId = String(data || paperIdOverride || builder.id || '');
   if (savedPaperId) {
     const { error: pyqIdentityError } = await supabase.rpc('set_question_paper_pyq_identity_v18', {
       p_paper_id: savedPaperId,
@@ -773,6 +814,41 @@ setBuilderOpen(false);
 }
 setMessage(status === 'draft' ? 'Draft saved.' : status === 'under_review' ? 'Paper submitted for approval.' : 'Paper published.');
 await load();
+return String(data || paperIdOverride || builder.id || '');
+}
+async function runPublishPreflight() {
+if (!supabase) return;
+setReadinessLoading(true);
+setError('');
+setPublishReadiness(null);
+const paperId = await savePaper('draft');
+if (!paperId) {
+setReadinessLoading(false);
+return;
+}
+const { data, error: readinessError } = await supabase.rpc('get_paper_publish_readiness_v1', { p_paper_id: paperId });
+setReadinessLoading(false);
+if (readinessError) {
+setError(`Release check failed: ${readinessError.message}`);
+return;
+}
+const readiness = data as PublishReadiness;
+setPublishReadiness(readiness);
+setReadinessFingerprint(publishFingerprint);
+setReadinessPaperId(paperId);
+if (!readiness.ready) {
+const failed = (readiness.checks || []).filter((item) => !item.ok).map((item) => item.label).join(', ');
+setError(`Not ready to publish. Fix: ${failed || 'release checklist'}.`);
+} else {
+setMessage('Release check passed. Publish is unlocked for this exact paper state.');
+}
+}
+async function publishCheckedPaper() {
+if (!releaseCheckCurrent || !readinessPaperId) {
+setError('Run the release check again before publishing this paper state.');
+return;
+}
+await savePaper('published', readinessPaperId);
 }
 async function setStatus(paper: PaperListRow, status: PaperStatus, reason: string | null = null) {
 if (!supabase) return;
@@ -787,6 +863,139 @@ return;
 }
 setMessage(`Paper moved to ${statusLabel(status)}.`);
 await load();
+}
+async function cloneAsNewVersion(paper: PaperListRow) {
+if (!supabase) return;
+setCloningPaperId(paper.id);
+setError('');
+setMessage('');
+const { data, error: cloneError } = await supabase.rpc('clone_paper_as_new_version_v1', {
+p_source_paper_id: paper.id,
+p_title: null,
+});
+setCloningPaperId('');
+if (cloneError) {
+setError(cloneError.message);
+return;
+}
+const clone = data as { title?: string; version_number?: number } | null;
+setMessage(`Created ${clone?.title || 'a new draft version'}. Audience and publication state were reset.`);
+await load();
+}
+async function openPaperPreview(paper: PaperListRow) {
+const opened = await openEdit(paper);
+if (!opened) return;
+setBuilderStep(5);
+setBuilderOpen(false);
+setPreviewOpen(true);
+}
+async function fetchPaperAttempts(paper: PaperListRow) {
+if (!supabase) return { rows: [] as PaperAttemptSummary[], error: 'Supabase is not configured.' };
+const { data, error: attemptsError } = await supabase
+.from('exam_attempts')
+.select('id,student_id,attempt_number,status,score,maximum_marks,percentage,correct_count,incorrect_count,unanswered_count,started_at,submitted_at,created_at')
+.eq('paper_id', paper.id)
+.order('created_at', { ascending: false })
+.limit(500);
+if (attemptsError) return { rows: [] as PaperAttemptSummary[], error: attemptsError.message };
+const raw = data || [];
+const studentIds = [...new Set(raw.map((attempt) => String(attempt.student_id || '')).filter(Boolean))];
+const names = new Map<string, string>();
+for (let start = 0; start < studentIds.length; start += 200) {
+const { data: profileRows, error: profileError } = await supabase.from('profiles').select('id,full_name').in('id', studentIds.slice(start, start + 200));
+if (profileError) return { rows: [] as PaperAttemptSummary[], error: profileError.message };
+for (const profileRow of profileRows || []) names.set(String(profileRow.id), String(profileRow.full_name || 'Student'));
+}
+const hydrated = raw.map((attempt) => {
+const correct = Number(attempt.correct_count || 0);
+const incorrect = Number(attempt.incorrect_count || 0);
+const answered = correct + incorrect;
+const started = attempt.started_at ? new Date(attempt.started_at).getTime() : NaN;
+const submitted = attempt.submitted_at ? new Date(attempt.submitted_at).getTime() : NaN;
+return {
+...attempt,
+student_name: names.get(String(attempt.student_id)) || `Student …${String(attempt.student_id).slice(-6)}`,
+rank: null,
+accuracy: answered > 0 ? Number(((correct / answered) * 100).toFixed(1)) : null,
+duration_seconds: Number.isFinite(started) && Number.isFinite(submitted) && submitted >= started ? Math.round((submitted - started) / 1000) : null,
+} as PaperAttemptSummary;
+});
+const ranked = hydrated.filter((attempt) => attempt.status === 'submitted' && attempt.percentage != null)
+.sort((a, b) => Number(b.percentage) - Number(a.percentage) || Number(b.score || 0) - Number(a.score || 0) || String(a.submitted_at || '').localeCompare(String(b.submitted_at || '')));
+let previousPercentage: number | null = null;
+let previousRank = 0;
+ranked.forEach((attempt, index) => {
+const percentage = Number(attempt.percentage);
+const rank = previousPercentage !== null && percentage === previousPercentage ? previousRank : index + 1;
+attempt.rank = rank;
+previousPercentage = percentage;
+previousRank = rank;
+});
+return { rows: hydrated, error: '' };
+}
+async function fetchIntegrityEvents(attempts: PaperAttemptSummary[]) {
+if (!supabase || !attempts.length) return { rows: [] as IntegrityEvent[], error: '' };
+const attemptIds = attempts.map((attempt) => attempt.id);
+const { data, error: eventError } = await supabase
+.from('exam_attempt_events')
+.select('id,attempt_id,event_type,metadata,created_at')
+.in('attempt_id', attemptIds)
+.order('created_at', { ascending: false })
+.limit(1000);
+if (eventError) return { rows: [] as IntegrityEvent[], error: eventError.message };
+return { rows: (data || []) as IntegrityEvent[], error: '' };
+}
+async function openPaperAction(paper: PaperListRow, mode: Exclude<PaperActionMode, null>) {
+setActionPaper(paper);
+setActionMode(mode);
+setActionLoading(true);
+setError('');
+setIntegrityEvents([]);
+const result = await fetchPaperAttempts(paper);
+if (result.error) {
+setActionLoading(false);
+setActionMode(null);
+setActionPaper(null);
+setError(result.error);
+return;
+}
+setPaperAttempts(result.rows);
+if (mode === 'integrity') {
+const evidence = await fetchIntegrityEvents(result.rows);
+if (evidence.error) {
+setActionLoading(false);
+setActionMode(null);
+setActionPaper(null);
+setError(evidence.error);
+return;
+}
+setIntegrityEvents(evidence.rows);
+}
+setActionLoading(false);
+}
+async function exportPaperResults(paper: PaperListRow) {
+setActionLoading(true);
+setError('');
+const result = await fetchPaperAttempts(paper);
+setActionLoading(false);
+if (result.error) {
+setError(result.error);
+return;
+}
+const escapeCsv = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+const header = ['attempt_id','student_id','attempt_number','status','score','maximum_marks','percentage','correct','incorrect','unanswered','started_at','submitted_at'];
+const rows = result.rows.map((attempt) => [attempt.id, attempt.student_id, attempt.attempt_number, attempt.status, attempt.score, attempt.maximum_marks, attempt.percentage, attempt.correct_count, attempt.incorrect_count, attempt.unanswered_count, attempt.started_at, attempt.submitted_at]);
+const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+const url = URL.createObjectURL(blob);
+const anchor = document.createElement('a');
+anchor.href = url;
+anchor.download = `${String(paper.code || paper.title || 'paper').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '') || 'paper'}-results.csv`;
+document.body.appendChild(anchor);
+anchor.click();
+anchor.remove();
+URL.revokeObjectURL(url);
+setMessage(`Exported ${result.rows.length} attempt${result.rows.length === 1 ? '' : 's'} for ${paper.title}.`);
 }
 async function confirmDelete() {
 if (!supabase || !deleteTarget) return;
@@ -815,6 +1024,10 @@ const topicOptions = topics.filter((topic) => active?.chapter_ids?.includes(topi
 const toggle = (values: string[] | undefined, value: string) => (values || []).includes(value)
 ? (values || []).filter((item) => item !== value)
 : [...(values || []), value];
+const submittedAttempts = paperAttempts.filter((attempt) => Boolean(attempt.submitted_at) || attempt.status === 'submitted' || attempt.status === 'completed');
+const scoredAttempts = submittedAttempts.filter((attempt) => attempt.percentage !== null && Number.isFinite(Number(attempt.percentage)));
+const averagePercentage = scoredAttempts.length ? scoredAttempts.reduce((sum, attempt) => sum + Number(attempt.percentage || 0), 0) / scoredAttempts.length : 0;
+const highestPercentage = scoredAttempts.length ? Math.max(...scoredAttempts.map((attempt) => Number(attempt.percentage || 0))) : 0;
 const stats = [
 { label: 'Total papers', value: papers.length, icon: FileQuestion, tone: 'var(--foreground)' },
 { label: 'Published', value: papers.filter((paper) => paper.status === 'published').length, icon: CheckCircle2, tone: 'var(--teal)' },
@@ -930,6 +1143,12 @@ className="h-11 border-[var(--line)] pl-9"
 <TableCell className="text-right">
 <div className="flex justify-end gap-1">
 <Button variant="ghost" size="icon" title="Edit paper" onClick={() => void openEdit(paper)} className="h-9 w-9 text-[var(--teal)] hover:bg-[var(--secondary)]"><Edit3 className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Preview paper" onClick={() => void openPaperPreview(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><Eye className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Duplicate paper" disabled={cloningPaperId === paper.id} onClick={() => void cloneAsNewVersion(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]">{cloningPaperId === paper.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CopyPlus className="h-4 w-4" />}</Button>
+<Button variant="ghost" size="icon" title="Test Results" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'results')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><FileQuestion className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Analytics" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'analytics')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><BookOpenCheck className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Integrity evidence" disabled={actionLoading} onClick={() => void openPaperAction(paper, 'integrity')} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><ShieldCheck className="h-4 w-4" /></Button>
+<Button variant="ghost" size="icon" title="Export" disabled={actionLoading} onClick={() => void exportPaperResults(paper)} className="h-9 w-9 text-[#44545C] hover:bg-[var(--line)]"><Save className="h-4 w-4" /></Button>
 {paper.status === 'under_review' && canApprove && (
 <>
 <Button variant="ghost" size="icon" title="Approve paper" onClick={() => void setStatus(paper, 'approved')} className="h-9 w-9 text-[#237A57] hover:bg-[#237A57]/10"><Check className="h-4 w-4" /></Button>
@@ -980,7 +1199,24 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 ))}
 </div>
+<div className="mb-5 overflow-x-auto rounded-xl border border-[var(--line)] bg-white p-2">
+<div className="grid min-w-[620px] grid-cols-5 gap-2">
+{([
+{ step: 1 as const, label: 'Details' },
+{ step: 2 as const, label: 'Questions' },
+{ step: 3 as const, label: 'Audience' },
+{ step: 4 as const, label: 'Settings' },
+{ step: 5 as const, label: 'Preview & Publish' },
+]).map((item) => (
+<button key={item.step} type="button" onClick={() => setBuilderStep(item.step)} className={`rounded-lg px-3 py-2 text-left transition ${builderStep === item.step ? 'bg-[var(--teal)] text-white' : 'text-[var(--muted-foreground)] hover:bg-[var(--canvas)]'}`}>
+<span className="block text-[10px] font-semibold uppercase tracking-[0.12em] opacity-75">Step {item.step}</span>
+<span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
+</button>
+))}
+</div>
+</div>
 <div className="space-y-5">
+{builderStep === 1 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading number="1" title="Paper identity" description="Define the paper once so question filtering, approval and future product bundling remain accurate." />
@@ -1008,9 +1244,17 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 </CardContent>
 </Card>
+)}
+{builderStep === 3 && (
+<div className="space-y-4">
+<SectionHeading number="3" title="Audience" description="Choose the students who can take this institutional test and preview the exact eligible cohort before publishing." />
+{kind === 'school' ? (builder.id ? <PaperAssignmentCenter paperId={builder.id} embedded /> : <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl"><CardContent className="space-y-3 p-5"><p className="text-sm font-semibold text-[var(--foreground)]">Save this paper draft before choosing its audience.</p><p className="text-sm text-[var(--muted-foreground)]">Audience eligibility is server-validated against the saved paper, active student memberships and the institution licence.</p><Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save draft to configure audience</Button></CardContent></Card>) : <Card className="gap-0 border border-[var(--line)] bg-white shadow-sm rounded-xl"><CardContent className="p-5 text-sm text-[var(--muted-foreground)]">Platform papers do not use an institution student audience. Continue to Settings.</CardContent></Card>}
+</div>
+)}
+{builderStep === 4 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
-<SectionHeading number="2" title="Delivery and student experience" description="Set time, attempts and result visibility. Institution assignment and publishing rules control access outside this builder." />
+<SectionHeading number="4" title="Delivery and student experience" description="Set time, attempts, schedule, shuffle and result visibility for the assigned test." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 <div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
 <div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
@@ -1023,10 +1267,12 @@ className="h-11 border-[var(--line)] pl-9"
 </div>
 </CardContent>
 </Card>
+)}
+{builderStep === 2 && (
 <Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading
-number="3"
+number="2A"
 title="Sections and selection strategy"
 description="Use one paper-wide default or choose Manual, Automatic or Hybrid independently for every section."
 action={<Button type="button" variant="outline" onClick={addSection} className="h-10 border-[var(--line)]"><Plus className="mr-2 h-4 w-4" />Add Section</Button>}
@@ -1101,11 +1347,13 @@ return (
 )}
 </CardContent>
 </Card>
+)}
+{builderStep === 2 && (
 <div className="grid min-w-0 gap-5 xl:grid-cols-2">
 <Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
-number="4"
+number="2B"
 title="Matching question bank"
 description="Only approved questions matching the paper exam, grade and active-section classification are shown."
 action={<div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => { setImportBefore(new Set(questions.map((question) => question.id))); setImportSection(activeSection); setImportOpen(true); }} className="border-[var(--line)]"><Upload className="mr-2 h-4 w-4" />Upload questions here</Button><Button type="button" variant="outline" size="sm" onClick={() => filteredQuestions.forEach((question) => addQuestion(question))} disabled={!filteredQuestions.length} className="border-[var(--line)]">Select all</Button></div>}
@@ -1132,7 +1380,7 @@ action={<div className="flex flex-wrap gap-2"><Button type="button" variant="out
 <Card className="min-w-0 gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
 <CardContent className="p-4 sm:p-5">
 <SectionHeading
-number="5"
+number="2C"
 title="Paper questions"
 description="Review order, section assignment and marks before saving or submitting the paper."
 action={<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="border-[var(--line)]"><Eye className="mr-2 h-4 w-4" />Test Preview</Button>}
@@ -1162,14 +1410,65 @@ action={<Button type="button" variant="outline" size="sm" disabled={!selected.le
 </CardContent>
 </Card>
 </div>
+)}
+{builderStep === 5 && (
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
+<CardContent className="space-y-5 p-4 sm:p-5">
+<SectionHeading number="5" title="Preview & Publish" description="Review the learner-facing paper and final summary before publishing or submitting for approval." />
+<div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-5">
+<div className="grid gap-3 sm:grid-cols-3"><div><p className="text-xs text-[var(--muted-foreground)]">Questions</p><p className="mt-1 text-xl font-bold">{selected.length}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Marks</p><p className="mt-1 text-xl font-bold">{totalMarks}</p></div><div><p className="text-xs text-[var(--muted-foreground)]">Duration</p><p className="mt-1 text-xl font-bold">{builder.duration} min</p></div></div>
+<Button type="button" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="mt-5 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Eye className="mr-2 h-4 w-4" />Open learner preview</Button>
+</div>
+</CardContent>
+</Card>
+)}
+{builderStep === 5 && (
+<Card className="gap-0 border-[var(--line)] bg-white shadow-sm rounded-xl">
+<CardContent className="space-y-5 p-4 sm:p-5">
+<SectionHeading number="5" title="Release check" description="Verify every server-authoritative publishing requirement before the final action is unlocked." />
+<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+{(['Approved questions','Duration','Marks','Audience','Schedule','Result policy'] as const).map((label) => {
+const check = publishReadiness?.checks?.find((item) => item.label === label);
+const current = readinessFingerprint === publishFingerprint;
+return <div key={label} className={`rounded-xl border p-4 ${check && current ? (check.ok ? 'border-[#237A57]/20 bg-[#237A57]/5' : 'border-[var(--destructive)]/20 bg-[var(--destructive)]/5') : 'border-[var(--line)] bg-[var(--canvas)]'}`}><div className="flex items-center gap-2">{check && current ? (check.ok ? <CheckCircle2 className="h-4 w-4 text-[#237A57]" /> : <XCircle className="h-4 w-4 text-[var(--destructive)]" />) : <ShieldCheck className="h-4 w-4 text-[var(--muted-foreground)]" />}<p className="text-sm font-semibold text-[var(--foreground)]">{label}</p></div><p className="mt-2 text-xs leading-relaxed text-[var(--muted-foreground)]">{check && current ? check.message : 'Run release check to verify this requirement against the saved paper.'}</p></div>;
+})}
+</div>
+<div className="flex flex-wrap items-center gap-3"><Button type="button" variant="outline" disabled={saving || readinessLoading} onClick={() => void runPublishPreflight()} className="h-10 border-[var(--teal)]/30 text-[var(--teal)]">{readinessLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Run release check</Button><span className={`text-xs font-medium ${releaseCheckCurrent ? 'text-[#237A57]' : 'text-[var(--muted-foreground)]'}`}>{releaseCheckCurrent ? 'All six checks passed for the current paper state.' : publishReadiness && readinessFingerprint !== publishFingerprint ? 'Paper changed after the last check. Run it again.' : 'Publish stays locked until all six checks pass.'}</span></div>
+<SectionHeading number="5" title="Publish" description="Ready to publish or submit? Review the paper summary, then use the final action below." />
+<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Title</p><p className="mt-1 font-semibold">{builder.title || 'Not set'}</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Paper code</p><p className="mt-1 font-semibold">{builder.code || 'Not set'}</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Questions</p><p className="mt-1 font-semibold">{selected.length} · {totalMarks} marks</p></div>
+<div className="rounded-xl border border-[var(--line)] p-4"><p className="text-xs text-[var(--muted-foreground)]">Delivery</p><p className="mt-1 font-semibold">{builder.duration} min · {builder.openForever ? 'Always open' : 'Scheduled'}</p></div>
+</div>
+</CardContent>
+</Card>
+)}
 </div>
 </div>
 <DialogFooter className="border-t border-[var(--line)] bg-white px-4 py-4 sm:px-6">
-<div className="mr-auto text-sm text-[var(--muted-foreground)]">{selected.length} questions · {totalMarks} marks · {builder.duration} minutes</div>
+<div className="mr-auto text-sm text-[var(--muted-foreground)]">Step {builderStep} of 5 · {selected.length} questions · {totalMarks} marks</div>
 <Button type="button" variant="outline" onClick={() => setBuilderOpen(false)} disabled={saving} className="h-11 border-[var(--line)]">Close</Button>
+{builderStep > 1 && <Button type="button" variant="outline" disabled={saving} onClick={() => setBuilderStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 border-[var(--line)]">Back</Button>}
 <Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
-<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{submitStatus === 'published' ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}{submitStatus === 'published' ? 'Save and Publish' : 'Submit for Approval'}</Button>
+{builderStep < 5 && <Button type="button" disabled={saving} onClick={() => setBuilderStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">Next</Button>}
+{builderStep === 5 && submitStatus === 'published' && (<Button type="button" disabled={saving || readinessLoading || !releaseCheckCurrent} onClick={() => void publishCheckedPaper()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Check className="mr-2 h-4 w-4" />Save and Publish</Button>)}
+{builderStep === 5 && submitStatus !== 'published' && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Send className="mr-2 h-4 w-4" />Submit for Approval</Button>)}
 </DialogFooter>
+</DialogContent>
+</Dialog>
+<Dialog open={Boolean(actionMode && actionPaper)} onOpenChange={(open) => { if (!open) { setActionMode(null); setActionPaper(null); setPaperAttempts([]); setIntegrityEvents([]); } }}>
+<DialogContent className="max-h-[90vh] w-[96vw] max-w-4xl overflow-y-auto border-[var(--line)]">
+<DialogHeader><DialogTitle>{actionMode === 'analytics' ? 'Paper Analytics' : actionMode === 'integrity' ? 'Integrity Evidence' : 'Test Results'} · {actionPaper?.title}</DialogTitle><DialogDescription>{actionMode === 'analytics' ? 'Live attempt analytics from the selected paper.' : actionMode === 'integrity' ? 'Recorded exam-session events for human review. These events are evidence only; they do not prove or prevent cheating.' : 'Latest student attempts for the selected paper.'}</DialogDescription></DialogHeader>
+{actionLoading ? <div className="py-10 text-center text-sm text-[var(--muted-foreground)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading…</div> : actionMode === 'analytics' ? (
+<div className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+{[{ label: 'Attempts', value: paperAttempts.length }, { label: 'Submitted', value: submittedAttempts.length }, { label: 'Average', value: `${averagePercentage.toFixed(1)}%` }, { label: 'Highest', value: `${highestPercentage.toFixed(1)}%` }].map((item) => <div key={item.label} className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><p className="text-xs text-[var(--muted-foreground)]">{item.label}</p><p className="mt-1 text-xl font-bold text-[var(--foreground)]">{item.value}</p></div>)}
+</div><p className="text-xs text-[var(--muted-foreground)]">Analytics are calculated from up to the latest 500 attempts visible to your role and institution scope.</p></div>
+) : actionMode === 'integrity' ? (
+<div className="space-y-4"><div className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/10 p-4 text-sm leading-relaxed text-[#6F5600]"><strong>Review evidence, not a verdict.</strong> Recorded events can help a school review an exam session, but they do not prove misconduct and Evidara does not claim that these signals prevent cheating.</div>{integrityEvents.length ? <div className="overflow-hidden rounded-xl border border-[var(--line)]"><Table><TableHeader><TableRow><TableHead>Time</TableHead><TableHead>Attempt</TableHead><TableHead>Recorded event</TableHead><TableHead>Evidence details</TableHead></TableRow></TableHeader><TableBody>{integrityEvents.map((event) => <TableRow key={event.id}><TableCell className="whitespace-nowrap text-xs">{new Date(event.created_at).toLocaleString('en-IN')}</TableCell><TableCell className="font-mono text-xs">…{event.attempt_id.slice(-8)}</TableCell><TableCell className="text-sm font-medium">{statusLabel(event.event_type)}</TableCell><TableCell className="max-w-[320px] break-words text-xs text-[var(--muted-foreground)]">{Object.keys(event.metadata || {}).length ? JSON.stringify(event.metadata) : 'No additional metadata recorded'}</TableCell></TableRow>)}</TableBody></Table></div> : <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]">No integrity events were recorded for the latest 500 visible attempts on this paper.</div>}<p className="text-xs text-[var(--muted-foreground)]">Evidence is limited to up to 1,000 latest events from the latest 500 attempts visible to your role and institution scope.</p></div>
+) : paperAttempts.length ? (
+<div className="space-y-3"><div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] px-4 py-3"><p className="text-sm font-semibold text-[var(--foreground)]">Traditional result sheet</p><p className="mt-1 text-xs text-[var(--muted-foreground)]">Rank is based on submitted percentage for this paper. Equal percentages share the same rank. Accuracy uses Correct ÷ (Correct + Incorrect); time is the recorded start-to-submit duration.</p></div><div className="overflow-x-auto rounded-xl border border-[var(--line)]"><Table><TableHeader><TableRow><TableHead>Rank</TableHead><TableHead>Student</TableHead><TableHead>Attempt</TableHead><TableHead>Score</TableHead><TableHead>Accuracy</TableHead><TableHead>Time</TableHead><TableHead>Submitted</TableHead></TableRow></TableHeader><TableBody>{paperAttempts.map((attempt) => <TableRow key={attempt.id}><TableCell className="font-semibold">{attempt.rank ?? '—'}</TableCell><TableCell><span className="font-medium">{attempt.student_name}</span></TableCell><TableCell>#{attempt.attempt_number}</TableCell><TableCell>{attempt.score ?? '—'} / {attempt.maximum_marks ?? '—'}{attempt.percentage === null ? '' : <span className="ml-1 text-xs text-[var(--muted-foreground)]">({Number(attempt.percentage).toFixed(1)}%)</span>}</TableCell><TableCell>{attempt.accuracy == null ? '—' : `${attempt.accuracy.toFixed(1)}%`}</TableCell><TableCell>{formatAttemptDuration(attempt.duration_seconds)}</TableCell><TableCell>{attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleString('en-IN') : 'Not submitted'}</TableCell></TableRow>)}</TableBody></Table></div></div>
+) : <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-8 text-center text-sm text-[var(--muted-foreground)]">No attempts have been recorded for this paper yet.</div>}
 </DialogContent>
 </Dialog>
 <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

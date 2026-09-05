@@ -1,0 +1,94 @@
+name: Phase 1 R10-R11 Exam Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+    paths:
+      - .github/workflows/phase1-r10-offline-reconnect-acceptance.yml
+      - scripts/phase1-r10-offline-reconnect-acceptance.mjs
+      - scripts/phase1-r11-submit-marks-acceptance.mjs
+      - .phase1-r10-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  r10-r11-exam-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+      EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+      EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+      EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+      EVIDARA_ACCEPTANCE_URL: http://127.0.0.1:3000
+      EVIDARA_ACCEPTANCE_LOCALHOST: YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY
+      EVIDARA_ACCEPTANCE_ATTEMPT_ID: d970d756-f56c-4e9a-9057-f2c775658719
+      EVIDARA_ACCEPTANCE_DB_BYTES: '219278483'
+      EVIDARA_ACCEPTANCE_STUDENT_EMAIL: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_EMAIL }}
+      EVIDARA_ACCEPTANCE_STUDENT_PASSWORD: ${{ secrets.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD }}
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_SUPABASE_URL: https://xzfozpnzvznqrvcsoail.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_zXOjaJgFSLZV54Xs9ekk4Q_QuJQAhgZ
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify isolated local acceptance target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVIDARA_ACCEPTANCE_ORG_SLUG" = "evidara-school-acceptance"
+          test "$EVIDARA_ACCEPTANCE_URL" = "http://127.0.0.1:3000"
+          test "$EVIDARA_ACCEPTANCE_LOCALHOST" = "YES_LOCAL_SYNTHETIC_ACCEPTANCE_ONLY"
+          test "$EVIDARA_ACCEPTANCE_ATTEMPT_ID" = "d970d756-f56c-4e9a-9057-f2c775658719"
+          echo "R10-R11 target is isolated localhost against the preserved synthetic acceptance attempt only."
+      - name: Install Playwright without changing lockfile
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start branch checkout application
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run dev -- --hostname 127.0.0.1 --port 3000 > /tmp/evidara-r10-r11-app.log 2>&1 &
+          echo $! > /tmp/evidara-r10-r11-app.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
+              echo "Local Evidara branch checkout is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/evidara-r10-r11-app.log
+          exit 1
+      - name: Execute R10 rendered offline reconnect acceptance
+        env:
+          EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r10-offline-reconnect
+        run: node scripts/phase1-r10-offline-reconnect-acceptance.mjs
+      - name: Execute R11 rendered final submission and marks acceptance
+        env:
+          EVIDARA_ACCEPTANCE_EVIDENCE_DIR: acceptance-evidence/r11-submit-marks
+        run: node scripts/phase1-r11-submit-marks-acceptance.mjs
+      - name: Upload redacted exam acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r10-r11-exam-acceptance-${{ github.sha }}
+          path: |
+            acceptance-evidence/r10-offline-reconnect
+            acceptance-evidence/r11-submit-marks
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload local app diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-r10-r11-app-log-${{ github.sha }}
+          path: /tmp/evidara-r10-r11-app.log
+          if-no-files-found: warn
+          retention-days: 7

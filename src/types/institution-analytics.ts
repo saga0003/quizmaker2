@@ -1,4 +1,4 @@
-export type InstitutionAnalyticsLevel = 'schools' | 'school' | 'class' | 'subject' | 'chapter' | 'student';
+export type InstitutionAnalyticsLevel = 'schools' | 'school' | 'programme' | 'grade' | 'section' | 'class' | 'subject' | 'chapter' | 'topic' | 'student';
 
 export type ScoreBand = {
   label: string;
@@ -37,6 +37,35 @@ export type InstitutionSchoolRow = {
   rank: number;
 };
 
+export type InstitutionScopeMetrics = {
+  studentCount: number;
+  completedTests: number;
+  averageTestsPerStudent: number;
+  averagePercentage: number | null;
+  accuracy: number | null;
+  participation: number | null;
+  highestPercentage: number | null;
+  lowestPercentage: number | null;
+  lastTestAt: string | null;
+  rank: number;
+};
+
+export type InstitutionProgrammeRow = InstitutionScopeMetrics & {
+  id: string;
+  organizationId: string;
+  name: string;
+  track: string | null;
+};
+
+export type InstitutionGradeRow = InstitutionScopeMetrics & {
+  id: string;
+  organizationId: string;
+  programmeId: string;
+  programmeName: string;
+  grade: number;
+  name: string;
+};
+
 export type InstitutionClassRow = {
   id: string;
   organizationId: string;
@@ -54,6 +83,11 @@ export type InstitutionClassRow = {
   lowestPercentage: number | null;
   lastTestAt: string | null;
   rank: number;
+};
+
+export type InstitutionSectionRow = InstitutionClassRow & {
+  programmeId: string;
+  programmeName: string;
 };
 
 export type InstitutionStudentRow = {
@@ -118,10 +152,17 @@ export type InstitutionAnalyticsPayload = {
   actor: InstitutionAnalyticsActor;
   generatedAt: string;
   school?: { id: string; name: string; city: string | null; state: string | null; board: string | null; status?: string | null } | null;
+  programme?: InstitutionProgrammeRow | null;
+  grade?: InstitutionGradeRow | null;
+  section?: InstitutionSectionRow | null;
   class?: InstitutionClassRow | null;
   subject?: InstitutionSubjectRow | null;
   chapter?: InstitutionChapterRow | null;
+  topic?: InstitutionTopicRow | null;
   schools?: InstitutionSchoolRow[];
+  programmes?: InstitutionProgrammeRow[];
+  grades?: InstitutionGradeRow[];
+  sections?: InstitutionSectionRow[];
   classes?: InstitutionClassRow[];
   students?: InstitutionStudentRow[];
   subjects?: InstitutionSubjectRow[];

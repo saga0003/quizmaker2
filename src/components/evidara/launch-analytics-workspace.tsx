@@ -73,7 +73,7 @@ function pct(value: number | null | undefined) {
 }
 
 function avg(values: number[]) {
-  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
 function fmtDate(value: string | null | undefined) {
@@ -134,7 +134,7 @@ function DemoHierarchy({ data, onOpenStudent, onBackToSchools }: { data: DemoPay
   function scopeStats(tests: DemoTest[]) {
     const ids = new Set(tests.map((row) => row.id));
     const rows = trackResults.filter((row) => ids.has(row.testId));
-    return { tests: tests.length, attempts: rows.length, average: avg(rows.map((row) => row.percentage)), accuracy: avg(rows.map((row) => row.accuracy)), top: rows.length ? Math.max(...rows.map((row) => row.percentage)) : 0 };
+    return { tests: tests.length, attempts: rows.length, average: avg(rows.map((row) => row.percentage)), accuracy: avg(rows.map((row) => row.accuracy)), top: rows.length ? Math.max(...rows.map((row) => row.percentage)) : null };
   }
 
   function back() {

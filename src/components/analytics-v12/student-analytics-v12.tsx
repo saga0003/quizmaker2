@@ -60,6 +60,29 @@ const GREEN = '#16A34A';
 const RED = '#DC2626';
 const BLUE = '#2563EB';
 const MUTED = '#94A3B8';
+const MIN_TOPIC_INTERPRETATION_EVIDENCE = 5;
+const MIN_PERCENTILE_COHORT = 5;
+
+function topicAnsweredEvidence(row: AnalyticsTaxonomyRow) {
+  return row.correct + row.incorrect;
+}
+
+function topicHasInterpretationEvidence(row: AnalyticsTaxonomyRow) {
+  return topicAnsweredEvidence(row) >= MIN_TOPIC_INTERPRETATION_EVIDENCE;
+}
+
+function eligiblePriorities(payload: AnalyticsV12Payload) {
+  return payload.priorities.filter((priority) => {
+    const topic = payload.topics.find((row) => row.id === priority.topic_id);
+    return Boolean(topic && topicHasInterpretationEvidence(topic));
+  });
+}
+
+function percentileCohortCopy(available: boolean, percentile: number | null) {
+  return available && percentile !== null
+    ? `Same-assessment submitters · cohort threshold ≥ ${MIN_PERCENTILE_COHORT} · ahead of ${round(percentile)}%`
+    : `Same-assessment submitters · requires at least ${MIN_PERCENTILE_COHORT} submitted attempts on every comparable product assessment`;
+}
 
 const difficultyLabels: Record<string, string> = {
   very_easy: 'Very easy',
@@ -152,14 +175,45 @@ function MetricCard({ icon, tone, label, value, copy, delta }: { icon: ReactNode
   </article>;
 }
 
+function formatTaxonomyTime(value: number | null) {
+  if (value === null || value === undefined) return '—';
+  const rounded = Math.max(0, Math.round(value));
+  if (rounded < 60) return `${rounded}s`;
+  const minutes = Math.floor(rounded / 60);
+  const seconds = rounded % 60;
+  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
 function MasteryRows({ rows, onSelect }: { rows: AnalyticsTaxonomyRow[]; onSelect?: (row: AnalyticsTaxonomyRow) => void }) {
   if (!rows.length) return <EmptyState title="No evidence yet" copy="This view will populate after completed tests contain matching taxonomy." />;
-  return <div className="analytics-v12-mastery-list">{rows.map((row) => <button type="button" key={row.id} className="analytics-v12-mastery-row" onClick={() => onSelect?.(row)} disabled={!onSelect}>
-    <span className="analytics-v12-mastery-name">{row.name}</span>
-    <span className="analytics-v12-bar-track"><span className={`analytics-v12-bar-fill ${row.accuracy < 70 ? 'attention' : ''}`} style={{ width: `${clamp(row.accuracy)}%` }} /></span>
-    <strong>{round(row.accuracy)}%</strong>
-    <span className={`analytics-v12-mini-trend ${(row.trend_delta || 0) < 0 ? 'down' : ''}`}>{row.trend_delta === null ? '—' : `${(row.trend_delta || 0) >= 0 ? '▲' : '▼'} ${Math.abs(round(row.trend_delta, 1) || 0)}`}</span>
-  </button>)}</div>;
+  return <div className="analytics-v12-mastery-list">{rows.map((row) => {
+    const attempted = row.correct + row.incorrect;
+    const accuracy = attempted > 0 ? metricValue(row.accuracy, '%') : '—';
+    const scorePercentage = row.questions > 0 && row.average_percentage !== null && row.average_percentage !== undefined
+      ? metricValue(row.average_percentage, '%')
+      : '—';
+    const trend = row.trend_delta === null
+      ? '—'
+      : `${row.trend_delta >= 0 ? '▲' : '▼'} ${Math.abs(round(row.trend_delta, 1) || 0)} pts`;
+    return <button type="button" key={row.id} className="analytics-v12-mastery-row" onClick={() => onSelect?.(row)} disabled={!onSelect}>
+      <span className="analytics-v12-mastery-head">
+        <span className="analytics-v12-mastery-name">{row.name}</span>
+        <span className="analytics-v12-bar-track" aria-label={`Accuracy ${accuracy}`}><span className={`analytics-v12-bar-fill ${attempted > 0 && row.accuracy < 70 ? 'attention' : ''}`} style={{ width: `${attempted > 0 ? clamp(row.accuracy) : 0}%` }} /></span>
+      </span>
+      <span className="analytics-v12-mastery-metrics">
+        <span><small>Exposure</small><strong>{row.questions}</strong></span>
+        <span><small>Attempted</small><strong>{attempted}</strong></span>
+        <span><small>Correct</small><strong>{row.correct}</strong></span>
+        <span><small>Incorrect</small><strong>{row.incorrect}</strong></span>
+        <span><small>Unanswered</small><strong>{row.unanswered}</strong></span>
+        <span><small>Accuracy</small><strong>{accuracy}</strong></span>
+        <span><small>Score %</small><strong>{scorePercentage}</strong></span>
+        <span><small>Time</small><strong>{formatTaxonomyTime(row.average_seconds)}</strong></span>
+        <span><small>Trend</small><strong className={`analytics-v12-mini-trend ${(row.trend_delta || 0) < 0 ? 'down' : ''}`}>{trend}</strong></span>
+        <span><small>Evidence</small><strong>{row.attempts}</strong></span>
+      </span>
+    </button>;
+  })}</div>;
 }
 
 function PriorityList({ rows }: { rows: AnalyticsPriority[] }) {
@@ -259,7 +313,7 @@ function OverviewView({ payload, metricMode, openInsights, openSubject }: {
   return <>
     <section className="analytics-v12-metrics">
       <MetricCard icon={<Target />} tone="green" label={overallLabel} value={overallValue} copy={payload.summary.completed_tests ? 'Good effort!' : 'Complete a test to begin'} delta={payload.summary.trend_delta} />
-      <MetricCard icon={<BarChart3 />} tone="amber" label="Percentile" value={payload.summary.percentile_available ? metricValue(payload.summary.percentile) : '—'} copy={payload.summary.percentile_available ? `You are ahead of ${round(payload.summary.percentile)}% students` : 'Available after enough comparable attempts'} />
+      <MetricCard icon={<BarChart3 />} tone="amber" label="Percentile · same assessment" value={payload.summary.percentile_available ? metricValue(payload.summary.percentile) : '—'} copy={percentileCohortCopy(payload.summary.percentile_available, payload.summary.percentile)} />
       <MetricCard icon={<CheckCircle2 />} tone="green" label="Accuracy" value={metricValue(payload.summary.accuracy, '%')} copy={payload.summary.accuracy >= 75 ? 'Good accuracy' : 'Keep improving'} />
       <MetricCard icon={<Clock3 />} tone="amber" label={payload.summary.time_management_score === null ? 'Average Pace' : 'Time Management'} value={payload.summary.time_management_score === null ? <>{metricValue(payload.summary.average_response_seconds)} <small>sec / Q</small></> : <>{metricValue(payload.summary.time_management_score)} <small>/ 10</small></>} copy={payload.summary.time_management_score === null ? 'Based on recorded question time' : payload.summary.time_management_label} />
     </section>
@@ -350,8 +404,9 @@ function ChapterView({ payload, chapterId, setChapterId, openTopic, metricMode }
   const errorKeys = [
     ['concept_gap', 'Concept gap', BRAND], ['calculation_error', 'Calculation', AMBER], ['careless_error', 'Careless', BLUE], ['guessed', 'Guessed', '#7a62b3'], ['ran_out_of_time', 'Time pressure', RED], ['other', 'Other', '#78909c'], ['unclassified', 'Not classified', '#c9d2d9'],
   ] as const;
-  const weakestTopic = [...topics].sort((a, b) => a.accuracy - b.accuracy)[0];
-  const slowestTopic = [...topics].filter((row) => row.average_seconds !== null).sort((a, b) => (b.average_seconds || 0) - (a.average_seconds || 0))[0];
+  const interpretableTopics = topics.filter(topicHasInterpretationEvidence);
+  const weakestTopic = [...interpretableTopics].sort((a, b) => a.accuracy - b.accuracy)[0];
+  const slowestTopic = [...interpretableTopics].filter((row) => row.average_seconds !== null).sort((a, b) => (b.average_seconds || 0) - (a.average_seconds || 0))[0];
   const selectSubject = (value: string) => {
     const first = payload.chapters.find((row) => row.subject_id === value || row.parent_id === value);
     if (first) setChapterId(first.id);
@@ -369,11 +424,11 @@ function ChapterView({ payload, chapterId, setChapterId, openTopic, metricMode }
       <MetricCard icon={<Clock3 />} tone="amber" label="Avg time per question" value={averageMinutes === null ? '—' : <>{averageMinutes} <small>min</small></>} copy={averageMinutes === null ? 'Question-level timing not recorded' : 'Based on active recorded response time'} />
     </section>
     <section className="analytics-v12-chapter-three-grid">
-      <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Topic mastery within {chapter.name}</h3><p>Topic performance with the chapter average shown as a marker.</p></div></div><div className="analytics-v12-topic-mastery-detailed">{topics.length ? topics.map((row) => <button type="button" key={row.id} onClick={() => openTopic(row)}><span>{row.name}</span><div className="analytics-v12-topic-track"><i style={{ width: `${clamp(row.accuracy)}%`, background: row.accuracy >= 70 ? BRAND : AMBER }} /><b style={{ left: `${clamp(chapter.accuracy)}%` }} /></div><strong>{round(row.accuracy)}%</strong></button>) : <p className="analytics-v12-evidence-note">No topic-tagged questions are available for this chapter.</p>}</div><div className="analytics-v12-topic-legend"><span><i />Your score</span><span><b />Chapter average</span></div></article>
+      <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Topic mastery within {chapter.name}</h3><p>Topic performance with the chapter average shown as a marker.</p></div></div><div className="analytics-v12-topic-mastery-detailed">{topics.length ? topics.map((row) => { const sample = topicAnsweredEvidence(row); const ready = topicHasInterpretationEvidence(row); return <button type="button" key={row.id} onClick={() => openTopic(row)}><span>{row.name}<small>{ready ? `n=${sample} answered` : `Building evidence · n=${sample}/${MIN_TOPIC_INTERPRETATION_EVIDENCE}`}</small></span><div className="analytics-v12-topic-track"><i style={{ width: `${ready ? clamp(row.accuracy) : 0}%`, background: ready ? (row.accuracy >= 70 ? BRAND : AMBER) : MUTED }} /><b style={{ left: `${clamp(chapter.accuracy)}%` }} /></div><strong>{ready ? `${round(row.accuracy)}%` : '—'}</strong></button>; }) : <p className="analytics-v12-evidence-note">No topic-tagged questions are available for this chapter.</p>}</div><div className="analytics-v12-topic-legend"><span><i />Your score</span><span><b />Chapter average</span></div></article>
       <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Accuracy vs time</h3><p>Each bubble represents a topic. Bubble size reflects evidence volume.</p></div><span className="analytics-v12-panel-mode">By topic</span></div>{scatter.length ? <div className="analytics-v12-chart-box tall"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{ left: -8, right: 12, top: 12, bottom: 12 }}><CartesianGrid stroke="#eef2f4" /><XAxis type="number" dataKey="seconds" name="Average time" unit="s" tick={{ fontSize: 10, fill: '#8998a8' }} /><YAxis type="number" dataKey="accuracy" name="Accuracy" unit="%" domain={[0, 100]} tick={{ fontSize: 10, fill: '#8998a8' }} /><ZAxis type="number" dataKey="questions" range={[55, 220]} /><Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name) => [name === 'accuracy' ? `${value}%` : name === 'seconds' ? `${value} sec` : value, name]} /><Scatter data={scatter} fill={BRAND} /></ScatterChart></ResponsiveContainer></div> : <div className="analytics-v12-unavailable-panel"><Clock3 /><strong>Timing analysis unavailable</strong><p>Question-level timing is required for this chart.</p></div>}</article>
       <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Error breakdown</h3><p>Reasons selected by the student after each test.</p></div><span className="analytics-v12-panel-mode">By topic</span></div><div className="analytics-v12-error-legend">{errorKeys.map(([key,label,color]) => <span key={key}><i style={{background:color}} />{label}</span>)}</div>{errorRows.length ? <div className="analytics-v12-error-rows">{errorRows.map((row) => <div key={row.topic_id || row.topic_name}><span>{row.topic_name}</span><div>{errorKeys.map(([key,,color]) => { const count=Number(row[key] || 0); const width=row.total_reviewable ? count/row.total_reviewable*100 : 0; return <i key={key} title={`${count} responses`} style={{width:`${width}%`,background:color}} />})}</div><small>{row.total_reviewable} review items</small></div>)}</div> : <div className="analytics-v12-unavailable-panel"><AlertTriangle /><strong>No self-classifications yet</strong><p>After a submitted test, students can classify each wrong or skipped question. This panel will then populate automatically.</p></div>}</article>
     </section>
-    <section className="analytics-v12-next-steps"><div className="analytics-v12-next-icon"><ArrowRight /></div><article><span>1</span><div><strong>Strengthen the weakest topic</strong><p>{weakestTopic ? `Begin with ${weakestTopic.name}, currently at ${round(weakestTopic.accuracy)}% accuracy.` : 'Complete more topic-tagged questions to identify the weakest area.'}</p></div></article><article><span>2</span><div><strong>Practice smarter</strong><p>Redo recently incorrect and skipped questions, then complete a short targeted practice set.</p></div></article><article><span>3</span><div><strong>{slowestTopic ? 'Manage your time' : 'Improve completion'}</strong><p>{slowestTopic ? `${slowestTopic.name} currently takes the longest at about ${round(slowestTopic.average_seconds)} seconds per question.` : `Your current chapter attempt rate is ${round(attemptRate)}%. Focus on completing a few more medium-difficulty questions.`}</p></div></article></section>
+    <section className="analytics-v12-next-steps"><div className="analytics-v12-next-icon"><ArrowRight /></div><article><span>1</span><div><strong>Strengthen the weakest topic</strong><p>{weakestTopic ? `Begin with ${weakestTopic.name}, currently at ${round(weakestTopic.accuracy)}% accuracy across n=${topicAnsweredEvidence(weakestTopic)} answered questions.` : `Complete at least ${MIN_TOPIC_INTERPRETATION_EVIDENCE} answered questions in a topic before Evidara labels it weak or strong.`}</p></div></article><article><span>2</span><div><strong>Practice smarter</strong><p>Redo recently incorrect and skipped questions, then complete a short targeted practice set.</p></div></article><article><span>3</span><div><strong>{slowestTopic ? 'Manage your time' : 'Improve completion'}</strong><p>{slowestTopic ? `${slowestTopic.name} currently takes the longest at about ${round(slowestTopic.average_seconds)} seconds per question.` : `Your current chapter attempt rate is ${round(attemptRate)}%. Focus on completing a few more medium-difficulty questions.`}</p></div></article></section>
   </>;
 }
 
@@ -416,7 +471,8 @@ function TopicView({ payload, topicId, setTopicId, studentId, openQuestionIntell
   const subject = payload.subjects.find((row) => row.id === topic.subject_id);
   const subjectChapters = payload.chapters.filter((row) => row.subject_id === subject?.id || row.parent_id === subject?.id);
   const chapterTopics = payload.topics.filter((row) => row.parent_id === chapter?.id);
-  const priority = payload.priorities.find((row) => row.topic_id === topic.id);
+  const topicSampleSize = topicAnsweredEvidence(topic);
+  const priority = topicHasInterpretationEvidence(topic) ? payload.priorities.find((row) => row.topic_id === topic.id) : undefined;
   const averageMinutes = topic.average_seconds === null ? null : round(topic.average_seconds / 60, 2);
   const confidence = reflection?.confidence_index ?? null;
   const calibration = reflection?.calibration_score ?? null;
@@ -441,7 +497,7 @@ function TopicView({ payload, topicId, setTopicId, studentId, openQuestionIntell
       <label><Target /><span><small>Topic</small><select value={topic.id} onChange={(event)=>setTopicId(event.target.value)}>{chapterTopics.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></span><ChevronDown /></label>
     </div>
     <section className="analytics-v12-metrics">
-      <MetricCard icon={<Target />} tone="green" label="Topic score" value={metricValue(topic.accuracy, '%')} copy={`${topic.questions} assessed outcomes`} delta={topic.trend_delta} />
+      <MetricCard icon={<Target />} tone="green" label="Topic score" value={topicHasInterpretationEvidence(topic) ? metricValue(topic.accuracy, '%') : '—'} copy={topicHasInterpretationEvidence(topic) ? `n=${topicSampleSize} answered · ${topic.questions} exposed` : `Building evidence · n=${topicSampleSize}/${MIN_TOPIC_INTERPRETATION_EVIDENCE} answered`} delta={topicHasInterpretationEvidence(topic) ? topic.trend_delta : null} />
       <MetricCard icon={<CheckCircle2 />} tone="green" label="Accuracy" value={metricValue(topic.accuracy, '%')} copy={`${topic.correct} correct · ${topic.incorrect} incorrect`} />
       <MetricCard icon={<Clock3 />} tone="amber" label="Avg time / question" value={averageMinutes === null ? '—' : <>{averageMinutes} <small>min</small></>} copy={averageMinutes === null ? 'Question-level timing not recorded' : 'Valid active response time'} />
       <MetricCard icon={<Gauge />} tone="blue" label="Confidence index" value={reflectionLoading ? '…' : confidence === null ? '—' : <>{round(confidence,1)} <small>/ 5</small></>} copy={confidence === null ? 'Student reflection not yet provided' : `${confidenceLabel(confidence)} · ${round(reflection?.confidence_coverage)}% coverage`} />
@@ -453,7 +509,7 @@ function TopicView({ payload, topicId, setTopicId, studentId, openQuestionIntell
     <section className="analytics-v12-topic-lower-grid">
       <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Confidence calibration</h3><p>How accurately the student judges what they know</p></div></div><div className="analytics-v12-calibration"><div className="analytics-v12-calibration-ring" style={{'--progress': `${calibration ?? 0}%`} as CSSProperties}><strong>{calibration === null ? '—' : `${round(calibration)}%`}</strong><span>Calibration</span></div><div><p><strong>Accuracy:</strong> {round(topic.accuracy)}%</p><p><strong>Confidence:</strong> {confidence === null ? 'Not rated' : `${round(confidence,1)} / 5`}</p><p>{confidence === null ? 'Ask the student to reflect during answer-key review.' : topic.accuracy < 60 && confidence >= 4 ? 'High-confidence errors suggest a misconception that needs correction.' : topic.accuracy >= 70 && confidence < 3 ? 'Performance is stronger than the student believes; confidence building may help.' : 'Confidence is reasonably aligned with performance.'}</p></div></div></article>
       <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Common mistakes</h3><p>Student-selected reasons after submission</p></div></div><div className="analytics-v12-mistake-list">{errorEntries.map(([key,label])=>{const count=Number(reflection?.error_breakdown?.[key]||0);const percentage=errorTotal?Math.round(count/errorTotal*100):0;return <div key={key}><AlertTriangle/><span><strong>{label}</strong><small>{count} response{count===1?'':'s'}</small></span><b>{errorTotal?`${percentage}%`:'—'}</b></div>})}</div><p className="analytics-v12-evidence-note">Classification coverage: {reflection ? `${reflection.classified_errors} of ${reflection.reviewable_errors}` : 'unavailable'} incorrect or skipped responses.</p></article>
-      <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Recommended practice</h3><p>Shown only when current evidence meets the priority threshold</p></div></div>{priority ? <div className="analytics-v12-evidence-recommendation"><ListChecks/><div><strong>Evidence-based next step</strong><p>{priority.action}</p><small>{priority.questions} assessed outcomes · {round(priority.accuracy)}% accuracy</small></div></div> : <EmptyState title="Not enough data yet" copy="Complete more tests in this topic before Evidara recommends a targeted practice step." />}</article>
+      <article className="analytics-v12-section-card"><div className="analytics-v12-section-head"><div><h3>Recommended practice</h3><p>Shown only when current evidence meets the priority threshold</p></div></div>{priority ? <div className="analytics-v12-evidence-recommendation"><ListChecks/><div><strong>Evidence-based next step</strong><p>{priority.action}</p><small>n={topicSampleSize} answered · {priority.questions} exposed outcomes · {round(priority.accuracy)}% accuracy</small></div></div> : <EmptyState title="Not enough data yet" copy="Complete more tests in this topic before Evidara recommends a targeted practice step." />}</article>
     </section>
     <section className="analytics-v12-focus-banner topic-focus"><div><ListChecks /></div><div><h4>{reflectionLoading ? 'Checking reflection evidence...' : reflection?.classified_errors ? `Review your recorded mistake patterns in ${topic.name}.` : 'Classification not yet available'}</h4><p>{reflection?.classified_errors ? `${reflection.classified_errors} of ${reflection.reviewable_errors} reviewable responses have student-selected classifications.` : 'Complete the optional post-test reflection to add mistake reasons. No reason is inferred automatically.'}</p></div><button type="button" onClick={openQuestionIntelligence}>Open question intelligence <ArrowRight/></button></section>
   </>;
@@ -462,15 +518,28 @@ function TopicView({ payload, topicId, setTopicId, studentId, openQuestionIntell
 function QuestionIntelligenceView({ payload, topicId }: { payload: AnalyticsV12Payload; topicId: string }) {
   const topic = payload.topics.find((row)=>row.id===topicId) || payload.topics[0];
   if (!topic) return <EmptyState title="Not enough data yet" copy="Complete more tests with verified topic taxonomy before Question Intelligence becomes available." />;
+  const questionEvidence = (payload.question_evidence || [])
+    .filter((row) => row.topic_id === topic.id)
+    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime() || a.question_no - b.question_no);
   return <>
     <section className="analytics-v12-question-intro"><div><Eye/><span><small>Question intelligence</small><h2>{topic.name}</h2><p>Question-level evidence must come from submitted responses, recorded timing and student reflection.</p></span></div></section>
     <section className="analytics-v12-metrics"><MetricCard icon={<CheckCircle2/>} tone="green" label="Correct" value={topic.correct} copy={`${topic.questions} total outcomes`}/><MetricCard icon={<XCircle/>} tone="amber" label="Incorrect" value={topic.incorrect} copy="Reviewable after submission"/><MetricCard icon={<Clock3/>} tone="blue" label="Average time" value={<>{metricValue(topic.average_seconds)} <small>sec</small></>} copy="Active question time"/><MetricCard icon={<Gauge/>} tone="green" label="Reflection" value="Evidence only" copy="Never inferred or fabricated"/></section>
-    <article className="analytics-v12-section-card analytics-v12-question-table"><div className="analytics-v12-section-head"><div><h3>Response evidence</h3><p>Only authorized live response data may appear here.</p></div></div><EmptyState title="Question-level detail is not available yet" copy="The current analytics contract provides real topic aggregates but not authorized question rows. No synthetic questions, retry status, confidence, or mistake reasons are being substituted." /></article>
+    <article className="analytics-v12-section-card analytics-v12-question-table">
+      <div className="analytics-v12-section-head"><div><h3>Response evidence</h3><p>Authorized submitted responses for this exact topic.</p></div><span className="analytics-v12-panel-mode">{questionEvidence.length} outcomes</span></div>
+      {questionEvidence.length ? <div data-f4-question-evidence className="divide-y divide-[var(--line)]">
+        {questionEvidence.slice(0, 150).map((row) => <div key={row.response_id} className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0"><small className="text-[var(--muted-foreground)]">{row.paper_title} · Q{row.question_no} · {formatDate(row.submitted_at)}</small><strong className="mt-1 block">{row.question_text}</strong><span className="mt-1 block text-xs text-[var(--muted-foreground)]">{row.subject_name} · {row.chapter_name} · {row.topic_name}</span></div>
+          <div className="flex flex-wrap items-center gap-2 text-sm md:justify-end"><span className="rounded-full border border-[var(--line)] px-2.5 py-1 font-semibold">{row.outcome === 'correct' ? 'Correct' : row.outcome === 'incorrect' ? 'Incorrect' : 'Unanswered'}</span><span>{row.marks_awarded > 0 ? `+${row.marks_awarded}` : row.marks_awarded} marks</span><span>{row.time_spent_seconds == null ? 'Time —' : `${row.time_spent_seconds}s`}</span></div>
+        </div>)}
+        {questionEvidence.length > 150 && <p className="pt-3 text-xs text-[var(--muted-foreground)]">Showing the latest 150 question outcomes for this topic.</p>}
+      </div> : <EmptyState title="No question evidence for this topic" copy="Question rows appear only when authorized submitted responses exist for this exact topic. No synthetic rows are substituted." />}
+    </article>
   </>;
 }
 
 function PrioritiesView({ payload }: { payload: AnalyticsV12Payload }) {
-  return <section className="analytics-v12-priorities-page"><div className="analytics-v12-section-head"><div><h3>Revision priorities</h3><p>Ranked automatically from accuracy, unanswered rate, pace and recent direction.</p></div></div><PriorityList rows={payload.priorities} /></section>;
+  const priorities = eligiblePriorities(payload);
+  return <section className="analytics-v12-priorities-page"><div className="analytics-v12-section-head"><div><h3>Revision priorities</h3><p>Ranked only after at least {MIN_TOPIC_INTERPRETATION_EVIDENCE} answered questions in the topic; sample size remains visible in topic analysis.</p></div></div><PriorityList rows={priorities} /></section>;
 }
 
 function HistoryView({ payload }: { payload: AnalyticsV12Payload }) {
@@ -480,7 +549,8 @@ function HistoryView({ payload }: { payload: AnalyticsV12Payload }) {
 
 function EvidenceDrawer({ payload, open, close }: { payload: AnalyticsV12Payload; open: boolean; close: () => void }) {
   const strengths = payload.subjects.slice().sort((a, b) => b.accuracy - a.accuracy).slice(0, 3);
-  return <><button type="button" aria-label="Close insights" className={`analytics-v12-overlay ${open ? 'open' : ''}`} onClick={close} /><aside className={`analytics-v12-drawer ${open ? 'open' : ''}`} aria-hidden={!open}><header><div><h2>Evidence insights</h2><p>Generated only from recorded assessment evidence.</p></div><button type="button" onClick={close}>×</button></header><div className="analytics-v12-drawer-scroll"><section><h3 className="good">What is going well</h3><ul>{strengths.map((row) => <li key={row.id}>{row.name}: {round(row.accuracy)}% accuracy across {row.questions} question outcomes.</li>)}</ul></section><section><h3 className="focus">What needs attention</h3><ul>{payload.priorities.slice(0, 3).map((row) => <li key={row.rank}>{row.topic_name || row.chapter_name}: {row.reasons[0]}.</li>)}</ul></section><section><h3>Recommended next steps</h3><ol>{payload.priorities.slice(0, 3).map((row) => <li key={row.rank}><span>{row.rank}</span>{row.action}</li>)}</ol></section><section className="analytics-v12-policy"><h3>Evidence policy</h3><p>Evidara records outcomes, timing and taxonomy automatically. Error types are included only when the student explicitly self-classifies an incorrect or skipped response after submission; unclassified items remain visible.</p></section></div></aside></>;
+  const priorities = eligiblePriorities(payload);
+  return <><button type="button" aria-label="Close insights" className={`analytics-v12-overlay ${open ? 'open' : ''}`} onClick={close} /><aside className={`analytics-v12-drawer ${open ? 'open' : ''}`} aria-hidden={!open}><header><div><h2>Evidence insights</h2><p>Generated only from recorded assessment evidence.</p></div><button type="button" onClick={close}>×</button></header><div className="analytics-v12-drawer-scroll"><section><h3 className="good">What is going well</h3><ul>{strengths.map((row) => <li key={row.id}>{row.name}: {round(row.accuracy)}% accuracy across {row.questions} question outcomes.</li>)}</ul></section><section><h3 className="focus">What needs attention</h3><ul>{priorities.slice(0, 3).map((row) => <li key={row.rank}>{row.topic_name || row.chapter_name}: {row.reasons[0]}.</li>)}</ul></section><section><h3>Recommended next steps</h3><ol>{priorities.slice(0, 3).map((row) => <li key={row.rank}><span>{row.rank}</span>{row.action}</li>)}</ol></section><section className="analytics-v12-policy"><h3>Evidence policy</h3><p>Evidara records outcomes, timing and taxonomy automatically. Error types are included only when the student explicitly self-classifies an incorrect or skipped response after submission; unclassified items remain visible.</p></section></div></aside></>;
 }
 
 export function AnalyticsV12Workspace({

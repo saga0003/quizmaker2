@@ -1,0 +1,196 @@
+#!/usr/bin/env node
+
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const ACK = 'YES_I_UNDERSTAND_NON_PRODUCTION_ONLY';
+const CANDIDATE_SHA = 'c80de5e044b9b757977be8ffbb49d4a3a92c8ece';
+let assertions = 0;
+
+function assert(condition, message) {
+  assertions += 1;
+  if (!condition) throw new Error(`Assertion ${assertions} failed: ${message}`);
+}
+
+function runNode(script, args = [], env = {}) {
+  return spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
+}
+
+function lineCount(path) {
+  const content = readFileSync(path, 'utf8');
+  return content.endsWith('\n') ? content.split('\n').length - 1 : content.split('\n').length;
+}
+
+function makeRunnerConfig(overrides = {}) {
+  const operations = Array.from({ length: 500 }, (_, index) => ({
+    actorId: `synthetic-student-${String(index + 1).padStart(4, '0')}`,
+    path: '/api/acceptance/noop',
+    method: 'POST',
+    authorization: `Bearer synthetic-session-${index + 1}`,
+    body: { synthetic: true },
+  }));
+  return {
+    target: 'https://quizmaker2-git-phase1-hardening-example.vercel.app',
+    syntheticOnly: true,
+    containsPersonalData: false,
+    scenario: 'start',
+    candidateSha: CANDIDATE_SHA,
+    workloadId: 'phase1-start-acceptance-001',
+    budget: { maxFailureRate: 0.01, maxP95Ms: 3000, maxP99Ms: 5000 },
+    operations,
+    concurrency: 50,
+    rampMs: 1000,
+    timeoutMs: 1000,
+    ...overrides,
+  };
+}
+
+const root = process.cwd();
+const generator = join(root, 'scripts', 'phase1-generate-load-fixtures.mjs');
+const preflight = join(root, 'scripts', 'phase1-acceptance-preflight.mjs');
+const runner = join(root, 'scripts', 'phase1-run-load-scenario.mjs');
+const temp = mkdtempSync(join(tmpdir(), 'evidara-acceptance-tooling-'));
+const runA = join(temp, 'run-a');
+const runB = join(temp, 'run-b');
+
+try {
+  const missingAck = runNode(preflight, ['--target', 'https://quizmaker2-git-phase1-hardening-example.vercel.app', '--dry-run']);
+  assert(missingAck.status === 2, 'preflight must fail closed without explicit non-production acknowledgement');
+  assert(missingAck.stderr.includes('ACCEPTANCE PREFLIGHT REFUSED'), 'missing acknowledgement must produce an explicit refusal');
+
+  const prodTarget = runNode(
+    preflight,
+    ['--target', 'https://quizmaker2-saga0003s-projects.vercel.app', '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(prodTarget.status === 2, 'known permanent production host must be refused');
+  assert(prodTarget.stderr.includes('permanent production host is forbidden'), 'production refusal must name the safety reason');
+
+  const mainTarget = runNode(
+    preflight,
+    ['--target', 'https://quizmaker2-git-main-saga0003s-projects.vercel.app', '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(mainTarget.status === 2, 'main-branch deployment host must be refused');
+
+  const nonVercel = runNode(
+    preflight,
+    ['--target', 'https://acceptance.example.com', '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(nonVercel.status === 2, 'unidentified external targets must fail closed');
+
+  const safePreview = runNode(
+    preflight,
+    ['--target', 'https://quizmaker2-git-phase1-hardening-example.vercel.app', '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(safePreview.status === 0, `explicit Evidara preview must pass dry preflight: ${safePreview.stderr}`);
+  const safePayload = JSON.parse(safePreview.stdout);
+  assert(safePayload.productionProtected === true, 'safe preflight must report production protection');
+  assert(safePayload.destructiveActionsPerformed === false, 'preflight must remain non-destructive');
+  assert(safePayload.mode === 'preflight-only', 'preflight must not masquerade as load execution');
+
+  const validRunnerConfigPath = join(temp, 'runner-valid.json');
+  writeFileSync(validRunnerConfigPath, JSON.stringify(makeRunnerConfig()));
+  const safeRunner = runNode(
+    runner,
+    ['--scenario', 'start', '--config', validRunnerConfigPath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(safeRunner.status === 0, `load runner safe config must pass dry-run: ${safeRunner.stderr}`);
+  const safeRunnerPayload = JSON.parse(safeRunner.stdout);
+  assert(safeRunnerPayload.requestsSent === 0, 'load runner dry-run must send zero requests');
+  assert(safeRunnerPayload.candidateSha === CANDIDATE_SHA, 'dry-run evidence must bind to exact candidate SHA');
+  assert(safeRunnerPayload.workloadId === 'phase1-start-acceptance-001', 'dry-run evidence must carry workload ID');
+  assert(safeRunnerPayload.budget.maxP95Ms === 3000, 'dry-run must expose the predeclared latency budget');
+  assert(safeRunnerPayload.maxResponseBytesPerOperation === 1048576, 'runner must expose a one-megabyte response cap');
+
+  const missingSha = makeRunnerConfig({ candidateSha: '' });
+  const missingShaPath = join(temp, 'runner-missing-sha.json');
+  writeFileSync(missingShaPath, JSON.stringify(missingSha));
+  const missingShaRun = runNode(runner, ['--scenario', 'start', '--config', missingShaPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(missingShaRun.status === 2, 'load runner must refuse evidence not bound to an exact candidate SHA');
+
+  const missingBudget = makeRunnerConfig({ budget: undefined });
+  const missingBudgetPath = join(temp, 'runner-missing-budget.json');
+  writeFileSync(missingBudgetPath, JSON.stringify(missingBudget));
+  const missingBudgetRun = runNode(runner, ['--scenario', 'start', '--config', missingBudgetPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(missingBudgetRun.status === 2, 'load runner must refuse execution without a predeclared budget');
+
+  const invalidBudget = makeRunnerConfig({ budget: { maxFailureRate: 0.5, maxP95Ms: 3000, maxP99Ms: 5000 } });
+  const invalidBudgetPath = join(temp, 'runner-invalid-budget.json');
+  writeFileSync(invalidBudgetPath, JSON.stringify(invalidBudget));
+  const invalidBudgetRun = runNode(runner, ['--scenario', 'start', '--config', invalidBudgetPath, '--dry-run'], { EVIDARA_LOAD_ACCEPTANCE: ACK });
+  assert(invalidBudgetRun.status === 2, 'load runner must reject permissive post-hoc-like failure budgets');
+
+  const authOverride = makeRunnerConfig();
+  authOverride.operations[0].headers = { authorization: 'Bearer service_role_override' };
+  const authOverridePath = join(temp, 'runner-auth-override.json');
+  writeFileSync(authOverridePath, JSON.stringify(authOverride));
+  const authOverrideRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', authOverridePath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(authOverrideRun.status === 2, 'load runner must refuse custom Authorization header overrides');
+  assert(authOverrideRun.stderr.includes('protected header: authorization'), 'authorization override refusal must name the protected header');
+
+  const hostOverride = makeRunnerConfig();
+  hostOverride.operations[0].headers = { Host: 'evidara.in' };
+  const hostOverridePath = join(temp, 'runner-host-override.json');
+  writeFileSync(hostOverridePath, JSON.stringify(hostOverride));
+  const hostOverrideRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', hostOverridePath, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(hostOverrideRun.status === 2, 'load runner must refuse Host header overrides');
+
+  const unsafePath = makeRunnerConfig();
+  unsafePath.operations[0].path = '//evidara.in/api/acceptance/noop';
+  const unsafePathFile = join(temp, 'runner-unsafe-path.json');
+  writeFileSync(unsafePathFile, JSON.stringify(unsafePath));
+  const unsafePathRun = runNode(
+    runner,
+    ['--scenario', 'start', '--config', unsafePathFile, '--dry-run'],
+    { EVIDARA_LOAD_ACCEPTANCE: ACK },
+  );
+  assert(unsafePathRun.status === 2, 'load runner must refuse scheme-relative paths');
+
+  execFileSync(process.execPath, [generator, '--out', runA, '--seed', '424242'], { stdio: 'pipe' });
+  execFileSync(process.execPath, [generator, '--out', runB, '--seed', '424242'], { stdio: 'pipe' });
+
+  const manifestA = JSON.parse(readFileSync(join(runA, 'manifest.json'), 'utf8'));
+  const manifestB = JSON.parse(readFileSync(join(runB, 'manifest.json'), 'utf8'));
+
+  assert(manifestA.syntheticOnly === true, 'fixture manifest must declare synthetic-only data');
+  assert(manifestA.containsPersonalData === false, 'fixture manifest must declare no personal data');
+  assert(manifestA.counts.students === 2000, 'L1 fixture count must be exactly 2,000 students');
+  assert(manifestA.counts.questions === 50000, 'L2 fixture count must be exactly 50,000 questions');
+  assert(manifestA.counts.papers === 1000, 'L3 fixture count must be exactly 1,000 papers');
+
+  assert(lineCount(join(runA, 'students-2000.csv')) === 2001, 'student CSV must contain header + exactly 2,000 rows');
+  assert(lineCount(join(runA, 'questions-50000.csv')) === 50001, 'question CSV must contain header + exactly 50,000 rows');
+  assert(lineCount(join(runA, 'papers-1000.csv')) === 1001, 'paper CSV must contain header + exactly 1,000 rows');
+
+  for (const file of ['students-2000.csv', 'questions-50000.csv', 'papers-1000.csv']) {
+    assertions += 1;
+    if (manifestA.files[file].sha256 !== manifestB.files[file].sha256) {
+      throw new Error(`Assertion ${assertions} failed: ${file} hash must be deterministic for the same seed`);
+    }
+  }
+
+  const students = readFileSync(join(runA, 'students-2000.csv'), 'utf8');
+  assert(students.includes('Synthetic Student 0001'), 'student fixtures must be visibly synthetic');
+  assert(!students.includes('@'), 'student fixture file must not contain email-like personal identifiers');
+
+  console.log(`Phase 1 acceptance tooling smoke passed (${assertions} assertions).`);
+} finally {
+  rmSync(temp, { recursive: true, force: true });
+}

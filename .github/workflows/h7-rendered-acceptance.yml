@@ -1,0 +1,112 @@
+name: H7 Rendered Responsive Acceptance
+
+on:
+  push:
+    branches: [phase1-hardening]
+
+permissions:
+  contents: read
+
+jobs:
+  rendered-acceptance:
+    if: contains(github.event.head_commit.message, 'run H7 rendered acceptance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Add isolated H7 QA harness
+        shell: bash
+        run: |
+          mkdir -p src/app/h7-rendered-qa
+          cat > src/app/h7-rendered-qa/page.tsx <<'EOF'
+          import { Phase1AsyncState, Phase1Card, Phase1FilterBar, Phase1PageHeading, Phase1TableFrame } from '@/components/evidara/phase1-ui';
+          import { Button } from '@/components/ui/button';
+          import { Input } from '@/components/ui/input';
+
+          const longToken = 'StMarysInternationalSchoolChikmagalurGrade11IntegratedNEETJEESectionAlphaExtremelyLongIdentifier';
+          export default function H7RenderedQA() {
+            return (
+              <main className="mx-auto min-h-screen w-full max-w-[1600px] min-w-0 space-y-6 overflow-x-clip p-3 sm:p-6 lg:p-8" data-h7-root>
+                <Phase1PageHeading title={`Institution analytics — ${longToken}`} description={`Review student participation, subject/chapter/topic evidence and assessment outcomes for ${longToken}. This deliberately uses realistic long content to expose wrapping and viewport defects.`} actions={<><Button>Export comprehensive analytics workbook</Button><Button variant="outline">Refresh institutional evidence</Button></>} />
+                <Phase1FilterBar label="Institution analytics filters">
+                  <label className="grid min-w-0 gap-1 text-sm"><span>Programme</span><Input defaultValue="ISC Science with Integrated NEET/JEE Coaching Programme" /></label>
+                  <label className="grid min-w-0 gap-1 text-sm"><span>Grade / section</span><Input defaultValue="Grade 11 — Section Alpha — 2026–27 Academic Year" /></label>
+                  <label className="grid min-w-0 gap-1 text-sm"><span>Subject</span><Input defaultValue="Physics — Mechanics and Rotational Motion" /></label>
+                  <Button>Apply filters</Button>
+                </Phase1FilterBar>
+                <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {['Licensed students 160', 'Active students 157', 'Participation 92.6%', 'Average score 71.4%'].map((x) => <Phase1Card key={x}><div className="break-words text-lg font-semibold [overflow-wrap:anywhere]">{x} — {longToken}</div><p className="mt-2 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">Evidence is scoped to the currently selected institution and assessment cohort.</p></Phase1Card>)}
+                </div>
+                <Phase1TableFrame label="Long institutional analytics result table"><table className="w-full min-w-[980px] text-sm"><thead><tr className="border-b"><th className="p-3 text-left">Student</th><th className="p-3 text-left">Programme</th><th className="p-3 text-left">Subject</th><th className="p-3 text-left">Chapter / topic</th><th className="p-3 text-left">Attempted</th><th className="p-3 text-left">Accuracy</th><th className="p-3 text-left">Score %</th><th className="p-3 text-left">Evidence</th></tr></thead><tbody>{Array.from({length: 8}).map((_, i) => <tr key={i} className="border-b"><td className="p-3">Student {i+1} — Very Long Registered Student Name</td><td className="p-3">ISC Science Integrated NEET/JEE</td><td className="p-3">Physics</td><td className="p-3">Rotational Motion / Angular Momentum Conservation</td><td className="p-3">42</td><td className="p-3">73.8%</td><td className="p-3">68.4%</td><td className="p-3">57 questions</td></tr>)}</tbody></table></Phase1TableFrame>
+                <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+                  <Phase1AsyncState state="loading" title={`Loading evidence for ${longToken}`} description="The analytics request is still processing. Existing screen structure must remain readable at narrow widths." />
+                  <Phase1AsyncState state="empty" title={`No assessed evidence yet for ${longToken}`} description="Performance metrics will populate after eligible students submit assessments with released evidence." action={<Button>Create or assign a test</Button>} />
+                  <Phase1AsyncState state="error" title={`Could not refresh ${longToken}`} description="The last successful evidence remains unchanged. Retry the request without losing your current filters." action={<><Button>Retry</Button><Button variant="outline">Return to dashboard</Button></>} />
+                </div>
+              </main>
+            );
+          }
+          EOF
+      - name: Install browser runtime
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start application
+        shell: bash
+        run: |
+          npm run dev -- --hostname 127.0.0.1 > /tmp/h7-next.log 2>&1 &
+          for i in {1..90}; do if curl -fsS http://127.0.0.1:3000/h7-rendered-qa >/dev/null; then exit 0; fi; sleep 1; done
+          cat /tmp/h7-next.log
+          exit 1
+      - name: Render viewport matrix and assert containment
+        shell: bash
+        run: |
+          mkdir -p h7-rendered-artifacts
+          cat > h7-rendered.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const viewports = [['360',360,800],['390',390,844],['430',430,932],['tablet',768,1024],['1366',1366,768],['1920',1920,1080]];
+          const browser = await chromium.launch({headless:true});
+          const report = [];
+          let failures = 0;
+          for (const [name,width,height] of viewports) {
+            const page = await browser.newPage({viewport:{width,height}});
+            const consoleErrors = [];
+            page.on('console', m => { if (m.type()==='error') consoleErrors.push(m.text()); });
+            const response = await page.goto('http://127.0.0.1:3000/h7-rendered-qa', {waitUntil:'networkidle'});
+            const metrics = await page.evaluate(() => {
+              const root = document.querySelector('[data-h7-root]');
+              const frame = document.querySelector('[role="region"][aria-label="Long institutional analytics result table"]');
+              const actionButtons = [...document.querySelectorAll('button')].map(el => { const r=el.getBoundingClientRect(); return {text:(el.textContent||'').trim(), left:r.left, right:r.right}; });
+              const viewport = document.documentElement.clientWidth;
+              const overflowingText = [...document.querySelectorAll('h1,p')].filter(el => el.scrollWidth > el.clientWidth + 1).map(el => (el.textContent || '').slice(0,80));
+              return {viewport,docScrollWidth:document.documentElement.scrollWidth,bodyScrollWidth:document.body.scrollWidth,rootRight:root?.getBoundingClientRect().right ?? 0,frameClientWidth:frame?.clientWidth ?? 0,frameScrollWidth:frame?.scrollWidth ?? 0,escapedButtons:actionButtons.filter(b => b.left < -0.5 || b.right > viewport + 0.5),overflowingText};
+            });
+            const ok = response?.ok() && metrics.docScrollWidth <= width + 1 && metrics.bodyScrollWidth <= width + 1 && metrics.rootRight <= width + 1 && metrics.escapedButtons.length === 0 && metrics.overflowingText.length === 0 && metrics.frameScrollWidth >= metrics.frameClientWidth;
+            if (!ok) failures++;
+            report.push({name,width,height,status:response?.status(),ok,consoleErrors,metrics});
+            await page.screenshot({path:`h7-rendered-artifacts/${name}.png`, fullPage:true});
+            await page.close();
+          }
+          await browser.close();
+          fs.writeFileSync('h7-rendered-artifacts/report.json', JSON.stringify(report,null,2));
+          console.log(JSON.stringify(report,null,2));
+          if (failures) process.exit(1);
+          EOF
+          node h7-rendered.mjs
+      - name: Upload rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h7-rendered-acceptance
+          path: h7-rendered-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/h7-next.log || true

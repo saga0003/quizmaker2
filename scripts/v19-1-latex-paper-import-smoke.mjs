@@ -23,7 +23,7 @@ check('paper importer creates paper and questions together',dialog.includes("act
 check('duplicate preview is batched safely',dialog.includes('start+=200'));
 check('paper import preview renders text, LaTeX and images',dialog.includes('RichQuestionContent')&&dialog.includes('RichOptionContent'));
 const rich=read('src/components/evidara/rich-math-content.tsx');
-check('mixed inline/display KaTeX renderer exists',rich.includes('MixedMathText')&&rich.includes('katex.renderToString')&&rich.includes('displayMode'));
+check('mixed inline/display KaTeX renderer exists',rich.includes('MixedMathText')&&rich.includes('InlineMath')&&rich.includes('BlockMath')&&rich.includes('math={normalized}'));
 const live=read('src/components/papers/LiveExam.tsx');
 const paperPreview=read('src/components/papers/PaperPreview.tsx');
 const device=read('src/components/evidara/question-device-preview.tsx');

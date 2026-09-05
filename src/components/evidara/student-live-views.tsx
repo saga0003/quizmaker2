@@ -219,74 +219,95 @@ export function StudentResultsView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {results.map((result) => (
-                        <TableRow
-                          key={result.attempt_id}
-                          className="border-[var(--line)] hover:bg-[var(--canvas)]"
-                        >
-                          <TableCell className="max-w-[240px]">
-                            <p className="truncate text-sm font-medium text-[var(--foreground)]">
-                              {result.paper_title}
-                            </p>
-                            <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                              Submitted
-                            </p>
-                            <button
-                              type="button"
-                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline"
-                              onClick={() => {
-                                setReflectionNotice('');
-                                setReflectionAttemptId(result.attempt_id);
-                              }}
-                            >
-                              <ListChecks className="h-3.5 w-3.5" />
-                              {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}
-                            </button>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm text-[var(--muted-foreground)]">
-                            {formatDate(result.submitted_at)}
-                          </TableCell>
-                          <TableCell>
-                            <ScoreBadge score={result.score} total={result.maximum_marks} />
-                            <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">{result.percentage}%</p>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`text-sm font-semibold ${
-                                accuracy(result) >= 80
-                                  ? 'text-emerald-600'
-                                  : accuracy(result) >= 60
-                                    ? 'text-amber-600'
-                                    : 'text-red-500'
-                              }`}
-                            >
-                              {accuracy(result)}%
-                            </span>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
-                            <span className="font-semibold text-emerald-600">
-                              {result.correct_count}
-                            </span>{' '}
-                            correct <span className="mx-1.5">·</span>
-                            <span className="font-semibold text-red-500">
-                              {result.incorrect_count}
-                            </span>{' '}
-                            wrong <span className="mx-1.5">·</span>
-                            {result.unanswered_count} skipped
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm text-[var(--muted-foreground)]">
-                            {formatDuration(result)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="whitespace-nowrap border-[var(--line)] text-[10px] capitalize text-[var(--info)]"
-                            >
-                              {result.result_mode.replaceAll('_', ' ')}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {results.map((result) => {
+                        const held = result.result_released === false || result.result_release_level === 'none';
+                        return (
+                          <TableRow
+                            key={result.attempt_id}
+                            className="border-[var(--line)] hover:bg-[var(--canvas)]"
+                          >
+                            <TableCell className="max-w-[240px]">
+                              <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                                {result.paper_title}
+                              </p>
+                              <p className="text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                                Submitted
+                              </p>
+                              {result.answers_released === true && (
+                                <button
+                                  type="button"
+                                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--teal)] hover:underline"
+                                  onClick={() => {
+                                    setReflectionNotice('');
+                                    setReflectionAttemptId(result.attempt_id);
+                                  }}
+                                >
+                                  <ListChecks className="h-3.5 w-3.5" />
+                                  {reflectionAttemptId === result.attempt_id ? 'Reflection open' : 'Continue reflection'}
+                                </button>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-sm text-[var(--muted-foreground)]">
+                              {formatDate(result.submitted_at)}
+                            </TableCell>
+                            {held ? (
+                              <>
+                                <TableCell>
+                                  <Badge variant="outline" className="whitespace-nowrap border-amber-300 bg-amber-50 text-[10px] font-semibold text-amber-800">
+                                    Result held
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-[var(--muted-foreground)]">—</TableCell>
+                                <TableCell className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
+                                  Details available after release
+                                </TableCell>
+                              </>
+                            ) : (
+                              <>
+                                <TableCell>
+                                  <ScoreBadge score={result.score} total={result.maximum_marks} />
+                                  <p className="mt-1 text-[10px] text-[var(--muted-foreground)]">{result.percentage}%</p>
+                                </TableCell>
+                                <TableCell>
+                                  <span
+                                    className={`text-sm font-semibold ${
+                                      accuracy(result) >= 80
+                                        ? 'text-emerald-600'
+                                        : accuracy(result) >= 60
+                                          ? 'text-amber-600'
+                                          : 'text-red-500'
+                                    }`}
+                                  >
+                                    {accuracy(result)}%
+                                  </span>
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap text-xs text-[var(--muted-foreground)]">
+                                  <span className="font-semibold text-emerald-600">
+                                    {result.correct_count}
+                                  </span>{' '}
+                                  correct <span className="mx-1.5">·</span>
+                                  <span className="font-semibold text-red-500">
+                                    {result.incorrect_count}
+                                  </span>{' '}
+                                  wrong <span className="mx-1.5">·</span>
+                                  {result.unanswered_count} skipped
+                                </TableCell>
+                              </>
+                            )}
+                            <TableCell className="whitespace-nowrap text-sm text-[var(--muted-foreground)]">
+                              {formatDuration(result)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="whitespace-nowrap border-[var(--line)] text-[10px] capitalize text-[var(--info)]"
+                              >
+                                {held ? 'held' : result.result_mode.replaceAll('_', ' ')}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

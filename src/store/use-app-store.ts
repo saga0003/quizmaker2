@@ -55,6 +55,7 @@ export type AppView =
   | 'admin-resources'
   | 'admin-referrals'
   | 'admin-self-assessment'
+  | 'admin-audit-health'
   | 'admin-access';
 
 export interface AppUser {

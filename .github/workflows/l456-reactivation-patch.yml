@@ -1,0 +1,36 @@
+name: L456 Reactivation Patch
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/l456-reactivation-patch.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Patch suspended synthetic membership reactivation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64
+          p=Path('scripts/phase1-l456-sharded-acceptance.mjs')
+          s=p.read_text()
+          old=base64.b64decode('ICAgIC8vIEVucm9sIGVhY2ggZnJlc2ggc3ludGhldGljIGlkZW50aXR5IHVzaW5nIHRoZSByZWFsIFNjaG9vbCBBZG1pbiBtZW1iZXJzaGlwIFJQQy4KICAgIGZvciAoY29uc3QgYWN0b3Igb2YgYWN0b3JzKSB7CiAgICAgIGNvbnN0IHIgPSBhd2FpdCBycGMoYWRtaW4udG9rZW4sICdhZGRfc2Nob29sX3N0dWRlbnRfbWVtYmVyc2hpcF92MTMnLCB7CiAgICAgICAgcF9vcmdhbml6YXRpb25faWQ6IE9SR19JRCwgcF9zdHVkZW50X2lkOiBhY3Rvci51c2VySWQsIHBfYWNhZGVtaWNfeWVhcjogJzIwMjYtMjcnLCBwX2dyYWRlOiAxMSwKICAgICAgICBwX3NlY3Rpb246ICdBJywgcF9ib2FyZDogJ0lTQycsIHBfdHJhY2tzOiBbJ05FRVQnXSwgcF9wYXJlbnRfbmFtZTogbnVsbCwgcF9wYXJlbnRfcGhvbmU6IG51bGwsCiAgICAgIH0pOwogICAgICBpZiAoIXIub2spIHRocm93IG5ldyBFcnJvcihgbWVtYmVyc2hpcCBhZGQgZmFpbGVkIGZvciBzeW50aGV0aWMgYWN0b3IgJHthY3Rvci5hY3RvckluZGV4fSAoJHtyLnN0YXR1c30pYCk7CiAgICB9CiAgICBuZXdNZW1iZXJzaGlwc0FkZGVkID0gdHJ1ZTsK').decode()
+          new=base64.b64decode('ICAgIC8vIEVucm9sIGVhY2ggZnJlc2ggc3ludGhldGljIGlkZW50aXR5LiBJbnRlcnJ1cHRlZCBwcmlvciBydW5zIGxlYXZlIHRoZXNlIGV4YWN0CiAgICAvLyBhY2NlcHRhbmNlIG1lbWJlcnNoaXBzIHN1c3BlbmRlZC9wcm9tb3Rpb24tbG9ja2VkLCBzbyByZWFjdGl2YXRlIHRob3NlIHRocm91Z2ggdGhlCiAgICAvLyBsaWZlY3ljbGUgUlBDIGluc3RlYWQgb2YgaW5jb3JyZWN0bHkgc2VuZGluZyB0aGVtIGJhY2sgdGhyb3VnaCB0aGUgYWRkIFJQQy4KICAgIGNvbnN0IGN1cnJlbnRSb3N0ZXJSZXN1bHQgPSBhd2FpdCBycGMoYWRtaW4udG9rZW4sICdsaXN0X3NjaG9vbF9zdHVkZW50X2xpZmVjeWNsZV92MTMnLCB7IHBfb3JnYW5pemF0aW9uX2lkOiBPUkdfSUQgfSk7CiAgICBpZiAoIWN1cnJlbnRSb3N0ZXJSZXN1bHQub2spIHRocm93IG5ldyBFcnJvcihgY3VycmVudCByb3N0ZXIgZmFpbGVkICgke2N1cnJlbnRSb3N0ZXJSZXN1bHQuc3RhdHVzfSlgKTsKICAgIGNvbnN0IGN1cnJlbnRSb3N0ZXIgPSBKU09OLnBhcnNlKGN1cnJlbnRSb3N0ZXJSZXN1bHQudGV4dCk7CiAgICBjb25zdCBtZW1iZXJzaGlwQnlOYW1lID0gbmV3IE1hcCgoY3VycmVudFJvc3Rlci5zdHVkZW50cyA/PyBbXSkubWFwKChtKSA9PiBbbS5uYW1lLCBtXSkpOwogICAgZm9yIChjb25zdCBhY3RvciBvZiBhY3RvcnMpIHsKICAgICAgY29uc3QgYWN0b3JOYW1lID0gYHBoYXNlMS1sNDU2LXN0dWRlbnQtJHtTdHJpbmcoYWN0b3IuYWN0b3JJbmRleCkucGFkU3RhcnQoNCwgJzAnKX1gOwogICAgICBjb25zdCBleGlzdGluZyA9IG1lbWJlcnNoaXBCeU5hbWUuZ2V0KGFjdG9yTmFtZSk7CiAgICAgIGNvbnN0IHIgPSBleGlzdGluZwogICAgICAgID8gYXdhaXQgcnBjKGFkbWluLnRva2VuLCAnc2V0X3NjaG9vbF9zdHVkZW50X2xpZmVjeWNsZV9zdGF0dXNfdjE0JywgewogICAgICAgICAgICBwX21lbWJlcnNoaXBfaWQ6IGV4aXN0aW5nLmlkLCBwX3N0YXR1czogJ2FjdGl2ZScsIHBfcmVhc29uOiBgUGhhc2UgMSBMNC1MNiBzeW50aGV0aWMgc2hhcmQgJHtzaGFyZH0gc2VhdCBzd2FwYCwKICAgICAgICAgIH0pCiAgICAgICAgOiBhd2FpdCBycGMoYWRtaW4udG9rZW4sICdhZGRfc2Nob29sX3N0dWRlbnRfbWVtYmVyc2hpcF92MTMnLCB7CiAgICAgICAgICAgIHBfb3JnYW5pemF0aW9uX2lkOiBPUkdfSUQsIHBfc3R1ZGVudF9pZDogYWN0b3IudXNlcklkLCBwX2FjYWRlbWljX3llYXI6ICcyMDI2LTI3JywgcF9ncmFkZTogMTEsCiAgICAgICAgICAgIHBfc2VjdGlvbjogJ0EnLCBwX2JvYXJkOiAnSVNDJywgcF90cmFja3M6IFsnTkVFVCddLCBwX3BhcmVudF9uYW1lOiBudWxsLCBwX3BhcmVudF9waG9uZTogbnVsbCwKICAgICAgICAgIH0pOwogICAgICBpZiAoIXIub2spIHRocm93IG5ldyBFcnJvcihgbWVtYmVyc2hpcCBhY3RpdmF0ZSBmYWlsZWQgZm9yIHN5bnRoZXRpYyBhY3RvciAke2FjdG9yLmFjdG9ySW5kZXh9ICgke3Iuc3RhdHVzfSlgKTsKICAgIH0KICAgIG5ld01lbWJlcnNoaXBzQWRkZWQgPSB0cnVlOwo=').decode()
+          if old not in s:
+              raise SystemExit('guarded source block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name saga0003
+          git config user.email sagar@smis.edu.in
+          git add scripts/phase1-l456-sharded-acceptance.mjs
+          git commit -m "fix(load): reactivate suspended L4-L6 synthetic memberships"
+          git push origin HEAD:phase1-hardening

@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const component = fs.readFileSync('src/components/evidara/question-bulk-import-dialog-core.tsx', 'utf8');
+const checks = [];
+const check = (name, fn) => { fn(); checks.push(name); };
+check('flow exposes Upload step', () => assert.match(component, /'1','Upload','Choose source files or content'/));
+check('flow exposes Map step', () => assert.match(component, /'2','Map','Confirm academic mapping'/));
+check('flow exposes Review step', () => assert.match(component, /'3','Review','Fix only what needs attention'/));
+check('flow exposes Import step', () => assert.match(component, /'4','Import','Save ready questions'/));
+check('source selection remains first action', () => assert.match(component, /Choose file/));
+check('mapping is taxonomy aware', () => { assert.match(component, /subjectByName/); assert.match(component, /selectedChapter/); assert.match(component, /selectedTopic/); });
+check('invalid rows block import', () => { assert.match(component, /valid\.length/); assert.match(component, /correct every highlighted issue before importing/); });
+check('review includes learner preview', () => assert.match(component, /QuestionDevicePreview/));
+check('Create Paper remains optional for schools', () => { assert.match(component, /createPaper/); assert.match(component, /setCreatePaper/); assert.match(component, /paperPayload/); });
+check('paper creation stays atomic with import', () => assert.match(component, /bulk_import_questions_and_paper_phase1/));
+check('plain import works with Create Paper off', () => assert.match(component, /paperPayload\s*=\s*createPaper\s*&&\s*kind\s*===\s*'school'/));
+check('result reports imported reused failed', () => { assert.match(component, /result\?\.imported/); assert.match(component, /result\?\.reused/); assert.match(component, /result\?\.failed/); });
+console.log(`C10 simplified import flow smoke: ${checks.length}/${checks.length} checks passed`);

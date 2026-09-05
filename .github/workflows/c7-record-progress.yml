@@ -1,0 +1,58 @@
+name: Record Phase 1 R12 acceptance heartbeat
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - .github/workflows/c7-record-progress.yml
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+          fetch-depth: 0
+      - name: Append hourly heartbeat
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          log = Path('PHASE1_PROGRESS_LOG.md')
+          marker = '## 2026-09-03 08:11 IST — R12 protected-preview credential block / R13 preflight'
+          body = log.read_text(encoding='utf-8')
+          if marker not in body:
+              lines = [
+                  '',
+                  marker,
+                  '',
+                  '- **Run start/end:** 2026-09-03 08:11 IST → approximately 08:15 IST.',
+                  '- **Active engineering/review span:** approximately **4 minutes** in this execution window; no time was padded.',
+                  '- **Section worked:** R12 held/released result acceptance, with safe R13 analytics preflight while the rendered R12 credential path remains externally blocked.',
+                  '- **Checklist items completed:** **none**. R12 remains unchecked; no later acceptance item was credited out of order.',
+                  '- **Starting branch head:** `8685b1c5e1d399ae2e87f1f778380322a9a111d8`.',
+                  '- **Health:** Vercel production runtime-error aggregation for the preceding 24 hours returned no errors; recent `phase1-hardening` previews were READY. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`, and `Evidara School` (`evidara-school-acceptance`) remained the isolated demo acceptance organization. Permanent production was not promoted or mutated.',
+                  '- **R12 investigation:** rerun evidence for workflow `33705794097` confirms the synthetic held contract and protected-preview preflight passed, but browser bootstrap failed because the stored Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` no longer grants the branch alias. A fresh temporary protected-preview share URL can still be issued successfully through Vercel, proving the preview itself is healthy; the fresh URL/token was not committed or logged.',
+                  '- **Execution constraint:** a local independent browser rerun could not be used because this runtime container has no external DNS access to clone/install the repository. No production security control was weakened to bypass Vercel protection.',
+                  '- **R13 preflight:** the authoritative R11 synthetic attempt remains submitted at 8/80 (10%, 2 correct, 0 incorrect, 18 unanswered) and the R8 paper is safely restored to `score_only`. The live student analytics RPC deliberately refuses self-analytics until `analytics_released` is true, so R13 must be exercised only after a controlled analytics-release mode is enabled; this is expected release-policy behavior, not a defect.',
+                  '- **Safety:** all database reads/mutations remain scoped to the existing same-project synthetic acceptance tenant; no St. Mary’s/future-client data and no separate/paid Supabase project were used.',
+                  '- **Blocker:** securely refresh the GitHub Actions protected-preview share credential. The connected GitHub API cannot read or update repository secrets, so the fresh temporary Vercel share token cannot be propagated into Actions without exposing it, which is intentionally not done.',
+                  '- **Exact next action:** refresh the secure Actions protected-preview credential, rerun rendered held R12, restore/verify `score_only`, run rendered released R12 and the complete release gate; only then check R12 and switch the synthetic paper to an analytics-released mode for R13 student subject/chapter/topic/question analytics verification.',
+                  ''
+              ]
+              log.write_text(body.rstrip() + '\n' + '\n'.join(lines), encoding='utf-8')
+          PY
+      - name: Commit heartbeat
+        shell: bash
+        run: |
+          git config user.name "Evidara Hardening Bot"
+          git config user.email "sagar@smis.edu.in"
+          git add PHASE1_PROGRESS_LOG.md
+          if git diff --cached --quiet; then
+            echo "Heartbeat already recorded."
+            exit 0
+          fi
+          git commit -m "docs(phase1): record 08:11 R12 heartbeat"
+          git push origin HEAD:phase1-hardening

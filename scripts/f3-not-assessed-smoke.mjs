@@ -1,0 +1,28 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const launch = read('src/components/evidara/launch-analytics-workspace.tsx');
+const hierarchy = read('src/components/evidara/analytics-hierarchy.tsx');
+const institution = read('src/components/institution-analytics/institution-analytics-workspace.tsx');
+const failures = [];
+let passed = 0;
+const check = (label, condition) => { if (condition) { passed += 1; console.log(`✓ ${label}`); } else { failures.push(label); console.error(`✗ ${label}`); } };
+check('launch empty average has no denominator instead of becoming zero', /function avg\(values: number\[\]\)[\s\S]*?values\.length \?[\s\S]*?: null;/.test(launch));
+check('launch scope top score is null when there are no attempts', /top: rows\.length \? Math\.max\([\s\S]*?\) : null/.test(launch));
+check('hierarchy group metrics admit missing evidence', /average: number \| null;[\s\S]*?accuracy: number \| null;[\s\S]*?top: number \| null;/.test(hierarchy));
+check('hierarchy empty average is null', /function avg\(values: number\[\]\)[\s\S]*?values\.length \?[\s\S]*?: null;/.test(hierarchy));
+check('hierarchy group top is null without submitted evidence', /top: rows\.length \? Math\.max\([\s\S]*?\) : null,/.test(hierarchy));
+check('selected program top score is null without evidence', /const topScore = trackResults\.length \? Math\.max\([\s\S]*?\) : null;/.test(hierarchy));
+check('inline program/test top-score displays no longer convert absence to zero', !hierarchy.includes('pct(rows.length ? Math.max(...rows.map((r) => r.percentage)) : 0)'));
+check('nullable averages sort safely rather than using arithmetic on null', (hierarchy.match(/\(b\.average \?\? -Infinity\) - \(a\.average \?\? -Infinity\)/g) || []).length === 2);
+check('live percentage formatter distinguishes missing evidence', /function percentage\(value: number \| null \| undefined\)[\s\S]*?value == null \? '—'/.test(institution));
+check('subject donut preserves null instead of coercing it to zero', /subject\.averagePercentage == null \? null : Math\.max/.test(institution) && !institution.includes('subject.averagePercentage || 0'));
+check('subject donut names the missing-evidence state', /score == null \? <span[^>]*>Not assessed<\/span>/.test(institution));
+check('topic progress bar is absent when there is no metric denominator', /row\.averagePercentage == null \? null : <i style=\{\{ width: `\$\{row\.averagePercentage\}%`/.test(institution) && !institution.includes('`${row.averagePercentage || 0}%`'));
+check('network tests-per-student is missing when there are no students', /totalStudents \? totalTests \/ totalStudents : null/.test(institution));
+const displayPercentage = (value) => value == null ? '—' : `${Math.round(value * 10) / 10}%`;
+check('a genuine measured zero still displays as 0%', displayPercentage(0) === '0%');
+check('missing evidence displays as an em dash', displayPercentage(null) === '—');
+if (failures.length) { console.error(`\nF3 not-assessed analytics smoke failed: ${failures.length} failed, ${passed} passed.`); process.exit(1); }
+console.log(`\nF3 not-assessed analytics checks passed (${passed} checks).`);

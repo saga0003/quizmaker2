@@ -17,7 +17,14 @@ check('package is current Evidara V19', pkg.version === '19.1.0');
 check('analytics QA targets the V13.2 smoke suite', pkg.scripts?.['qa:analytics'] === 'node scripts/v13-2-analytics-smoke.mjs');
 contains('src/lib/release.ts', "EVIDARA_RELEASE = '19.1.0'", 'central release metadata is V19');
 contains('src/lib/release.ts', "EVIDARA_DEPLOYMENT_TARGET = 'vercel-supabase'", 'deployment target is Vercel + Supabase');
-contains('src/app/page.tsx', 'AnalyticsV12Workspace', 'root workspace loads the evidence analytics application');
+check(
+  'root workspace loads the evidence analytics application through the current student router',
+  exists('src/app/page.tsx')
+    && exists('src/components/evidara/student-preview-analytics.tsx')
+    && read('src/app/page.tsx').includes("view.startsWith('student-analytics-')")
+    && read('src/app/page.tsx').includes('<StudentPreviewAnalytics view={analyticsView(view)} />')
+    && read('src/components/evidara/student-preview-analytics.tsx').includes('AnalyticsV12Workspace'),
+);
 contains('src/app/page.tsx', "view.startsWith('student-analytics-')", 'student analytics hierarchy is routed');
 contains('src/app/page.tsx', "view.startsWith('school-analytics-')", 'school analytics hierarchy is routed');
 
@@ -32,7 +39,8 @@ for (const [token, label] of [
   ['function HistoryView', 'test history exists'],
   ["get_student_analytics_v12", 'live evidence analytics RPC is used'],
   ["get_topic_reflection_analytics_v13", 'topic confidence/reflection analytics is connected'],
-  ['Question-level detail is not available yet', 'unavailable question intelligence is labelled honestly'],
+  ['const questionEvidence = (payload.question_evidence || [])', 'question intelligence uses authorized live response evidence'],
+  ['No synthetic rows are substituted', 'missing question evidence is labelled honestly without fabricated rows'],
   ['Sub-concept mastery will appear', 'fabricated sub-concept mastery is not shown'],
 ]) contains(analyticsFile, token, label);
 check('real student analytics does not call the benchmark bridge', !read(analyticsFile).includes('get_v13_benchmark_analytics'));

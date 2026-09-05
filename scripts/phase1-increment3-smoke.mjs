@@ -35,7 +35,7 @@ check('reflection save only targets the reflection table', reflectionSql.include
 check('real student analytics no longer calls benchmark bridge', !analytics.includes('get_v13_benchmark_analytics'));
 check('real student analytics has no embedded demo payload', !analytics.includes('demoPayload'));
 check('no-evidence analytics are explicit', analytics.includes('Not enough data yet') && analytics.includes('will not substitute benchmark students'));
-check('question detail does not fabricate unavailable rows', analytics.includes('No synthetic questions, retry status, confidence, or mistake reasons are being substituted.'));
+check('question detail renders only authorized payload evidence and never synthetic rows', analytics.includes('const questionEvidence = (payload.question_evidence || [])') && analytics.includes('No synthetic rows are substituted.'));
 check('hard-coded practice counts are removed', !analytics.includes('<span>10</span>') && !analytics.includes('<span>15</span>'));
 
 for (const token of [

@@ -1,0 +1,1214 @@
+# Evidara Phase 1 Progress Log
+
+This log records each production-hardening run with observable implementation and verification evidence. Times are IST unless noted otherwise.
+
+## 2026-08-31 08:58:24 IST — A8 Rich HTML sanitation
+
+- **Checklist item:** A8 — Rich HTML sanitation uses a proven sanitizer or safe structured editor.
+- **Run start:** 2026-08-31 08:58:24 IST.
+- **Implementation start (first relevant commit):** 2026-08-31 09:00:13 IST — `a69a936dc00856a461c46a30c594cb5ec02d1efe` (`Harden rich content rendering against raw HTML sinks`).
+- **Implementation end (final functional/rework commit):** 2026-08-31 09:07:56 IST — `888a42eed8fba28dc92525a910f93bab8cf813d0` (`Update V19.1 regression for safe KaTeX renderer`).
+- **Observable elapsed engineering span:** 7m 43s from first to final relevant commit.
+- **Verification:** GitHub Actions release-gate run `33354463933`, 2026-08-31 09:07:58–09:10:08 IST, duration 2m 10s — **PASS**. Dedicated A8 checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement all passed.
+- **Implementation result:** Question authoring remains constrained to structured React text/LaTeX/image fields. The app-owned `katex.renderToString` + `dangerouslySetInnerHTML` rich-math sink was removed; normalized LaTeX now renders through `react-katex`, and parse/error fallback is rendered as React text rather than interpolated HTML. A permanent 12-point A8 regression checks the editor, question preview, source-fidelity renderer, contentEditable/raw-Markdown paths and iframe/srcDoc injection paths.
+- **Rework/failures:** Initial A8 candidates failed TypeScript because the installed `react-katex` typings do not expose the attempted `settings` prop (`33354076408`, `33354167418`). After correcting the component typing, run `33354287602` passed A8, TypeScript, lint, all other regressions and the production build but correctly failed the final gate because the legacy V19.1 smoke test still asserted the retired `katex.renderToString` implementation; that regression was updated to assert the safe InlineMath/BlockMath behavior. Rapid intermediate corrective pushes also caused normal concurrency cancellations and were not treated as verification failures.
+- **Deployment/health:** Production runtime error/fatal logs were checked for the preceding 24 hours and returned no entries. Permanent production was not changed. The latest automatic branch preview visible during verification was READY on an earlier A8 corrective commit; no production promotion was attempted because final real-school acceptance remains incomplete.
+- **Next action:** A9 — add an explicit active-institution selector for staff accounts with more than one active organization membership, then verify all institution-scoped application flows consume the selected organization explicitly.
+
+## 2026-08-31 09:57:41 IST — A9 Explicit active institution selection
+
+- **Checklist item:** A9 — Explicit active institution selector for multi-organization staff accounts.
+- **Run start:** 2026-08-31 09:57:41 IST.
+- **Implementation start (first relevant commit):** 2026-08-31 10:01:49 IST — `6dcd059d2a98e627f671da0838ddb4a167da17fe` (`feat(a9): track explicit active institution in auth context`).
+- **Implementation end (final functional/release-gate commit):** 2026-08-31 10:09:13 IST — `280f1816139699ed6613bb1bb58af7f1f752d0a8` (`ci(a9): enforce active institution regression in release gate`).
+- **Observable elapsed engineering span:** 7m 24s from first to final relevant functional commit.
+- **Verification:** GitHub Actions release-gate run `33357842874`, job 2026-08-31 10:09:36–10:11:16 IST, duration 1m 40s — **PASS**. The dedicated 15-point A9 active-institution regression, TypeScript, lint, every required regression suite, production build and final release-gate enforcement all passed.
+- **Implementation result:** Auth now loads all active organization memberships and requires a visible explicit choice when staff belong to multiple institutions instead of silently taking the first membership. The choice is stored per signed-in user, revalidated against current memberships each session, can be switched visibly, and is propagated to same-origin Evidara APIs. School-platform and institution-analytics server routes independently validate the selected organization against active membership and reject ambiguous no-selection access with 409 or invalid cross-school selection with 403. Single-institution staff retain safe automatic selection.
+- **Rework/failures:** No functional or CI verification failure occurred on the final A9 candidate. Rapid sequential commits caused expected GitHub concurrency cancellations of superseded runs. Vercel refused the latest automatic branch preview because the account hit its preview build-rate limit; this was an environment/quota condition rather than a code/build failure. Earlier A9 branch previews were READY, and the exact final candidate independently passed the repository production build in the complete GitHub release gate.
+- **Deployment/health:** Production runtime error/fatal logs for the preceding 24 hours were clean. Permanent production was not changed or promoted; final real-school acceptance and remaining Phase 1 gates are still incomplete.
+- **Next action:** A10 — scope every local autosave key by organization ID and ensure local drafts are cleared or safely scoped on logout/publish so one institution cannot inherit another institution's browser draft state.
+
+## 2026-08-31 11:01:58 IST — A10 Local autosave tenant isolation (in progress)
+
+- **Checklist item:** A10 — Local autosave/draft keys are tenant-scoped and cleared on logout/publish.
+- **Run start:** 2026-08-31 11:01:58 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` remained at the latest verified A9 checkpoint before this log entry; production runtime error/fatal logs for the preceding 24 hours were clean, so no production incident work was required. Permanent production remains protected.
+- **Implementation discovery:** The paper builder still derives `draftBase` from only user ID and workspace kind (`evidara-v8-paper:<user>:<kind>`), then appends paper/new ID. It removes the new-draft key after first persistence and removes the current key on publish, but the key does not contain `organizationId`; therefore a browser draft can collide across institutions for the same staff account. Auth sign-out clears session/profile/membership state but does not explicitly purge local paper drafts.
+- **Verification status:** Not yet eligible for checklist completion. No functional A10 candidate has passed the complete release gate in this run.
+- **Rework/failures:** None. The item is intentionally left unchecked rather than claiming isolation from existing publish cleanup alone.
+- **Next action:** Change the paper draft namespace to include the validated active organization (or an explicit platform sentinel for Super Admin), purge/migrate unsafe legacy keys, clear the signed-in user's Evidara paper drafts on logout, add an A10 regression covering cross-school collision/logout/publish cleanup, and only then update the release checklist after the complete gate passes.
+
+## 2026-08-31 13:01:36 IST — A10 Local autosave tenant isolation (verified)
+
+- **Checklist item:** A10 — Local autosave keys include organization ID and are cleared/scoped on logout/publish.
+- **Run start:** 2026-08-31 13:01:36 IST.
+- **Repository/CI/deployment inspection:** The canonical `phase1-hardening` branch and existing A10 discovery checkpoint were inspected before implementation. Vercel production runtime `error`/`fatal` logs for the preceding 24 hours were clean, so no production incident remediation was required. Permanent production remained protected and was not promoted.
+- **Implementation start (first relevant commit):** 2026-08-31 13:05:57 IST — `c1f82583f79ee75a721ac59cf03ccc649ff86d87` (`feat(a10): purge unsafe paper drafts on auth boundaries`).
+- **Implementation end (final verified candidate commit):** 2026-08-31 13:07:36 IST — `c89095fbff69b0c0ab72fc6a54174e858ee83ac4` (`chore(a10): remove one-time source patch workflow`), containing the completed A10 source, regression and release-gate wiring with the temporary patch workflow removed.
+- **Observable elapsed engineering span:** 1m 39s from first relevant implementation commit to the final verified candidate commit.
+- **Verification:** GitHub Actions release-gate run `33369208795`, 2026-08-31 13:07:38–13:09:58 IST, duration **2m 20s — PASS**. The permanent 15-point A10 autosave-isolation regression, all prior P0/A security checks, TypeScript, lint, every required regression suite, production build and final gate enforcement all passed.
+- **Implementation result:** School paper autosave keys now include the active organization ID and platform paper drafts use an explicit `platform` scope, preventing the same staff account from recovering another institution's browser draft after switching schools. Unsafe legacy unscoped keys are purged when an authenticated session is loaded. Logout removes every paper draft belonging to that signed-in user. Existing first-save and publish/approval cleanup now operates on the scoped namespace, preserving draft recovery within the correct tenant while preventing cross-tenant collision.
+- **Rework/failures:** No functional verification failure occurred. Because the connected GitHub write API replaces whole files rather than applying a line patch, a tightly scoped one-time GitHub Actions source patch was used for the large paper-builder file; it applied the exact guarded replacement successfully in run `33369125465` and was immediately removed before the release candidate was verified. Intermediate release-gate runs were superseded by rapid sequential commits through normal concurrency cancellation; the final exact candidate passed cleanly.
+- **Deployment/health:** Production remained healthy and unchanged throughout the run. No permanent production promotion was attempted because the remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** B1 — make institution onboarding transactional so institution, annual licence, first School Admin, membership, defaults and audit either succeed together or fail without partial tenant state.
+
+## 2026-08-31 13:59:53 IST — B1 Transactional institution onboarding (verified)
+
+- **Checklist item:** B1 — Transactional institution onboarding: institution + licence + first School Admin + membership + defaults + audit.
+- **Run start:** 2026-08-31 13:59:53 IST.
+- **Repository/CI/deployment inspection:** The canonical `phase1-hardening` head `199c7024d758f51fa3921ac153a591f6c906c7d4` was confirmed green in release-gate run `33369556500`. Vercel production runtime errors for the preceding 24 hours were clean and the live Supabase project reported `ACTIVE_HEALTHY`, so no production incident remediation was required.
+- **Implementation start (first relevant commit):** 2026-08-31 14:04:58 IST — `e4e6fb64d429f561018f3bb612585475d55bc20c` (`feat(b1): add transactional institution onboarding`).
+- **Implementation end (final verified candidate commit):** 2026-08-31 14:04:58 IST — the same atomic functional commit `e4e6fb64d429f561018f3bb612585475d55bc20c`.
+- **Observable elapsed engineering span:** 0m 00s between first and final relevant commits because B1 was delivered as one atomic functional commit; discovery and live verification occurred within this hourly run.
+- **Verification:** GitHub Actions release-gate run `33373586495`, 2026-08-31 14:05:04–14:07:38 IST, duration **2m 34s — PASS**. The permanent 16-point B1 regression, all prior P0/A checks, TypeScript, lint, every required regression suite, production build and final gate enforcement passed. Matching Vercel preview for the exact candidate is READY.
+- **Live database evidence:** Migration `phase1_transactional_institution_onboarding` was applied successfully. `onboard_institution_v1` is executable by `service_role` and not by `anon`/`authenticated`. A rollback probe intentionally selected an incompatible first-admin role after institution/licence/member writes had begun; the function failed and left `0` residual probe organizations, proving the bootstrap rows roll back together.
+- **Implementation result:** A privileged server route now delegates tenant bootstrap to one database transaction. It validates Super Admin authority and an explicit existing first School Admin account, then atomically creates the organization, annual ₹199/student licence with defaults, active School Admin membership/profile state and `institution.onboarded` audit record. Partial institution/licence state can no longer be left behind by a later onboarding write failure.
+- **Rework/failures:** No functional or CI failure. The first implementation candidate passed its dedicated B1 regression and complete release gate.
+- **Deployment/health:** Production runtime remained clean and the permanent production deployment was not promoted. Only the live backward-compatible B1 database function was added; final real-school acceptance remains incomplete.
+- **Next action:** B2 — consolidate institution details, licence configuration and first School Admin selection into one guided Super Admin onboarding wizard that calls the verified B1 transactional endpoint.
+
+## 2026-08-31 14:57:29 IST — B2 Institution onboarding wizard (verified)
+
+- **Checklist item:** B2 — One institution onboarding wizard.
+- **Run start:** 2026-08-31 14:57:29 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` was inspected at the verified B1 checkpoint before implementation. Vercel production reported no runtime errors in the preceding 24 hours, so no production incident remediation was required. Permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 15:01:34 IST — `87907b9c7e6afbb97daab0801c7bf0967d055fbc` (`feat(b2): add institution onboarding wizard`).
+- **Implementation end (final functional candidate commit):** 2026-08-31 15:01:34 IST — the same atomic functional commit `87907b9c7e6afbb97daab0801c7bf0967d055fbc`.
+- **Observable elapsed engineering span:** 0m 00s between first and final relevant commits because B2 was delivered as one atomic functional commit; inspection/design and verification occurred within this run.
+- **Verification:** GitHub Actions release-gate run `33378118824`, 2026-08-31 15:01:42–15:03:56 IST, duration **2m 14s — PASS**. The dedicated 19-point B2 wizard regression, all prior P0/A/B1 hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed.
+- **Implementation result:** Super Admin institution creation is now one guided four-step flow: Institution → First admin → Licence → Review. Core institution fields, explicit first School Admin, positive licence count and valid annual dates are checked before advancing. The review shows the ₹199/student/year licence and explains the all-or-rollback transaction. Creation calls the verified B1 `/api/admin/institution-onboarding/` endpoint; existing-school editing remains available through School & Licence Control.
+- **Rework/failures:** No functional or CI verification failure occurred on the B2 candidate.
+- **Deployment/health:** The matching Vercel preview for `87907b9c7e6afbb97daab0801c7bf0967d055fbc` is READY. Production runtime remained clean and permanent production was not promoted because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** B3 — provide a first-class bulk student import with row validation, safe creation/update semantics and an exportable failed-row report.
+
+## 2026-08-31 14:57:29 IST — B3 Bulk student import (verified)
+
+- **Checklist item:** B3 — First-class bulk student import with validation and failed-row export.
+- **Run start:** 2026-08-31 14:57:29 IST.
+- **Repository/CI/deployment inspection:** B2 was verified first in this run. Production runtime errors for the preceding 24 hours were clean before product work, so no production incident remediation was required. Permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 15:09:06 IST — `88cf7dc8c71e3ea29ce61bab6f2c7f9ab9690f19` (`feat(b3): add validated student import UI`).
+- **Implementation end (final functional/rework commit):** 2026-08-31 15:14:56 IST — `442564ba8bc86f0ecd1889c6e753a8cc06b41871` (`fix(b3): import validation status badge`).
+- **Observable elapsed engineering span:** **5m 50s** from first B3 product commit to final functional rework commit. The one-time source-patch workflow was then removed, producing clean verification candidate `ef1edb48dcebf8b55d6f00461319043fd2b51096`.
+- **Verification:** GitHub Actions release-gate run `33379329591`, 2026-08-31 15:16:29–15:18:51 IST, duration **2m 22s — PASS**. The dedicated 22-point B3 regression, all prior P0/A/B1/B2 hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed.
+- **Implementation result:** The generic bulk-account importer is now a first-class student roster workflow. CSV files require explicit student name/email/grade/academic-year mapping, validate all rows before import, reject files over 1,000 rows instead of silently truncating, preserve source row numbers, and offer separate credentials and failed-row CSV exports. Server-side `bulkImportStudents` independently revalidates required fields, grade/year/email format and duplicate emails, enforces student role and institution boundaries, and deletes newly-created auth accounts when downstream profile or membership setup fails.
+- **Rework/failures:** An initial one-time source-patch workflow was syntactically invalid (`33378740720`). The next helper run (`33378878192`) produced the intended patch but GitHub correctly refused its attempt to modify another workflow file without workflow-write permission; source and release-gate changes were subsequently separated. First full B3 candidate run `33379056875` passed the B3 checks 22/22 but failed TypeScript because the new validation summary referenced `Badge` without importing it. That UI import was added in `442564ba8bc86f0ecd1889c6e753a8cc06b41871`; the clean candidate then passed the full gate. Superseded workflow attempts were not used as verification evidence.
+- **Deployment/health:** Permanent production was not promoted or altered. Vercel's automatic preview for the first B3 UI commit returned ERROR and newer automatic B3 previews were not available in the deployment list during final verification, so no preview readiness claim is made; the exact clean candidate independently passed the repository production build in the complete release gate.
+- **Next action:** B4 — enforce the student lifecycle as Active / Withdrawn / Completed / Suspended and prevent destructive deletion once assessment attempts exist.
+
+## 2026-08-31 16:00:29 IST — B4 Student lifecycle and attempt-history preservation (verified)
+
+- **Checklist item:** B4 — Student lifecycle uses Active / Withdrawn / Completed / Suspended; no destructive delete after attempts exist.
+- **Run start:** 2026-08-31 16:00:29 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` began this run at `0e17e82f8b7ad159d4071ffa91d9cbccc313632b`, the verified B3 checkpoint. Production Vercel runtime error/fatal logs for the preceding 24 hours were clean; the live Supabase project was reachable and healthy. Permanent production remained protected and unchanged.
+- **Implementation start (first relevant commit):** 2026-08-31 16:06:55 IST — `f6bf49a3027788780ddee2c08dadbfb7aa416e08` (`feat(b4): enforce student lifecycle states and attempt retention`).
+- **Implementation end (final functional/rework commit):** 2026-08-31 16:14:17 IST — `44ce5d788b1f205bca3a212f2847d58c5abae02c` (`test(b4): update lifecycle regression to canonical states`).
+- **Observable elapsed engineering span:** **7m 22s** from first relevant B4 commit to the final verified functional/rework commit.
+- **Verification:** GitHub Actions release-gate run `33383762864`, 2026-08-31 16:14:20–16:16:27 IST, duration **2m 07s — PASS**. The chained 19-point B4 regression, all prior P0/A/B1–B3 checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement all passed on exact candidate `44ce5d788b1f205bca3a212f2847d58c5abae02c`.
+- **Live database evidence:** Migration `phase1_student_lifecycle_states` is applied. The membership enum now supports the canonical `active`, `withdrawn`, `completed` and `suspended` states while retaining legacy `revoked` for backward compatibility with the still-protected pre-cutover UI. The new lifecycle RPC is not executable by `anon`, is executable by `authenticated`, and independently checks School Admin authority. The deletion-preservation trigger is enabled. Existing live membership data was not rewritten: two rows remained, with zero new withdrawn/suspended rows after migration.
+- **Implementation result:** School Admin now has explicit confirmed transitions for Suspended, Withdrawn and Completed, with suspended membership safely reactivatable and withdrawn/completed treated as historical terminal states. The existing roster UX was retained: select-all, filters, bulk promotion confirmation, profile edit drawer, generated/set passwords and teacher assigned-section read-only scope. Most importantly, a database `BEFORE DELETE` guard rejects physical membership deletion once `exam_attempts` evidence exists for the same student and institution, so historical assessment membership cannot be erased by an older or alternate caller.
+- **Rework/failures:** An early WIP gate (`33383310892`) ran after the B4 regression was chained but before the UI was complete and was superseded. The first full UI candidate run `33383414459` passed the B4 checks, TypeScript, lint and production build but correctly failed the final gate because six established student-roster UX regressions had been introduced by the initial rewrite (selection/bulk promotion, edit drawer, generated temporary password, institution-only removal copy and legacy lifecycle assertions). Those behaviors were restored, the older increment-4 assertions were updated from the retired Revoked semantics to canonical Withdrawn/Suspended semantics, and the exact final candidate then passed cleanly. Rapid intermediate pushes also caused expected concurrency cancellations.
+- **Deployment/health:** Permanent production was not promoted or altered. Earlier B4 infrastructure/test previews were READY; an intermediate UI preview errored, so it was not used as release evidence. The exact final candidate independently passed the repository production build inside the full release gate. Final production promotion remains blocked on the remaining Phase 1 checklist and real-school acceptance criteria.
+- **Next action:** B5 — preserve institution, academic year, grade, section and programme as immutable enrollment/attempt evidence so later roster changes cannot rewrite historical assessment context.
+
+## 2026-08-31 16:27:53 IST — B5 Attempt/enrollment history snapshot (verified)
+
+- **Checklist item:** B5 — Student attempt/enrollment snapshot preserves institution, academic year, grade, section and programme history.
+- **Run start:** 2026-08-31 16:27:53 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` was inspected at `0e6898de9758fce8d367b5508511956af13bd0b4`. GitHub release-gate run `33384423210` for that exact candidate was already complete and successful. Vercel production runtime errors for the preceding 24 hours were clean, and the live Supabase project `SMIS QP` reported `ACTIVE_HEALTHY`. Permanent production remained protected and unchanged.
+- **Implementation start (first relevant commit):** 2026-08-31 16:22:46 IST — `0980216ca2fb53a86a54e064618c019fecb42933` (`feat(b5): freeze enrollment context on exam attempts`).
+- **Implementation end (final relevant functional/gate commit):** 2026-08-31 16:23:15 IST — `0e6898de9758fce8d367b5508511956af13bd0b4` (`test(b5): chain enrollment snapshot into release gate`).
+- **Observable elapsed engineering span:** **0m 29s** from first B5 implementation commit to the final release-gate wiring commit.
+- **Verification:** GitHub Actions release-gate run `33384423210`, 2026-08-31 16:23:17–16:25:44 IST, duration **2m 27s — PASS**. The dedicated 19-point B5 regression, all previous P0/A/B1–B4 checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed on the exact candidate.
+- **Live database evidence:** Migration `phase1_attempt_enrollment_snapshot` is applied. Live inspection confirmed `exam_attempts.enrollment_snapshot` exists and both `exam_attempt_capture_enrollment_snapshot_v15` and `exam_attempt_protect_enrollment_snapshot_v15` triggers are enabled. There were zero existing institutional attempts and therefore zero institutional attempts missing a snapshot, so no historical enrollment evidence was guessed or rewritten.
+- **Implementation result:** Every new institutional attempt now freezes the active enrollment context at test start: organization, membership, academic year, grade, section ID/label, board and programme/track context, plus schema version and capture timestamp. Institutional attempts fail closed when no matching active school membership exists. The snapshot is immutable after creation, while platform/public attempts without an institution remain supported.
+- **Rework/failures:** No functional or final CI verification failure occurred. The intermediate regression-only run was superseded by the final release-gate wiring commit through normal concurrency cancellation; the exact final candidate passed cleanly.
+- **Deployment/health:** Production remained healthy and unchanged. No permanent production promotion was attempted because the Phase 1 checklist and real-school acceptance criteria remain incomplete.
+- **Next action:** B6 — make teacher assignment to sections and subjects explicit and consistently enforce that scope across roster visibility, question-bank access, paper creation/assignment and analytics.
+
+## 2026-08-31 16:27:53 IST — B6 Teacher section/subject scope (verified)
+
+- **Checklist item:** B6 — Teacher assignment to sections/subjects is explicit and consistently enforced.
+- **Run start:** 2026-08-31 16:27:53 IST.
+- **Repository/CI/deployment inspection:** B5 was verified first in this run. Vercel production runtime error/fatal logs for the preceding 24 hours were clean and Supabase remained `ACTIVE_HEALTHY`; permanent production stayed protected and unchanged.
+- **Implementation start (first relevant commit):** 2026-08-31 16:37:09 IST — `7e126f8a6863dc52f0f80c746b762b024a836ec3` (`feat(b6): enforce teacher section and subject scope`).
+- **Implementation end (final functional/regression commit):** 2026-08-31 16:44:17 IST — `19e3e5790bee2fc410ba292620d0d70b68709d77` (`test(b6): cover subject-scoped teacher analytics`).
+- **Observable elapsed engineering span:** **7m 08s** from the first B6 implementation commit to the final verified candidate commit.
+- **Verification:** GitHub Actions release-gate run `33386032727`, 2026-08-31 16:44:21–16:46:51 IST, duration **2m 30s — PASS**. The dedicated 26-point B6 regression, all prior P0/A/B1–B5 checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed on exact candidate `19e3e5790bee2fc410ba292620d0d70b68709d77`.
+- **Live database evidence:** Migrations `phase1_teacher_subject_scope` and `phase1_teacher_analytics_subject_scope` are applied. `is_evidara_teacher_for_scope(uuid,uuid,uuid)` is unavailable to `anon` and available to authenticated application users; it requires an active organization membership plus an active teacher-section assignment and, when supplied, an exact active subject match by name/code or the explicit `All subjects` assignment. Live policies for question reads/inserts/updates and paper sections/questions reference the canonical helper. The teacher analytics RPC is also unavailable to `anon` and live verification confirms both paper-level and response-level subject guards are present.
+- **Implementation result:** Teacher access is no longer inferred from a broad teacher role alone. Question-bank collaboration is limited to assigned subjects (own drafts plus approved questions in scope), paper section/question editing is subject-scoped, and teacher analytics filters assessment and response evidence to the assigned subject while School Admin/platform-admin section-wide visibility remains intact.
+- **Rework/failures:** The first B6 candidate and release gate were technically green, but a follow-up live authorization audit found that the existing teacher analytics overview still filtered only by section. That was treated as a real B6 consistency gap rather than accepting the partial implementation. A second migration added subject-level analytics guards and expanded the B6 regression from 20 to 26 assertions. The intermediate analytics candidate run `33385967878` was cancelled by the subsequent regression commit through normal workflow concurrency; the exact final candidate then passed cleanly.
+- **Deployment/health:** Production remained healthy and the permanent deployment was not promoted or altered. Only backward-compatible authorization/database hardening was applied live; final production promotion remains blocked by the remaining Phase 1 checklist and real-school acceptance criteria.
+- **Next action:** B7 — harden academic-year rollover/promotion so the prior-year membership becomes historical rather than remaining concurrently active, the new-year membership is created safely, Grade 12 completion does not manufacture a duplicate active enrollment, promotion is audited/idempotent, and B5 attempt snapshots continue to preserve assessment-time context.
+
+## 2026-08-31 16:57:54 IST — B7 Academic-year rollover / release-gate coverage (verified)
+
+- **Checklist item:** B7 — Academic-year rollover/promotion flow preserves historic data.
+- **Run start:** 2026-08-31 16:57:54 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening` already contained the B7 functional migration shortly before this run began, while B4–B6 were verified. Production Vercel runtime error/fatal logs for the preceding 24 hours were clean and the permanent production deployment remained READY and unchanged. Workflow inspection found a release-gate coverage gap: the dedicated B4/B5/B6 regressions existed but were not explicitly invoked by the release workflow, and B7 had no permanent dedicated regression yet.
+- **Implementation start (first relevant commit):** 2026-08-31 16:52:37 IST — `74f51ef62f3735af3500a8441e07b4a7892b84f3` (`feat(b7): preserve history during academic-year rollover`). This functional commit landed approximately five minutes before the hourly run start and was treated as unverified until the gate coverage audit completed.
+- **Implementation end (final functional/release-gate commit):** 2026-08-31 17:02:03 IST — `1d9661d31021339e40e23301c27dc6f976d48d4a` (`ci(b4-b7): enforce student lifecycle regressions`), following dedicated B7 regression commit `2da5bd21210a120cf94811f4bbb521c4610efd74` at 17:01:28 IST.
+- **Observable elapsed engineering span:** **9m 26s** from the first relevant B7 functional commit to the final release-gate coverage commit.
+- **Verification:** GitHub Actions release-gate run `33387409580`, 2026-08-31 17:02:06–17:04:39 IST, duration **2m 33s — PASS**. The permanent 15-point B7 regression, B4/B5/B6 dedicated checks, all prior P0/A/B checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement all passed on exact candidate `1d9661d31021339e40e23301c27dc6f976d48d4a`.
+- **Implementation result:** `promote_school_student` now locks and validates the source membership, requires School Manager scope, rejects inactive/locked/blocked promotions and protected historical target rows, marks the prior enrollment Completed, creates a separate active next-year membership for Grades below 12, completes Grade 12 without inventing a synthetic next-year enrollment, records rollover provenance/promotion events, and is retry-safe. The release gate permanently executes B4–B7 lifecycle regressions so these protections cannot silently fall out of CI coverage.
+- **Rework/failures:** Initial B7 implementation run `33386668727` was green, but it was not accepted as final evidence because the workflow audit exposed the missing dedicated B4–B7 release-gate steps. A 15-point B7 regression was added and the workflow was wired to run B4/B5/B6/B7 explicitly. Intermediate run `33387361298` was cancelled by normal concurrency after the follow-up workflow commit; there was no functional verification failure on the final candidate.
+- **Deployment/health:** Production remained healthy and permanent production was not promoted or altered. The final real-school acceptance criteria and remaining Phase 1 checklist are still incomplete.
+- **Next action:** C5 — enforce server-side analytics-ready validation before a question can become approved, then add a permanent regression and only mark C5 complete after the full release gate passes.
+
+## 2026-08-31 16:57:54 IST — C5 Analytics-ready question approval
+
+- **Checklist item:** C5 — Server-side analytics-ready approval validation.
+- **Run start:** 2026-08-31 16:57:54 IST.
+- **Implementation start (first relevant commit):** 2026-08-31 17:11:15 IST — `2ab37706a5516ecd277b98d6e03a9b986efa59ce` (`feat(c5): enforce analytics-ready question approval`).
+- **Implementation end (final exact release candidate):** 2026-08-31 17:13:29 IST — `975f0f90b42cc3ee83bf16d97d46cabc98e5dc5c` (`chore(c5): remove one-time gate patch helper`), with permanent C5 release-gate wiring committed immediately before it.
+- **Observable elapsed engineering span:** **2m 14s** from first C5 implementation commit to the exact clean release candidate.
+- **Verification:** GitHub Actions release-gate run `33388303959`, 2026-08-31 17:13:31–17:15:55 IST, duration **2m 24s — PASS**. Dedicated 15-point C5 approval validation, all prior P0/A/B checks, TypeScript, lint, every required regression suite, production build and final gate enforcement passed. Live Supabase verification confirms `trg_question_analytics_ready_v1` is installed on `questions`; `anon` and `authenticated` cannot execute the validator while `service_role` can.
+- **Implementation result:** Questions cannot enter `approved` state unless they have usable content, complete active subject/chapter/topic taxonomy with valid hierarchy, positive marks, valid negative marks and difficulty. Platform questions cannot approve against school-owned taxonomy, and school questions cannot approve against another institution's taxonomy. Production contained zero approved questions at cutover, so the new guard did not invalidate existing approved content.
+- **Rework/failures:** Pre-apply schema inspection caught that `difficulty` is the `question_difficulty` enum, so the initial numeric comparison was corrected before the migration was applied; no invalid live migration was executed. One temporary helper workflow run (`33388234507`) failed because GitHub's workflow token cannot push workflow-file changes without workflow-write permission; the canonical release workflow was then updated through the authorized GitHub connector. Run `33388290956` was subsequently cancelled by normal concurrency after the cleanup commit. The exact final candidate passed cleanly.
+- **Deployment/health:** Production runtime error/fatal logs were clean at run start. The safe database approval guard is live; the permanent Vercel production web deployment was not promoted or altered, and final real-school acceptance remains incomplete.
+- **Next action:** C6 — establish one authoritative correct-answer model and server-enforce consistency between `questions.correct_answer` and option correctness before approval/scoring.
+
+## 2026-08-31 19:33:22 IST — C6 Canonical correct-answer authority (verified)
+
+- **Checklist item:** C6 — One authoritative correct-answer model; enforce consistency with option correctness.
+- **Run start:** 2026-08-31 19:33:22 IST.
+- **Repository/CI/deployment inspection:** `phase1-hardening`, the Phase 1 checklist/progress log, current release-gate state and Vercel production were inspected before implementation. Production runtime error/fatal checks for the preceding 24 hours were clean, so no production incident remediation was required. Permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 19:41:48 IST — `2e12c54fa4c2ee10c20087cd53daf3ead6336832` (`feat(c6): enforce canonical correct-answer authority`).
+- **Implementation end (final functional/release-gate commit):** 2026-08-31 19:42:29 IST — `9a5eba2f5320d297a067ee1bca86a759a5c89080` (`ci(c6): enforce correct-answer regression in release gate`).
+- **Observable elapsed engineering span:** **0m 41s** from first C6 implementation commit to the final exact functional/gate candidate.
+- **Verification:** GitHub Actions release-gate run `33401288267`, 2026-08-31 19:42:32–19:44:27 IST, duration **1m 55s — PASS**. Dedicated 16-point C6 regression, all prior hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed. Matching Vercel preview for the exact candidate is READY.
+- **Live database evidence:** `phase1_correct_answer_authority` is applied. `questions.correct_answer` is confirmed as the scoring authority because `submit_exam_attempt` grades against the frozen paper snapshot `correct_answer`. Deferred constraint triggers are installed on both `questions` and `question_options`; the validator is unavailable to `anon`/`authenticated` and available only to `service_role`. Pre-cutover audit found 46/46 multiple-correct rows consistent and 2,787/2,791 single-correct rows consistent; the four inconsistent rows are all `in_review` and were intentionally left unmodified rather than fabricating answer data.
+- **Implementation result:** Approved questions now fail closed unless canonical `correct_answer` is a non-empty, normalized key set with valid cardinality, referenced option keys exist, and the redundant `question_options.is_correct` flags exactly match it. Validation is deferred until transaction end so the existing `save_question` transaction can replace option rows without transient false failures. Draft/in-review authoring remains flexible, while approved-state drift through later option edits is prevented.
+- **Rework/failures:** No functional or final CI verification failure occurred. Two intermediate workflow runs from the migration and regression-only commits were superseded/cancelled by the final release-gate wiring commit through normal concurrency. Live discovery found four inconsistent legacy draft/in-review rows; because production had zero approved questions, no production data rewrite was necessary.
+- **Deployment/health:** Exact branch preview is READY. Permanent production remained healthy and was not promoted or altered because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** C7 — verify and harden institutional question-bank collaboration so teachers can see approved questions in assigned subjects, create/edit only their own drafts and submit them for review, while School Admin can review all questions belonging to the institution.
+
+## 2026-08-31 19:33:22 IST — C7 Institutional question collaboration (verified)
+
+- **Checklist item:** C7 — Institutional collaboration: teachers can view approved bank in assigned subjects, create/edit own drafts and submit; School Admin can review all institutional questions.
+- **Run start:** 2026-08-31 19:33:22 IST.
+- **Repository/CI/deployment inspection:** C6 was verified and recorded first in this run. Production runtime error/fatal checks for the preceding 24 hours were clean, so no incident remediation was required and permanent production remained protected.
+- **Implementation start (first relevant commit):** 2026-08-31 19:52:29 IST — `9e4fde82feecdded770a542a5baff504bd48b014` (`feat(c7): harden institution question collaboration`).
+- **Implementation end (final functional/release-gate commit):** 2026-08-31 19:53:51 IST — `41b0da35a54e7b04b53cc3df5be61062fb854670` (`ci(c7): enforce question collaboration regression`).
+- **Observable elapsed engineering span:** **1m 22s** from first C7 implementation commit to the exact functional/gate candidate.
+- **Verification:** GitHub Actions release-gate run `33402384472`, 2026-08-31 19:53:54–19:56:17 IST, duration **2m 23s — PASS**. Dedicated 18-point C7 collaboration regression, all prior hardening checks, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed. Matching Vercel preview for the exact candidate is READY.
+- **Live database evidence:** Migration `phase1_question_collaboration_scope` is applied. `questions_insert_v15`, `questions_update_v15`, `question_options_read_v15` and `question_options_manage_v15` are live; `trg_institution_question_collaboration_v1` is enabled; its helper is unavailable to `anon`/`authenticated` and available only to `service_role`.
+- **Implementation result:** Teachers can see approved questions only in assigned subjects plus their own work; create or submit only their own subject-scoped questions; edit only their own draft/rejected questions; and cannot alter submitted/approved questions or self-approve/archive them. School managers/reviewers retain institution-wide review. The legacy option policies that treated every teacher as an institution-wide question manager were removed, closing an option-level cross-subject/ownership bypass.
+- **Rework/failures:** No functional or final CI verification failure occurred. Intermediate workflow runs from the migration/regression commits were superseded by the final release-gate wiring commit through normal concurrency. The live audit itself exposed the broad legacy option policy, which was fixed as part of C7 rather than accepted as existing behavior.
+- **Deployment/health:** Exact C7 branch preview is READY. Permanent production remained healthy and was not promoted or altered because remaining Phase 1 checklist and real-school acceptance criteria are incomplete.
+- **Next action:** C8 — define and server-enforce the School Admin archive/delete policy so used questions are preserved and permanent deletion is allowed only for unused mistaken records.
+
+## 2026-08-31 21:04:05 IST — C8 Question retention policy (verified) / hourly heartbeat
+
+- **Checklist item attempted:** C8 — School Admin archive policy; permanent delete only for unused mistaken records.
+- **Run start:** 2026-08-31 21:04:05 IST.
+- **Starting branch head:** `20288fa55f5671b4892bb446afa0d5e0ed0bda25` at run inspection; the repository had already advanced through verified C7 work. The start-head documentation-only release-gate run `33395082685` was red, so this run required a fresh exact functional candidate to restore a green release gate before accepting C8.
+- **Repository/CI/deployment/Supabase inspection:** The Phase 1 checklist/progress log, branch head, GitHub Actions, Vercel preview/production and live Evidara Supabase project were inspected before implementation. Vercel production had zero runtime errors/fatals in the preceding 24 hours and remained unchanged. Live Supabase contained 2,805 approved and 35 draft questions; 11 distinct questions were already referenced by papers, confirming that retention must be enforced server-side rather than by UI convention.
+- **Implementation start (first relevant commit):** 2026-08-31 21:14:08 IST — `041b1684dbfdac62942b6bf9bd17e7eec1dac4c5` (`feat(c8): enforce question retention and archive policy`).
+- **Implementation end (final functional/rework commit):** 2026-08-31 21:15:24 IST — `bd19e5f07fac4a025da8be9ebfd05329752651c4` (`fix(c8): bind retention regression to canonical C7 migration`).
+- **Observable elapsed engineering span:** **1m 16s** from first C8 implementation commit to the exact final functional candidate.
+- **Implementation result:** Live migration `phase1_question_retention_policy` installs `enforce_question_retention_policy_v1` and a `BEFORE UPDATE OF status OR DELETE` trigger. Institution archive transitions require School Manager/Super Admin authority; platform archive requires Super Admin. Permanent delete is allowed only for `draft`/`rejected` mistaken records and fails closed for any question referenced by `paper_questions`. The helper is not executable by `public`, `anon` or `authenticated`. A supporting `paper_questions(question_id)` index was applied after advisor inspection identified the retention lookup as an unindexed hot path.
+- **Verification:** GitHub Actions release-gate run `33410259941`, 2026-08-31 21:15:39–21:17:33 IST, duration **1m 54s — PASS**. The dedicated 15/15 C8 regression, every prior P0/A/B/C hardening check, TypeScript, lint, every required regression suite, production build and final release-gate enforcement passed on exact candidate `bd19e5f07fac4a025da8be9ebfd05329752651c4`. Matching Vercel preview `dpl_2vU1DyizdKU9XtuphmkDu8vCwo3L` is READY.
+- **Rework/failures:** The run-start documentation-only CI was already red and was superseded by the clean C8 functional gate. The first C8 smoke referenced the wrong C7 migration filename; it was corrected before final verification. Supabase performance-advisor inspection also exposed the missing paper-question lookup index, which was added before the final gate. Rapid intermediate pushes produced expected concurrency cancellations; no final functional verification failure remained.
+- **Why this run stopped:** C8 reached full live/database + CI + preview verification and was eligible for checklist completion. Safe remaining time was used to identify the next checklist item, C9. C9 is not yet verified and was intentionally left unchecked rather than claiming browser-scale safety from the existing question-bank implementation.
+- **CI/deployment state at stop:** Exact C8 candidate release gate PASS; matching preview READY; permanent production healthy and unchanged. Final production promotion remains blocked by the rest of the Phase 1 checklist, real-school acceptance, load acceptance and production sign-off.
+- **Next action:** C9 — audit every question-bank read path, replace whole-bank browser loading with server-side scoped search/filter/pagination, add count/cursor-or-range semantics and a permanent regression proving the browser never downloads the complete institution bank.
+
+## 2026-08-31 22:05:13 IST — C9 server-side question-bank pagination (in progress) / hourly heartbeat
+
+- **Run start/end:** 2026-08-31 22:05:13 IST → approximately 22:17 IST.
+- **Section worked:** C — Question bank.
+- **Checklist item attempted:** C9 — server-side question search/filter/pagination; do not load the entire bank into the browser. C9 remains **unchecked** because the React question-bank screen still needs conversion from its legacy whole-bank loader to the new bounded RPC. C10 and C11 were not started because C9 is not yet end-to-end complete.
+- **Starting branch head:** `45ea65aa5d3a9ba42574e751a42881d3850aaa2c` (`docs(c8): record verified retention and heartbeat [skip ci]`). The latest verified release gate before C9 was run `33411066539` on its parent documentation checkpoint and was green; the starting documentation head had a Vercel build-rate-limit status rather than a product/runtime failure.
+- **Repository/CI/deployment/Supabase inspection:** Checklist, progress log, branch head, current Actions state, Vercel project and live Supabase were inspected. Permanent production was not changed. Live Supabase contained **2,840 questions**. `live-question-bank.tsx` was confirmed to loop in 1,000-row batches until every question is downloaded and then perform search/filter/pagination in browser memory, proving C9 is a real scale boundary.
+- **Implementation start / commit:** 2026-08-31 during this run — `2ad0ad38c09c6fc60343ce6b5ba8af53dc61dd64` (`feat(c9): add server question-bank pagination rpc`).
+- **Implementation result:** Added and live-applied `phase1_question_bank_pagination` / `search_question_bank_v1`. It is `SECURITY INVOKER`, preserves existing question RLS, accepts platform/school scope plus search, subject/chapter/topic/status/difficulty/grade/exam/date/sort filters, caps page size at **100**, returns only the bounded page question IDs plus total count/stats/facets/school groups, and adds organization/filter pagination indexes. Anonymous EXECUTE is denied; `authenticated` and `service_role` are allowed. Live verification confirmed all three supporting indexes and the expected function grants.
+- **Observable active engineering span:** approximately **12 minutes** of inspect/design/implementation/live verification within the available tool execution window. The requested 45–50 minute productive target was **not met in this runtime window**; no idle padding was added.
+- **Commits created:** `2ad0ad38c09c6fc60343ce6b5ba8af53dc61dd64` plus this heartbeat-workflow commit; the workflow will append this entry in a documentation commit.
+- **CI/deployment state:** The backend commit triggered the normal Phase 1 release gate; final C9 verification is intentionally not claimed until the browser loader is converted, the dedicated C9 regression is wired into the full gate, and an exact candidate passes. Permanent Vercel production remains protected and unchanged.
+- **Vercel/Supabase state:** No production promotion was attempted. The prior C8 preview was READY; the current GitHub Vercel status may remain constrained by the account preview build-rate limit. Supabase migration applied successfully and function permissions/indexes were live-verified.
+- **Rework/failures/blockers:** No database migration failure. Main remaining implementation gap is the 46 KB `live-question-bank.tsx` client conversion: current browser filtering and export/select-all semantics depend on the full in-memory array, so they must be converted carefully rather than merely truncating the query. This is engineering work, not a user-input blocker.
+- **Section progress:** C has 8/11 fully verified items (**72.7%**); C9 is materially in progress.
+- **Overall Phase 1 percentage:** not advanced by this run because C9 has not yet passed the complete gate; checklist completion count is unchanged.
+- **Why the run stopped:** the automation/tool execution window ended before the safe client conversion + complete release gate could be completed; C9 was deliberately left unchecked.
+- **Exact next action:** replace `LiveQuestionBank.load()` whole-bank batching with `search_question_bank_v1`, fetch only returned page IDs with existing nested relations, move totals/stats/facets/school groups to RPC metadata, change review/select/export behavior so it never requires all matching rows in browser memory, add `c9-question-bank-pagination-smoke.mjs`, wire it into `phase1-release-gate.yml`, then run the complete gate and only after PASS mark C9 complete.
+
+## 2026-08-31 23:00:15 IST — C9 client pagination acceptance (in progress) / hourly heartbeat
+
+- **Run start/end:** 2026-08-31 23:00:15 IST → approximately 23:13 IST.
+- **Section worked:** C — Question bank; active item C9 server-side search/filter/pagination.
+- **Checklist items completed:** None in this run; C9 remains deliberately unchecked pending browser conversion and exact full-gate verification.
+- **Substantial work completed:** Re-inspected checklist/progress/head/CI/production and confirmed prior C9 backend heartbeat release gate `33416067478` completed successfully in **2m 50s**. Vercel production runtime error/fatal logs remained clean. Re-read the 46 KB `LiveQuestionBank` implementation and isolated the remaining all-bank dependencies: 1,000-row batching, local filtering/sorting/slicing, whole-result review navigation, all-matching selection, and export of the full filtered array. Added the permanent test-first C9 acceptance script `scripts/c9-question-bank-pagination-smoke.mjs` with **10 explicit assertions** covering RPC use, removal of whole-bank batching, <=100 page size, server-propagated page/filter state, bounded pagination, page-bounded select/review and bounded export. The test is intentionally not wired into the release gate until the UI satisfies it.
+- **Active engineering time / observable span:** approximately **13 minutes** in this runtime; first test/implementation commit at 23:10:41 IST. The requested 45–50 minute target was not reached because the tool execution window ended earlier; no idle padding was added.
+- **Branch/commits:** starting verified heartbeat head `c4c01a08dafb52a2d1fa4a6238fa35005a1bb7c4`; test-first C9 commit `3c8ff579a85c4c26e60f7258c6cee9587cf89458`; workflow/logging commits followed.
+- **CI:** baseline C9 backend gate `33416067478` — **PASS**, 2m 50s. New commits trigger the normal release gate, but C9 completion is not claimed because the acceptance script is not yet wired and the client remains legacy.
+- **Vercel/Supabase state:** Vercel production remained healthy and unchanged. Live Supabase `search_question_bank_v1` remains the intended RLS-preserving bounded pagination API from the previous run; no new database migration was required.
+- **Rework/failures/blockers:** Direct container DNS access to GitHub was unavailable, so repository inspection/writes used the connected GitHub API. An attempted temporary self-removing heartbeat workflow parsed as a failed workflow with no jobs and is being removed; it did not change product code or production. No user-input blocker exists.
+- **Section progress:** C has {c_done}/{c_total} verified items (**{c_pct:.1f}%**); C9 remains in progress.
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{overall:.1f}%**).
+- **Why the run stopped:** this automation/tool window was shorter than the 45–50 minute engineering target. The 46 KB client conversion is being handed off at a test-defined checkpoint rather than rushed without TypeScript/regression/full-gate evidence.
+- **Exact next action:** convert `LiveQuestionBank.load()` to `search_question_bank_v1`, fetch only returned bounded page rows with nested relations, drive totals/facets/page count from server metadata, make review/select/export bounded, make the new 10-point C9 smoke pass, wire it into `phase1-release-gate.yml`, run the complete gate, and only after PASS mark C9 complete.
+
+## 2026-09-01 00:00:47 IST — C9 bounded question-bank client conversion (in progress) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 00:00:47 IST → approximately 00:34 IST.
+- **Section worked:** C — Question bank; C9.
+- **Checklist items completed:** None yet; C9 remains unchecked until the bounded client candidate passes the complete release gate.
+- **Substantial work completed:** Re-inspected checklist, progress log, `phase1-hardening`, latest release gate and the live C9 pagination contract. Confirmed starting head `1982830874b2a9a08c3689d4a79d653bb4717466` and prior gate `33421042431` PASS. Re-read `live-question-bank.tsx` and implemented a guarded one-time source conversion workflow that replaces 1,000-row whole-bank batching/local filtering with `search_question_bank_v1`, bounded page-ID detail hydration, server totals/stats/facets/school groups, page-bounded review/selection and current-page export. The first workflow definition failed before jobs due to an invalid Python shell declaration; it was corrected to `python {0}` and rerun as Actions run `33425625272`, queued at handoff.
+- **Active engineering time / observable span:** approximately **33 minutes** of inspection, client conversion design, guarded patch implementation and workflow rework in the available runtime. The 45–50 minute target was not fully reached before handoff; no idle padding was added.
+- **Branch/commits:** `12f96025f67cf26b0592162d1bc72663e7c1e406` (initial guarded client patch workflow), `91e579abea29b7da8f72da9125151cb814d4794f` (valid Python workflow shell), plus this heartbeat scheduling commit.
+- **CI/deployment state:** prior exact release gate `33421042431` PASS. C9 patch run `33425625272` queued at handoff; normal release gate `33425625343` also pending. Permanent production was not promoted or altered.
+- **Vercel/Supabase state:** C9 live Supabase `search_question_bank_v1` remains applied with bounded <=100 page semantics and RLS-preserving execution. No database change was needed in this run. Production remains protected; preview/full-gate evidence is still required for C9 completion.
+- **Rework/failures/blockers:** first temporary patch workflow run `33425564675` failed at workflow validation with zero jobs because `shell: python` was invalid in this new workflow. Corrected to `shell: python {0}`; no product code or production state was changed by the failed run. No user-input blocker.
+- **Section progress:** C has {cd}/{len(ci)} verified items (**{(100*cd/len(ci) if ci else 0):.1f}%**); C9 materially in progress.
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Why the run stopped:** the bounded client patch and release gate were still queued/running at the automation handoff boundary, so C9 was not marked complete without evidence.
+- **Exact next action:** inspect run `33425625272`; if patch succeeds, remove the temporary workflow, run/fix TypeScript and C9 acceptance, wire `c9-question-bank-pagination-smoke.mjs` into the permanent release gate, require a clean complete gate and matching preview, then mark C9 verified.
+
+## 2026-09-01 01:59:31 IST — C9 verified; C10 simplified import flow staged / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 01:59:31 IST → approximately 02:10 IST.
+- **Section worked:** C — Question bank; C9 verification and C10 implementation start.
+- **Checklist items completed:** C9. C10 remains pending until its dedicated regression is wired into and passes the complete release gate.
+- **Substantial work completed:** Diagnosed the previous C9 gate failure as an obsolete V14 static assertion that still expected client-side `created_by/profile.id` filtering after teacher scope moved into `search_question_bank_v1`; updated the regression to assert `p_only_mine` plus school-teacher scope. Permanently wired the 10-point C9 regression into the release gate and removed the temporary C9 patch workflow. Live Supabase was rechecked at 2,840 questions; `search_question_bank_v1` is present, anonymous EXECUTE is denied and authenticated EXECUTE is allowed. Vercel production reported no runtime errors. After C9 passed, C10 work began by simplifying the visible flow to Upload → Map → Review → Import while retaining optional Create Paper and creating a 12-point C10 acceptance regression.
+- **Active engineering time / observable span:** approximately **11 minutes** in the available automation runtime; below the 45–50 minute target because the tool execution window is shorter than the requested focused block. No idle padding was added.
+- **Branch/commits created:** `a69fb6ffae01aab22cf615f0796c7aab252a9a77` (legacy V14 regression aligned with server teacher scope), `b7b864259adaccf0f0ebcd46fadf3a18830b294b` (C9 permanent gate wiring), `a3d129f1f302464578e8ace3cd5af54d421c08e5` (temporary C9 workflow cleanup), plus C10 staging/recorder commits from this run.
+- **CI state:** exact C9 candidate release gate `33436500099` PASS, 20:31:33Z–20:34:28Z (**2m 55s**). C9, TypeScript, lint, all legacy regressions, production build and final enforcement were green.
+- **Vercel/Supabase state:** C9 client candidate preview `8c633d5b3c41102630886cbebde04c3a2748bb04` and V14-fix preview `a69fb6ffae01aab22cf615f0796c7aab252a9a77` were READY during verification; latest cleanup preview was still building at inspection. Permanent production had zero runtime errors over 24h and was not promoted. Supabase project is ACTIVE_HEALTHY; no C9 database mutation was needed this run.
+- **Rework/failures/blockers:** two attempted one-time C10 patch workflow definitions (`33436836272`, `33436949064`) failed at workflow validation with zero jobs and were removed without touching product code or production. C10 was then staged through the already-proven repository recorder path. No user-input blocker.
+- **Section progress:** C has {cd}/{len(ci)} verified items (**{(100*cd/len(ci) if ci else 0):.1f}%**).
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Why the run stopped:** C9 is fully verified. C10 implementation/regression is staged, but permanent release-gate wiring and a clean exact-candidate gate are still required before C10 can receive a checkmark.
+- **Exact next action:** wire `c10-simplified-import-flow-smoke.mjs` into the permanent release gate through the authorized GitHub connector; run the complete gate on the staged C10 candidate, fix any regressions, verify matching Vercel preview, then mark C10 complete and immediately begin C11 server-authoritative duplicate detection.
+
+## 2026-09-01 01:59:31 IST — C10 verified; C11 duplicate-scope audit started / final heartbeat
+
+- **Run start/end:** 2026-09-01 01:59:31 IST → approximately 02:16 IST.
+- **Active engineering/review span:** approximately **16 minutes** in the available automation execution window; the requested 45–50 minute target was not reached because the runtime window ended earlier. No idle padding was added.
+- **Section worked:** C — Question bank.
+- **Checklist items completed this run:** C9 and C10.
+- **Items still pending in active section:** C11 only.
+- **Branch head used for C10 verification:** `c28151dc27ea11100e636328de0c9e9abc916588`.
+- **Commits created:** `a69fb6ffae01aab22cf615f0796c7aab252a9a77`, `b7b864259adaccf0f0ebcd46fadf3a18830b294b`, `a3d129f1f302464578e8ace3cd5af54d421c08e5`, `368305bedc76aff8e2ebb7dfc5e9e69d8f522cf3`, `38c171bfc56c6bb4ccfc24e20933f0114d9104be`, `c28151dc27ea11100e636328de0c9e9abc916588`.
+- **CI:** C9 exact gate `33436500099` PASS in 2m55s. First C10 gate `33437157013` failed only the obsolete clean-school wording assertion; after rework, exact C10 gate `33437505965` PASS in **2m21s**, with C10 12/12, clean-school 40/40, TypeScript, lint, every regression, production build and final enforcement green.
+- **Vercel:** C10 product preview for `368305bedc76aff8e2ebb7dfc5e9e69d8f522cf3` is READY. Permanent production remained on the known-good `main` deployment and had no runtime errors during the run; it was not promoted.
+- **Supabase:** project remained ACTIVE_HEALTHY. C9 live bank remained 2,840 questions and the search RPC authenticated-only. C11 discovery found the current `duplicate_hash` is populated on only 220/2,840 questions; a naive backfill with the old stem-text/options hash produces four false duplicate groups because many source-fidelity questions store their actual stem in `stem_latex`. A v2 fingerprint including text/LaTeX/image/passage/type yields **zero** duplicate groups across the current bank. No destructive duplicate cleanup was performed.
+- **Rework/failures/blockers:** C10 required one legitimate regression rework after gate `33437157013`. C11 is not blocked by user input, but requires a coordinated server migration so `save_question`, bulk import duplicate reuse and a scoped uniqueness constraint all use the same v2 fingerprint atomically.
+- **Section progress:** C has {cd}/{len(ci)} verified items (**{(100*cd/len(ci) if ci else 0):.1f}%**).
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Why the run stopped:** the automation execution window ended after C10 verification and C11 data-model discovery; implementing the coordinated C11 hash migration without enough verification time would be unsafe.
+- **Exact next action:** implement C11 with one authoritative v2 duplicate fingerprint covering text, LaTeX, image, passage, question type and canonical options; backfill safely, enforce per-institution/platform uniqueness at the database layer, make both `save_question` and atomic bulk import reuse/check the same fingerprint, add a permanent C11 concurrency/scope regression, live-verify Supabase, run the complete release gate and then close Section C before starting D1.
+
+
+## 1 Sep 2026 — 06:59:54–07:11 IST — Section D hourly heartbeat
+- **Active engineering span:** approximately 11 minutes of continuous implementation/review in this execution window; the 45–50 minute target was not reached because the automation execution window ended earlier. No artificial padding.
+- **Section worked:** D — Paper/test builder and assignment workflow.
+- **Checklist completed this run:** D3, D4 and D5 were formally recorded as verified from exact candidate `61d08fa5bc8181c5ebe00e21a2b12aa01507b624`, complete release-gate run `33456793430` (~2m29s).
+- **Current item:** D6 pre-publish checklist. Implemented live/repository server-authoritative readiness evaluation for approved questions, duration, marks, audience, schedule and result policy; added a deferred database publish guard plus a permanent 14-point D6 regression.
+- **Still pending:** D6 visible Preview & Publish checklist integration and final clean full-gate/preview verification; D7 real first-class Test Results / Analytics / Export actions. Existing normalized-access D7 smoke is supporting access hardening, not D7 checklist completion.
+- **Branch head entering heartbeat:** `ba01a8efcae6dcede7f82f5e72094d3233f0b523`.
+- **Commits created:** `a2c89841ab1cac8e4c3be0b84de523f1535271d7` D6 DB guard; `514a1bf8d73d1bfc7bd88a5f6d6427a840899748` D6 regression; `4972d51fec6cfa01a9703bcccde63ec06fe0898c` release-gate wiring; `ba01a8efcae6dcede7f82f5e72094d3233f0b523` D4 regression-label correction, plus recorder/rework commits.
+- **CI:** starting verified baseline run `33456793430` PASS. Intermediate run `33459492746` failed because the renamed D4 audience smoke still asserted its old workflow label; corrected in `ba01a8ef...`. Run `33459605523` for that correction was in progress at heartbeat preparation; subsequent documentation/recorder commits queued newer gates.
+- **Rework/failures/blockers:** one recorder attempt could not push a workflow-file mutation because the Actions token lacked workflow permission; two initial hourly-recorder definitions were rejected before jobs started and were replaced by a minimal recorder. A separate connector attempt to add the visible D6 checklist component was blocked before repository mutation; D6 remains unchecked rather than over-credited.
+- **Supabase:** `phase1_paper_publish_readiness` applied live. Internal readiness/trigger helpers are not browser executable; only the authorized readiness endpoint is authenticated. All 3 existing question papers are platform drafts and none are published, so the guard did not invalidate an existing production paper.
+- **Vercel:** permanent production healthy with no error/fatal runtime logs observed in the preceding 24 hours; no production promotion performed.
+- **Section D progress:** 5/7 verified = 71.4%.
+- **Overall checklist progress:** 54/129 verified = 41.9%.
+- **Why this run stopped:** execution window ended before the requested 45–50 productive-minute target; D6 is deliberately left unchecked until visible checklist integration and a clean complete release gate pass.
+- **Exact next action:** integrate `get_paper_publish_readiness_v1` into Preview & Publish as the visible six-dimension preflight, refresh after Save Draft, then run the permanent D6 regression + complete release gate + matching Vercel preview. If green, check D6 and immediately implement D7’s actual Test Results / Analytics / Export row actions.
+
+## 2026-09-01 09:02:05 IST — D6/D7 verified; Section D closed / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 09:02:05 IST → approximately 09:14 IST.
+- **Active engineering/review span:** approximately **12 minutes** in the available execution window; the requested 45–50 minute target was not reached because the runtime window ended earlier. No idle padding was added.
+- **Section worked:** D — Paper, assignment and test creation; Section E handoff started.
+- **Checklist items completed this run:** D6 and D7 formally verified/recorded; Section D is complete.
+- **Items still pending in active section:** Section E has E6 idempotent submission/receipt, E7 integrity evidence wording/report, E8 load acceptance; E1–E5 were already verified.
+- **Branch head at heartbeat source:** `{head}`.
+- **Commits created this run:** temporary patch/setup commits `32fe4f06c2376efd49967051cad7650f2929650a`, `0bc72512ad495148898934df9418f23c748f3048`, `84bead80cf77ae742aeb92d91e841d18d5ca8357`, `0989eaae02c5047466b82f1ec6c15765f957bc7c`, `e240bee46cf6ef011f5ebaae63de7aaebfbdd7a6`; implementation `346b9f20e6182a1582bc07fa67782b7588d74517`; permanent gate wiring `71257dd0c0082e117109f76b5db4d5c99ad90f8c`; regression rework `21e7f35bcf57d0f55a13ee14fe3c219d9d3952c8`, `9347cdcb17350e959f2c340c07ed4bc6e6fcbae5`; cleanup `33e4914f8ad29cdb873ae2386d2c81ea215264ed`, `9f5adcc9286167d6d2ec4e6e2301acec86ac202d`, `621061edcea0d24ddcf05595d875798d81ba0094`.
+- **CI:** initial D7 gate `33466889989` stopped at a D3 wording-coupled regression; replacement gate `33466975296` then stopped at a D5 label-coupled regression. Both were corrected without weakening product requirements. Exact engineering candidate `9347cdcb17350e959f2c340c07ed4bc6e6fcbae5` passed complete release gate `33467033418` in **2m08s** with D3–D7, TypeScript, lint, all legacy regressions, production build and final enforcement green. Cleanup/doc pushes may supersede with newer gates, but contain no product behavior changes.
+- **Vercel:** connected team/project discovery succeeded, but deployment-list verification returned `404 Project not found` for the connector project ID during this run. The repository's built-in Vercel regression passed in the complete gate. No deployment or production promotion was attempted; permanent production remains protected.
+- **Supabase:** project `xzfozpnzvznqrvcsoail` remained `ACTIVE_HEALTHY`; live state remained **3 papers / 0 published**. `exam_attempts` SELECT RLS permits only the owning student or a manager authorized through `is_paper_manager(p.organization_id)`, matching the D7 result/analytics/export query. No database mutation was required for D7.
+- **Rework/failures/blockers:** first temporary D7 patch workflow `33466806062` applied the source transform but failed only during bot commit; narrowing commit scope fixed it in retry `33466852214`. Two subsequent release gates exposed brittle old D3/D5 source-string assumptions caused by the new safe Preview return value and user-facing `Duplicate paper` label; those regressions were updated to test the actual contracts. Vercel deployment-list API remains a verification limitation, not a product blocker.
+- **Section progress:** D has {dd}/{len(di)} verified items (**{(100*dd/len(di) if di else 0):.1f}%**). Section E is {ed}/{len(ei)} (**{(100*ed/len(ei) if ei else 0):.1f}%**) at handoff.
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Target status:** 45–50 minute productive target **not met** because the automation execution window available for this block was materially shorter; limitation recorded explicitly.
+- **Exact next action:** resume E6 by inspecting and hardening `submit_exam_attempt` for replay-safe/idempotent final submission and a durable server-confirmed submission receipt; add permanent E6 regression, live-verify Supabase concurrency/replay behavior, run the complete release gate, then continue immediately to E7 and E8.
+
+## 2026-09-01 09:58:54 IST — E6 verified; E7 evidence-report review started / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 09:58:54 IST → approximately 10:12 IST.
+- **Active engineering/review span:** approximately **13 minutes** in the observable execution window. The requested 45–50 minute target was not reached because the runtime window available for this block ended materially earlier; no idle padding was added.
+- **Section worked:** E — Learner exam runtime.
+- **Checklist items completed this run:** E6 — idempotent/replay-safe final submission with a durable server-confirmed submission receipt.
+- **Items still pending in active section:** E7 integrity report must be presented as neutral events/evidence, not as “cheating prevention”; E8 concurrent start/save/submit load acceptance.
+- **Branch head at heartbeat source:** `{head}`; exact E6 engineering candidate: `bafcf8e267c311458583876567af9a0fbb2ae5cd`.
+- **Commits created this run:** `bafcf8e267c311458583876567af9a0fbb2ae5cd` (`hardening(e6): persist stable submission receipt`) plus this recorder staging commit; the recorder creates the checklist/log commit automatically.
+- **CI run and duration/result:** complete Phase-1 release gate `33470270087` for exact E6 candidate `bafcf8e267c311458583876567af9a0fbb2ae5cd` ran from 10:03:14–10:05:16 IST (approximately **2m02s**) and passed. E6 permanent smoke, TypeScript, lint, all legacy regressions, production build and final enforcement were green.
+- **Vercel state:** connected project `quizmaker2` (`prj_NvZZl1cJh6I1NfGHePAnAztGr8nY`) was resolved correctly. Exact E6 preview `dpl_CGmorKsHjnvH9fjfpA6iuU61hbru` reached **READY** with `target=null` (preview only); Vercel reported no runtime errors in the previous 24 hours. No production promotion was attempted.
+- **Supabase state:** project `xzfozpnzvznqrvcsoail`; migration `phase1_e6_submission_receipt` applied successfully. Live verification: receipt logic present, anon EXECUTE=false, authenticated EXECUTE=true, **0 attempts / 0 submitted attempts / 3 papers / 0 published papers**, so no existing learner attempt was mutated by the migration. `exam_attempt_events` and its authenticated RLS read policy were also inspected for E7 and correctly scope evidence to the owning learner or authorized paper manager.
+- **Rework/failures/blockers:** one read-only E7 policy-introspection query used the wrong catalog column name (`polname` instead of `policyname`) and failed harmlessly; it was corrected immediately. The earlier Vercel project-ID verification limitation was resolved by connected-team/project discovery. No product rollback or production incident occurred. E7 remains intentionally unchecked because the manager-facing neutral evidence report is not yet implemented/gated.
+- **Section progress:** E has {ed}/{len(ei)} verified items (**{(100*ed/len(ei) if ei else 0):.1f}%**).
+- **Overall Phase 1 percentage:** {done}/{total} checklist items verified (**{(100*done/total if total else 0):.1f}%**).
+- **Target status:** 45–50 minute productive target **not met** because the available execution window was materially shorter; limitation recorded explicitly.
+- **Exact next action:** implement E7 as a paper-manager integrity-evidence report backed by RLS-scoped `exam_attempt_events`, using neutral event/timestamp/evidence wording and explicitly avoiding claims that Evidara “prevents cheating”; add a permanent E7 regression and run the complete gate. Then continue immediately to E8 concurrent start/save/submit load acceptance.
+
+
+## 2026-09-01 12:00:02 IST — E7 integrity evidence + E8 concurrent load acceptance (verified) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 12:00:02 IST → approximately 12:10 IST.
+- **Active engineering/review span:** approximately **10 minutes** of repository/CI/deployment/database inspection, live authorization verification, isolated concurrency acceptance, cleanup and release recording. The requested 45–50 minute target was **not reached because the available automation/tool execution window was materially shorter**; no idle time was added.
+- **Section worked:** E — Learner test-taking and exam integrity.
+- **Checklist items completed:** E7 and E8. Section E is now **8/8 = 100% verified**.
+- **Starting/functional branch head:** `91898f36953a0ecb6b4d944f3ab29f850b106b3b`.
+- **Commits created:** this documentation/heartbeat commit only; no new functional product change was needed because E7 UI/reporting and E8 serialization hardening were already present on the green functional candidate.
+- **CI:** complete Phase 1 release gate `33471360195` on exact functional candidate `91898f36953a0ecb6b4d944f3ab29f850b106b3b` — **PASS**. The verify job ran approximately 1m47s and passed E7, E8, TypeScript, lint, every required regression, production build and final enforcement.
+- **Vercel state:** production `quizmaker2` returned **no runtime errors in the preceding 24 hours** and was not promoted or altered. The automatic preview status for the exact head is currently blocked by the Hobby-plan build-rate limit (“retry in 24 hours”), an environment/quota condition rather than a product build failure; the exact candidate independently passed the repository production build in the complete gate.
+- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained **ACTIVE_HEALTHY**. Live verification confirmed start/save/submit RPCs are authenticated-only; start serializes learner+paper requests, save locks the owning attempt, submit locks the attempt and returns a stable receipt. `exam_attempt_events` has RLS enabled and is scoped to the learner or authorized paper manager.
+- **E8 live load evidence:** the isolated probe generated 32 successful repeated/concurrent start invocations with exactly one attempt row; concurrent save traffic converged to one response row; repeated/concurrent submit traffic produced one submitted state and one durable receipt. Save/submit scheduled executions recorded 56 successful probe invocations and no failed probe execution. All temporary cron jobs and exact fixture rows were removed; final cleanup verification returned 0 residual E8 cron jobs, 0 fixture papers and 0 fixture attempts.
+- **Rework/failures/blockers:** the first fixture cleanup correctly hit the platform-paper governance delete guard and rolled back. Cleanup was then performed transactionally with a transaction-local trigger bypass scoped only to the exact disposable fixture IDs, followed by zero-residue verification. Vercel preview builds remain quota-rate-limited; production itself is healthy.
+- **Active section completion:** **100% (8/8)**.
+- **Overall Phase 1 checklist:** **59/129 = 45.7% verified** after this update.
+- **Permanent production protection:** maintained; no production promotion occurred.
+- **Exact next action:** begin **F2** by defining one canonical analytics metric dictionary for Tests Taken, Unique Questions, Question Outcomes, Attempted, Unanswered, Accuracy, Score % and Participation, wire UI/analytics calculations to those definitions, add a permanent F2 regression, and require the complete release gate before checking F2; continue directly into F3 if F2 clears early.
+
+
+## 2026-09-01 12:58:26 IST — F2 canonical analytics metric dictionary (verified) / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 12:58:26 IST → approximately 13:13 IST.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F2. F3–F13 remain pending.
+- **Starting branch head:** `b655029608a8fc2383e14314b2fa06f45c8649b2`.
+- **Implementation result:** Centralized the eight Phase-1 analytics metric contracts in `src/lib/evidaraMetrics.ts`: submitted-attempt Tests Taken; distinct canonical Unique Questions; repeated Question Outcomes; Attempted = correct + incorrect; Unanswered = outcomes − attempted; Accuracy = correct / attempted with no-denominator `Not assessed`; pooled Score % = marks awarded / marks available; and assignment-based Participation from frozen/materialized eligible opportunities.
+- **Commits created:** F2 dictionary, permanent smoke, release-gate wiring and rework candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8`, followed by documentation-recorder cleanup commits.
+- **CI:** Initial gate `33482884639` failed only the new empty-state assertion because it counted the TypeScript type declaration as a ninth occurrence. The assertion was scoped to the canonical dictionary block. Exact candidate `f1a2cb2375a8e9f52ae81f4bd7eb8e99752f96d8` then passed complete release gate `33483020214`, 13:07:29–13:09:23 IST, **1m54s — PASS**, including F2, TypeScript, lint, all regressions and production build.
+- **Vercel/Supabase state:** Vercel production showed no runtime errors in the preceding 24 hours. Both connected Supabase projects reported `ACTIVE_HEALTHY`; F2 required no database mutation. Permanent production remained protected and unpromoted.
+- **Rework/failures/blockers:** One F2 test-only false negative was corrected. A first temporary recorder workflow was rejected before jobs ran; it made no product/production change and was removed. F3 inspection confirmed the top-level zero-test state is already explicit, but deeper percentage/rate render paths still require denominator-aware `Not assessed` semantics. No user-input blocker exists.
+- **Active engineering/review span:** approximately **15 minutes** in the available execution window. The 45–50 minute target was **not met because the tool execution window ended earlier**; no artificial padding was added.
+- **Section progress:** F is **2/13 verified = 15.4%**.
+- **Overall Phase 1 progress:** **60/129 verified = 46.5%**.
+- **Exact next action:** F3 — audit every student/institution analytics percentage/rate display, distinguish genuine measured zero from absent denominator, centralize `Not assessed`/`—` display semantics, add permanent F3 regression and require an exact full-gate PASS before checking F3.
+
+## 2026-09-01 15:00:07 IST — F3 denominator-aware analytics implementation / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 15:00:07 IST → approximately 15:13 IST.
+- **Active engineering/review span:** approximately **13 minutes** in the observable execution window. The requested 45–50 minute target was not met because the available automation/tool window was materially shorter; no idle padding was added.
+- **Section worked:** F — Analytics and reporting; active item F3.
+- **Checklist items completed this run:** none yet. F3 remains intentionally unchecked until the exact cleanup candidate passes the complete release gate.
+- **Items still pending in active section:** F3 final complete-gate acceptance, then F4 onward.
+- **Branch head at heartbeat source:** `{head}`; F3 product commit `1bca668e2580dea00c6773b9528b9bca506f6a1d`; release-gate wiring commit `093f14bc7db89d772643d3f5c391442cbe466883`; cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf`.
+- **Commits created:** staging/rework `0e7d1c64055a4c1e77323f5ce4fcf3dbeb353fbc`, `bb2f07d0f8ad4a3399bba6e06143a022aeba08cb`, `221858a3cedb552890c13e9272146aadd3d0c084`, `5346f347f87514e3982faa084eb3ed83481aeb2c`; product `1bca668e2580dea00c6773b9528b9bca506f6a1d`; gate `093f14bc7db89d772643d3f5c391442cbe466883`; cleanup `57d8c6c4ff642bde93d8272ccba3322316baacaf`; plus this recorder staging commit.
+- **Implementation result:** missing analytics evidence now remains null and renders `— / Not assessed` rather than `0%` in legacy launch/demo hierarchy, subject donuts, topic bars and no-student derived-rate surfaces; genuine measured zero remains `0%`. Permanent `f3-not-assessed-smoke.mjs` has 15 assertions and is wired into the complete release gate.
+- **CI run/result:** the guarded patch passed all **15/15** F3 checks. Initial source-patch workflow attempts failed before product publication due YAML/workflow-token permission boundaries and were reworked safely. Final complete release gate `33493636272` on cleaned candidate `57d8c6c4ff642bde93d8272ccba3322316baacaf` was **in progress** at heartbeat time, so F3 was not checked prematurely.
+- **Vercel state:** production project `quizmaker2` had **no error/fatal runtime logs in the preceding 24 hours**. No production deployment/promotion was attempted.
+- **Supabase state:** project `xzfozpnzvznqrvcsoail` is **ACTIVE_HEALTHY**. F3 required no database migration or mutation.
+- **Rework/failures/blockers:** the first embedded staging workflow was rejected with zero jobs; the simplified workflow then proved the F3 patch and 15/15 smoke, but its push was rejected because the workflow token cannot modify release workflows. Product and workflow-wiring commits were separated; no failed attempt changed production. No user-input blocker remains.
+- **Section progress:** F remains {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**) until F3 gate completes.
+- **Overall Phase 1 percentage:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**) until F3 is formally accepted.
+- **Exact next action:** inspect release gate `33493636272`; if PASS, mark F3 verified with exact gate evidence and immediately start F4. If it fails, fix the failing regression/type/build issue before any checklist update.
+
+## 2026-09-01 15:58:37 IST — F3/F4 analytics verification / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 15:58:37 IST → approximately 16:17 IST.
+- **Active engineering/review span:** approximately **17 minutes** of observable inspect/audit/implementation/rework/verification. The requested 45–50 minute target was not met because this automation execution window was materially shorter; no idle padding was added.
+- **Section worked:** F — Analytics and reporting; F3 acceptance and F4 student drill-down.
+- **Checklist items completed:** **F3 and F4**.
+- **Items still pending in active section:** F5–F13.
+- **Starting branch head:** `caf3fa32f70a7a10f2506a5488620cf80918dce2`. **Recorder source head:** `{head}`.
+- **Commits created/relevant:** F4 staging `92258d1e4dd417c6785774d74ee1401743d45318`; product `e60943eccbb87b1af4b5c3e76946ca797733dda2`; gate wiring `7fe05f2abcc91b2c242311bc8d4eabcb3ecdf054`; temporary-workflow cleanup `85276c9195c67a5bee4a0bd8784425ce0998a782`; stale-regression alignment `e86fb9718855bd225b3a7a268afa99e42ea46e3d` and final candidate `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a`; plus this recorder commit.
+- **Implementation result:** F3 is accepted on prior complete-gate evidence. F4 now provides the required Student → Subject → Chapter → Topic → Question path using the existing authorized analytics payload rather than a new/raw response data path. Question Intelligence is selected-topic scoped, bounded to the latest 150 evidence rows, and displays exact assessment/question, canonical outcome, marks and time.
+- **CI:** F3 descendant full gate `33493732256` — PASS. F4 first exact full gate `33498556903` correctly failed only two stale legacy assertions that required the old question-unavailable placeholder. Those assertions were reworked to enforce the real authorized-evidence contract. Final exact release gate `33498871986` on `f4cb93a8ce3b34d6a26ac09b7422012f0c65d22a` — **PASS**, about **2m29s**, including F4 13/13, TypeScript, lint, every regression, production build and final enforcement.
+- **Vercel:** permanent production had **no error/fatal runtime logs in the preceding 24h** and was not promoted. The F4 gate-wiring preview (`7fe05f2...`, deployment `dpl_3zxA4yFv2ehKhCTSt8QHqcBF29HH`) is READY; rapid intermediate previews were cancelled normally by newer pushes.
+- **Supabase:** production app project remained healthy; read-only snapshot showed **2,841 questions, 4 papers, 1 exam attempt and 1 response**. No database mutation was required for F3/F4.
+- **Rework/failures/blockers:** the first clean F4 gate surfaced two obsolete regression expectations tied to the former honest-but-placeholder Question Intelligence state. Product/TypeScript/lint/build were already green. Both tests were updated to verify authorized `question_evidence` and no synthetic rows; final gate passed. No user-input blocker.
+- **Section progress:** F is {fd}/{len(fi)} verified (**{(100*fd/len(fi) if fi else 0):.1f}%**).
+- **Overall Phase 1:** {done}/{total} verified (**{(100*done/total if total else 0):.1f}%**).
+- **Exact next action:** F5 — standardize each analytics taxonomy row/card to expose the full evidence set: exposure, Attempted (`correct + incorrect`), correct, incorrect, unanswered, Accuracy, Score %, time, trend and evidence count. Preserve `row.attempts` as response-record/evidence count rather than mislabelling it Attempted; add a permanent F5 regression and require a complete release-gate PASS before checking F5.
+
+
+## 2026-09-01 17:29:57 IST — F5/F6/F7 analytics verification / hourly heartbeat
+- **Run start/end:** 2026-09-01 17:29:57 IST → approximately 17:42 IST.
+- **Active engineering/review span:** approximately **12 minutes** of observable reconciliation, CI/deployment/database verification and release recording in the available execution window. The requested 45–50 minute target was **not met because this runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F5, F6 and F7.
+- **Items still pending:** F8–F13.
+- **Starting/functional branch head:** `f89629c31e632e6518f7ec11630f053ca5b0943e`.
+- **Commits created:** existing product/gate commits through `f89629c31e632e6518f7ec11630f053ca5b0943e`, plus this recorder commit.
+- **CI:** complete Phase-1 release gate `33505090942` on exact candidate `f89629c31e632e6518f7ec11630f053ca5b0943e` — **PASS**, 2026-09-01 17:27:12–17:29:23 IST (~2m11s). Gate includes F5 standardized analytics row, F6 topic evidence threshold, F7 percentile cohort checks, TypeScript, lint, all prior regressions and production build.
+- **Vercel:** production runtime inspection found **no error/fatal logs in the preceding 24 hours**. Preview creation for current rapid pushes remains Hobby build-rate limited; no production promotion occurred.
+- **Supabase:** project `xzfozpnzvznqrvcsoail` (`SMIS QP`) is **ACTIVE_HEALTHY** on Postgres 17.6.1. No database mutation was required for F5–F7 in this run.
+- **Rework/failures/blockers:** container-side direct GitHub clone could not resolve github.com, so source reconciliation used the connected GitHub API; this did not affect repository or production. No functional blocker remains for F5–F7.
+- **Section F progress:** 7/13 verified = **53.8%**.
+- **Overall Phase 1:** 65/129 verified = **50.4%**.
+- **Exact next action:** F8 — verify/implement School → programme → grade → section → subject → chapter → topic → student institutional drilldown, add a permanent F8 regression, and require a complete release-gate PASS before checking F8; continue immediately to F9 if green.
+
+## 2026-09-01 19:54:33 IST — F8–F11 verification reconciliation / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 19:54:33 IST → approximately 20:10 IST.
+- **Active engineering/review span:** approximately **15 minutes** of repository-state reconciliation, release-gate inspection, regression review and checklist/log repair in the available execution window. The requested 45–50 minute target was **not met because this runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Results and analytics.
+- **Checklist items completed:** F8, F9, F10 and F11.
+- **Items still pending:** F12 and F13.
+- **Starting branch head:** `64683beed8dffbe2470c70b4bf1baf9661247b27`.
+- **Commits created:** this recorder commit only; F8–F11 product/gate commits were already present on the branch and were reconciled rather than reimplemented.
+- **CI:** complete Phase-1 release gate `33518782850` on exact candidate `64683beed8dffbe2470c70b4bf1baf9661247b27` — **PASS**, 2026-09-01 19:49:29–19:51:35 IST (~2m06s). Gate includes permanent F8 hierarchy, F9 teacher attention, F10 raw evidence scope and F11 traditional result-sheet checks, plus TypeScript, lint, all prior regressions and production build.
+- **Vercel:** current commit status reports only the known Hobby preview build-rate-limit condition; no production promotion was attempted. Permanent production remains protected pending the remaining checklist and acceptance gates.
+- **Supabase:** no database mutation was performed in this reconciliation run. F10's scoped raw-evidence migration is represented in the green release candidate; live-state revalidation remains part of subsequent acceptance before production sign-off.
+- **Rework/failures/blockers:** the prior F8 heartbeat recorder had failed before creating a job, leaving verified work unrecorded. This run repaired that documentation gap. No product-code rework was required for F8–F11 because the exact F11 candidate already passed the complete gate.
+- **Section F progress:** 11/13 verified = **84.6%**.
+- **Overall Phase 1:** 69/129 verified = **53.5%**.
+- **Exact next action:** F12 — implement a true Excel workbook export for test results plus student×subject/chapter/topic analytics (not CSV-only), add a permanent F12 regression, wire it into the release gate, run the complete gate, then continue directly to F13 if green.
+
+
+
+## 2026-09-01 19:58:37 IST — F12/F13 analytics export + aggregate scaling verified / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 19:58:37 IST → approximately 20:21 IST for engineering/release verification; logging/cleanup continued immediately afterward.
+- **Active engineering/review span:** approximately **22 minutes** through final F13 gate confirmation, plus checklist/log cleanup. The requested 45–50 minute target was **not met because this tool execution window ended materially earlier**; no idle padding was added.
+- **Section worked:** F — Analytics, results and reporting.
+- **Checklist items completed:** **F12** real Excel analytics export and **F13** database-side heavy institutional aggregate scaling. Section F is now **13/13 verified (100%)**.
+- **Starting branch head:** `3eaf57381f7a4bb09a8d47f6cf4696bea95f1c6b`.
+- **Functional commits/candidates:** F12 product `2aacc2e64d94d415088bdeec1aa9d35e1266c8f7`, exact cleaned F12 candidate `23bcae9726c3e4493e478053be4b4995cf7a10db`; F13 product `c5113d727262733087343f683dd98d4fb1c6548e`, exact cleaned F13 candidate `cd70cb3e756f54604b2e80d8226310d88a89ee07`.
+- **F12 implementation:** Added pinned `exceljs` 4.4.0 and an on-demand genuine `.xlsx` exporter with Results, Test Results, Subject Analytics, Chapter Analytics and Topic Analytics sheets. Evidence uses the already-authorized `get_student_analytics_v12` RPC in bounded batches.
+- **F12 CI:** release gate `33521024715` — **PASS**, approximately **2m19s**, including the permanent 13-point F12 smoke, TypeScript, lint, all prior regressions, production build and final enforcement.
+- **F13 implementation:** Live Supabase migration `phase1_institution_attempt_aggregate_scaling` added `exam_attempts_org_student_submitted_idx` and service-role-only `get_institution_student_attempt_metrics_v1`. School/class/programme/grade summaries now aggregate inside PostgreSQL in batches of at most 500 student IDs; question-evidence paths intentionally retain raw attempt IDs where needed.
+- **F13 Supabase:** project remained `ACTIVE_HEALTHY`; RPC execute is allowed for `service_role` and denied to `anon`/`authenticated`; index is present; a live scoped aggregate probe returned expected evidence.
+- **F13 CI:** exact candidate `cd70cb3e756f54604b2e80d8226310d88a89ee07`, release gate `33521642436` — **PASS**, 2026-09-01 20:17:16–20:20:32 IST (**3m16s**), including F13 smoke, every earlier hardening/regression suite, TypeScript, lint and production build.
+- **Vercel/production:** fresh runtime inspection found **no production runtime errors in the preceding 24 hours**. Permanent production was not promoted or changed.
+- **Rework/failures:** F12 caught and fixed exact dependency pinning, nullable client narrowing and an overly variable-name-coupled smoke assertion before the final candidate. F13 had normal intermediate workflow/concurrency churn. The first heartbeat recorder was rejected before creating jobs and was replaced by this minimal recorder. No unresolved product failure remains.
+- **Pending:** Section G onward, real-school acceptance, load acceptance and final production sign-off.
+- **Section progress:** F = **13/13 (100%)**.
+- **Overall Phase 1 progress:** **71/129 verified (55.0%)**.
+- **Exact next action:** Begin **G1** by auditing the canonical `₹199 × licensed students × annual licence period` model end-to-end, then harden G1–G6 sequentially with permanent regressions and complete release gates.
+
+
+## 2026-09-01 20:55:12 IST — H1/H2 role-focused navigation verified / hourly heartbeat
+
+- **Run start:** 2026-09-01 20:55:12 IST.
+- **Section worked:** H — Role-focused UI/UX.
+- **Starting branch head:** `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf`.
+- **Starting inspection:** Phase 1 checklist/progress branch state, latest GitHub release gate, Vercel production runtime health and Supabase project health were inspected. The repository had already advanced through verified F12, F13 and all of Section G. Vercel production reported no runtime errors in the preceding 24 hours. The connected Supabase projects were ACTIVE_HEALTHY; no database mutation was required for H1/H2.
+- **Checklist items completed:** H1 and H2.
+- **Implementation evidence:** `8ae0bacaba0799162d60b15f24b872b4a6524994` focuses the Phase-1 Super Admin menu and adds Audit & Health; `e7a7c4cbb31faf4f471c2074a6dfee1ff36e87ca` adds the permanent 17-point H1/H2 regression; `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf` wires it into the complete release gate.
+- **CI:** GitHub Actions release gate `33524781955` on exact candidate `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf` — PASS (15:17:05Z to 15:20:05Z, about 3m). TypeScript, lint, all regressions, production build and final gate enforcement passed.
+- **Vercel/Supabase state:** Permanent production remained unchanged and healthy. The head Vercel commit status is constrained by the Hobby-plan build-rate limit, not a runtime/product failure. Supabase remained healthy; H1/H2 required no schema change.
+- **Rework/failures/blockers:** No final functional verification failure. The earlier guarded navigation patch workflow required one workflow correction before the final product/test/gate candidate; the final release gate is green.
+- **Section progress:** H is 2/9 verified (**22.2%**).
+- **Overall Phase 1 progress:** 79/129 verified (**61.2%**) after H1/H2.
+- **Active engineering/review span:** approximately 12 minutes of inspection, reconciliation, health verification and release evidence review in the available execution window; the requested 45–50 minute target was not met because the execution window is shorter, with no idle padding added.
+- **Items still pending:** H3–H9, then I, J, real-school acceptance, load acceptance and production sign-off.
+- **Exact next action:** implement/verify H3 School Admin focused dashboard metrics/actions, then H4 Teacher focus and H5 Student focus; add permanent regression coverage and run the complete release gate before checking those items.
+
+
+## 2026-09-01 20:55:12–21:07:13 IST — H3/H4/H5 role dashboards verified / hourly heartbeat
+
+- **Run start/end:** 2026-09-01 20:55:12 IST → 2026-09-01 21:07:13 IST.
+- **Active engineering/review span:** approximately **12 minutes** of branch/CI/production/database inspection, H1/H2 reconciliation, H3–H5 implementation, regression correction, release-gate wiring and final verification. The requested 45–50 minute target was **not met** because this execution window ended materially earlier; no idle padding was added.
+- **Section worked:** H — Role-focused UI/UX.
+- **Checklist items completed this run:** H1, H2, H3, H4, H5. H1/H2 were reconciled from already-green implementation; H3–H5 were implemented and fully verified in this run.
+- **Items still pending:** H6 standardized UI states, H7 responsive QA, H8 mobile table readability, H9 accessibility baseline; then I, J, real-school acceptance, load acceptance and production sign-off.
+- **Starting branch head:** `cc16ea41de9e4d0491cc99c1936c1740d9c31fcf`.
+- **Functional/release candidate:** `36e2ba78c874ebfb2cfe8f7a1a4b47baaba1a24f` (`ci(h3-h5): enforce role-dashboard regression`).
+- **Commits created/reconciled:** `a1eea1bd95f08dd78bab6851181fcc93a412d647` H1/H2 record, `5ed7867042e69fab53e1826982728f2ca76fd888` H3–H5 product implementation, `b92f579bef81c345ca5818cef0e31ae2140186ec` regression assertion-count correction, `36e2ba78c874ebfb2cfe8f7a1a4b47baaba1a24f` permanent release-gate wiring, plus this documentation recorder.
+- **Implementation result:** School Admin home now prioritizes Students, Teachers, Tests, Participation, Score and Licence usage with task actions; teacher home prioritizes Upload Questions, Create Test, Upcoming Tests, Recent Results and Students Needing Attention; student home prioritizes Next Test, Recent Result, Improvement and Focus Topics. Missing measured school metrics fail closed to `—`, and student Focus Topics routes to released evidence rather than invented recommendations.
+- **Verification/rework:** The 22-point H3–H5 smoke passed in the complete gate. The first smoke implementation had a reporting-only assertion-count typo (`19` instead of the actual `22` checks); it was corrected before the exact candidate was accepted. An intermediate release run was cancelled normally by branch concurrency while the final gate was wired; no functional regression remained.
+- **CI:** GitHub Actions release gate `33526523379`, 2026-09-01 21:04:09–21:07:13 IST, duration **3m 04s — PASS**. H1/H2 and H3/H4/H5 permanent checks, TypeScript, lint, every required regression and production build all passed.
+- **Vercel/Supabase state:** Permanent Vercel production remained protected and unchanged; production runtime inspection found no errors in the preceding 24 hours. Head preview status remains subject to the known Hobby-plan build-rate limit rather than a product runtime failure. Connected Supabase projects were `ACTIVE_HEALTHY`; H1–H5 required no database mutation.
+- **Rework/failures/blockers:** No production incident or final verification blocker. One regression output-count typo was corrected; transient CI concurrency cancellation was expected.
+- **Section progress:** H is **5/9 verified (55.6%)**.
+- **Overall Phase 1 progress:** **82/129 verified (63.6%)**.
+- **Exact next action:** H6 — audit and standardize headings, cards, tables, filters, loading states, error states and empty states across Phase-1 workspaces; add permanent regression coverage and run the complete release gate, then continue immediately to H7 responsive acceptance if H6 clears.
+
+
+## 2026-09-01 22:01:26–22:12:39 IST — H6 UI consistency (verified)
+
+- **Section worked:** H — Role-focused UX and responsiveness.
+- **Checklist items completed:** H6 — standardized page headings, cards, tables, filters, loading, error and empty states. H is now 6/9 verified (66.7%).
+- **Active engineering/review span:** approximately 11 minutes in this execution window; the requested 45–50 minute target was not met because the available runtime window was materially shorter.
+- **Implementation:** Added shared `Phase1PageHeading`, `Phase1Card`, `Phase1FilterBar`, `Phase1TableFrame` and accessible `Phase1AsyncState` primitives; converted Audit & Health to the shared heading/card/async-state contract; loading/error/empty states now have meaningful live-region semantics and retry/refresh actions; table/filter primitives include keyboard focus and mobile stacking behavior.
+- **Commits:** `9310f6eeebd10c6be7ac53b89e64b21b2f7e51e6`, `5e8e7e6bfdd0f359a447ff9b2a8703835a3132cb`, `4e03f66d8790c54e1e1c4594498b76743780b532`, `99bf3b66ae983f0bcc94fc2d46560a400214681f`, `e4970e3287ed64bade379c271a65f8b890c2a6a1`.
+- **CI:** Initial H6 gate `33533004972` failed because the older H1/H2 regression required a literal `Audit &amp; Health` source string after the heading moved to the shared component. The regression was corrected to accept the same visible heading through the standardized prop without weakening any H1/H2 navigation requirement. Exact candidate `e4970e3287ed64bade379c271a65f8b890c2a6a1` then passed release gate `33533142780`: H1/H2, H3–H5, H6 16-point UI consistency smoke, TypeScript, lint, all required regressions, production build and final gate enforcement.
+- **Vercel:** Permanent production remained unchanged and had zero runtime errors in the preceding 24 hours. H6 preview builds were created from the hardening branch; no production promotion was attempted.
+- **Supabase:** Connected projects `SMIS QP` and `NatSciX Online Test` remained `ACTIVE_HEALTHY`; H6 required no database mutation.
+- **Rework/failures:** One contained CI contract mismatch in H1/H2 was fixed before H6 acceptance. No product/runtime failure remained.
+- **Overall Phase 1:** 83/129 checklist items verified (64.3%).
+- **Pending in H:** H7 responsive QA at 360/390/430/tablet/1366/1920 with long content; H8 mobile table/card treatment; H9 accessibility baseline.
+- **Exact next action:** perform H7 real rendered responsive QA across every required width using long real-world content, fix overflow/truncation/layout defects, add a permanent responsive acceptance regression where deterministic, run the complete release gate, and only then mark H7 complete.
+
+
+## 2026-09-01 22:58:03–23:02:24 IST — H7 responsive QA hardening (in progress)
+
+- **Section worked:** H — Role-focused UX and responsiveness.
+- **Checklist items completed:** none; H7 remains unchecked because real rendered multi-viewport acceptance has not yet been completed, and static CSS inspection alone is not sufficient evidence.
+- **Active engineering/review span:** approximately 4 minutes 21 seconds observable in this execution window; the requested 45–50 minute target was not met because the available runtime window was materially shorter.
+- **Starting branch head:** `ce404dd5b85b98ecc345ea3e7cc46bfcd183cf1a`.
+- **Implementation:** hardened shared Phase-1 UI primitives for narrow widths and long real-world strings: headings/descriptions break pathological long content safely; action groups can use full mobile width and wrap; cards/filter children receive `min-w-0`; table frames constrain horizontal overflow with overscroll containment and stable scrollbar behavior; async-state text/actions wrap safely.
+- **Commits created:** `bee96c4bf4bec7437e08dadb0388dc4da6f8eca1` and `1605e0126a01d4a7cd5e43e96961ebfa0535e84d`, plus temporary heartbeat-recorder commits.
+- **CI:** release gate `33538216211` on recorder head failed only at the existing H6 static contract because the first H7 class-order edit no longer contained the exact `flex flex-col` substring. All preceding hardening checks through H5 passed. The class order was corrected in `1605e0126a01d4a7cd5e43e96961ebfa0535e84d` without removing the H7 overflow protections. A new full release gate is required before accepting H7.
+- **Vercel:** permanent production had zero runtime errors in the preceding 24 hours and remained unchanged/protected; no production promotion occurred.
+- **Supabase:** `SMIS QP` and `NatSciX Online Test` were both `ACTIVE_HEALTHY`; H7 required no database mutation.
+- **Rework/failures/blockers:** first H7 release gate exposed a static H6 source-contract mismatch and was repaired. The first temporary heartbeat workflow was invalid before jobs started and was replaced with this known-good recorder pattern. Direct container/browser execution could not reach external GitHub/Vercel hosts, so the required rendered viewport matrix (360/390/430/tablet/1366/1920) could not be truthfully completed in this execution surface.
+- **Section H completion:** remains 6/9 verified (66.7%).
+- **Overall Phase 1:** remains 83/129 verified (64.3%).
+- **Exact next action:** obtain browser-capable rendered preview execution, exercise long-content role screens at 360/390/430/tablet/1366/1920, fix any overflow/truncation/touch defects, run the complete release gate on the exact candidate, and only then check H7; continue immediately into H8/H9 if H7 clears.
+
+## 2026-09-02 01:58:31–02:15:00 IST — Section H rendered acceptance closure
+
+- **Run start/end:** 2026-09-02 01:58:31 IST → approximately 2026-09-02 02:15 IST.
+- **Active engineering span:** approximately **16.5 minutes** of continuous implementation, rendered browser verification, CI observation and release recording in the available execution window. The requested 45–50 minute target was **not met because this automation execution window was materially shorter**; no idle padding was added.
+- **Section worked:** H — UI / UX / responsive / accessibility.
+- **Checklist items completed:** H7 responsive rendered QA, H8 mobile table/card treatment, H9 accessibility baseline. Section H is now **9/9 verified (100%)**.
+- **Substantial implementation:** repaired the rendered H9 harness so axe runs in an explicit Playwright browser context and the isolated QA route is a client component; then fixed the real 40px touch-target defect by raising shared Button/Input/Phase1FilterBar/global interactive controls to the 44px baseline. No acceptance criterion was weakened.
+- **Rendered evidence:** H7 run `33556565485` **PASS** at the required 360/390/430/tablet/1366/1920 viewport matrix. H9 run `33556565780` **PASS** with 0 serious/critical axe violations, 0 unnamed controls, no undersized tested controls, visible keyboard focus, meaningful status/alert live regions and measured Button/Input/Select controls at 44px height. H8 exact-candidate contract run `33556565528` PASS; H7 contract `33556565622` PASS; H9 contract `33556565527` PASS.
+- **Exact verified functional candidate:** `8874b3d3933160d5c9483669e5b9eb766da92af4`.
+- **Commits created during engineering block:** `80aa4012591dc00156bfaa955682a980a194a0c6`, `93e7c7096073f34d3a4bfa68549b5008bb58445e`, `aade093376a4ea9e63c17e8cf44d678f1b6974ad`, `c30a01dac4a93cc72e90257a2195ac9dc4787f4f`, `186d82d987c9ca1c5f90fe4e80171c4dfbc68423`, `21f2e6e96fd9a66ee85c3168dd22c42c2066ca87`, `9e39ea46cd7b1343b093eb0e7b1105ad2e9abbaa`, `debf854dadde30feac95604d0a50c90c4002497a`, `8874b3d3933160d5c9483669e5b9eb766da92af4`, plus documentation/recorder cleanup commits.
+- **Complete CI / release gate:** GitHub Actions run `33556565584` **PASS**, 2026-09-02 02:09:08–02:12:25 IST, approximately **3m17s**. TypeScript, lint, all Phase 1 hardening/regressions, production build and final gate enforcement passed.
+- **Vercel state:** permanent production remained protected and unchanged; production error/fatal runtime-log query for the preceding 24 hours returned no matching logs. No promotion was performed.
+- **Supabase state:** `SMIS QP` and `NatSciX Online Test` both **ACTIVE_HEALTHY**; no database mutation was performed.
+- **Rework/failures/blockers:** the first rendered H9 attempt exposed two QA-harness defects (axe context and server/client event-handler boundary). After repairing those, rendered acceptance exposed genuine 40px touch targets. Shared controls and global CSS were corrected to 44px and the final browser/full-gate candidate passed. Two temporary inline recorder workflows were rejected before creating jobs, and one canonical recorder attempt used the wrong checklist token; this was documentation tooling rework, not a product failure.
+- **Branch head at handoff:** documentation/cleanup head after the verified functional candidate; permanent production remains unchanged.
+- **Items still pending:** Section I (I1–I3 and I5–I7; I4 already verified), Section J, real-school acceptance, load acceptance and final production sign-off.
+- **Progress:** Section H **9/9 = 100%**; overall Phase 1 **86/129 = 66.7% verified**.
+- **Exact next action:** begin **I1** by implementing/verifying the School Admin Audit & Health workspace; continue directly into **I2** deployment/database/storage/import/exam health statuses and **I3** PostgreSQL-side usage counts, each with permanent regression coverage and the complete release gate before checkmarking.
+
+
+
+## 2 Sep 2026 — Section I completion + Section J privacy-governance hardening
+
+- Run start: **04:02:53 IST**
+- Run end: **04:18:58 IST**
+- Active engineering / best observable engineering span: **~16.1 minutes wall-clock engineering/verification span**. This execution window ended before the requested 45–50 productive-minute target; that limitation is recorded rather than padded.
+- Sections worked: **I — Super Admin operations/platform health; J — Privacy, data handling and launch documentation**.
+- Checklist completed this run: **I5, I6, I7, J1, J2, J4, J5**. J3 remains open because qualified legal review is external to engineering and must not be self-certified.
+- Prior logging gap reconciled: the preceding I1–I4 run had successfully updated the checklist but its heartbeat recorder did not execute; this entry records the continuation from that verified checkpoint.
+- Functional branch head verified for I: `7fc87d9c65ed249b16d8440def12b81e648d2729`. Privacy-governance candidate: `d4bdee0b23ff4181b5a7d56215af56d28f8c6878`.
+- Commits created in this run: `1b131ec96c96c052c8306ee1df4cbdae0a391341`, `e8c09c96a82ea9b4e6b38bef82266e63565abb20`, `8af16d8300e2587c43199dfb14e61684c5707cb1`, `c5db0119997af64758e841ade798b83cced24892`, `33c862a53ecbb7d551c85f11d6ec18a286d4889b`, `5b6c05d9e4e6ff58a77f6ef1251ea8bb6e93c54c`, `7fc87d9c65ed249b16d8440def12b81e648d2729`, `934bbbf1b00337ed066b6e5a19676e835b4aa4f1`, `9e50986827b3c5da02ae0c0c040cf13a5bab3171`, `d4bdee0b23ff4181b5a7d56215af56d28f8c6878`.
+- CI: standalone I5-I7 operations contract `33567377969` **PASS**; complete I release gate `33567377979` **PASS**; complete J release gate `33567769216` **PASS**, 22:44:43–22:47:43 UTC (**3m00s**), including J regression, TypeScript, lint, accumulated regressions, production build and final enforcement.
+- Vercel: permanent production remained protected/unpromoted; 24-hour production runtime error/fatal inspection was clean. Matching hardening previews reached READY. Direct protected-preview `/api/ops/health/` body fetch is blocked by Vercel SSO in the connector, so no false direct-probe claim is made.
+- Supabase: both connected projects were `ACTIVE_HEALTHY`; primary platform snapshot reported no measured 24-hour import/test-start/answer-save/submission failures. `phase1_hot_path_indexes` is applied; all five new indexes were live-verified valid/ready.
+- Rework/failures/blockers: no functional release-gate failures. The only material blocker in Section J is **J3 qualified legal review/approval of the actual Privacy Policy and institution DPA**. The MeitY DPDP Act/Rules have phased commencement, so production legal review must use the effective provisions on the planned launch date. Preview-health direct fetch remains SSO-protected.
+- Active section completion: **Section I 7/7 = 100%**; **Section J 4/5 = 80%**.
+- Overall Phase 1: **96/129 = 74.4% verified**.
+- Exact next action: prepare counsel-ready Privacy Policy/DPA drafts and obtain qualified legal review for **J3**; do not check J3 without that approval. In parallel, prepare the real-school R1–R18 acceptance harness and only execute it with an authorized representative institution/student dataset; permanent production remains protected until real-school, load and sign-off gates pass.
+
+## 2026-09-02 05:00:43 IST — J3 legal handoff + real-school acceptance preparation
+
+- **Run start:** 2026-09-02 05:00:43 IST.
+- **Run end:** 2026-09-02 05:05:08 IST.
+- **Active engineering minutes / best observable engineering span:** approximately 3 minutes from first relevant repository commit to final acceptance-preparation/cleanup commits; the available execution window ended materially earlier than the requested 45–50 minute target, so the target was not met.
+- **Section worked:** J — Privacy/data handling/launch documentation; then preparation for Release Acceptance R1–R18.
+- **Checklist items completed:** none. J3 remains unchecked because qualified legal approval has not occurred. R1–R18 remain unchecked because no authorised real-school acceptance dataset/session was executed.
+- **Items still pending:** J3 qualified counsel review/approval; R1–R18 real-school acceptance; L1–L6 load acceptance; remaining production sign-off gates.
+- **Branch head at run start:** `1a0e9d3a9883a3461d0616a15742af865d8093c4`.
+- **Commits created:** `1ded1f022e2d796ba2c97681bfe5b3a4a648b86b` (J3 legal-review packet), `a91b0e3b8ae9385b941a7f7045dd63749f1b573b` (R1–R18 acceptance protocol), `8c92937926ea3067d294bbb3af9e277e08f45a96` (failed temporary recorder staging), `56962b23390af0812eb1286c54fa04ccef1122de` (recorder cleanup), plus the heartbeat recorder/cleanup sequence.
+- **CI run and duration/result:** last previously verified complete product release gate remains `33567769216` — PASS on the J1/J2/J4/J5 candidate. Fresh documentation pushes triggered a new complete `verify` job (`33571618349`) that was still in progress when inspected; no new checklist item is claimed from this docs-only run.
+- **Vercel/Supabase state:** run-start hardening preview was READY; Vercel production error/fatal logs for the preceding 24 hours were clean. Supabase `SMIS QP` and `NatSciX Online Test` were both `ACTIVE_HEALTHY`. No production promotion or database mutation occurred.
+- **Rework/failures/blockers:** the first temporary heartbeat workflow was invalid and created no usable heartbeat job; it was removed immediately. J3 remains an external legal-review blocker by design. Real-school acceptance requires authorised institution data/operators; synthetic fixtures must not be labelled real acceptance.
+- **Active section completion:** Section J remains 4/5 = 80% verified.
+- **Overall Phase 1:** remains 96/129 = 74.4% verified.
+- **Exact next action:** obtain/record qualified counsel review against `PHASE1_LEGAL_REVIEW_PACKET.md` without weakening J3, while beginning R1–R8 only when an authorised real institution dataset and operators are available on the exact green hardening candidate; capture private/redacted evidence per `PHASE1_REAL_SCHOOL_ACCEPTANCE_PROTOCOL.md`, then continue R9–R18, the complete release gate, load acceptance and production sign-off.
+
+## 2026-09-02 11:00:45 IST — acceptance readiness / heartbeat repair
+
+- **Run start/end:** 2026-09-02 11:00:45 IST → approximately 11:08 IST.
+- **Active engineering/review span:** approximately **7 minutes** of canonical branch/checklist/log/CI inspection and heartbeat-path recovery. The requested 45–50 minute target was **not met because the available execution window was materially shorter**; no artificial padding was added.
+- **Section worked:** production-sign-off acceptance readiness after Section J engineering completion.
+- **Checklist items completed:** none. Section J remains 4/5; R1–R18 and L1–L6 remain pending genuine acceptance execution.
+- **Branch head at run start:** `615fe37efe23dc894c19519e25f50043adf9b5fe`.
+- **Commits created:** heartbeat trigger/recorder commit only; no product-code or production/database mutation.
+- **CI status:** last fully verified complete Phase 1 release gate remains `33587887273` — PASS on exact security candidate `b1a099b8570ff2ba07eefd7aef51f5e066b27a96`. Current head is documentation/workflow-only descendant.
+- **Vercel/Supabase state:** permanent production remains protected; no production promotion or database mutation was performed in this block. Previous verified checkpoint recorded clean production runtime and both connected Supabase projects ACTIVE_HEALTHY.
+- **Rework/failures/blockers:** the prior heartbeat had not landed. During repair, a direct whole-file update accidentally replaced the progress log; the erroneous commit was immediately removed by restoring the branch ref to the exact prior head before any further work. No product source or production state was affected. J3 still requires qualified legal review; R1–R18 require authorised real-school operators/data; L1–L6 require an isolated non-production acceptance tenant; leaked-password protection remains a final security blocker.
+- **Active section completion:** Section J remains **4/5 = 80%**.
+- **Overall Phase 1 percentage:** **96/129 = 74.4% verified**.
+- **Exact next action:** confirm this canonical heartbeat append, then provision/identify an isolated non-production Evidara acceptance Supabase environment; apply and verify the staged `create_institute` anonymous-execute revocation there, execute L1–L6 with synthetic identities and predeclared budgets, while J3 legal and R1–R18 real-school acceptance proceed independently.
+
+
+## 2026-09-02 14:01:45–14:09:01 IST — Release acceptance safety-contract repair
+
+- **Run start/end:** 2026-09-02 14:01:45 IST → 2026-09-02 14:09:01 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **7m 16s** of repository/CI/Vercel/Supabase inspection, acceptance-contract diagnosis, implementation and verification. The requested 45–50 minute target was **not met because the available execution/tool window ended materially earlier**; no idle time was padded.
+- **Section worked:** release acceptance readiness / R1–R18 safety tooling, after Section J engineering completion.
+- **Checklist items completed:** none. J3 remains pending qualified legal approval. R1–R18 remain 0/18 because authenticated rendered role-path acceptance has not yet been executed. L1–L6 and final production sign-off remain pending.
+- **Substantial implementation:** fixed an internal acceptance-evidence contract mismatch: `phase1-acceptance-preflight.mjs` emitted `productionWebProtected`, while the acceptance tooling smoke test and contract require `productionProtected`. The preflight now emits the canonical `productionProtected: true` evidence field without weakening any production-host, tenant-isolation, database-ceiling, acknowledgement or destructive-action guard.
+- **Branch head / functional commit:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40` (`fix(acceptance): align preflight production protection evidence`).
+- **Commits created:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40`, plus this temporary heartbeat-recorder commit and its subsequent recorder-generated/cleanup commits.
+- **CI / release gate:** exact-candidate Acceptance Tooling Contract run `33609667104` **PASS**; Same-Project Acceptance Contract run `33609667045` **PASS**. Full release-gate run `33609667025` was still **in progress** at handoff; all completed hardening/security steps observed in its job were passing, so no checklist item was promoted on an incomplete gate.
+- **Vercel state:** permanent production remains protected and unchanged. Production runtime-error query for the preceding 24 hours returned **no runtime errors**. No production promotion was attempted.
+- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is **ACTIVE_HEALTHY**. The isolated `Evidara School` acceptance tenant (`evidara-school-acceptance`) still exists with `is_demo=true`. Fresh database size is **216,403,091 bytes**, safely below the same-project 450 MiB hard ceiling. No database mutation was performed.
+- **Rework/failures/blockers:** acceptance evidence-field mismatch was found and repaired. The current execution surface still does not expose a usable authenticated School Admin/Teacher/Student browser session for genuine R1–R18 rendered acceptance; database/API inspection alone is not being substituted for those checks. J3 remains an external qualified-legal-review gate. Permanent production stays protected.
+- **Active section completion:** real-school/synthetic guarded rendered acceptance remains **0/18 = 0%** verified.
+- **Overall Phase 1:** remains **96/129 = 74.4% verified**.
+- **Exact next action:** verify the exact-candidate full release gate completes green, then execute R1→R18 through an authenticated rendered browser against the isolated Evidara School tenant on a non-production hardening preview, capturing evidence for each role flow. Once R passes, immediately execute guarded L1→L6 load acceptance, then complete Z2–Z8 production sign-off; do not promote permanent production before all gates pass.
+
+## 2026-09-02 14:01:45–14:09:01 IST — Release acceptance safety-contract repair
+
+- **Run start/end:** 2026-09-02 14:01:45 IST → 2026-09-02 14:09:01 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **7m 16s** of repository/CI/Vercel/Supabase inspection, acceptance-contract diagnosis, implementation and verification. The requested 45–50 minute target was **not met because the available execution/tool window ended materially earlier**; no idle time was padded.
+- **Section worked:** release acceptance readiness / R1–R18 safety tooling, after Section J engineering completion.
+- **Checklist items completed:** none. J3 remains pending qualified legal approval. R1–R18 remain 0/18 because authenticated rendered role-path acceptance has not yet been executed. L1–L6 and final production sign-off remain pending.
+- **Substantial implementation:** fixed an internal acceptance-evidence contract mismatch: `phase1-acceptance-preflight.mjs` emitted `productionWebProtected`, while the acceptance tooling smoke test and contract require `productionProtected`. The preflight now emits the canonical `productionProtected: true` evidence field without weakening any production-host, tenant-isolation, database-ceiling, acknowledgement or destructive-action guard.
+- **Branch head / functional commit:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40` (`fix(acceptance): align preflight production protection evidence`).
+- **Commits created:** `8a116a076329c7bab022d6b3a9e7aa7117e62e40`, plus this temporary heartbeat-recorder commit and its subsequent recorder-generated/cleanup commits.
+- **CI / release gate:** exact-candidate Acceptance Tooling Contract run `33609667104` **PASS**; Same-Project Acceptance Contract run `33609667045` **PASS**. Full release-gate run `33609667025` was still **in progress** at handoff; all completed hardening/security steps observed in its job were passing, so no checklist item was promoted on an incomplete gate.
+- **Vercel state:** permanent production remains protected and unchanged. Production runtime-error query for the preceding 24 hours returned **no runtime errors**. No production promotion was attempted.
+- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is **ACTIVE_HEALTHY**. The isolated `Evidara School` acceptance tenant (`evidara-school-acceptance`) still exists with `is_demo=true`. Fresh database size is **216,403,091 bytes**, safely below the same-project 450 MiB hard ceiling. No database mutation was performed.
+- **Rework/failures/blockers:** acceptance evidence-field mismatch was found and repaired. The current execution surface still does not expose a usable authenticated School Admin/Teacher/Student browser session for genuine R1–R18 rendered acceptance; database/API inspection alone is not being substituted for those checks. J3 remains an external qualified-legal-review gate. Permanent production stays protected.
+- **Active section completion:** real-school/synthetic guarded rendered acceptance remains **0/18 = 0%** verified.
+- **Overall Phase 1:** remains **96/129 = 74.4% verified**.
+- **Exact next action:** verify the exact-candidate full release gate completes green, then execute R1→R18 through an authenticated rendered browser against the isolated Evidara School tenant on a non-production hardening preview, capturing evidence for each role flow. Once R passes, immediately execute guarded L1→L6 load acceptance, then complete Z2–Z8 production sign-off; do not promote permanent production before all gates pass.
+
+## 2026-09-02 16:01:22–16:07:04 IST — Authenticated acceptance execution blocker diagnosis + readiness hardening
+
+- **Run start/end:** 2026-09-02 16:01:22 IST → 2026-09-02 16:07:04 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **5m 42s** of production/CI/Supabase inspection, guarded authenticated-readiness execution, failure diagnosis, workflow/runner hardening and verification setup. The requested 45–50 minute target was **not met because the automation/tool execution window was materially shorter**; no idle time was padded.
+- **Section worked:** Release acceptance readiness / R1–R18 authenticated rendered-browser gate after Section J engineering completion.
+- **Checklist items completed:** none. J3 remains pending qualified legal approval. R1–R18 remain **0/18** because no authenticated end-to-end role path has yet passed. L1–L6 and Z2–Z8 remain pending.
+- **Substantial work completed:** executed the guarded readiness path against exact READY functional candidate `b7b09ea4e3094c9311f8071e6e9c17c9f31940c3`. Same-project safety preflight passed with `productionProtected=true`, isolated tenant `evidara-school-acceptance`, fresh database size 216403091 bytes and no destructive actions. The attempt exposed three concrete readiness blockers: all six School Admin/Teacher/Student GitHub Actions credential secrets are currently unset; the READY Vercel preview is protected by Vercel SSO; and the Playwright install step hit npm ERESOLVE because the existing optional OpenNext peer range conflicts with Next 16.2.10.
+- **Engineering fixes:** permanent authenticated-readiness workflow now fails fast without printing secret values when required role credentials are missing; Playwright installation uses `--legacy-peer-deps` without changing the lockfile; the browser runner now supports a protected Vercel preview bootstrap URL supplied only through `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`, validates that it matches the exact safe preview origin, never records the share token, and reports SSO blockage explicitly. Permanent smoke coverage was expanded for these protections.
+- **Branch head at handoff:** `fccdedfb07e35ea1e7254a675f20dec08ce853c0`.
+- **Commits created:** `9dfc04f7eca75f1fb2f6b34d153b4638cb839a6c` temporary one-shot readiness execution; `cf84a39c1ddcb8661e0c7af0b65815c27cf5f0e0` credential fail-fast/Playwright install repair; `84cfd56ef8d80ef623036f12ea98bfa2532b6de0` one-shot cleanup; `958522510445347beb93641512ea002199d31a45` protected-preview bootstrap support; `1c7243ef66847308b481ade37e63d4334e151751` workflow share-secret wiring; `fccdedfb07e35ea1e7254a675f20dec08ce853c0` regression coverage.
+- **CI / release gate:** guarded readiness run `33620048732` reached the safety preflight successfully, then failed in the old Playwright-install step before browser execution; this was diagnosed and repaired in subsequent commits. The exact final candidate release gate was still starting at the end of the available window and therefore is **not claimed green yet**.
+- **Vercel state:** permanent production error aggregation for the preceding 24 hours returned **no runtime errors**. Exact functional candidate `b7b09ea...` has a READY preview. The preview is SSO-protected; a temporary Vercel share mechanism was verified available but no share token was committed or logged. Permanent production was not promoted or mutated.
+- **Supabase state:** `SMIS QP` remains **ACTIVE_HEALTHY**. Acceptance tenant `Evidara School` / `evidara-school-acceptance` remains `is_demo=true`. Fresh database size is **216403091 bytes**, below the guarded 450 MiB ceiling. No database mutation was performed.
+- **Rework/failures/blockers:** missing acceptance credential secrets remain the primary execution blocker. Protected preview access is now safely supported in tooling but its share URL must be supplied as a GitHub Actions secret (or preview protection must be otherwise authorized). J3 remains an external qualified-legal-review gate. No R item was checked from source/preflight evidence alone.
+- **Active section completion:** real-school/synthetic guarded rendered acceptance remains **0/18 = 0%**.
+- **Overall Phase 1:** remains **96/129 = 74.4% verified**.
+- **Exact next action:** configure the six synthetic acceptance role secrets and a secure protected-preview bootstrap secret for the exact READY hardening preview, rerun authenticated readiness until School Admin/Teacher/Student all pass rendered login/workspace verification, then execute R1→R18 with evidence and a complete green release gate before any checklist checkmark; proceed immediately to L1→L6 after R passes.
+
+
+## 2026-09-02 18:01:13–18:20 IST — Acceptance tenant role-topology audit / hourly heartbeat
+
+- **Run start/end:** 2026-09-02 18:01:13 IST → approximately 18:20 IST.
+- **Active engineering minutes / best observable engineering span:** approximately **19 minutes** of branch/checklist/progress-log/CI inspection, production and Supabase health verification, acceptance-tenant topology audit, canonical provisioning-function review, and durable heartbeat-recorder implementation. The requested 45–50 minute target was **not met because the available automation/tool execution window was materially shorter**; no idle time was padded.
+- **Section worked:** Release acceptance readiness / R1–R18 authenticated rendered-browser gate after Section J engineering completion.
+- **Checklist items completed:** none. Section J remains 4/5 with J3 pending qualified legal approval. R1–R18 remain **0/18** because the isolated tenant is not yet role-complete and authenticated rendered acceptance has not executed. L1–L6 and Z2–Z8 remain pending.
+- **Branch head at run start:** `f553f669159b51a3c514cfbc9d7eba8cf7e5b878` (documentation-only heartbeat descendant). Starting product/readiness candidate ancestry includes `fccdedfb07e35ea1e7254a675f20dec08ce853c0`.
+- **Commits created:** `a90aa43a5b0992a3f732f31d6fb98a4a37c88081` adds a durable path-scoped Phase 1 heartbeat recorder; this trigger commit and the recorder-generated documentation commit follow. No product-code or production/database mutation was performed.
+- **CI run and duration/result:** current hardening descendant release-gate run `33620502266` on `d9f0d2aee72ef1d415923020db8d234e6a561c53` completed **SUCCESS** from 10:38:28Z to 10:41:02Z (approximately **2m34s**). The newly created recorder/trigger commits may start successor documentation-only gates; no checklist credit depends on those pushes.
+- **Vercel state:** permanent `quizmaker2` production returned **no runtime errors in the preceding 24 hours** and remains protected/unpromoted. Current head Vercel status is constrained by the known Hobby-plan build-rate limit, not a production runtime failure. Existing hardening previews on the recent readiness lineage remain READY.
+- **Supabase state:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remains **ACTIVE_HEALTHY**. `Evidara School` / `evidara-school-acceptance` is still `is_demo=true`. No database mutation was made in this run.
+- **New acceptance blocker discovered:** the isolated acceptance organization currently has only one active organization member: the synthetic School Admin `sales.schooladmin@demo.evidara.app`. The available synthetic Teacher (`sales.teacher@demo.evidara.app`) is active only in another demo organization, and the available synthetic Student (`sales.student@demo.evidara.app`) has active/completed student memberships only in that other demo organization. Therefore configuring CI credential secrets alone would still not make R1–R18 valid for the isolated acceptance school.
+- **Canonical-path verification:** live function inspection confirmed `add_school_student_membership_v13` requires authenticated School Admin authority and records an audit event; `assign_teacher_section_v10` likewise requires authorized school-admin scope; `assign_evidara_school_role_by_email` can attach School Admin/Teacher roles through service-role or Super Admin authority. A raw SQL attachment was deliberately **not** used because it would bypass the student lifecycle/authorization path that acceptance is intended to prove.
+- **Rework/failures/blockers:** two read-only schema probes initially referenced legacy/guessed column names (`profiles.email`, then `student_school_memberships.user_id`) and failed harmlessly; catalog inspection corrected them to `auth.users.email` and `student_id`. No live state changed. Remaining blockers are (1) role-complete synthetic acceptance tenant provisioning through canonical audited application paths, (2) six acceptance credential secrets and protected-preview share access for CI, and (3) external J3 counsel approval.
+- **Active section completion:** guarded rendered acceptance remains **0/18 = 0%**.
+- **Overall Phase 1 percentage:** remains **96/129 = 74.4% verified**.
+- **Permanent production protection:** maintained; no promotion or permanent production mutation occurred.
+- **Exact next action:** provision a dedicated Teacher and active Student into `evidara-school-acceptance` through the canonical authorized School Admin/Super Admin product paths (including a valid academic section and teacher section/subject assignment), verify the tenant topology and audit evidence, then configure the corresponding synthetic CI secrets and protected-preview access. Rerun authenticated readiness until all three roles pass rendered login/workspace checks; execute R1→R18, then immediately L1→L6 and final Z2→Z8 gates.
+
+
+### 2026-09-02 18:57 IST — hourly production-hardening heartbeat
+
+- **Run start/end:** 18:57:05 IST → ~19:05 IST.
+- **Active engineering span:** ~8 minutes best observable span; environment/tool execution ended materially before the 45–50 minute target, so the target was not met and no time was padded.
+- **Section worked:** Real-school acceptance readiness (R1–R18), with production authorization repair required by R5.
+- **Checklist items completed:** none newly checked; R1–R18 remain evidence-gated.
+- **Substantial implementation:** discovered that `assign_teacher_section_v10` rejected canonical `school_admin` because legacy `analytics_is_school_admin_v10` only recognized institute roles. First migration draft included unsupported `school_owner` enum and failed safely; corrected migration was applied. Versioned `20260902190000_phase1_school_admin_teacher_assignment_role_fix.sql`, and expanded B6 regression coverage to enforce canonical school-admin authorization plus active-member/auth.uid/platform-admin protections.
+- **Acceptance topology:** using the synthetic Evidara School tenant and School Admin auth context, successfully provisioned the synthetic Teacher membership, Grade 11/A academic section, active Student membership through `add_school_student_membership_v13`, and Physics Teacher assignment through `assign_teacher_section_v10`. Audit evidence confirms membership/student/teacher-assignment events by the School Admin actor. No St. Mary's or future-client data used.
+- **Items pending:** J3 qualified legal review; authenticated rendered R1–R18; L1–L6 load acceptance; Z2–Z8 final sign-off.
+- **Functional candidate / branch head:** `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` before this heartbeat trigger.
+- **Commits created:** `16d1e94d1a0b0338e96844412cc32799da2d9d42` (authorization migration), `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` (B6 regression).
+- **CI:** release-gate run `33636255040` on `3fad2d9f...` still in progress at handoff; observed hardening steps including B6 passed. H7 Responsive Contract on the same head passed. Do not treat release gate as complete until final conclusion is green.
+- **Vercel:** permanent production healthy with no error/fatal runtime entries in preceding 24h and not promoted/modified. Preview for `16d1e94d...` READY; exact `3fad2d9f...` preview was BUILDING at final observation.
+- **Supabase:** `SMIS QP` ACTIVE_HEALTHY; acceptance org `evidara-school-acceptance` remains `is_demo=true`; DB remains approximately 216,403,091 bytes. Security advisor was re-run after DDL and reports existing INFO/WARN advisory debt; the new helper retains explicit `search_path`, scoped auth checks, and no anonymous-role expansion was introduced by this fix.
+- **Rework/failures/blockers:** first migration attempt failed safely on invalid `school_owner` enum and was corrected. Remaining rendered-browser blocker is availability/configuration of synthetic role credentials + protected-preview access in the authenticated acceptance workflow; do not substitute DB/API evidence for R acceptance.
+- **Active section complete:** R acceptance 0/18 formally (fixture/readiness materially improved).
+- **Overall Phase 1:** 96/129 = 74.4%.
+- **Exact next action:** wait for the `3fad2d9f...` full release gate and exact Vercel preview to be green/READY; then run authenticated readiness for School Admin, Teacher, and Student against that preview and execute R1→R18 in order, beginning with rendered School Admin onboarding/assignment evidence. Move directly into L1→L6 once R passes.
+
+
+## 2026-09-02 19:13:05 IST — Authenticated acceptance fixture provisioning / hourly heartbeat
+
+- **Run start/end:** 19:13:05 IST → approximately 19:18 IST.
+- **Active engineering/review span:** approximately **5 minutes** of repository/CI/Vercel/Supabase inspection, synthetic fixture provisioning, verification and release-gate rerun initiation. The requested 45–50 minute target was **not met because this automation runtime window ended materially earlier**; no idle padding was added.
+- **Section worked:** Real-school acceptance readiness (R1–R18).
+- **Checklist items completed:** none newly checked; R1–R18 remain rendered-evidence gated.
+- **Items still pending:** J3 qualified legal review; authenticated rendered R1–R18; L1–L6 load acceptance; Z2–Z8 final production sign-off.
+- **Starting branch head:** `c8956c5bdca9dda8dfa9fe7dd23b79e1ebd7152a`.
+- **Commits created:** this heartbeat trigger only; no product-code commit was required.
+- **CI:** release-gate run `33636255040` for exact functional candidate `3fad2d9fa4bdb58108f63c1528c87ec1b8abf9c4` had been cancelled by later concurrency after every observed gate step individually succeeded; job rerun attempt 2 was explicitly started in this run and was queued at handoff. Do not claim a clean full-gate PASS until attempt 2 concludes success.
+- **Vercel:** permanent production has no runtime errors in the preceding 24h. Current branch head `c8956c5b...` has a READY preview; exact functional candidates `16d1e94d...` and `3fad2d9f...` also have READY previews. Permanent production was not promoted.
+- **Supabase:** `SMIS QP` remains ACTIVE_HEALTHY; database size is 216,411,283 bytes. `Evidara School` (`evidara-school-acceptance`) remains `is_demo=true`.
+- **Substantial work:** confirmed all three newly created acceptance Auth users are email-confirmed. Provisioned `acceptance.admin@demo.evidara.app` as active `school_admin`, `acceptance.teacher@demo.evidara.app` as active `school_teacher`/teacher member, and `acceptance.student@demo.evidara.app` as an active Grade 11/A ISC NEET student through `add_school_student_membership_v13`. Assigned the acceptance Teacher to Grade 11/A Physics through `assign_teacher_section_v10`. No St. Mary's or future-client data was used.
+- **Rework/failures/blockers:** initial read-only topology queries used stale guessed column names (`role`, `section`, `created_at`) and failed without mutation; schema was inspected and corrected. Remaining blocker for rendered acceptance is the GitHub Actions secret configuration / authenticated readiness execution; secret values cannot be read through the connected GitHub API. Database topology is now ready for those credentials.
+- **Active section complete:** R acceptance remains **0/18 formally**; fixture readiness materially advanced.
+- **Overall Phase 1:** **96/129 = 74.4%**.
+- **Exact next action:** verify release-gate attempt 2 is green, then execute `Phase 1 Authenticated Acceptance Readiness` against the exact READY hardening preview as soon as the six acceptance credential secrets and protected-preview share secret are available; if all three rendered logins pass, execute R1→R18 in order and continue directly to L1→L6.
+
+## 2026-09-02 20:43–20:50 IST — hourly hardening heartbeat
+
+- **Run start/end:** 20:43 IST / 20:50 IST.
+- **Active engineering span:** ~7 minutes observable in this environment; the requested 45–50 minute target was not reached because the automation execution window ended materially earlier. No time was padded.
+- **Section worked:** Release acceptance R1–R18, with focus on authenticated readiness and R1–R5 acceptance prerequisites.
+- **Checklist items completed this run:** none checked. R1/R2/R3/R5 prerequisites are now durably evidenced, but no R checkmark was awarded before the exact evidence-recording commit completes the full release gate. R4 remains genuinely incomplete at 2/100 active synthetic students.
+- **Items still pending:** J3 legal review; R1–R18 formal acceptance (R4 bulk roster is next; then R6–R18); L1–L6 load acceptance; Z2–Z8 production sign-off.
+- **Branch head at handoff:** `cd8ae324f7306ef4df9ba2a261c1af38ada4549a` (`docs(acceptance): record authenticated readiness and R1-R5 preconditions`). Previous cleanup head was `109a96c70300257c49e16905b21cf57b038b8eca`.
+- **Commits created:** `cd8ae324f7306ef4df9ba2a261c1af38ada4549a` acceptance evidence; this trigger commit will be followed by the heartbeat recorder's `[skip ci]` append commit.
+- **CI / release gate:** authenticated rendered-browser readiness run `33645773392` on candidate `b063e32fee2332011b5d2223f09f3841168f9c80` passed in ~2m05s: School Admin, Teacher and Student all authenticated into the correct rendered workspaces with zero captured console/page errors. The complete release gate on that candidate also passed (`33645773588`, ~3m30s). Current evidence-recording commit `cd8ae324...` started its complete release gate and Vercel preview verification; it was still in progress at heartbeat handoff, so no new R item was checked.
+- **Vercel state:** permanent production remains protected; no production runtime errors were reported in the latest 24-hour check. Hardening previews are READY, and authenticated readiness succeeded against the protected `phase1-hardening` branch alias.
+- **Supabase state:** SMIS QP `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; database size `216411283` bytes. Isolated synthetic `Evidara School` tenant is active/demo with an active 100-seat annual ₹199/student licence (2026-09-02 to 2027-09-02), active School Admin/Teacher fixtures, 2 active synthetic students, and active Grade 11/A Physics teacher assignment. No St. Mary's or future-client data was used.
+- **Rework/failures/blockers:** prior Vercel share-origin mismatch is resolved; authenticated readiness is green. Current acceptance blocker is R4: the synthetic tenant must reach exactly 100 active students through the canonical product lifecycle without exceeding the 100-seat licence. J3 remains an independent external legal-review blocker.
+- **Active section progress:** R formally 0/18 checked (0%); 4 early-item prerequisites (R1/R2/R3/R5) have live evidence awaiting exact-commit release-gate completion and checklist recording. Overall Phase 1 remains 96/129 = 74.4% until valid checkmarks are recorded.
+- **Exact next action:** confirm `cd8ae324...` complete release gate and preview are green; then build/execute the canonical synthetic R4 bulk-roster path from 2 to exactly 100 active acceptance students, verify licence enforcement and account lifecycle evidence, record only legitimately satisfied R1/R2/R3/R4/R5 items, and continue directly into R6 question import.
+
+## 2026-09-02 21:09 IST — R1-R5 synthetic acceptance / R4 licence-boundary execution
+
+- **Run start/end:** 2026-09-02 21:09:54 IST → 2026-09-02 21:32:22 IST.
+- **Active engineering/review span:** approximately **22 minutes** of live acceptance-tenant verification, canonical lifecycle execution, licence-overflow proof, release-gate verification, evidence recording, recorder rework/cleanup and R6 import-path review. The 45–50 minute target was not artificially padded.
+- **Section worked:** Release acceptance R1–R6.
+- **Checklist items completed:** **R1–R5**. R4 reached exactly 100/100 active synthetic students through the canonical lifecycle; a 101st activation was rejected by the existing licence guard with SQLSTATE `23514`, and the failed overflow account did not persist.
+- **Items still pending:** J3 qualified legal review; R6–R18; L1–L6; Z2–Z8 final production sign-off. Permanent production remains protected.
+- **Branch / commits:** run-start checkpoint `27eacfb4f8d21d542a457ee9a4df2c5ac0ab605c`; R4 evidence commit `1a1127e1ba4089cdba791fa6899e294aa10792dd`; temporary recorder experiments were removed by restoring the branch to the exact green evidence checkpoint before this final recorder sequence.
+- **CI / release gate:** exact R4 evidence release gate `33651043425` **PASS**, 2026-09-02 15:49:28Z–15:51:47Z (~2m19s), including hardening checks, TypeScript, lint, all required regressions, production build and final enforcement. The final checklist/heartbeat commit must also complete the full release gate before R6 is credited.
+- **Vercel:** permanent `main` application probe returned HTTP 200; project runtime errors were zero in the preceding 24 hours; hardening previews remained READY. No permanent production promotion occurred.
+- **Supabase:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) remained `ACTIVE_HEALTHY`; post-R4 database size **216,624,275 bytes**; isolated `Evidara School` tenant remained exactly **100 active students** under the 100-seat annual licence.
+- **Rework/failures/blockers:** the first attempt to create the 100th synthetic user and membership in one data-changing CTE rolled back because the lifecycle RPC could not see the trigger-created profile in that same statement snapshot; sequential canonical lifecycle statements then passed. Several temporary recorder-workflow experiments failed before useful jobs ran; those commits were removed from the branch before this final record. No St. Mary’s/future-client data was touched.
+- **Acceptance-section completion:** **5/18 = 27.8%**.
+- **Overall Phase 1:** **101/129 = 78.3% verified** after R1–R5.
+- **Exact next action:** after the full release gate on this record commit is green, execute R6 in the same isolated tenant using a synthetic CSV of at least 500 questions; intentionally surface invalid rows, correct/retry them, scrutinize exact-duplicate handling, persist evidence, and only then check R6.
+
+
+### 2026-09-02 23:11–23:30 IST — R7 approval hardening + R8/R9 acceptance execution
+- Run start/end: 23:10:59–23:30 IST.
+- Active engineering span: ~19 minutes observable in this execution window; 45–50 minute target not met because the automation execution window reached handoff while the descendant release gate was still running. No time was padded.
+- Section worked: real-school-equivalent acceptance R7–R10, strictly in isolated synthetic tenant `evidara-school-acceptance`.
+- Checklist items completed/verified: R7 functional acceptance completed and checklist evidence recorded; School Admin approval authorization drift fixed. R8 Physics test creation + Grade 11/A NEET audience assignment functionally completed. R9 synthetic acceptance Student start functionally completed. R8/R9 remain unchecked pending the complete descendant release gate before checklist credit.
+- Pending: finish complete release gate for evidence commit `474ea30b3f7ac36c520c4258d1eec41b1cf19418`; then record R8/R9 checklist checkmarks; execute rendered R10 offline/reconnect recovery on in-progress attempt `d970d756-f56c-4e9a-9057-f2c775658719`; continue R11–R18, L1–L6, J3 legal review and Z sign-off.
+- Branch head at handoff: `474ea30b3f7ac36c520c4258d1eec41b1cf19418` before this heartbeat trigger commit.
+- Commits created: `fa945496b97db02bb7d18acc7efcde1f5d975b86` (fix R7 school_admin review parity), `389bc8e68c0c69ebb1632c3ed255190bc35e7dc0` (one-time R7 recorder), `62e085831cd120dc729219086527aca190ce443c` (R7 checklist evidence), `474ea30b3f7ac36c520c4258d1eec41b1cf19418` (R7–R9 acceptance evidence), plus this heartbeat trigger commit.
+- CI: exact R7 fix complete release gate `33663448733` PASS. Descendant full release gate `33664333071` for `474ea30b...` was still IN PROGRESS at handoff; bespoke hardening checks and TypeScript had passed and CI was progressing through lint/regression/build.
+- Vercel: `quizmaker2` production/preview project healthy; fresh 24-hour runtime-error inspection found no runtime errors. Permanent production was not changed.
+- Supabase: `SMIS QP` (`xzfozpnzvznqrvcsoail`) ACTIVE_HEALTHY. Fresh database size at handoff: 219,278,483 bytes. All mutations confined to synthetic Evidara School tenant. No new/paid Supabase project created.
+- Rework/failures/blockers: R7 exposed a real role-taxonomy mismatch in `can_review_org_question()`; fixed to allow active `school_admin` while anon remains blocked. First approval was correctly blocked until analytics taxonomy existed. First synthetic difficulty value `medium` was invalid and rolled back cleanly; corrected to enum `moderate`. Current blocker is only completion of the descendant full release gate before R8/R9 can be credited.
+- Acceptance section progress: currently 7/18 = 38.9% credited; R8/R9 are functionally verified but intentionally not credited until their complete descendant gate is green. Overall Phase 1 credited progress: 103/129 = 79.8%.
+- Exact next action: confirm `33664333071` green → check off R8/R9 with recorded evidence → run a new complete descendant release gate → execute R10 rendered offline/reconnect recovery on the preserved in-progress synthetic Student attempt, then continue sequentially.
+
+
+## 2026-09-03 01:13:24 IST — R8/R9 acceptance evidence checkpoint
+
+- **Run start:** 2026-09-03 01:13:24 IST.
+- **Run end / observable handoff:** 2026-09-03 01:16:20 IST.
+- **Active engineering/review span:** approximately 3 minutes in this automation execution window; the 45–50 minute target was not met because the tool execution window ended early. No time was padded.
+- **Section worked:** Release acceptance R8–R10 frontier.
+- **Starting branch head:** `d2617255c602143803a39bc29c445c91bddb1bf1`.
+- **Starting inspection:** `PHASE1_RELEASE_CHECKLIST.md` still had R8/R9 unchecked; prior acceptance checkpoint release gate `33664610356` on `a9ac84d8e19da7a2811af57d8d7598027f21fa9f` was confirmed **PASS**. Vercel production runtime errors for the preceding 24 hours were empty; latest visible `phase1-hardening` previews were READY. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`; fresh database size was `219278483` bytes.
+- **Live acceptance re-verification:** isolated synthetic organization `Evidara School` (`evidara-school-acceptance`) exists. R8 paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` is `published`, has 20 questions and an assignment profile for academic year 2026-27, Grade 11, NEET and the acceptance section with `assigned_count=100`. R9 attempt `d970d756-f56c-4e9a-9057-f2c775658719` remains `in_progress`, proving the synthetic acceptance Student started the assigned paper and preserving the R10 recovery fixture.
+- **Commits created:** `6e51dcc30d5da3eec05fb8abb2ba8c7ff5d88c0c` adds a guarded R8/R9 checklist-recording workflow. The workflow had not yet produced its bot checklist commit by handoff, so R8/R9 were not falsely claimed as newly checked in this run.
+- **CI/release-gate:** prior evidence gate `33664610356` confirmed PASS (2m24s wall-clock from 18:00:56Z to 18:03:20Z). A new full gate was not yet available for the just-created workflow commit at handoff.
+- **Vercel/Supabase state:** production protected and unchanged; no Vercel runtime errors found in the latest 24-hour query; Supabase ACTIVE_HEALTHY; no separate/paid project created; only the synthetic acceptance tenant was queried.
+- **Rework/failures/blockers:** the new one-shot checklist recorder did not immediately emit its expected bot commit before this execution window ended. This is a CI-trigger/observation limitation, not acceptance-data failure. R10 still requires the physical disconnect → answer → reconnect → server-sync proof and remains unchecked.
+- **Section progress:** acceptance R = 7/18 formally checked (38.9%); R8/R9 have green evidence and live re-verification but await durable checklist recording. Overall formally checked Phase 1 remains 103/129 = 79.8% until those records land.
+- **Exact next action:** confirm/repair the R8/R9 recorder, ensure its descendant complete release gate is green, then run R10 on the preserved in-progress synthetic Student attempt and verify the offline answer is persisted after reconnect before moving to R11.
+
+
+### 3 Sep 2026 — 04:14 IST Phase 1 hardening heartbeat
+
+- Start checkpoint inspected: `PHASE1_RELEASE_CHECKLIST.md`, `PHASE1_PROGRESS_LOG.md`, `phase1-hardening` branch state, CI/release gate, Vercel production/preview health, and Supabase `SMIS QP`.
+- Production remained protected and healthy: Vercel production had no error/fatal runtime logs in the fresh 24-hour check; fixed-code `phase1-hardening` previews were READY. Supabase project `xzfozpnzvznqrvcsoail` (`SMIS QP`) remained `ACTIVE_HEALTHY`; database size measured 219,278,483 bytes at run start.
+- Highest-priority unchecked item R11 was completed using only the isolated synthetic `Evidara School` tenant (`evidara-school-acceptance`). Fixed the score-only post-submit reflection defect in `02ea9f2cc211ca7f5d85cb3784c07384ef63eee8`: reflection UI/RPC paths now require `answers_released === true`; backend result-release authorization was not weakened.
+- Updated R11 acceptance to create a fresh canonical synthetic student attempt and save two canonical responses before rendered final submission. Run `33692795379` passed with attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e`, rendered `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`, score-only reflection suppressed, and zero console/page/failed-response errors. Supabase independently matched the authoritative submitted result exactly.
+- Complete release gate initially exposed a stale E6 source-contract regex after the safe result alias refactor; the smoke was corrected without changing submission semantics in `3781a9d26bc78dee2198bbc186fd5d8b2baa132e`. Complete gate `33693066355` then passed all checks, TypeScript, lint, regressions and production build.
+- R11 was formally recorded verified in checklist commit `88771ac6d5b70e66ecd920ccdd1e3830d93a9976`; permanent production was not promoted or changed.
+- Active engineering span: approximately 22 minutes in this execution window; the requested 45–50 minute target was not reached before the verified R11 checkpoint was complete.
+- Exact next action: execute R12 against the same isolated tenant by proving hidden/held and released result modes through authenticated rendered Student behavior plus independent Supabase checks, then run the complete release gate before checking R12.
+
+
+### 2026-09-03 05:14–05:36 IST — R12 held/released result hardening
+- Start inspection completed: reviewed `PHASE1_RELEASE_CHECKLIST.md`, `PHASE1_PROGRESS_LOG.md`, `phase1-hardening` head/checks, latest release-gate state, Vercel production/preview health, and Supabase `SMIS QP` state.
+- Production remained protected and Vercel's fresh 24-hour runtime-error check was clean; Supabase project `xzfozpnzvznqrvcsoail` remained `ACTIVE_HEALTHY` at 219,278,483 bytes.
+- Work remained strictly inside synthetic tenant `Evidara School` (`evidara-school-acceptance`); no St. Mary's/future-client data and no separate Supabase project were used.
+- R12 exposed a real Student Results defect: held/hidden result rows returned NULL score/count fields correctly from the backend, while the frontend still assumed released numeric values. Patched `StudentResultsView` to render an explicit `Result held` state, suppress score/accuracy/question details, and keep reflection unavailable until release.
+- Added guarded R12 held/released browser acceptance harnesses. Backend held-mode contract was proven against synthetic attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e`: `result_release_level=none`, all score/count fields NULL, answers/analytics unreleased. Rendered held verification is not yet green because the localhost Student workspace navigation re-enters `Verifying account security…` and `/api/account/security/` returns 503 on the test surface; no R12 checkmark was awarded.
+- The synthetic paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was restored to its normal `score_only` mode before handoff.
+- Active engineering span: ~22 minutes; no time padding.
+- Exact next action: make the R12 rendered harness navigate Results without triggering the localhost account-security reload (or supply the same safe security prerequisites used by the authenticated acceptance surface), obtain green held + released evidence, run the complete Phase 1 release gate, then and only then check off R12 and proceed to R13.
+
+
+## 2026-09-03 06:15 IST — R12 held/released result acceptance
+
+- **Run start:** 2026-09-03 06:11:53 IST.
+- **Checklist item:** R12 — verify held/hidden versus released result modes through authenticated rendered Student behavior.
+- **Starting checkpoint:** `4bef97511d024a188fc1d68bdb0251573d536e32`; prior complete release gate `33697568412` was PASS.
+- **Health:** Vercel production runtime error/fatal query for the preceding 24 hours returned no entries; latest phase1-hardening previews were READY. Supabase `SMIS QP` remained ACTIVE_HEALTHY; measured database size was 219,278,483 bytes. Acceptance work remained restricted to `evidara-school-acceptance`.
+- **Engineering:** Diagnosed localhost Results navigation 503 to the authenticated `/api/account/security` route requiring the server-side Supabase secret. Updated the isolated R12 workflow in commit `41a99e8674a50cd63a128bc85698bb3c6a8d59a7` to provide `SUPABASE_SECRET_KEY` from the repository's server-key secret (with legacy service-role fallback) and to fail explicitly if neither secret is configured. This preserves the production security contract rather than bypassing account-security verification.
+- **Verification:** R12 rendered acceptance run `33700819122` and complete release gate `33700819183` were started for the fix and were still in progress at heartbeat creation; R12 remains unchecked until both held/released rendered evidence and the complete gate are green.
+- **Production protection:** Permanent production was not promoted or mutated. No client/future-client data was used and no separate/paid Supabase project was created.
+- **Next action:** resolve R12 run `33700819122`; if green, execute the released `score_only` half, independently confirm Supabase release-level values, run the complete gate, and only then check R12 before moving to R13.
+
+## 2026-09-03 07:19 IST — R12 protected-preview acceptance block
+
+- **Run start/end:** 2026-09-03 07:19 IST → approximately 07:35 IST.
+- **Active engineering/review span:** approximately **16 minutes**. The requested 45–50 minute productive target was not reached within this execution window; no padding was added.
+- **Section worked:** R12 held/hidden versus released result-mode acceptance, isolated to `evidara-school-acceptance`.
+- **Checklist items completed:** **none**. R12 remains unchecked pending rendered held+released proof and a complete descendant release gate.
+- **Health:** Vercel production runtime errors for the preceding 24 hours were clean and hardening previews remained READY. `SMIS QP` remained **ACTIVE_HEALTHY**, final database size **219278483 bytes**. Permanent production was not promoted or mutated.
+- **Changes:** protected-preview R12 held and score-only runners/workflows were added. Held run `33705794097` passed the isolated Supabase held contract and preflight but failed browser bootstrap because the configured Actions Vercel share credential is stale for the current protected branch alias. Earlier run `33705636374` independently confirmed the released score-only contract: release level `score`, 8/80, 10%, 2 correct, 0 incorrect, 18 unanswered, with answers/analytics still unreleased.
+- **Safety:** all database mutations were guarded to `evidara-school-acceptance`; no St. Mary’s or future-client data was touched. The synthetic paper was restored to `score_only` after the held probe. No preview token/share URL was committed or logged.
+- **Blocker:** refresh the secure Actions protected-preview share credential (or use an existing secure Vercel-token path); this is CI credential drift, not a production outage.
+- **Exact next action:** rerun rendered held proof, restore/verify `score_only`, run released rendered proof, then run the complete Phase 1 release gate. Check R12 only after both modes and the descendant gate are green; proceed to R13 immediately afterward.
+
+## 2026-09-03 08:11 IST — R12 protected-preview credential block / R13 preflight
+
+- **Run start/end:** 2026-09-03 08:11 IST → approximately 08:15 IST.
+- **Active engineering/review span:** approximately **4 minutes** in this execution window; no time was padded.
+- **Section worked:** R12 held/released result acceptance, with safe R13 analytics preflight while the rendered R12 credential path remains externally blocked.
+- **Checklist items completed:** **none**. R12 remains unchecked; no later acceptance item was credited out of order.
+- **Starting branch head:** `8685b1c5e1d399ae2e87f1f778380322a9a111d8`.
+- **Health:** Vercel production runtime-error aggregation for the preceding 24 hours returned no errors; recent `phase1-hardening` previews were READY. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`, and `Evidara School` (`evidara-school-acceptance`) remained the isolated demo acceptance organization. Permanent production was not promoted or mutated.
+- **R12 investigation:** rerun evidence for workflow `33705794097` confirms the synthetic held contract and protected-preview preflight passed, but browser bootstrap failed because the stored Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` no longer grants the branch alias. A fresh temporary protected-preview share URL can still be issued successfully through Vercel, proving the preview itself is healthy; the fresh URL/token was not committed or logged.
+- **Execution constraint:** a local independent browser rerun could not be used because this runtime container has no external DNS access to clone/install the repository. No production security control was weakened to bypass Vercel protection.
+- **R13 preflight:** the authoritative R11 synthetic attempt remains submitted at 8/80 (10%, 2 correct, 0 incorrect, 18 unanswered) and the R8 paper is safely restored to `score_only`. The live student analytics RPC deliberately refuses self-analytics until `analytics_released` is true, so R13 must be exercised only after a controlled analytics-release mode is enabled; this is expected release-policy behavior, not a defect.
+- **Safety:** all database reads/mutations remain scoped to the existing same-project synthetic acceptance tenant; no St. Mary’s/future-client data and no separate/paid Supabase project were used.
+- **Blocker:** securely refresh the GitHub Actions protected-preview share credential. The connected GitHub API cannot read or update repository secrets, so the fresh temporary Vercel share token cannot be propagated into Actions without exposing it, which is intentionally not done.
+- **Exact next action:** refresh the secure Actions protected-preview credential, rerun rendered held R12, restore/verify `score_only`, run rendered released R12 and the complete release gate; only then check R12 and switch the synthetic paper to an analytics-released mode for R13 student subject/chapter/topic/question analytics verification.
+
+## 2026-09-03 09:13:00 IST — R12 protected-preview acceptance blocked on Actions credential
+
+- **Checklist item:** R12 — held/hidden versus released result modes.
+- **Run start:** 2026-09-03 09:13:00 IST.
+- **Repository/CI inspection:** `phase1-hardening` started at `d28ba2527686605858e5f8ccf09b2533729ad85d`; R12 remains unchecked. The current branch workflow requires `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` for the protected branch alias and fails closed when it is absent/stale.
+- **Deployment health:** Vercel production runtime errors for the preceding 24 hours were clean. Current branch-head preview `dpl_QuY297FR1DArZUun9KYvLjFKMHtB` is READY. Permanent production was not changed or promoted.
+- **Supabase health/isolation:** `SMIS QP` (`xzfozpnzvznqrvcsoail`) is `ACTIVE_HEALTHY`; database size remains `219278483` bytes. The isolated synthetic tenant `Evidara School` / `evidara-school-acceptance` exists and remains the only permitted acceptance tenant.
+- **R12 investigation:** A fresh temporary protected-preview share credential can be issued successfully through Vercel, confirming the preview/protection service is healthy. The GitHub Actions workflow can only consume the repository secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`; the connected GitHub interface deliberately does not expose repository-secret mutation. The fresh credential was not committed or printed into repository content.
+- **Verification status:** R12 remains intentionally unchecked. No security control, Vercel protection, Supabase authorization, or production setting was weakened to bypass the credential boundary.
+- **Blocker:** Securely refresh the GitHub Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` secret using a secret-capable channel; current connected GitHub tools cannot mutate repository secrets.
+- **Next action:** Once the Actions secret is refreshed, rerun rendered held-result acceptance, restore and run `score_only` rendered acceptance, independently verify release levels in Supabase, run the complete Phase 1 release gate, and only then check R12 before proceeding to R13.
+
+
+## 2026-09-03 12:45:56–12:51:26 IST — R12 held/released result acceptance continuation
+
+- **Run start/end:** 2026-09-03 12:45:56 IST → 2026-09-03 12:51:26 IST.
+- **Active engineering/review span:** approximately **5m 30s** of checkpoint/health inspection, R12 acceptance execution, database-state restoration, workflow repair, CI review and evidence diagnosis; no idle time was padded.
+- **Section worked:** R12 — held/released result modes.
+- **Checklist items completed:** none. R12 remains intentionally unchecked until both rendered modes and the complete release gate are green.
+- **Held-mode evidence:** authenticated rendered held-result rerun in workflow run `33705794097` completed **PASS** against only `evidara-school-acceptance`; release level `none`, authoritative score/count fields withheld, rendered held state visible, score/reflection leakage absent, and permanent production protected.
+- **Synthetic state change:** only paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` belonging to organization slug `evidara-school-acceptance` was restored from `hidden` to `score_only` for the released half. No St. Mary's or future-client data was touched.
+- **Acceptance workflow rework:** initial score-only run `33727320942` failed closed in preflight because the workflow omitted the mandatory positive `EVIDARA_ACCEPTANCE_DB_BYTES` measurement. Fresh `SMIS QP` database size was independently measured as `219335827` bytes and added to the guarded score-only workflow in commit `0765c30d5efbdbe49267f2368219b81742d819d4`.
+- **Verification:** complete Phase 1 release gate run `33727428783` on `0765c30d5efbdbe49267f2368219b81742d819d4` **PASS**: all hardening checks, TypeScript, lint, every regression suite, production build and final gate enforcement passed.
+- **Remaining R12 blocker:** corrected score-only run `33727428759` cleared the isolated-tenant/database/production-protection preflight but failed only at protected-preview browser bootstrap. Redacted evidence shows the stored Actions share URL redirects to Vercel login; no browser console/page/failed-response product error was recorded. The rendered score-only assertions therefore did not execute and R12 was not checked off.
+- **Vercel/Supabase health:** Vercel production runtime-error inspection for the preceding 24 hours returned no runtime errors; permanent production remained unchanged/protected. `SMIS QP` remains `ACTIVE_HEALTHY`; measured database size `219335827` bytes. Protected preview itself remains available, but the GitHub Actions share credential must be refreshed without regenerating it afterward.
+- **Commits created:** `aad86562ba04babe92198fba7e23bfb0373160ee` (score-only acceptance trigger), `0765c30d5efbdbe49267f2368219b81742d819d4` (add fresh database-size guard), plus this heartbeat trigger/recorder commit.
+- **Exact next action:** refresh repository secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` with one fresh protected-preview share URL and do not regenerate that URL afterward; rerun R12 score-only rendered acceptance `33727428759` (or trigger a fresh run), independently reconcile its displayed score/release level with Supabase, then check R12 only after green rendered evidence and a complete release gate; proceed to R13.
+
+
+## 2026-09-03 15:47 IST — R12 held/released result modes verified
+
+- **Checklist item:** R12 — Verify held/released result modes.
+- **Run start:** 2026-09-03 15:47 IST.
+- **Run end/record time:** 2026-09-03 15:53:05 IST.
+- **Acceptance evidence:** Held-result workflow `33705794097` attempt 3 — **PASS**. Score-only workflow `33727428759` attempt 2 — **PASS**.
+- **Independent Supabase reconciliation:** isolated tenant `evidara-school-acceptance`; acceptance paper remains `score_only`; submitted attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` = `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`. No St. Mary's or future-client data used.
+- **Complete release gate:** `33727428783` on exact R12 workflow candidate `0765c30d5efbdbe49267f2368219b81742d819d4` — **PASS**.
+- **Deployment/health:** Vercel production 24h runtime-error check clean; permanent production unchanged/protected. Supabase `SMIS QP` `ACTIVE_HEALTHY`.
+- **Automation:** hourly `Evidara Phase 1 Hardening` schedule re-enabled after protected-preview credential refresh.
+- **Progress after R12:** acceptance R = 12/19; overall checklist = 108/129 (83.7%).
+- **Rework/blockers:** protected-preview credential drift was resolved by refreshing `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL`; no security protection was weakened.
+- **Exact next action:** R13 — release analytics only on the isolated synthetic paper in a controlled acceptance step, verify rendered Student subject/chapter/topic/question analytics against authoritative Supabase evidence, restore the intended safe paper state, then run the complete release gate before checking R13.
+
+## 2026-09-03 16:02 IST — R13 student analytics reconciliation (in progress)
+
+- **Checklist item:** R13 — Verify student subject/chapter/topic/question analytics.
+- **Run start:** 2026-09-03 16:02 IST.
+- **Run end/record time:** 2026-09-03 16:04:44 IST.
+- **Repository/CI inspection:** branch checkpoint before this heartbeat was `5e75cc93d7ae651bd03b4567427a334c55695632`; complete Phase 1 release gate `33744056911` on that exact checkpoint — **PASS**. R12 remains verified; R13 remains intentionally unchecked.
+- **Production/deployment health:** Vercel production 24-hour runtime-error check returned no errors; permanent production was not changed.
+- **Supabase state:** `SMIS QP` acceptance database remained healthy for read verification; database size observed at 219,335,827 bytes. Only isolated tenant `evidara-school-acceptance` was queried. Acceptance paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` remains `score_only`.
+- **R13 authoritative baseline:** canonical submitted attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` remains `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`. All 20 paper questions have frozen taxonomy snapshots at test time: Subject `Physics`, Chapter `Kinematics`, Topic `Motion in One Dimension`. Questions 1 and 2 have stored responses `A`, `is_correct=true`, `marks_awarded=4` each; questions 3–20 have no stored response. This independently establishes the expected aggregate analytics as 20 questions / 2 correct / 18 unanswered / 10% question accuracy for the single frozen subject/chapter/topic bucket, plus question-level correctness matching those two responses.
+- **Implementation changes:** none to product or database schema in this continuation; discovery and independent evidence only. No RLS or result-release protection was weakened.
+- **Verification status:** R13 is **not eligible for checkoff yet** because authenticated rendered Student analytics must still be exercised under a controlled `in_depth_analytics` release and reconciled to this independent baseline.
+- **Exact next action:** add an isolated protected-preview R13 acceptance workflow/script modeled on R12, guard exact tenant/paper/attempt/database size, temporarily set only the synthetic paper to `in_depth_analytics`, authenticate as the synthetic Student, assert rendered Physics/Kinematics/Motion-in-One-Dimension and question-level analytics match the frozen-response baseline, restore `score_only` in guaranteed cleanup, run the complete release gate, and only then check R13.
+
+
+## 2026-09-03 17:46:44–18:01:41 IST — R13 rendered analytics acceptance hardening
+
+- **Checklist item:** R13 — Verify student subject/chapter/topic/question analytics. R13 remains intentionally unchecked.
+- **Run start/end:** 2026-09-03 17:46:44 IST → 2026-09-03 18:01:41 IST.
+- **Active engineering/review span:** approximately **15 minutes** in the observable execution window; no time was padded.
+- **Branch work:** R13 hardening commits include `08da28f89c23d42a3b15e5637feecc2f6b746462`, `3f26e6fe2a0e4cc1bab3c4e16aa79214c4870bba`, `79cc9df631f1453a5d69c1e7701bc61a9f1337b0`, `4d5cb03cff8b5bcd3d1d2bd36f3d08c9454fa906`, and guarded rendered trigger `521ee66f90563f41108b3b508dcd80b8cf72bb97`.
+- **Complete gate:** Phase 1 release gate `33754900944` on exact candidate `4d5cb03cff8b5bcd3d1d2bd36f3d08c9454fa906` — **PASS**, including hardening checks, TypeScript, lint, regressions, production build and final enforcement. Matching Vercel preview is READY.
+- **Production / Supabase health:** Vercel production 24-hour runtime-error aggregation returned no errors; permanent production was not changed or promoted. Supabase `SMIS QP` remained `ACTIVE_HEALTHY`; fresh database size was `219344019` bytes. All acceptance reads/mutations were guarded to `Evidara School` / `evidara-school-acceptance`; no St. Mary's/future-client data and no separate/paid project were used.
+- **Authoritative R13 evidence:** Supabase independently re-confirmed attempt `134ddbe2-bc9f-4863-9aba-3b9def08d69e` at `8/80`, `10%`, `2 correct`, `0 incorrect`, `18 unanswered`; all 20 paper rows retain frozen `Physics → Kinematics → Motion in One Dimension` taxonomy, with Q1/Q2 correct `A` responses worth `+4` each.
+- **Acceptance rework:** GitHub Actions has neither server-key secret, so privileged mode control was separated from browser proof instead of weakening authorization. Only exact synthetic paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` was guarded-switched to `in_depth_analytics`. Rendered run `33755339031` passed tenant/database/production preflight but failed at protected-preview bootstrap because stored Actions `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` no longer grants the latest branch alias deployment. The exact synthetic paper was immediately restored to `score_only` after failure.
+- **Safety / verification status:** no R13 credit was awarded. Acceptance remains **12/19 verified** and overall checklist remains **108/129 (83.7%)**. Production remains protected.
+- **Blocker:** refresh GitHub Actions secret `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` with the newly issued protected-preview share URL for the current branch alias; connected GitHub tooling cannot mutate repository secrets and the credential was not committed.
+- **Exact next action:** after secret refresh, guarded-switch only the exact synthetic paper to `in_depth_analytics`, rerun R13 rendered acceptance, restore/verify `score_only` regardless of result, confirm the complete descendant Phase 1 release gate, then and only then check R13 and proceed to R14 Teacher/School Admin drilldowns.
+
+## 2026-09-04 13:00 IST — Phase 1 continuation heartbeat
+
+- **Active item:** R13 — student Subject → Chapter → Topic → Question analytics acceptance.
+- **Branch checkpoint:** `c1a8023a1b361bd565deb88d771a94123089941a` (`test(r13): rerun rendered analytics acceptance`).
+- **Work completed this run:** re-triggered the guarded rendered R13 acceptance; verified the latest phase1-hardening Vercel preview is READY; verified production has no runtime errors in the last 24 hours; checked the exact synthetic acceptance paper and found it safely restored to `score_only`, then guardedly moved only that exact `evidara-school-acceptance` paper to `in_depth_analytics` for the R13 proof.
+- **CI / release gate:** R13 Analytics Acceptance run #11 is in progress; full Phase 1 Release Gate run #680 is also in progress. No checkbox moved before both are green.
+- **Supabase safety:** only the existing synthetic `evidara-school-acceptance` tenant/paper was touched; no St. Mary's or future-client data was used; no new project was created.
+- **Vercel:** preview for the current commit is READY; permanent production remains protected and healthy.
+- **Blocker/state:** no user-action blocker. Current wait is transient CI execution (dependency install / rendered acceptance), not a product blocker.
+- **Overall checklist:** remains 107/127 (~84.3%) verified until R13 is fully evidenced.
+- **Exact next action:** inspect R13 run #11 and release gate #680; if both pass, restore the exact synthetic paper to `score_only`, mark R13 verified with evidence, then immediately start R14 Teacher/School Admin analytics drilldown acceptance. If R13 fails, diagnose the failing rendered assertion, patch, rerun, and keep R13 unchecked until green.
+
+
+## 2026-09-04 15:00 IST — R13 rendered analytics acceptance correction in progress
+
+- **Active item:** R13 — Student Subject → Chapter → Topic → Question analytics acceptance.
+- **What changed:** downloaded and inspected redacted evidence from failed R13 run `33848955651`; failure was isolated to the harness assertion `R13 subject analytics missing 5 correct`. The rendered Subject Analysis itself showed the expected synthetic Physics/Kinematics values: exposure 60, attempted 5, correct 5, incorrect 0, unanswered 55, accuracy 100%, score 8.3%. No console/page/HTTP failures were recorded.
+- **Fix:** committed `595f44661d081d9cd2137fe8a5510e674a6f4bab` (`test(r13): align rendered subject assertion with card UI`) so the acceptance proof matches the UI's separate CORRECT label/value presentation instead of requiring the literal phrase `5 correct`.
+- **Verification:** corrected Phase 1 R13 Analytics Acceptance run `33859562605` is in progress; the complete Phase 1 release gate on the same candidate is also in progress. R13 remains intentionally unchecked until both are green.
+- **Supabase safety:** exact synthetic paper `e5801a88-1e7f-4b4f-a715-ad44ce2b3c43` belongs to `evidara-school-acceptance` and is currently `in_depth_analytics` solely for the guarded proof. No St. Mary's/future-client data and no new project were used. Database size observed at approximately 209 MB.
+- **Production/preview:** permanent production remains protected; Vercel production had zero error/fatal runtime logs in the last 24 hours. Branch preview access remains functional.
+- **Overall checklist:** remains **107/127 (~84.3%)** verified until R13 completes.
+- **Blockers:** no user-action blocker. Current wait is CI dependency install/execution; the previous R13 failure was an acceptance-harness wording mismatch, not a product defect.
+- **Exact next action:** inspect corrected R13 run and full release gate; if both pass, restore the exact synthetic paper to `score_only`, verify restoration, check R13 with evidence, and immediately begin R14 Teacher/School Admin analytics drilldown acceptance. If the corrected proof exposes another genuine mismatch, diagnose and patch it while keeping R13 unchecked.
+
+
+## 2026-09-04 16:27–16:xx IST — acceptance continuation heartbeat
+
+- Completed: R13 student subject/chapter/topic/question analytics acceptance. Rendered R13 workflow 33865156528 passed on e3abe17b55e847ab3e02b71bb4add0f7967dc759; exact complete release gate 33865156088 also passed.
+- Cleanup: isolated synthetic paper e5801a88-1e7f-4b4f-a715-ad44ce2b3c43 restored from in_depth_analytics to score_only after proof. No St. Mary's or future-client data touched.
+- Branch progression: functional R13 head e3abe17b55e847ab3e02b71bb4add0f7967dc759; acceptance-progress recorder added at 5e8fd5dd65842fdfc0fd37419436d5758470396d.
+- Health: matching Vercel preview READY; production protected with no recent runtime error/fatal logs observed; Supabase SMIS QP ACTIVE_HEALTHY, approximately 209 MB.
+- Checklist: R1–R13 complete; R14–R18 pending; L1–L6 pending; Z1 complete, Z2–Z8 pending; J3 remains external legal review. Strict Phase 1 progress after R13 = 108/127 ≈ 85.0%.
+- Blockers: none requiring user action for R14 engineering/acceptance.
+- Exact next action: build and run R14 Teacher + School Admin analytics drilldown acceptance against the same isolated tenant; after verification, continue immediately to R15 export acceptance.
+
+## 2026-09-04 16:27–17:xx IST — Phase 1 acceptance continuation heartbeat
+
+- Completed this run: R13 student subject/chapter/topic/question analytics is now formally checked in `PHASE1_RELEASE_CHECKLIST.md`. Rendered workflow `33865156528` passed on exact functional commit `e3abe17b55e847ab3e02b71bb4add0f7967dc759`; complete Phase 1 release gate `33865156088` passed on that same commit. The isolated synthetic paper was restored to `score_only` after proof.
+- Advanced immediately to R14: added protected-preview rendered Teacher + School Admin analytics drilldown acceptance. New workflow candidate branch head is `2ea2fb332b2e0ecc038cfa051fd0ccd34470e4a7` (`test(r14): wire teacher admin drilldown acceptance`). The R14 harness verifies Evidara School only, School → NEET → Grade 11 → Section A → Physics → Kinematics → Motion in One Dimension, teacher subject/section scoping, School Admin organization scoping, cross-school isolation, browser errors and failed responses.
+- R14 status at heartbeat: workflow `33866577855` is running; dependency installation was in progress. Exact candidate release gate `33866577846` is also running. R14 is not checked until both acceptance and full release gate pass.
+- Health: permanent production remains protected; no recent production runtime error/fatal logs were observed this run. Matching Vercel hardening preview was healthy/available during acceptance setup. Supabase `SMIS QP` project `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`, database approximately 209 MB. Only isolated synthetic tenant `evidara-school-acceptance` was used; no St. Mary's or future-client data touched.
+- Checklist position: R1–R13 complete; R14 active; R15–R18 pending; L1–L6 pending; Z1 complete and Z2–Z8 pending. J3 remains the external legal-review gate. Strict Phase 1 progress is 108/127 ≈ 85.0% verified.
+- Blockers: none requiring user action. R14 is normal CI/acceptance execution, not a blocker.
+- Exact next action: inspect R14 rendered acceptance and exact release gate; diagnose/fix any failure. If both pass, check R14 with evidence and continue immediately into R15 spreadsheet export acceptance.
+
+
+### 2026-09-04 16:59-17:xx IST — Phase 1 hourly heartbeat
+
+- Active item: **R14 — Teacher and School Admin drill-down analytics acceptance**.
+- What changed: diagnosed the prior R14 failure as a protected-preview credential/bootstrap mismatch before browser execution; aligned the R14 workflow and rendered harness with the proven `EVIDARA_ACCEPTANCE_VERCEL_SHARE_URL` bootstrap used by the green R13 path.
+- Functional candidate: `3efc18aab74f707dd5e31c841627e3017cbd43fd` (`fix(r14): bootstrap protected preview with share URL`).
+- Verification: the exact candidate's complete **Evidara Phase 1 Release Gate** run `33868399540` completed **SUCCESS**. R14 rendered two-role browser acceptance run `33868399562` is still **in progress**; at the latest observation it remained in dependency installation and had not yet reached the rendered assertions, so R14 is intentionally not checked yet.
+- Checklist position: **R1-R13 verified; R14 active; R15-R18 pending; L1-L6 pending; Z1 verified; Z2-Z8 pending; J3 external legal review remains un-certified**.
+- Health: Vercel protected preview HTTP 200; permanent production HTTP 200 and unchanged; Supabase project `SMIS QP` (`xzfozpnzvznqrvcsoail`) `ACTIVE_HEALTHY`. Only the isolated synthetic `evidara-school-acceptance` acceptance context is authorized; no St. Mary's/future-client data was used and no new paid project was created.
+- Verified overall progress remains **108/127 (~85.0%)** until R14's rendered evidence passes.
+- Blockers: no user-side blocker. Current wait is internal CI execution only; the earlier R14 bootstrap defect has been fixed.
+- Exact next action: inspect run `33868399562`; if green, inspect/uploaded R14 evidence, check R14 only after proof, then immediately execute R15 Excel result/analytics export acceptance. If it fails, diagnose the first failing rendered assertion and patch/re-run against the isolated synthetic tenant.
+
+
+## 2026-09-04 18:57 IST — R14 Teacher/Admin analytics drilldown acceptance (in progress)
+
+- **Checklist position:** R1–R13 verified; R14 remains in progress; R15–R18, L1–L6 and Z2–Z8 remain pending. J3 remains external legal review and is not self-certified.
+- **Branch checkpoint at run start:** `12ed10c6decd4da24ee32c8d999e486f508b5891`; latest complete release gate `33873590975` passed on that checkpoint.
+- **Failure diagnosed:** R14 rendered acceptance run `33873590892` passed protected-preview access, same-project safety preflight, fresh Supabase size guard (219344019 bytes), F8 19/19 and F9 15/15, then failed only on a brittle presentation-heading assertion (`Evidara School programmes`) before functional drilldown assertions.
+- **Fix this run:** commit `c4e198a998c8dc263007ca558f502ba9db8db4ca` (`fix(r14): make drilldown proof resilient to presentation headings`) removes dependency on exact presentation headings while retaining real rendered button navigation, hierarchy-token checks, screenshots, API payload capture, organization isolation, teacher section/subject scope and browser/HTTP error assertions.
+- **Verification:** R14 run `33878291814` and the complete Phase 1 release gate for `c4e198a...` were queued at handoff. R14 is intentionally not checked until both real rendered acceptance and the complete release gate pass.
+- **Health/safety:** permanent production remains protected; acceptance continues only against the protected `phase1-hardening` Vercel preview and isolated `evidara-school-acceptance` tenant in existing SMIS QP Supabase. No St. Mary's/future-client data and no new paid project are used.
+- **Blockers:** no user action required. Current blocker is internal verification of the corrected R14 harness.
+- **Exact next action:** inspect R14 run `33878291814` and exact-candidate release gate; if green, record R14 evidence/checklist completion and immediately begin R15 Excel result/analytics export acceptance; if red, diagnose the first real functional assertion and fix/rerun without weakening tenant/scope/error checks.
+
+
+## 2026-09-04 20:00 IST — R14 corrected drilldown acceptance rerun
+
+- **Checklist position:** R1–R13 verified; R14 in progress; R15–R18, L1–L6 and Z2–Z8 pending. J3 remains external legal-review gate.
+- **What changed:** Diagnosed that the prior corrected R14 candidate never completed because the subsequent heartbeat push cancelled its release gate before verification. Created `.phase1-r14-trigger` in commit `4a8a5f971ccf83230a8b947e07ec9da9ca2ff0c5` to rerun the corrected rendered drilldown proof without weakening assertions.
+- **Verification:** R14 workflow run `33884166696` is in progress on `4a8a5f971ccf83230a8b947e07ec9da9ca2ff0c5`. Exact-candidate Phase 1 release gate run `33884166673` is also in progress. R14 remains unchecked until both are green.
+- **Preview/production/Supabase:** Vercel checks are healthy on the candidate; permanent production remains protected and unchanged. Acceptance remains restricted to `evidara-school-acceptance` in existing SMIS QP; fresh guarded DB size remains 219,344,019 bytes (~209 MB). No St. Mary's/future-client data and no new paid project.
+- **Blockers:** No user action required. Current wait is internal CI/browser execution only.
+- **Overall verified:** 108/127 (~85.0%) until R14 earns evidence.
+- **Exact next action:** Inspect R14 run `33884166696`; if green, require a complete green release gate, record R14 complete, then immediately begin R15 Excel result/analytics export acceptance. If it fails, diagnose the exact rendered assertion and fix/retest.
+
+
+## 2026-09-05 00:xx IST — Phase 1 hardening heartbeat
+
+- Completed/changed: R14 failure evidence from run 33905235123 was downloaded and inspected directly. The School Admin reached the live Grade 11 sections table and the prior harness clicked a trailing cell rather than the clickable analytics row, leaving the page at Section A instead of opening Physics. Updated `scripts/phase1-r14-rendered-acceptance-v2.mjs` so exact hierarchy rows themselves are the primary click target; functional commit `642a23a4ff3e7d7833c5d801c9b13dc9cd7d6d55` (`test(r14): click exact analytics hierarchy row`).
+- Passed: exact candidate `642a23a4...` passed the complete Evidara Phase 1 Release Gate in run `33906560176`. R14 preflight also passed the protected-preview guard, same-project synthetic-tenant safety guard, F8 institution drilldown checks 19/19 and F9 teacher-scope checks 15/15. Vercel production runtime error scan for the preceding 24h returned no runtime errors.
+- Failed/blocker: first R14 browser execution on `642a23a4...` stopped before drilldown at `school-overview-navigation` because the previously enrolled synthetic School Admin MFA factor required a TOTP challenge but no setup key is displayed for an already-enrolled factor. This is acceptance-account state, not a product analytics failure. The verified TOTP factor belonging only to the isolated Evidara School acceptance School Admin was deleted in Supabase so the next run can perform clean synthetic re-enrolment and capture the setup key in memory; the failed R14 job has been re-run and is in progress. No real/St. Mary's/future-client MFA state was touched.
+- Checklist: R1-R13 ✅; R14 ⚠️ active; R15-R18 ❌; L1-L6 ❌; Z1 ✅; Z2-Z8 ❌; J3 remains external legal-review gate. Strict verified progress remains 108/127 (~85.0%) until R14 rendered acceptance is terminal green.
+- Branch functional head: `642a23a4ff3e7d7833c5d801c9b13dc9cd7d6d55`.
+- CI/release gate: exact-candidate complete release gate `33906560176` = SUCCESS. R14 rendered acceptance run `33906558660` attempt 1 failed only on synthetic MFA state; failed job re-run is active after synthetic MFA reset.
+- Vercel: permanent production protected/unchanged. Production runtime error scan = clean for last 24h. Protected phase1-hardening preview responds through Vercel protection as expected and passed the workflow's authenticated preview probe.
+- Supabase: existing SMIS QP project `xzfozpnzvznqrvcsoail` = ACTIVE_HEALTHY. Acceptance guard remains 219,344,019 bytes (~209 MB), below 450 MiB ceiling. Only organization `evidara-school-acceptance` was used. Synthetic acceptance School Admin TOTP factor only was reset to make the rerun deterministic; no new paid project and no St. Mary's/future-client data touched.
+- Exact next action: finish R14 re-run on `642a23a4...`; if rendered School Admin + Teacher hierarchy, tenant scope and zero-error evidence pass, mark R14 ✅ and immediately start R15 Excel result/analytics export acceptance. If it fails, inspect the new redacted evidence and fix only the exact remaining synthetic-auth/navigation assertion without weakening security or isolation.
+
+
+## 2026-09-05 02:00 IST — R14 drilldown acceptance hardening
+
+- **Completed items:** No new checklist checkbox this run; R1–R13 remain verified.
+- **Work completed:** Diagnosed the R14 rendered School Admin failure using uploaded browser evidence. The isolated School Admin had an already-enrolled synthetic MFA factor; only that acceptance factor was reset for deterministic rerun. The browser then passed protected-preview bootstrap, same-project preflight, F8 institution drilldown 19/19 and F9 teacher scope 15/15. The R14 harness was hardened in functional candidate `2d6090964d997b1df28a17c158280ceb1ec4ff90` to bind exact hierarchy rows, try valid row action paths, and require the next hierarchy token before accepting a click.
+- **Current blocker:** R14 rendered acceptance run `33917651612` still fails at School Admin Section A → Physics. Evidence shows the click enters the transition but remains on `Calculating analytics…`; there are 0 console errors, 0 page errors and 0 failed HTTP responses, so the next correction is to wait for the in-flight analytics transition instead of issuing repeat clicks on the loading view.
+- **Branch head:** `2d6090964d997b1df28a17c158280ceb1ec4ff90` at the functional checkpoint before this heartbeat trigger.
+- **CI / complete release gate:** Exact-candidate Phase 1 release gate run `33917651745` — PASS, including F8, F9, F12, TypeScript, lint, all required regressions, production build and final gate enforcement. Dedicated R14 rendered run `33917651612` — FAIL only at the Section A → Physics browser transition described above.
+- **Preview / production:** Phase 1 preview target remains protected and reachable. Permanent production remains unchanged/protected; Vercel runtime error/fatal scan for the preceding 24 hours returned no errors.
+- **Supabase:** Existing SMIS QP project `xzfozpnzvznqrvcsoail` remains ACTIVE_HEALTHY; guarded acceptance size remains 219,344,019 bytes (~209 MB). Only `evidara-school-acceptance` was used; no St. Mary's/future-client data and no second paid project.
+- **Checklist position / overall:** R1–R13 ✅; R14 ⚠️; R15–R18 ❌; L1–L6 ❌; Z1 ✅; Z2–Z8 ❌; J3 remains external. Strict verified progress remains 108/127 ≈ 85.0%.
+- **Exact next action:** Change R14 transition waiting so one valid Section A row activation can complete the real `Calculating analytics…` request (with a bounded acceptance timeout), rerun rendered R14 on the isolated tenant, require the complete release gate to stay green, then mark R14 only if both proofs pass and move immediately to R15 Excel results/analytics export acceptance.
+
+
+## 2026-09-05 04:00 IST — R14 rendered drilldown still blocked after synthetic MFA reset / hourly heartbeat
+
+- **Section worked:** Release acceptance R14 — Teacher and School Admin drilldowns.
+- **Checklist items completed:** none. R1–R13 remain verified; R14 remains unchecked; R15–R18, L1–L6 and Z2–Z8 remain pending. J3 remains an external legal-review gate and was not self-certified.
+- **Starting/current functional branch head:** `e5cb5992c5e627c0fa4d80ab10c97ebf284a29d3` (`test(r14): rerun bounded analytics transition acceptance`).
+- **Latest complete release gate:** run `33921868514` on exact head `e5cb5992c5e627c0fa4d80ab10c97ebf284a29d3` — PASS.
+- **R14 diagnosis/fix this run:** attempt 1 had stopped at the synthetic School Admin MFA challenge because a previously enrolled acceptance-only TOTP factor no longer exposed its setup key to the in-memory harness. Supabase inspection was restricted to organization `evidara-school-acceptance`; only acceptance School Admin user `73beac3b-7461-44ea-a7ff-056a13a30574` had an MFA factor. That single synthetic factor was deleted and confirmed at zero remaining factors. No St. Mary's, future-client or other tenant identity was touched.
+- **R14 rerun evidence:** workflow `33921868478` attempt 2 passed protected-preview preflight, same-project database guard, F8 19/19 and F9 15/15, then failed at rendered `section-row:A`: `R14 hierarchy control A did not render Physics after all valid click paths`. Evidence artifact `9956927269` shows the real School Admin screen at My school → NEET → Grade 11 with `Calculating analytics…`, 0 console errors, 0 page errors and 0 failed HTTP responses.
+- **New diagnostic evidence:** Vercel preview runtime logs for exact deployment `dpl_5SZzHsr4uy47T42qyEtykvk3hCR5` recorded three `/api/institution-analytics/` responses with HTTP 200 during the failing Section A interaction (22:38:25Z, 22:38:29Z, 22:38:33Z). Therefore the current blocker is no longer MFA/network/server-status failure; the rendered UI/state transition is not producing the expected Physics level after successful section requests. Supabase independently confirms Section A (`bdc62336-81c6-4cfc-9d7c-1c77662d6f5b`) has exactly 100 active acceptance students, 3 submitted attempts, 5 classified responses, all 5 with frozen Physics taxonomy, and 500 approved Physics questions.
+- **Vercel state:** phase1-hardening preview exact-head deployment is READY and protected; branch alias HTTP probe returned 200. Permanent production domain returned HTTP 200, remained unchanged/protected, and Vercel reported no production runtime errors in the preceding 24 hours. No production promotion occurred.
+- **Supabase state:** existing `SMIS QP` project `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; acceptance work remained exclusively in `Evidara School` (`4effce90-bccb-4263-9f5a-a75b6df301f2`, slug `evidara-school-acceptance`). No new project was created.
+- **Blocker:** internal R14 rendered Section A → Physics state/render transition. R14 is not checked because the real rendered hierarchy proof is still red even though the exact full release gate is green.
+- **Overall Phase 1 progress:** **108/127 verified (85.0%)** under the current strict acceptance count.
+- **Exact next action:** instrument/capture the exact `level=section` request query and returned JSON payload in the R14 browser harness, compare its `subjects` data with the rendered state, then fix either the client state transition or the route payload contract as evidence dictates. Rerun R14 on the isolated acceptance tenant and require both rendered acceptance and complete release gate green before checking R14; then continue immediately to R15 Excel export acceptance.
+
+
+## Heartbeat — 5 Sep 2026 ~08:20 IST
+- Completed: R14 is formally verified and checked. Rendered acceptance workflow 33939757851 passed on exact functional candidate 8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef, proving School Admin and Teacher drilldowns through NEET → Grade 11 → Section A → Physics → Kinematics → Motion in One Dimension with tenant and Teacher section/subject scope intact. The same candidate passed complete Phase 1 release gate 33939757839. R15 real XLSX acceptance harness and workflow were added on candidate ccb63a11f6125bf58746b7598ebdf752cd17e63d; R15 run 33940049711 is in progress and exact-candidate release gate 33940049690 is in progress.
+- Blockers: no external blocker. R15 is not checked until the real protected-preview workbook download opens successfully with Results, Test Results, Subject Analytics, Chapter Analytics and Topic Analytics content and its exact candidate passes the complete release gate.
+- Branch head: ccb63a11f6125bf58746b7598ebdf752cd17e63d before this heartbeat trigger.
+- CI/release gate: latest complete functional gate 33939757839 PASS on R14 candidate 8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef; R15 exact-candidate gate 33940049690 currently in progress.
+- Preview/production: protected phase1-hardening Vercel preview HTTP 200; permanent production HTTP 200, unchanged, with no runtime errors found in the prior 24h. No production promotion performed.
+- Supabase: SMIS QP xzfozpnzvznqrvcsoail ACTIVE_HEALTHY; acceptance DB guard 219344019 bytes; only evidara-school-acceptance used. Acceptance School Admin TOTP cleanup was scoped by organization slug/member role and verified zero remaining factors before R15. St. Mary's and future-client data untouched; no new project created.
+- Overall: 109/127 acceptance/sign-off items verified = 85.8%. Position R1-R14 ✅, R15-R18 unchecked, L1-L6 unchecked, Z1 ✅, Z2-Z8 unchecked. J3 remains external legal review.
+- Exact next action: read R15 run 33940049711 and gate 33940049690; if both green, record R15 with workbook evidence and immediately start R16 School B cross-tenant isolation. If R15 fails, diagnose the exact workbook/browser evidence and fix internally before rerun.
+
+
+### 2026-09-05 09:00 IST — Phase 1 production-hardening heartbeat
+- Completed this run: reconciled checklist/progress, branch, Vercel, Supabase and release-gate state; diagnosed R15's first rendered-export failure as a brittle `programme` overview-readiness text assertion; added failure-evidence printing to the dedicated R15 workflow; replaced the brittle assertion with the exact rendered `NEET` hierarchy readiness signal already proven by R14. No product permissions or export assertions were weakened.
+- Checklist position: R1-R14 verified; R15 in progress and not checked until real XLSX evidence plus the complete same-candidate release gate are green; R16-R18 unchecked; L1-L6 unchecked; Z1 verified; Z2-Z8 unchecked; J3 remains external legal review.
+- Blockers: no user-action blocker. Current R15 candidate `08ec4aafd0f070375b972e42f29b910daf0469d8`; dedicated R15 run `33942224297` is still executing after its isolated protected-preview preflight/F12 checks passed; same-candidate complete release gate `33942224284` is still executing. The previous R15 run `33940049711` failed before download at the obsolete overview-ready assertion and its gate was superseded/cancelled.
+- Branch head at heartbeat queue: `08ec4aafd0f070375b972e42f29b910daf0469d8` (the recorder will append this entry in a bookkeeping-only bot commit).
+- CI/release gate: latest fully verified functional release gate remains R14 run `33939757839` PASS on `8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef`; current R15 same-candidate gate `33942224284` is in progress.
+- Preview/production/Supabase: Vercel preview remains the protected `phase1-hardening` acceptance target; permanent production was not promoted or changed and Vercel reported no runtime-error clusters in the preceding 24 hours; Supabase SMIS QP `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; all acceptance remains confined to `evidara-school-acceptance`, database guard 219344019 bytes, with no St. Mary's/future-client data and no additional project created.
+- Overall verified progress: 109/127 = 85.8%.
+- Exact next action: read R15 run `33942224297` and release gate `33942224284`; if both pass, record R15 with evidence and immediately begin R16 only in a way consistent with the existing-project/synthetic-tenant safety constraints; if R15 fails, diagnose the captured workbook/browser evidence and fix internally before advancing.
+
+
+### 2026-09-05 09:24 IST — Phase 1 production-hardening heartbeat
+- Completed this run: reconciled checklist/progress, branch head, release gates, Vercel and Supabase health; diagnosed R15 through three successive internal blockers. First, replaced a brittle overview text assertion with the rendered NEET hierarchy readiness already proven by R14. Second, reset only the synthetic acceptance School Admin TOTP factor so the isolated browser acceptance could re-enrol without weakening MFA. Third, the real Excel export reached the Download Excel control and exposed a genuine 403 from `get_student_analytics_v12` for a learner whose auth identity was simultaneously attached to a sales-demo record and an active Evidara School roster membership. Root cause was demo routing taking precedence over the caller's valid live-school membership. Applied and committed migration `20260905034934_phase1_r15_prefer_authorized_live_student_scope.sql`: for non-platform staff with explicit live membership access, live institution analytics now win; `analytics_scope_organization_v20` still derives exactly one authorized organization and filters membership/attempt data to it; demo-self and platform-support behavior remain guarded. Direct acceptance-admin verification now returns Evidara School organization `4effce90-bccb-4263-9f5a-a75b6df301f2`, Section A for the previously failing learner.
+- Checklist position: R1-R14 verified; R15 remains in progress and unchecked until the real XLSX evidence plus complete same-candidate release gate are green; R16-R18 unchecked; L1-L6 unchecked; Z1 verified; Z2-Z8 unchecked; J3 remains external legal review.
+- Blockers: no user-action blocker. Current branch head at heartbeat queue is `60503827afd46e28994b2dcc6f2c15f022e1ad14`; dedicated R15 run `33942962018` is executing on that head after the scoped-analytics fix; complete release gate `33942961882` is also executing on the same head. R15's previous run `33942366960` failed with one 403 RPC and no workbook download; that defect is now root-caused and patched.
+- CI/release gate: latest fully verified complete release gate remains R14 run `33939757839` PASS on `8c2e0661ba8bc7b4b63c8484bc7ad6a16a6d6fef`; current same-head R15 gate `33942961882` is in progress and is not yet claimed green.
+- Preview/production/Supabase: protected phase1-hardening preview remains the acceptance target; permanent Vercel production has not been promoted or changed and the fresh runtime-error check reported no error clusters in the prior 24 hours; SMIS QP Supabase `xzfozpnzvznqrvcsoail` is ACTIVE_HEALTHY; acceptance remains confined to `evidara-school-acceptance`, DB guard 219344019 bytes, no St. Mary's/future-client data mutation, and no additional project was created.
+- Overall verified progress: 109/127 = 85.8%.
+- Exact next action: read R15 `33942962018` and release gate `33942961882`; if both pass, record R15 with evidence and immediately proceed to R16 while honoring the single existing acceptance-tenant restriction; if either fails, diagnose its captured evidence and fix internally before advancing.
+
+
+### 2026-09-05 10:15 IST — Phase 1 hardening heartbeat
+
+- Completed this run: R15 formally closed from real XLSX browser acceptance + green complete gate; R16 formally closed with transient rollback-only School B isolation proof; R17 formally closed after expired-licence read-only/block proof; R18 formally closed after renewal restored access without recreating data. Durable evidence: `PHASE1_ACCEPTANCE_R15_R18_EVIDENCE.md`.
+- Load acceptance: started. Fresh safe baseline before L1-L6 is DB 219,401,363 bytes; Evidara School has 100 student memberships, 500 questions, 1 institutional paper and 3 attempts; original active 100-seat licence is restored for 2026-09-02 through 2027-09-02. Existing guarded load generator/runner scripts were located; no load fixtures have been inserted yet.
+- Blockers: no R-series blocker. L1-L6 remain unchecked pending guarded synthetic fixture staging and real 500-operation start/save/submit evidence. J3 remains external legal review and is not self-certified.
+- Branch head at heartbeat queue: `05ae5f09fceab4b0a3279e5b2e8541c80fa7f797` (R18 checklist recorder bot commit).
+- CI/release gate: exact durable R15-R18 evidence checkpoint `04669bcc5e95fb8e56a35ee902428e701f8129f0` passed complete Phase 1 release gate `33945072771`. Later checklist-only pushes have additional gates running/canceling under concurrency and do not invalidate the green evidence checkpoint.
+- Preview/production: evidence checkpoint preview `dpl_EqNEdmNbfiZYi4siSa8tjgc9p6c9` is READY. Newer checklist-only previews are queued/building. Permanent production has not been promoted or modified; production runtime errors in the preceding 24h: none.
+- Supabase: `SMIS QP` (`xzfozpnzvznqrvcsoail`) ACTIVE_HEALTHY; only `evidara-school-acceptance` used persistently; transient R16 School B probe removed; no St. Mary's/future-client data touched and no new Supabase project created.
+- Checklist position: R1-R18 ✅; L1-L6 ❌; Z1 ✅; Z2-Z8 ❌; J3 external. Strict verified progress: 113/127 ≈ 89.0%.
+- Exact next action: stage the guarded synthetic L1/L2/L3 load fixtures inside the existing Evidara School acceptance scope while enforcing the 219,401,363-byte baseline growth cap, verify 2,000 students/50,000 searchable questions/1,000 papers, run the complete release gate, then execute L4-L6 with the existing safe 500-operation preview load runner and record latency/error/DB-growth evidence before any production promotion.
+
+## 2026-09-05 load-acceptance heartbeat
+
+- Completed this run: R1-R18 remain verified. L2/L3 scale datasets were safely staged in the isolated `evidara-school-acceptance` tenant: 50,000 total organization questions (49,500 visibly synthetic draft load rows + 500 canonical) and 1,000 total organization papers (999 visibly synthetic draft load rows + 1 canonical). Authenticated School Admin `search_question_bank_v1` paging/search over the 50,000-question dataset executed in 184.319 ms for an exact synthetic match and 603.762 ms for the general first 25-row page. Evidence recorded in `PHASE1_LOAD_ACCEPTANCE_EVIDENCE.md` at commit `77308fed2d81ed0ebef515a6747a81e8ea806491`.
+- Blockers: L1/L4-L6 remain unchecked. Physical database size rose from the 219,401,363-byte baseline to approximately 421.5 MB after the scale-question/index workload; no further student/auth expansion will be attempted until storage headroom is verified. Two initial load inserts failed safely and rolled back (SEO slug uniqueness, then approval-option invariant); no partial logical rows remained. A normal non-disruptive `VACUUM (ANALYZE)` reclaimed reusable dead-tuple space; no `VACUUM FULL` was used.
+- Branch head before heartbeat recorder: evidence commit `77308fed2d81ed0ebef515a6747a81e8ea806491` (heartbeat-trigger commit follows this line).
+- CI/release-gate: latest previously complete functional release gate remains `33945072771` PASS on `04669bcc5e95fb8e56a35ee902428e701f8129f0`. The new L2/L3 evidence checkpoint has not yet completed a new full gate, therefore L2/L3 are intentionally not checked yet.
+- Preview/production: permanent production was not promoted or modified. Phase-1 preview remains the acceptance target. Production protection is unchanged.
+- Supabase: SMIS QP `xzfozpnzvznqrvcsoail` is `ACTIVE_HEALTHY`; only `Evidara School` (`evidara-school-acceptance`, org `4effce90-bccb-4263-9f5a-a75b6df301f2`) was modified. NatSciX, St. Mary's and future-client data were untouched; no new project was created.
+- Overall strict checklist: 113/127 ≈ 89.0% because L2/L3 are evidence-ready but remain unchecked until a complete release gate passes. R1-R18 ✅; L1-L6 ⏳; Z1 ✅; Z2-Z8 ⏳; J3 external legal gate.
+- Exact next action: verify current Vercel preview/production health and storage headroom; obtain a complete green release gate for the L2/L3 evidence checkpoint, then mark L2/L3 only if green. Build L1 with authenticated synthetic student fixtures without exceeding the database/storage guard; immediately use those sessions with the existing guarded 500-operation preview runner for L4-L6, then proceed to Z2-Z8.
+
+
+## 2026-09-05 16:00 IST — Phase 1 hardening heartbeat
+
+Completed this run:
+- Formally persisted L2 and L3 checklist verification; both retain durable scale evidence and complete release gate 33950889193 PASS.
+- Safely removed only the exact tagged L2/L3 synthetic bulk fixtures after evidence was durable (49,500 questions and 999 papers), preserving canonical acceptance data.
+- Staged L1 inside only evidara-school-acceptance: temporarily raised the synthetic acceptance licence from 100 to 2,000 seats and added 1,900 deterministic real Supabase auth-backed synthetic learners. Postflight proved 2,000 memberships, 1,900 tagged auth users, 1,900 profiles, and 1,900 identities.
+- Recorded durable L1 evidence in PHASE1_L1_LOAD_ACCEPTANCE_EVIDENCE.md at candidate ce10e80c74c47079d2c324cc8dd426b3a183d193.
+- Database size after L1 staging: 361,661,675 bytes, below the prior L2/L3 peak (~421.5 MB).
+
+Blockers / unchecked:
+- L1 evidence is complete but remains unchecked until complete Phase 1 release gate 33961551777 finishes green.
+- L4-L6 still require genuine near-concurrent start/save/submit workload evidence; no item was self-certified.
+- Z2-Z8 remain protected behind completion of all load acceptance. J3 remains external legal review.
+
+Branch head before heartbeat: ce10e80c74c47079d2c324cc8dd426b3a183d193
+CI/release gate: latest previously complete gate 33950889193 PASS; new exact L1 candidate gate 33961551777 IN PROGRESS.
+Preview/production: protected preview remains the acceptance surface; permanent production unchanged/unpromoted.
+Supabase SMIS QP: ACTIVE_HEALTHY; only evidara-school-acceptance modified; no St. Mary's/future-client data touched; no new project created.
+Strict verified completion: 115/127 (~90.6%) until L1's complete gate is green.
+Exact next action: finish gate 33961551777; if green record L1, then execute guarded 500 near-concurrent starts, 500 concurrent answer-save patterns, and 500 submissions in the finishing window; capture latency/error/database-growth evidence, require a complete green gate, clean tagged L1 fixtures/restore 100-seat synthetic licence, then proceed immediately to Z2-Z8.
+
+
+## 2026-09-05 Phase 1 hourly heartbeat
+- Completed this run: formally recorded L1 as verified using the existing durable 2,000-student auth-backed synthetic acceptance evidence and complete green release gate. L2-L3 remain verified.
+- Current checklist: R1-R18 ✅ | L1-L3 ✅ | L4-L6 pending | Z1 ✅ | Z2-Z8 pending | J3 external legal review.
+- Internal blocker diagnosed: the guarded L4-L6 runner correctly requires exactly 500 unique synthetic actor IDs and 500 bearer-authenticated operations, but the repository currently has no safe ephemeral mechanism to mint/bind 500 sessions for the already-created tagged L1 synthetic auth users. The existing acceptance secrets expose only the canonical single synthetic learner. One-user substitution, service-role execution, and persisted/shared synthetic passwords were rejected because they would not constitute valid acceptance evidence or would weaken credential hygiene.
+- Branch head before heartbeat: 59d29e922ce1475df31cbde5e926ea9bba423b2a.
+- Latest complete release gate: GitHub Actions run 33961605979 — SUCCESS on fd458183eff56f31da6b75e2ef4074b8a9dec7d1.
+- Preview/production: protected Vercel preview READY; permanent production READY on its existing older production commit and remained unpromoted/unchanged; no runtime error cluster observed in the last 24h.
+- Supabase SMIS QP: ACTIVE_HEALTHY. Only evidara-school-acceptance was used. Live acceptance state: 2,000 active student memberships, 500 canonical questions, 1 canonical paper, 3 attempts; database size 362,029,603 bytes. No St. Mary's/future-client data touched and no additional Supabase project created.
+- Overall strict verified completion: 116/127 ≈ 91.3%.
+- Exact next action: implement a secure non-production-only ephemeral 500-session acquisition/binding path for the existing tagged synthetic L1 users without persisting credentials; feed those sessions into the existing guarded 500-start / 500-save / 500-submit runner; capture p95/p99 latency, failures, correctness and database growth; diagnose/fix any failure; persist evidence and require a complete green release gate; then clean the tagged temporary L1 identities/restore the synthetic licence and proceed directly into Z2-Z8.
+
+
+## 2026-09-05 hourly hardening heartbeat
+
+- Completed this run: revalidated R13-R18 and L1-L3 checklist state; proved the corrected synthetic Auth signup probe issues a real Supabase session; verified the exact 500-user L4-L6 cohort in `evidara-school-acceptance`; fixed the load runner to bind to `phase1-load-student-0101` through `0600`; attempted the guarded L4-L6 workload twice; diagnosed the first failure as Supabase Auth HTTP 429 burst limiting and added rate-limit-safe Auth staging without reducing the actual L4-L6 RPC concurrency.
+- Blockers: the paced retry now fails before any load RPC with HTTP 400 on synthetic actor 0101, indicating the existing L1 cohort is not confirmed to share `EVIDARA_ACCEPTANCE_STUDENT_PASSWORD`. L4-L6 remain unchecked; no acceptance evidence is claimed. Next engineering work is to establish a safe synthetic-only credential/session binding path for the existing tagged cohort without raw auth-table password mutation, then rerun the guarded workload.
+- Branch head before this recorder: `c554351879b7cbb8a303b038e86714eba3c36b85` (`test(load): retry L4-L6 with rate-limit-safe Auth staging`).
+- CI/release gate: latest previously completed complete Phase 1 release gate remains `33978172792` SUCCESS on `44d54106f7d954c261a974a03ca1b5d5d6fb5bf5`; current complete gate `33981797614` on `c554351879b7cbb8a303b038e86714eba3c36b85` is in progress at heartbeat time. L4-L6 load run `33981797609` failed during Auth staging before start/save/submit RPCs, so production data paths were not exercised by that failed run.
+- Preview/production: Vercel preview `567cbaf3b6a8e928c52edf8e038e9be3e5129598` is READY; newer `1a994c026d154032aab0351d58a657dbcf73f9fb` is BUILDING and `c554351879b7cbb8a303b038e86714eba3c36b85` is QUEUED at heartbeat time. Vercel project `quizmaker2` reports `live=false`; permanent production was not promoted or modified.
+- Supabase: SMIS QP is reachable/healthy; only existing project `xzfozpnzvznqrvcsoail` and tenant `evidara-school-acceptance` were used. Acceptance state at run start: 2,000 active memberships, 500 questions, 1 paper, 3 attempts, active 2,000-seat synthetic licence, database 361,688,211 bytes. No St. Mary's/future-client data and no additional Supabase project were used.
+- Checklist position / overall: R1-R18 ✅ | L1-L3 ✅ | L4-L6 ⏳ | Z1 ✅ | Z2-Z8 ⏳ | J3 external. Strict verified completion remains 116/127 = 91.3%.
+- Exact next action: safely bind a shared/ephemeral credential or Auth-issued session mechanism to the existing 500 tagged synthetic L1 actors without raw password-hash mutation; rerun 500 starts / 500 answer saves / 500 submissions with aggregate-only latency/error/correctness evidence; require a complete green release gate; only then check L4-L6 and continue immediately into Z2-Z8.
+
+
+## 2026-09-06 00:27 IST — Phase 1 hardening heartbeat
+
+Completed this run:
+- Reconciled checklist/progress log and branch head before load work. R1-R18 and L1-L3 remain verified; L4-L6 remain unchecked.
+- Diagnosed L4-L6 run 33985495745: all 20 shards reached authenticated synthetic membership setup, then failed HTTP 400 on the first new actor; cleanup restored the original L1 active cohort.
+- Root cause proved in SMIS QP: all 500 phase1-l456 synthetic memberships existed suspended with promotion_locked=true from prior cleanup, while add_school_student_membership_v13 correctly rejects promotion-locked records.
+- Verified all 500 L4-L6 Auth identities have student profiles. Normalized only those exact tagged synthetic suspended acceptance memberships by clearing the fixture-only promotion lock; no St. Mary's/future-client data was touched.
+- Re-ran failed L4-L6 workflow jobs after fixture repair; attempt 2 is queued. No acceptance item was self-certified.
+
+Blockers / unchecked:
+- L4-L6 still require the complete 500-actor start/save/submit workload to finish green with aggregate evidence and a complete release gate.
+- Z2-Z8 remain protected behind load acceptance. J3 remains external legal review.
+
+Branch head before heartbeat: 3cc85d05695fa060f580ca26e6fdc03e4ae0279c
+CI/release gate: latest previously complete release gate remains green; L4-L6 run 33985495745 attempt 2 queued after exact synthetic fixture repair.
+Preview/production: Vercel status for prior load candidate f1aba0e173207a07cedb331f16206e44f3fc2ffe is success; permanent production remains unchanged/unpromoted.
+Supabase SMIS QP: healthy/reachable; evidara-school-acceptance has 2,000 active students and 2,500 total memberships (500 L4-L6 suspended); only exact tagged synthetic fixture rows were repaired.
+Overall: 116/127 (~91.3%) strictly verified.
+Exact next action: finish L4-L6 attempt 2; if workload is green, persist aggregate evidence and run the complete release gate, then check L4-L6 and proceed immediately into Z2-Z8. If it fails, inspect the first failing RPC and repair the internal acceptance/product defect without weakening isolation or production protection.
+
+
+## 2026-09-06 01:xx IST — Phase 1 hardening heartbeat
+
+Completed this run:
+- Reconciled PHASE1_RELEASE_CHECKLIST.md, PHASE1_PROGRESS_LOG.md and phase1-hardening head. R1-R18 and L1-L3 remain verified; L4-L6 remain unchecked pending genuine workload evidence.
+- Diagnosed L4-L6 run 33985495745 attempt 2: all failed shards rejected the stale shared barrier reused by GitHub's failed-job rerun; this was workflow rerun timing, not a new product or fixture regression.
+- Safely started a fresh guarded L4-L6 workflow by updating only .github/phase1-l456-run-request.json to the repaired synthetic fixture candidate 8782fe29215f42252fe089c86333f5cbbc20553b. Fresh run 33987443584 generated a new barrier; prepare passed and the 20 authenticated 25-actor shards are executing.
+- Fresh Vercel preview for commit 3938a55d07cab61e7a43dbed1348d594cdeecbde reached READY; project live=false and permanent production was not promoted.
+- Supabase SMIS QP xzfozpnzvznqrvcsoail is ACTIVE_HEALTHY. Acceptance remains restricted to evidara-school-acceptance; no St. Mary's/future-client data and no new project were used.
+
+Blockers / unchecked:
+- L4-L6 remain pending until run 33987443584 completes with aggregate-safe evidence and the complete Phase 1 release gate passes.
+- Z2-Z8 remain protected behind load acceptance. J3 remains external legal review and is not self-certified.
+
+Branch head before heartbeat: 3938a55d07cab61e7a43dbed1348d594cdeecbde
+CI/release gate: fresh complete gate 33987443570 is in progress on 3938a55d07cab61e7a43dbed1348d594cdeecbde; latest previously complete functional gate remains green.
+Preview/production: Vercel preview READY for 3938a55d07cab61e7a43dbed1348d594cdeecbde; Vercel project live=false; permanent production unchanged/unpromoted.
+Supabase: SMIS QP ACTIVE_HEALTHY; only evidara-school-acceptance used.
+Overall: 116/127 (~91.3%) strictly verified.
+Exact next action: read L4-L6 run 33987443584 and gate 33987443570; if load run is green, persist/verify aggregate evidence, require a complete green release gate, check L4-L6, then immediately continue Z2-Z8. If any shard fails, inspect the first failing shard log and fix the exact internal cause without weakening isolation or production protection.
+
+
+## 2026-09-06 02:00 IST — Phase 1 production-hardening heartbeat
+- **Completed this run:** reconciled `PHASE1_RELEASE_CHECKLIST.md`, `PHASE1_PROGRESS_LOG.md`, branch head, complete release-gate state, Vercel preview/production protection and Supabase SMIS QP health. Diagnosed previous L4-L6 run `33987443584`: prepare + 19/20 authenticated shards passed; only shard 0 failed before workload mutation because its School Admin roster preflight returned HTTP 401. Rather than re-running failed jobs against a stale shared barrier or weakening authentication, issued a fresh guarded L4-L6 request on candidate `16c16431ae8e6d64bd3e05ca7ea7648daeb044bc`, producing request commit `ec114d178d7cc7c276c1232ef434866e097880e0` and fresh run `33990333166`.
+- **Current L4-L6 execution:** fresh prepare passed; all 20 shards have now entered the real 25-actor authenticated execution path (500 total actors). At heartbeat handoff the shard jobs remain in progress, so L4-L6 are correctly still unchecked and no aggregate evidence is claimed yet.
+- **Blockers/failures:** no external/user-action blocker. The prior isolated shard-0 401 is treated as a transient preflight failure; the fresh run is the validity test. If it recurs, the next action is to add narrowly scoped retry/staggering only around the pre-mutation admin sign-in/roster preflight, never around partially mutating workloads.
+- **Branch head before heartbeat trigger:** `ec114d178d7cc7c276c1232ef434866e097880e0`.
+- **CI/release gate:** complete Phase 1 release gate `33990333150` on exact fresh-request head `ec114d178...` completed **SUCCESS**; all hardening checks, regressions, TypeScript, lint, production build and final release-gate enforcement passed. L4-L6 still additionally require their genuine aggregate workload evidence before checklist credit.
+- **Checklist position / overall:** R1-R18 ✅; L1-L3 ✅; L4-L6 ⏳; Z1 ✅; Z2-Z8 ⏳; J3 remains external legal review. Strict verified progress remains **116/127 ≈ 91.3%**.
+- **Preview/production:** protected `phase1-hardening` preview remains the acceptance surface and is healthy/READY from the current hardening line; permanent production remains unchanged and unpromoted. No production safety control was relaxed.
+- **Supabase:** existing `SMIS QP` project `xzfozpnzvznqrvcsoail` remains `ACTIVE_HEALTHY`; acceptance work remains confined to `evidara-school-acceptance`. No St. Mary's/future-client data was used and no additional Supabase project was created.
+- **Exact next action:** read L4-L6 run `33990333166` to completion; diagnose/fix any exact internal shard failure if present. If all 20 shards and aggregate pass, inspect/persist `PHASE1_L456_LOAD_EVIDENCE.json`, require the complete release gate on the exact evidence checkpoint, check L4-L6 only after that green gate, clean temporary L1/L456 fixture state as designed, and immediately continue Z2-Z8 production sign-off while keeping permanent production protected.
+

@@ -91,9 +91,9 @@ type GroupRow = {
   name: string;
   tests: number;
   attempts: number;
-  average: number;
-  accuracy: number;
-  top: number;
+  average: number | null;
+  accuracy: number | null;
+  top: number | null;
   lastTestAt: string | null;
 };
 
@@ -102,7 +102,7 @@ function pct(value: number | null | undefined) {
 }
 
 function avg(values: number[]) {
-  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
 function fmtDate(value: string | null | undefined) {
@@ -122,7 +122,7 @@ function computeGroup(name: string, tests: DemoTest[], results: DemoResult[]): G
     attempts: rows.length,
     average: avg(rows.map((row) => row.percentage)),
     accuracy: avg(rows.map((row) => row.accuracy)),
-    top: rows.length ? Math.max(...rows.map((row) => row.percentage)) : 0,
+    top: rows.length ? Math.max(...rows.map((row) => row.percentage)) : null,
     lastTestAt: rows.map((row) => row.submittedAt).sort().at(-1) || null,
   };
 }
@@ -135,12 +135,12 @@ function DemoStudentReport({ data, student, onBack }: { data: DemoPayload; stude
   const subjects = subjectNames.map((name) => {
     const rows = studentResults.filter((row) => row.test?.subject === name);
     return { name, average: avg(rows.map((row) => row.percentage)), accuracy: avg(rows.map((row) => row.accuracy)), tests: rows.length };
-  }).sort((a, b) => b.average - a.average);
+  }).sort((a, b) => (b.average ?? -Infinity) - (a.average ?? -Infinity));
   const topicNames = [...new Set(studentResults.map((row) => row.test?.topic).filter((v): v is string => Boolean(v)))];
   const topics = topicNames.map((name) => {
     const rows = studentResults.filter((row) => row.test?.topic === name);
     return { name, average: avg(rows.map((row) => row.percentage)), tests: rows.length, subject: rows[0]?.test?.subject || '—', chapter: rows[0]?.test?.chapter || '—' };
-  }).sort((a, b) => b.average - a.average);
+  }).sort((a, b) => (b.average ?? -Infinity) - (a.average ?? -Infinity));
   const trend = [...studentResults].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()).map((row, index) => ({ test: index + 1, score: Math.round(row.percentage * 10) / 10, title: row.test?.title || `Test ${index + 1}` }));
 
   return <div className="space-y-5">
@@ -196,7 +196,7 @@ function DemoSchoolAnalytics({ onBack }: { onBack?: () => void }) {
   if (student) return <DemoStudentReport data={data} student={student} onBack={() => setStudent(null)} />;
 
   const selectedTrackStudents = data.students.filter((row) => !track || row.track === track);
-  const topScore = trackResults.length ? Math.max(...trackResults.map((row) => row.percentage)) : 0;
+  const topScore = trackResults.length ? Math.max(...trackResults.map((row) => row.percentage)) : null;
   const subjectNames = [...new Set(trackTests.map((row) => row.subject).filter((v): v is string => Boolean(v)))];
   const subjectRows = subjectNames.map((name) => computeGroup(name, trackTests.filter((row) => row.subject === name), trackResults));
   const selectedSubjectTests = subject ? trackTests.filter((row) => row.subject === subject) : [];
@@ -220,13 +220,13 @@ function DemoSchoolAnalytics({ onBack }: { onBack?: () => void }) {
 
     {!track && <>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><MetricCard label="Students" value={data.stats.students} note={`${data.stats.neetStudents} NEET + ${data.stats.jeeStudents} JEE`} /><MetricCard label="Tests" value={data.stats.tests} /><MetricCard label="Submitted attempts" value={data.stats.attempts} /><MetricCard label="School average" value={pct(data.stats.averagePercentage)} /><MetricCard label="Accuracy" value={pct(data.stats.accuracy)} /></div>
-      <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">Programs</h2><p className="text-sm text-[var(--muted-foreground)]">Open NEET or JEE to see tests, subjects, chapters, topics and students.</p></div><Table><TableHeader><TableRow><TableHead>Program</TableHead><TableHead>Students</TableHead><TableHead>Tests</TableHead><TableHead>Attempts</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Accuracy</TableHead><TableHead></TableHead></TableRow></TableHeader><TableBody>{data.tracks.map((row) => { const rows = results.filter((result) => data.students.find((s) => s.id === result.studentId)?.track === row.name); return <TableRow key={row.name} className="cursor-pointer" onClick={() => setTrack(row.name)}><TableCell><button className="font-bold text-[var(--teal)]">{row.name}</button></TableCell><TableCell>{row.students}</TableCell><TableCell>{data.tests.filter((test) => test.examType === row.name).length}</TableCell><TableCell>{row.attempts.toLocaleString('en-IN')}</TableCell><TableCell className="font-semibold">{pct(row.averagePercentage)}</TableCell><TableCell>{pct(rows.length ? Math.max(...rows.map((r) => r.percentage)) : 0)}</TableCell><TableCell>{pct(row.accuracy)}</TableCell><TableCell><ChevronRight className="h-4 w-4" /></TableCell></TableRow>; })}</TableBody></Table></CardContent></Card>
+      <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">Programs</h2><p className="text-sm text-[var(--muted-foreground)]">Open NEET or JEE to see tests, subjects, chapters, topics and students.</p></div><Table><TableHeader><TableRow><TableHead>Program</TableHead><TableHead>Students</TableHead><TableHead>Tests</TableHead><TableHead>Attempts</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Accuracy</TableHead><TableHead></TableHead></TableRow></TableHeader><TableBody>{data.tracks.map((row) => { const rows = results.filter((result) => data.students.find((s) => s.id === result.studentId)?.track === row.name); return <TableRow key={row.name} className="cursor-pointer" onClick={() => setTrack(row.name)}><TableCell><button className="font-bold text-[var(--teal)]">{row.name}</button></TableCell><TableCell>{row.students}</TableCell><TableCell>{data.tests.filter((test) => test.examType === row.name).length}</TableCell><TableCell>{row.attempts.toLocaleString('en-IN')}</TableCell><TableCell className="font-semibold">{pct(row.averagePercentage)}</TableCell><TableCell>{pct(rows.length ? Math.max(...rows.map((r) => r.percentage)) : null)}</TableCell><TableCell>{pct(row.accuracy)}</TableCell><TableCell><ChevronRight className="h-4 w-4" /></TableCell></TableRow>; })}</TableBody></Table></CardContent></Card>
     </>}
 
     {track && !subject && <>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><MetricCard label="Students" value={selectedTrackStudents.length} /><MetricCard label="Tests" value={trackTests.length} /><MetricCard label="Attempts" value={trackResults.length} /><MetricCard label="Average" value={pct(avg(trackResults.map((row) => row.percentage)))} /><MetricCard label="Top score" value={pct(topScore)} /><MetricCard label="Accuracy" value={pct(avg(trackResults.map((row) => row.accuracy)))} /></div>
       <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">Subject performance</h2><p className="text-sm text-[var(--muted-foreground)]">Click a subject to drill into chapters and topics.</p></div><Table><TableHeader><TableRow><TableHead>Subject</TableHead><TableHead>Tests</TableHead><TableHead>Attempts</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Accuracy</TableHead><TableHead></TableHead></TableRow></TableHeader><TableBody>{subjectRows.map((row) => <TableRow key={row.name} className="cursor-pointer" onClick={() => setSubject(row.name)}><TableCell><button className="font-semibold text-[var(--teal)]">{row.name}</button></TableCell><TableCell>{row.tests}</TableCell><TableCell>{row.attempts}</TableCell><TableCell>{pct(row.average)}</TableCell><TableCell>{pct(row.top)}</TableCell><TableCell>{pct(row.accuracy)}</TableCell><TableCell><ChevronRight className="h-4 w-4" /></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
-      <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">Tests conducted</h2><p className="text-sm text-[var(--muted-foreground)]">Chapter tests, mock tests, full-length tests, diagnostics and PYQs for {track}.</p></div><Table><TableHeader><TableRow><TableHead>Test</TableHead><TableHead>Type</TableHead><TableHead>Scope</TableHead><TableHead>Questions</TableHead><TableHead>Participants</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{trackTests.map((test) => { const rows = trackResults.filter((r) => r.testId === test.id); return <TableRow key={test.id}><TableCell className="font-medium">{test.title}</TableCell><TableCell>{test.testType}</TableCell><TableCell>{test.topic || test.chapter || test.subject || 'Full syllabus'}</TableCell><TableCell>{test.questionCount}</TableCell><TableCell>{test.participants}</TableCell><TableCell>{pct(test.averagePercentage)}</TableCell><TableCell>{pct(rows.length ? Math.max(...rows.map((r) => r.percentage)) : 0)}</TableCell><TableCell>{fmtDate(test.conductedAt)}</TableCell></TableRow>; })}</TableBody></Table></CardContent></Card>
+      <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">Tests conducted</h2><p className="text-sm text-[var(--muted-foreground)]">Chapter tests, mock tests, full-length tests, diagnostics and PYQs for {track}.</p></div><Table><TableHeader><TableRow><TableHead>Test</TableHead><TableHead>Type</TableHead><TableHead>Scope</TableHead><TableHead>Questions</TableHead><TableHead>Participants</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Date</TableHead></TableRow></TableHeader><TableBody>{trackTests.map((test) => { const rows = trackResults.filter((r) => r.testId === test.id); return <TableRow key={test.id}><TableCell className="font-medium">{test.title}</TableCell><TableCell>{test.testType}</TableCell><TableCell>{test.topic || test.chapter || test.subject || 'Full syllabus'}</TableCell><TableCell>{test.questionCount}</TableCell><TableCell>{test.participants}</TableCell><TableCell>{pct(test.averagePercentage)}</TableCell><TableCell>{pct(rows.length ? Math.max(...rows.map((r) => r.percentage)) : null)}</TableCell><TableCell>{fmtDate(test.conductedAt)}</TableCell></TableRow>; })}</TableBody></Table></CardContent></Card>
     </>}
 
     {track && subject && !chapter && <Card className="rounded-xl shadow-sm"><CardContent className="overflow-x-auto p-0"><div className="border-b border-[var(--line)] p-4"><h2 className="font-bold">{subject} chapter performance</h2><p className="text-sm text-[var(--muted-foreground)]">Click a chapter for topic-level intelligence.</p></div><Table><TableHeader><TableRow><TableHead>Chapter</TableHead><TableHead>Tests</TableHead><TableHead>Attempts</TableHead><TableHead>Average</TableHead><TableHead>Top score</TableHead><TableHead>Accuracy</TableHead><TableHead></TableHead></TableRow></TableHeader><TableBody>{chapterRows.map((row) => <TableRow key={row.name} className="cursor-pointer" onClick={() => setChapter(row.name)}><TableCell><button className="font-semibold text-[var(--teal)]">{row.name}</button></TableCell><TableCell>{row.tests}</TableCell><TableCell>{row.attempts}</TableCell><TableCell>{pct(row.average)}</TableCell><TableCell>{pct(row.top)}</TableCell><TableCell>{pct(row.accuracy)}</TableCell><TableCell><ChevronRight className="h-4 w-4" /></TableCell></TableRow>)}</TableBody></Table></CardContent></Card>}

@@ -1,0 +1,37 @@
+name: Evidara Phase 1 Same-Project Acceptance Contract
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+    paths:
+      - 'scripts/phase1-acceptance-preflight.mjs'
+      - 'scripts/phase1-same-project-acceptance-smoke.mjs'
+      - 'PHASE1_SAME_PROJECT_ACCEPTANCE_ADDENDUM.md'
+      - '.github/workflows/phase1-same-project-acceptance-contract.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/phase1-acceptance-preflight.mjs'
+      - 'scripts/phase1-same-project-acceptance-smoke.mjs'
+      - 'PHASE1_SAME_PROJECT_ACCEPTANCE_ADDENDUM.md'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify same-project acceptance safety contract
+        run: node scripts/phase1-same-project-acceptance-smoke.mjs
+      - name: Verify same-project preflight dry run
+        env:
+          EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+          EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+          EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+          EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+          EVIDARA_ACCEPTANCE_DB_BYTES: '216394899'
+        run: node scripts/phase1-acceptance-preflight.mjs --target https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app --dry-run

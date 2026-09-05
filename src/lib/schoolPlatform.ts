@@ -1,6 +1,6 @@
 export type SchoolBoard = "Karnataka State" | "CBSE" | "ICSE" | "ISC" | "Other";
 export type StudentTrack = "Foundation" | "NEET" | "JEE" | "KCET" | "Olympiad" | "Boards";
-export type StudentLifecycleStatus = "active" | "revoked" | "completed";
+export type StudentLifecycleStatus = "active" | "withdrawn" | "completed" | "suspended";
 export type StudentInvitationStatus = "active" | "invited" | "pending";
 export type SubscriptionStatus = "active" | "trial" | "expired" | "suspended";
 
@@ -92,7 +92,7 @@ export const defaultSchoolPlatformState: SchoolPlatformState = {
     { id: "st-2", name: "Arjun M.", grade: 9, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Foundation", "Olympiad"], status: "active", promotionLocked: false, parentName: "Mahesh M.", parentPhone: "9000000002" },
     { id: "st-3", name: "Sana F.", grade: 12, section: "B", board: "Karnataka State", academicYear: "2026-27", tracks: ["Boards", "JEE", "KCET"], status: "active", promotionLocked: false, parentName: "Fathima S.", parentPhone: "9000000003" },
     { id: "st-4", name: "Kiran P.", grade: 8, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Foundation", "Olympiad"], status: "active", promotionLocked: false, parentName: "Prakash P.", parentPhone: "9000000004" },
-    { id: "st-5", name: "Nidhi S.", grade: 10, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Boards", "NEET"], status: "revoked", promotionLocked: true, revokedAt: "2026-07-01", parentName: "Shilpa S.", parentPhone: "9000000005" },
+    { id: "st-5", name: "Nidhi S.", grade: 10, section: "A", board: "Karnataka State", academicYear: "2026-27", tracks: ["Boards", "NEET"], status: "withdrawn", promotionLocked: true, revokedAt: "2026-07-01", parentName: "Shilpa S.", parentPhone: "9000000005" },
   ],
   sections: [],
   resources: [
@@ -107,12 +107,22 @@ export const defaultSchoolPlatformState: SchoolPlatformState = {
   ],
 };
 
+function normalizeLifecycleStatus(value: unknown): StudentLifecycleStatus {
+  if (value === "active" || value === "withdrawn" || value === "completed" || value === "suspended") return value;
+  if (value === "revoked") return "withdrawn";
+  return "withdrawn";
+}
+
 export function loadSchoolPlatformState(): SchoolPlatformState {
   if (typeof window === "undefined") return defaultSchoolPlatformState;
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || "null");
     if (parsed?.school && Array.isArray(parsed.students) && Array.isArray(parsed.resources)) {
-      return { ...parsed, sections: Array.isArray(parsed.sections) ? parsed.sections : [] };
+      return {
+        ...parsed,
+        students: parsed.students.map((student: SchoolStudent & { status?: unknown }) => ({ ...student, status: normalizeLifecycleStatus(student.status) })),
+        sections: Array.isArray(parsed.sections) ? parsed.sections : [],
+      };
     }
   } catch {}
   localStorage.setItem(KEY, JSON.stringify(defaultSchoolPlatformState));
@@ -135,7 +145,7 @@ export function daysUntilExpiry(subscription: SchoolSubscription) {
 }
 
 export function resourceEligibility(resource: LearningResource, student: SchoolStudent, subscription: SchoolSubscription) {
-  if (student.status !== "active") return { allowed: false, reason: "Student access has been revoked." };
+  if (student.status !== "active") return { allowed: false, reason: `Student access is ${student.status}.` };
   if (resource.subscriptionRequired && !subscriptionIsActive(subscription)) return { allowed: false, reason: "Annual school subscription is inactive." };
   if (student.grade < resource.gradeMin || student.grade > resource.gradeMax) return { allowed: false, reason: `Available for Grades ${resource.gradeMin}${resource.gradeMax !== resource.gradeMin ? `–${resource.gradeMax}` : ""}.` };
   if (resource.board && resource.board !== student.board) return { allowed: false, reason: `Available only for ${resource.board} students.` };
@@ -150,7 +160,7 @@ export function nextGrade(grade: number) {
 export function promoteStudent(state: SchoolPlatformState, studentId: string, targetYear: string) {
   const students = state.students.map(student => {
     if (student.id !== studentId || student.status !== "active" || student.promotionLocked || student.academicYear === targetYear) return student;
-    if (student.grade >= 12) return { ...student, status: "completed" as const, academicYear: targetYear, promotedAt: new Date().toISOString() };
+    if (student.grade >= 12) return { ...student, status: "completed" as const, academicYear: targetYear, promotionLocked: true, promotedAt: new Date().toISOString() };
     return { ...student, grade: nextGrade(student.grade), academicYear: targetYear, promotedAt: new Date().toISOString() };
   });
   return { ...state, students };
@@ -164,7 +174,7 @@ export function revokeStudent(state: SchoolPlatformState, studentId: string) {
   return {
     ...state,
     students: state.students.map(student => student.id === studentId && student.status === "active"
-      ? { ...student, status: "revoked" as const, promotionLocked: true, revokedAt: new Date().toISOString() }
+      ? { ...student, status: "withdrawn" as const, promotionLocked: true, revokedAt: new Date().toISOString() }
       : student),
   };
 }
@@ -173,7 +183,7 @@ export function revokeAllStudents(state: SchoolPlatformState) {
   return {
     ...state,
     students: state.students.map(student => student.status === "active"
-      ? { ...student, status: "revoked" as const, promotionLocked: true, revokedAt: new Date().toISOString() }
+      ? { ...student, status: "withdrawn" as const, promotionLocked: true, revokedAt: new Date().toISOString() }
       : student),
   };
 }

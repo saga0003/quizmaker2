@@ -167,6 +167,68 @@ export async function POST(request: Request) {
       const { error } = await ctx.admin.auth.admin.updateUserById(userId, { password: temporaryPassword });
       if (error) throw new Error(error.message);
       return NextResponse.json({ ...(await snapshot(ctx, { organizationId, search: String(body.search || ''), role: String(body.roleFilter || 'all'), page: Number(body.page || 1), pageSize: Number(body.pageSize || 50) })), temporaryPassword }, { headers: { 'Cache-Control': 'no-store' } });
+    } else if (action === 'bulkImportStudents') {
+      const rows = Array.isArray(body.rows) ? body.rows as Array<Record<string, unknown>> : [];
+      if (!rows.length) throw Object.assign(new Error('No student rows were supplied.'), { status: 400 });
+      if (rows.length > 1000) throw Object.assign(new Error('Student imports are limited to 1,000 rows per file. Split the roster and retry.'), { status: 400 });
+      const requestedOrg = body.organizationId ? String(body.organizationId) : null;
+      const organizationId = ctx.role === 'school_admin' ? ctx.organizationId : requestedOrg;
+      if (!organizationId) throw Object.assign(new Error('Choose an institution for this student import.'), { status: 400 });
+      if (ctx.role === 'school_admin' && organizationId !== ctx.organizationId) throw Object.assign(new Error('School Admin can import students only into their own school.'), { status: 403 });
+      const { data: organization } = await ctx.admin.from('organizations').select('id,status').eq('id', organizationId).maybeSingle();
+      if (!organization) throw Object.assign(new Error('The selected institution does not exist.'), { status: 400 });
+      if (ctx.role === 'evidara_admin') {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: subscription } = await ctx.admin.from('school_subscriptions').select('id').eq('organization_id', organizationId).eq('status', 'active').lte('starts_at', today).gte('ends_at', today).limit(1).maybeSingle();
+        if (!subscription) throw Object.assign(new Error('Evidara Admin can provision an institution only after an active paid subscription is confirmed.'), { status: 403 });
+      }
+      const results: Array<Record<string, unknown>> = [];
+      const seenEmails = new Set<string>();
+      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const validAcademicYear = /^\d{4}(?:-\d{2,4})?$/;
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        const rowNumber = Number(row.rowNumber || index + 2);
+        const fullName = String(row.fullName || row.name || '').trim();
+        const email = String(row.email || '').trim().toLowerCase();
+        const phone = String(row.phone || '').trim();
+        const grade = Number(row.grade);
+        const section = String(row.section || '').trim();
+        const academicYear = String(row.academicYear || '').trim();
+        const board = String(row.board || 'Other').trim() || 'Other';
+        const parentName = String(row.parentName || '').trim();
+        const parentPhone = String(row.parentPhone || '').trim();
+        const source = { rowNumber, fullName, email, phone, grade: String(row.grade || ''), section, academicYear, board, parentName, parentPhone };
+        if (fullName.length < 2) { results.push({ ...source, status: 'failed', error: 'Student name is required.' }); continue; }
+        if (!validEmail.test(email)) { results.push({ ...source, status: 'failed', error: 'A valid email is required.' }); continue; }
+        if (!Number.isInteger(grade) || grade < 1 || grade > 12) { results.push({ ...source, status: 'failed', error: 'Grade must be an integer from 1 to 12.' }); continue; }
+        if (!validAcademicYear.test(academicYear)) { results.push({ ...source, status: 'failed', error: 'Academic year must look like 2026 or 2026-27.' }); continue; }
+        if (seenEmails.has(email)) { results.push({ ...source, status: 'failed', error: 'Duplicate email in this CSV.' }); continue; }
+        seenEmails.add(email);
+
+        const password = generatePassword();
+        const created = await ctx.admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName } });
+        if (created.error || !created.data.user) { results.push({ ...source, status: 'failed', error: created.error?.message || 'Unable to create student account.' }); continue; }
+        const userId = created.data.user.id;
+        const { error: profileError } = await ctx.admin.from('profiles').update({ full_name: fullName, phone: phone || null, role: 'student' }).eq('id', userId);
+        if (profileError) {
+          await ctx.admin.auth.admin.deleteUser(userId);
+          results.push({ ...source, status: 'failed', error: `Profile setup failed: ${profileError.message}` });
+          continue;
+        }
+        const { error: membershipError } = await ctx.admin.from('student_school_memberships').insert({
+          organization_id: organizationId, student_id: userId, academic_year: academicYear, grade,
+          section: section || null, board, tracks: [], status: 'active',
+          parent_name: parentName || null, parent_phone: parentPhone || null,
+        });
+        if (membershipError) {
+          await ctx.admin.auth.admin.deleteUser(userId);
+          results.push({ ...source, status: 'failed', error: membershipError.message });
+          continue;
+        }
+        results.push({ ...source, role: 'student', status: 'created', userId, temporaryPassword: password });
+      }
+      return NextResponse.json({ results, created: results.filter((r) => r.status === 'created').length, failed: results.filter((r) => r.status === 'failed').length }, { headers: { 'Cache-Control': 'no-store' } });
     } else if (action === 'bulkCreateAccounts') {
       const rows = Array.isArray(body.rows) ? body.rows.slice(0, 1000) as Array<Record<string, unknown>> : [];
       const requestedOrg = body.organizationId ? String(body.organizationId) : null;

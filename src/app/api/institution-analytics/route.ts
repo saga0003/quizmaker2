@@ -6,7 +6,10 @@ import type {
   InstitutionAnalyticsPayload,
   InstitutionChapterRow,
   InstitutionClassRow,
+  InstitutionGradeRow,
+  InstitutionProgrammeRow,
   InstitutionSchoolRow,
+  InstitutionSectionRow,
   InstitutionStudentRow,
   InstitutionSubjectRow,
   InstitutionTopicRow,
@@ -29,6 +32,19 @@ type AttemptRow = {
   status: string;
 };
 
+type AttemptMetricRow = {
+  student_id: string;
+  completed_tests: number | string;
+  percentage_sum: number | string | null;
+  average_percentage: number | string | null;
+  correct_count: number | string | null;
+  incorrect_count: number | string | null;
+  unanswered_count: number | string | null;
+  highest_percentage: number | string | null;
+  lowest_percentage: number | string | null;
+  last_test_at: string | null;
+};
+
 type MembershipRow = {
   organization_id: string;
   student_id: string;
@@ -36,6 +52,7 @@ type MembershipRow = {
   grade: number;
   section: string | null;
   section_id: string | null;
+  tracks: string[] | null;
   status: string;
 };
 
@@ -124,16 +141,28 @@ async function requestContext(request: Request) {
   const role = normalizeEvidaraRole(profile.role);
   if (role === 'student') throw Object.assign(new Error('Institution analytics is available only to authorised staff.'), { status: 403 });
   const platformAdmin = isPlatformAdmin(role);
+  const selectedOrganizationId = request.headers.get('x-evidara-organization-id')?.trim() || null;
 
-  const { data: membership } = await auth.admin
-    .from('organization_members')
-    .select('organization_id,member_role,is_active')
-    .eq('user_id', auth.user.id)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-
-  const organizationId = membership?.organization_id || null;
+  let organizationId: string | null = null;
+  if (!platformAdmin) {
+    const { data: memberships, error: membershipError } = await auth.admin
+      .from('organization_members')
+      .select('organization_id,member_role,is_active')
+      .eq('user_id', auth.user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+    if (membershipError) throw new Error(membershipError.message);
+    const activeMemberships = memberships || [];
+    if (selectedOrganizationId) {
+      const selected = activeMemberships.find((membership) => membership.organization_id === selectedOrganizationId);
+      if (!selected) throw Object.assign(new Error('The selected institution is not an active membership for this account.'), { status: 403 });
+      organizationId = selected.organization_id;
+    } else if (activeMemberships.length > 1) {
+      throw Object.assign(new Error('Choose an active institution before opening institution analytics.'), { status: 409 });
+    } else {
+      organizationId = activeMemberships[0]?.organization_id || null;
+    }
+  }
   if (!platformAdmin && !organizationId) throw Object.assign(new Error('No active school is linked to this account.'), { status: 403 });
 
   let allowedSectionIds: string[] | null = null;
@@ -212,7 +241,7 @@ async function ensureSectionAccess(ctx: CloudContext, sectionId: string) {
 async function membershipsForOrganization(ctx: CloudContext, organizationId: string) {
   return paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .eq('organization_id', organizationId)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
@@ -237,6 +266,24 @@ async function attemptsForStudents(ctx: CloudContext, studentIds: string[], orga
   return output;
 }
 
+async function attemptMetricsForStudents(ctx: CloudContext, studentIds: string[], organizationId: string) {
+  if (!studentIds.length) return [] as AttemptMetricRow[];
+  const output: AttemptMetricRow[] = [];
+  for (let start = 0; start < studentIds.length; start += 500) {
+    const { data, error } = await ctx.admin.rpc('get_institution_student_attempt_metrics_v1', {
+      p_organization_id: organizationId,
+      p_student_ids: studentIds.slice(start, start + 500),
+    });
+    if (error) throw new Error(error.message);
+    output.push(...((data || []) as AttemptMetricRow[]));
+  }
+  return output;
+}
+
+function submittedAttemptCount(metrics: AttemptMetricRow[]) {
+  return metrics.reduce((sum, row) => sum + number(row.completed_tests), 0);
+}
+
 function studentMetrics(studentId: string, attempts: AttemptRow[]) {
   const rows = attempts.filter((attempt) => attempt.student_id === studentId);
   const percentages = rows.map((row) => number(row.percentage));
@@ -254,6 +301,73 @@ function studentMetrics(studentId: string, attempts: AttemptRow[]) {
   };
 }
 
+
+const UNASSIGNED_PROGRAMME = '__unassigned__';
+
+function programmeIds(membership: MembershipRow) {
+  const tracks = (membership.tracks || []).map((track) => String(track || '').trim()).filter(Boolean);
+  return tracks.length ? [...new Set(tracks)] : [UNASSIGNED_PROGRAMME];
+}
+
+function programmeLabel(programmeId: string) {
+  return programmeId === UNASSIGNED_PROGRAMME ? 'Unassigned programme' : programmeId;
+}
+
+function membershipsForProgramme(memberships: MembershipRow[], programmeId: string) {
+  return memberships.filter((membership) => programmeIds(membership).includes(programmeId));
+}
+
+function scopeMetrics(memberships: MembershipRow[], attempts: AttemptRow[]) {
+  const studentIds = new Set(memberships.map((row) => row.student_id));
+  const rows = attempts.filter((attempt) => studentIds.has(attempt.student_id));
+  const percentages = rows.map((row) => number(row.percentage));
+  const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
+  const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
+  const participants = new Set(rows.map((row) => row.student_id)).size;
+  return {
+    studentCount: studentIds.size,
+    completedTests: rows.length,
+    averageTestsPerStudent: studentIds.size ? rounded(rows.length / studentIds.size) : 0,
+    averagePercentage: average(percentages),
+    accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
+    participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
+    highestPercentage: percentages.length ? Math.max(...percentages) : null,
+    lowestPercentage: percentages.length ? Math.min(...percentages) : null,
+    lastTestAt: rows.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
+    rank: 0,
+  };
+}
+
+function scopeAggregateMetrics(memberships: MembershipRow[], metrics: AttemptMetricRow[]) {
+  const studentIds = new Set(memberships.map((row) => row.student_id));
+  const rows = metrics.filter((row) => studentIds.has(row.student_id));
+  const completedTests = submittedAttemptCount(rows);
+  const percentageSum = rows.reduce((sum, row) => sum + number(row.percentage_sum), 0);
+  const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
+  const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
+  const participants = rows.filter((row) => number(row.completed_tests) > 0).length;
+  const highs = rows.map((row) => row.highest_percentage == null ? null : number(row.highest_percentage)).filter((value): value is number => value !== null);
+  const lows = rows.map((row) => row.lowest_percentage == null ? null : number(row.lowest_percentage)).filter((value): value is number => value !== null);
+  return {
+    studentCount: studentIds.size,
+    completedTests,
+    averageTestsPerStudent: studentIds.size ? rounded(completedTests / studentIds.size) : 0,
+    averagePercentage: completedTests ? rounded(percentageSum / completedTests) : null,
+    accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
+    participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
+    highestPercentage: highs.length ? Math.max(...highs) : null,
+    lowestPercentage: lows.length ? Math.min(...lows) : null,
+    lastTestAt: rows.map((row) => row.last_test_at).filter((value): value is string => Boolean(value)).sort().at(-1) || null,
+    rank: 0,
+  };
+}
+
+function rankScopeRows<T extends { averagePercentage: number | null; rank: number }>(rows: T[]) {
+  return [...rows]
+    .sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
 async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayload> {
   let organizationQuery = ctx.admin.from('organizations').select('id,name,city,state,board,status').neq('status', 'suspended').order('name');
   if (!ctx.actor.platformAdmin && ctx.actor.organizationId) organizationQuery = organizationQuery.eq('id', ctx.actor.organizationId);
@@ -267,12 +381,16 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
 
   const memberships = await paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .in('organization_id', organizationIds)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
-  const studentIds = [...new Set(memberships.map((row) => row.student_id))];
-  const attempts = await attemptsForStudents(ctx, studentIds);
+  const metricsByOrganization = new Map<string, AttemptMetricRow[]>();
+  for (const organizationId of organizationIds) {
+    const orgStudentIds = [...new Set(memberships.filter((row) => row.organization_id === organizationId).map((row) => row.student_id))];
+    metricsByOrganization.set(organizationId, await attemptMetricsForStudents(ctx, orgStudentIds, organizationId));
+  }
+  const totalSubmittedAttempts = [...metricsByOrganization.values()].reduce((sum, rows) => sum + submittedAttemptCount(rows), 0);
   const sections = await paged<SectionRow>((from, to) => ctx.admin
     .from('academic_sections')
     .select('id,organization_id,academic_year,grade,name,code')
@@ -282,12 +400,7 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
 
   const schools: InstitutionSchoolRow[] = (organizations || []).map((organization) => {
     const orgMemberships = memberships.filter((row) => row.organization_id === organization.id);
-    const orgStudentIds = new Set(orgMemberships.map((row) => row.student_id));
-    const orgAttempts = attempts.filter((row) => row.organization_id ? row.organization_id === organization.id : orgStudentIds.has(row.student_id));
-    const percentages = orgAttempts.map((row) => number(row.percentage));
-    const correct = orgAttempts.reduce((sum, row) => sum + number(row.correct_count), 0);
-    const incorrect = orgAttempts.reduce((sum, row) => sum + number(row.incorrect_count), 0);
-    const participants = new Set(orgAttempts.map((row) => row.student_id)).size;
+    const orgMetrics = metricsByOrganization.get(organization.id) || [];
     return {
       id: organization.id,
       name: organization.name,
@@ -295,17 +408,9 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
       state: organization.state,
       board: organization.board,
       status: organization.status,
-      totalStudents: orgStudentIds.size,
+      totalStudents: new Set(orgMemberships.map((row) => row.student_id)).size,
       totalClasses: sections.filter((row) => row.organization_id === organization.id).length,
-      completedTests: orgAttempts.length,
-      averageTestsPerStudent: orgStudentIds.size ? rounded(orgAttempts.length / orgStudentIds.size) : 0,
-      averagePercentage: average(percentages),
-      accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
-      participation: orgStudentIds.size ? rounded(participants / orgStudentIds.size * 100) : null,
-      highestPercentage: percentages.length ? Math.max(...percentages) : null,
-      lowestPercentage: percentages.length ? Math.min(...percentages) : null,
-      lastTestAt: orgAttempts.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
-      rank: 0,
+      ...scopeAggregateMetrics(orgMemberships, orgMetrics),
     };
   }).sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }));
 
@@ -316,10 +421,10 @@ async function schoolList(ctx: CloudContext): Promise<InstitutionAnalyticsPayloa
     generatedAt: new Date().toISOString(),
     schools,
     evidence: {
-      submittedAttempts: attempts.length,
+      submittedAttempts: totalSubmittedAttempts,
       classifiedResponses: 0,
-      hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live school records loaded. No submitted assessment attempts are available yet.',
+      hasLiveEvidence: totalSubmittedAttempts > 0,
+      note: totalSubmittedAttempts ? undefined : 'Live school records loaded. No submitted assessment attempts are available yet.',
     },
   };
 }
@@ -341,7 +446,7 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     .order('name');
   if (ctx.actor.allowedSectionIds) {
     if (!ctx.actor.allowedSectionIds.length) {
-      return { mode: 'live', level: 'school', actor: ctx.actor, generatedAt: new Date().toISOString(), school, classes: [], evidence: { submittedAttempts: 0, classifiedResponses: 0, hasLiveEvidence: false } };
+      return { mode: 'live', level: 'school', actor: ctx.actor, generatedAt: new Date().toISOString(), school, programmes: [], classes: [], evidence: { submittedAttempts: 0, classifiedResponses: 0, hasLiveEvidence: false } };
     }
     sectionQuery = sectionQuery.in('id', ctx.actor.allowedSectionIds);
   }
@@ -351,16 +456,10 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
   const permittedMemberships = ctx.actor.allowedSectionIds
     ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
     : memberships;
-  const attempts = await attemptsForStudents(ctx, [...new Set(permittedMemberships.map((row) => row.student_id))], organizationId);
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(permittedMemberships.map((row) => row.student_id))], organizationId);
 
   const classes: InstitutionClassRow[] = sections.map((section) => {
     const members = permittedMemberships.filter((row) => row.section_id === section.id);
-    const studentIds = new Set(members.map((row) => row.student_id));
-    const rows = attempts.filter((attempt) => studentIds.has(attempt.student_id));
-    const percentages = rows.map((row) => number(row.percentage));
-    const correct = rows.reduce((sum, row) => sum + number(row.correct_count), 0);
-    const incorrect = rows.reduce((sum, row) => sum + number(row.incorrect_count), 0);
-    const participants = new Set(rows.map((row) => row.student_id)).size;
     return {
       id: section.id,
       organizationId,
@@ -368,18 +467,18 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
       grade: section.grade,
       name: `Grade ${section.grade} · ${section.name}`,
       code: section.code,
-      studentCount: studentIds.size,
-      completedTests: rows.length,
-      averageTestsPerStudent: studentIds.size ? rounded(rows.length / studentIds.size) : 0,
-      averagePercentage: average(percentages),
-      accuracy: correct + incorrect ? rounded(correct / (correct + incorrect) * 100) : null,
-      participation: studentIds.size ? rounded(participants / studentIds.size * 100) : null,
-      highestPercentage: percentages.length ? Math.max(...percentages) : null,
-      lowestPercentage: percentages.length ? Math.min(...percentages) : null,
-      lastTestAt: rows.map((row) => row.submitted_at).filter(Boolean).sort().at(-1) || null,
-      rank: 0,
+      ...scopeAggregateMetrics(members, aggregateMetrics),
     };
   }).sort((a, b) => (b.averagePercentage ?? -1) - (a.averagePercentage ?? -1)).map((row, index) => ({ ...row, rank: index + 1 }));
+
+  const programmeKeys = [...new Set(permittedMemberships.flatMap(programmeIds))].sort((a, b) => programmeLabel(a).localeCompare(programmeLabel(b)));
+  const programmes = rankScopeRows<InstitutionProgrammeRow>(programmeKeys.map((programmeId) => ({
+    id: programmeId,
+    organizationId,
+    name: programmeLabel(programmeId),
+    track: programmeId === UNASSIGNED_PROGRAMME ? null : programmeId,
+    ...scopeAggregateMetrics(membershipsForProgramme(permittedMemberships, programmeId), aggregateMetrics),
+  })));
 
   return {
     mode: 'live',
@@ -387,23 +486,82 @@ async function schoolClasses(ctx: CloudContext, organizationId: string): Promise
     actor: ctx.actor,
     generatedAt: new Date().toISOString(),
     school,
+    programmes,
     classes,
     evidence: {
-      submittedAttempts: attempts.length,
+      submittedAttempts: submittedAttemptCount(aggregateMetrics),
       classifiedResponses: 0,
-      hasLiveEvidence: attempts.length > 0,
-      note: attempts.length ? undefined : 'Live classes and enrolments loaded. Results will appear after students submit assessments.',
+      hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live classes and enrolments loaded. Results will appear after students submit assessments.',
     },
   };
 }
 
-async function classStudents(ctx: CloudContext, section: SectionRow): Promise<{ memberships: MembershipRow[]; students: InstitutionStudentRow[]; attempts: AttemptRow[]; profiles: Map<string, string> }> {
-  const memberships = await paged<MembershipRow>((from, to) => ctx.admin
+async function programmeSnapshot(ctx: CloudContext, organizationId: string, programmeId: string): Promise<InstitutionAnalyticsPayload> {
+  const schoolPayload = await schoolClasses(ctx, organizationId);
+  const programme = (schoolPayload.programmes || []).find((row) => row.id === programmeId) || null;
+  if (!programme) throw Object.assign(new Error('Programme not found in the active school roster.'), { status: 404 });
+  const memberships = await membershipsForOrganization(ctx, organizationId);
+  const permitted = ctx.actor.allowedSectionIds
+    ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
+    : memberships;
+  const scoped = membershipsForProgramme(permitted, programmeId);
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(scoped.map((row) => row.student_id))], organizationId);
+  const grades = rankScopeRows<InstitutionGradeRow>([...new Set(scoped.map((row) => row.grade))].sort((a, b) => a - b).map((grade) => ({
+    id: `${programmeId}:${grade}`,
+    organizationId,
+    programmeId,
+    programmeName: programme.name,
+    grade,
+    name: `Grade ${grade}`,
+    ...scopeAggregateMetrics(scoped.filter((row) => row.grade === grade), aggregateMetrics),
+  })));
+  return {
+    mode: 'live', level: 'programme', actor: ctx.actor, generatedAt: new Date().toISOString(),
+    school: schoolPayload.school, programme, grades,
+    evidence: { submittedAttempts: submittedAttemptCount(aggregateMetrics), classifiedResponses: 0, hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live programme roster loaded. Results will appear after students submit assessments.' },
+  };
+}
+
+async function gradeSnapshot(ctx: CloudContext, organizationId: string, programmeId: string, grade: number): Promise<InstitutionAnalyticsPayload> {
+  const programmePayload = await programmeSnapshot(ctx, organizationId, programmeId);
+  const gradeRow = (programmePayload.grades || []).find((row) => row.grade === grade) || null;
+  if (!gradeRow) throw Object.assign(new Error('Grade not found in the selected programme.'), { status: 404 });
+  const memberships = membershipsForProgramme(await membershipsForOrganization(ctx, organizationId), programmeId).filter((row) => row.grade === grade);
+  const permitted = ctx.actor.allowedSectionIds
+    ? memberships.filter((row) => row.section_id && ctx.actor.allowedSectionIds?.includes(row.section_id))
+    : memberships;
+  const aggregateMetrics = await attemptMetricsForStudents(ctx, [...new Set(permitted.map((row) => row.student_id))], organizationId);
+  let query = ctx.admin.from('academic_sections')
+    .select('id,organization_id,academic_year,grade,name,code')
+    .eq('organization_id', organizationId).eq('grade', grade).eq('is_active', true).order('name');
+  if (ctx.actor.allowedSectionIds) query = query.in('id', ctx.actor.allowedSectionIds);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  const sections = rankScopeRows<InstitutionSectionRow>(((data || []) as SectionRow[])
+    .filter((section) => permitted.some((row) => row.section_id === section.id))
+    .map((section) => ({
+      id: section.id, organizationId, academicYear: section.academic_year, grade: section.grade,
+      name: section.name, code: section.code, programmeId, programmeName: programmeLabel(programmeId),
+      ...scopeAggregateMetrics(permitted.filter((row) => row.section_id === section.id), aggregateMetrics),
+    })));
+  return {
+    mode: 'live', level: 'grade', actor: ctx.actor, generatedAt: new Date().toISOString(),
+    school: programmePayload.school, programme: programmePayload.programme, grade: gradeRow, sections,
+    evidence: { submittedAttempts: submittedAttemptCount(aggregateMetrics), classifiedResponses: 0, hasLiveEvidence: submittedAttemptCount(aggregateMetrics) > 0,
+      note: submittedAttemptCount(aggregateMetrics) ? undefined : 'Live grade and section roster loaded. Results will appear after students submit assessments.' },
+  };
+}
+
+async function classStudents(ctx: CloudContext, section: SectionRow, programmeId?: string | null): Promise<{ memberships: MembershipRow[]; students: InstitutionStudentRow[]; attempts: AttemptRow[]; profiles: Map<string, string> }> {
+  const allMemberships = await paged<MembershipRow>((from, to) => ctx.admin
     .from('student_school_memberships')
-    .select('organization_id,student_id,academic_year,grade,section,section_id,status')
+    .select('organization_id,student_id,academic_year,grade,section,section_id,tracks,status')
     .eq('section_id', section.id)
     .eq('status', 'active')
     .range(from, to) as unknown as PromiseLike<{ data: MembershipRow[] | null; error: { message: string } | null }>);
+  const memberships = programmeId ? membershipsForProgramme(allMemberships, programmeId) : allMemberships;
   const studentIds = [...new Set(memberships.map((row) => row.student_id))];
   const attempts = await attemptsForStudents(ctx, studentIds, section.organization_id);
   const profiles = new Map<string, string>();
@@ -434,7 +592,7 @@ async function responseEvidence(ctx: CloudContext, attemptIds: string[]) {
     const ids = attemptIds.slice(start, start + 150);
     const rows = await paged<Record<string, unknown>>((from, to) => ctx.admin
       .from('exam_responses')
-      .select('attempt_id,is_correct,marks_awarded,time_spent_seconds,paper_questions(marks,questions(id,subject_id,chapter_id,topic_id,subjects(id,name),chapters(id,name),topics(id,name)))')
+      .select('attempt_id,is_correct,marks_awarded,time_spent_seconds,paper_questions(marks,question_snapshot,questions(id,subject_id,chapter_id,topic_id,subjects(id,name),chapters(id,name),topics(id,name)))')
       .in('attempt_id', ids)
       .range(from, to) as unknown as PromiseLike<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>);
     output.push(...rows);
@@ -447,13 +605,24 @@ function taxonomyObject(response: Record<string, unknown>) {
   const paperQuestion = Array.isArray(paperQuestionRaw) ? paperQuestionRaw[0] : paperQuestionRaw as Record<string, unknown> | null;
   const questionRaw = paperQuestion?.questions;
   const question = Array.isArray(questionRaw) ? questionRaw[0] : questionRaw as Record<string, unknown> | null;
+  const snapshotRaw = paperQuestion?.question_snapshot;
+  const snapshot = snapshotRaw && typeof snapshotRaw === 'object' && !Array.isArray(snapshotRaw)
+    ? snapshotRaw as Record<string, unknown>
+    : null;
   const object = (value: unknown) => Array.isArray(value) ? value[0] as Record<string, unknown> : value as Record<string, unknown> | null;
+  const frozenTaxonomy = (idKey: string, nameKey: string, fallback: Record<string, unknown> | null) => {
+    const id = snapshot?.[idKey];
+    const name = snapshot?.[nameKey];
+    if (typeof id === 'string' && id && typeof name === 'string' && name) return { id, name };
+    if (typeof id === 'string' && id) return { id, name: typeof name === 'string' && name ? name : String(fallback?.name || id) };
+    return fallback;
+  };
   return {
     paperQuestion,
     question,
-    subject: object(question?.subjects),
-    chapter: object(question?.chapters),
-    topic: object(question?.topics),
+    subject: frozenTaxonomy('subject_id', 'subject_name', object(question?.subjects)),
+    chapter: frozenTaxonomy('chapter_id', 'chapter_name', object(question?.chapters)),
+    topic: frozenTaxonomy('topic_id', 'topic_name', object(question?.topics)),
   };
 }
 
@@ -513,7 +682,7 @@ function aggregateTaxonomy<T extends InstitutionSubjectRow | InstitutionChapterR
       accuracy: answered ? rounded(correct / answered * 100) : null,
       highestPercentage: studentPercentages.length ? Math.max(...studentPercentages) : null,
       lowestPercentage: studentPercentages.length ? Math.min(...studentPercentages) : null,
-      averageSeconds: average(group.responses.map((row) => number(row.time_spent_seconds))),
+      averageSeconds: average(group.responses.map((row) => row.time_spent_seconds == null ? null : number(row.time_spent_seconds))),
       scoreBands: scoreBands(studentPercentages),
     };
     if (input.level === 'chapter') return { ...result, subjectId: group.subjectId || '', subjectName: group.subjectName || 'Subject' } as T;
@@ -547,15 +716,20 @@ function classRowFromEvidence(section: SectionRow, students: InstitutionStudentR
   };
 }
 
-async function classSnapshot(ctx: CloudContext, sectionId: string): Promise<InstitutionAnalyticsPayload> {
+function sectionRowFromEvidence(section: SectionRow, students: InstitutionStudentRow[], attempts: AttemptRow[], programmeId: string): InstitutionSectionRow {
+  return { ...classRowFromEvidence(section, students, attempts), programmeId, programmeName: programmeLabel(programmeId), name: section.name };
+}
+
+async function classSnapshot(ctx: CloudContext, sectionId: string, programmeId?: string | null, outputLevel: 'section' | 'class' = 'section'): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = visibleTeacherSubjects(ctx, section.id, aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' }));
   const { data: school } = await ctx.admin.from('organizations').select('id,name,city,state,board').eq('id', section.organization_id).single();
   return {
     mode: 'live',
-    level: 'class', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    level: outputLevel, actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), students, subjects,
     scoreBands: scoreBands(students.map((row) => row.averagePercentage).filter((value): value is number => value !== null)),
     evidence: {
@@ -567,9 +741,9 @@ async function classSnapshot(ctx: CloudContext, sectionId: string): Promise<Inst
   };
 }
 
-async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: string): Promise<InstitutionAnalyticsPayload> {
+async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
   const subject = subjects.find((row) => row.id === subjectId) || null;
@@ -581,6 +755,7 @@ async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   return {
     mode: 'live',
     level: 'subject', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), subject, chapters,
     scoreBands: subject?.scoreBands || [],
     evidence: {
@@ -592,9 +767,9 @@ async function subjectSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   };
 }
 
-async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string): Promise<InstitutionAnalyticsPayload> {
+async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
   const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
   const subject = subjects.find((row) => row.id === subjectId) || null;
@@ -608,6 +783,7 @@ async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   return {
     mode: 'live',
     level: 'chapter', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
     class: classRowFromEvidence(section, students, attempts), subject, chapter, topics,
     scoreBands: chapter?.scoreBands || [],
     evidence: {
@@ -619,9 +795,31 @@ async function chapterSnapshot(ctx: CloudContext, sectionId: string, subjectId: 
   };
 }
 
-async function studentSnapshot(ctx: CloudContext, studentId: string, sectionId: string): Promise<InstitutionAnalyticsPayload> {
+async function topicSnapshot(ctx: CloudContext, sectionId: string, subjectId: string, chapterId: string, topicId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
   const section = await ensureSectionAccess(ctx, sectionId);
-  const { students, attempts } = await classStudents(ctx, section);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
+  const responses = await responseEvidence(ctx, attempts.map((row) => row.id));
+  const subjects = aggregateTaxonomy<InstitutionSubjectRow>({ responses, attempts, students, level: 'subject' });
+  const subject = subjects.find((row) => row.id === subjectId) || null;
+  if (subject && !teacherCanOpenSubject(ctx, section.id, subject.name)) throw Object.assign(new Error('This subject is not assigned to the signed-in teacher.'), { status: 403 });
+  const chapters = aggregateTaxonomy<InstitutionChapterRow>({ responses, attempts, students, level: 'chapter', subjectId });
+  const chapter = chapters.find((row) => row.id === chapterId) || null;
+  const topics = aggregateTaxonomy<InstitutionTopicRow>({ responses, attempts, students, level: 'topic', subjectId, chapterId });
+  const topic = topics.find((row) => row.id === topicId) || null;
+  const { data: school } = await ctx.admin.from('organizations').select('id,name,city,state,board').eq('id', section.organization_id).single();
+  return {
+    mode: 'live', level: 'topic', actor: ctx.actor, generatedAt: new Date().toISOString(), school,
+    section: programmeId ? sectionRowFromEvidence(section, students, attempts, programmeId) : undefined,
+    class: classRowFromEvidence(section, students, attempts), subject, chapter, topic, students,
+    scoreBands: topic?.scoreBands || [],
+    evidence: { submittedAttempts: attempts.length, classifiedResponses: responses.length, hasLiveEvidence: Boolean(topic && responses.length),
+      note: topic ? undefined : 'No submitted response evidence is available for this topic yet.' },
+  };
+}
+
+async function studentSnapshot(ctx: CloudContext, studentId: string, sectionId: string, programmeId?: string | null): Promise<InstitutionAnalyticsPayload> {
+  const section = await ensureSectionAccess(ctx, sectionId);
+  const { students, attempts } = await classStudents(ctx, section, programmeId);
   const student = students.find((row) => row.id === studentId);
   if (!student) throw Object.assign(new Error('The selected student is not part of this class.'), { status: 404 });
   const { data: school } = await ctx.admin
@@ -655,13 +853,23 @@ export async function GET(request: Request) {
     if (level === 'schools') return NextResponse.json(await schoolList(ctx), { headers: { 'Cache-Control': 'no-store' } });
     if (!organizationId) throw Object.assign(new Error('Choose a school.'), { status: 400 });
     if (level === 'school') return NextResponse.json(await schoolClasses(ctx, organizationId), { headers: { 'Cache-Control': 'no-store' } });
+    const programmeId = params.get('programme') || '';
+    if (level === 'programme') return NextResponse.json(await programmeSnapshot(ctx, organizationId, programmeId), { headers: { 'Cache-Control': 'no-store' } });
+    const requestedGrade = Number(params.get('grade'));
+    if (level === 'grade') {
+      if (!Number.isInteger(requestedGrade)) throw Object.assign(new Error('Choose a valid grade.'), { status: 400 });
+      return NextResponse.json(await gradeSnapshot(ctx, organizationId, programmeId, requestedGrade), { headers: { 'Cache-Control': 'no-store' } });
+    }
     const sectionId = params.get('sectionId') || '';
-    if (level === 'class') return NextResponse.json(await classSnapshot(ctx, sectionId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'section') return NextResponse.json(await classSnapshot(ctx, sectionId, programmeId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'class') return NextResponse.json(await classSnapshot(ctx, sectionId, programmeId || null, 'class'), { headers: { 'Cache-Control': 'no-store' } });
     const subjectId = params.get('subjectId') || '';
-    if (level === 'subject') return NextResponse.json(await subjectSnapshot(ctx, sectionId, subjectId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'subject') return NextResponse.json(await subjectSnapshot(ctx, sectionId, subjectId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
     const chapterId = params.get('chapterId') || '';
-    if (level === 'chapter') return NextResponse.json(await chapterSnapshot(ctx, sectionId, subjectId, chapterId), { headers: { 'Cache-Control': 'no-store' } });
-    if (level === 'student') return NextResponse.json(await studentSnapshot(ctx, params.get('studentId') || '', sectionId), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'chapter') return NextResponse.json(await chapterSnapshot(ctx, sectionId, subjectId, chapterId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
+    const topicId = params.get('topicId') || '';
+    if (level === 'topic') return NextResponse.json(await topicSnapshot(ctx, sectionId, subjectId, chapterId, topicId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
+    if (level === 'student') return NextResponse.json(await studentSnapshot(ctx, params.get('studentId') || '', sectionId, programmeId || null), { headers: { 'Cache-Control': 'no-store' } });
     throw Object.assign(new Error('Unsupported analytics level.'), { status: 400 });
   } catch (error) {
     return failure(error);

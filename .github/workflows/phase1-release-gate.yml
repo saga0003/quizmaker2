@@ -1,0 +1,285 @@
+name: Evidara Phase 1 Release Gate
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: phase1-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Phase 1 hardening checks
+        run: node scripts/phase1-hardening-smoke.mjs
+      - name: P0.6 historical snapshot checks
+        run: node scripts/p06-historical-snapshot-smoke.mjs
+      - name: P0.7 annual student licence checks
+        run: node scripts/p07-licence-model-smoke.mjs
+      - name: P0.8 subscription enforcement checks
+        run: node scripts/p08-subscription-enforcement-smoke.mjs
+      - name: P0.10 exam network reliability checks
+        run: node scripts/p010-exam-network-reliability-smoke.mjs
+      - name: P0.11 RPC permission allowlist checks
+        run: node scripts/p011-rpc-permission-smoke.mjs
+      - name: P0.12 credential security checks
+        run: node scripts/p012-credential-security-smoke.mjs
+      - name: A2 tenant isolation checks
+        run: node scripts/a2-tenant-isolation-smoke.mjs
+      - name: A3 privileged audit checks
+        run: node scripts/a3-privileged-audit-smoke.mjs
+      - name: A4 legacy RLS checks
+        run: node scripts/a4-legacy-rls-smoke.mjs
+      - name: A5 protected resource checks
+        run: node scripts/a5-protected-resource-smoke.mjs
+      - name: A6 upload signature checks
+        run: node scripts/a6-upload-hardening-smoke.mjs
+      - name: A7 ZIP safety checks
+        run: node scripts/a7-zip-safety-smoke.mjs
+      - name: A8 rich-content safety checks
+        run: node scripts/a8-rich-content-safety-smoke.mjs
+      - name: A9 active institution checks
+        run: node scripts/a9-active-institution-smoke.mjs
+      - name: A10 local autosave isolation checks
+        run: node scripts/a10-local-autosave-scope-smoke.mjs
+      - name: B1 transactional institution onboarding checks
+        run: node scripts/b1-transactional-onboarding-smoke.mjs
+      - name: B2 institution onboarding wizard checks
+        run: node scripts/b2-institution-onboarding-wizard-smoke.mjs
+      - name: B3 bulk student import checks
+        run: node scripts/b3-bulk-student-import-smoke.mjs
+      - name: B4 student lifecycle checks
+        run: node scripts/b4-student-lifecycle-smoke.mjs
+      - name: B5 attempt enrollment snapshot checks
+        run: node scripts/b5-attempt-enrollment-snapshot-smoke.mjs
+      - name: B6 teacher scope checks
+        run: node scripts/b6-teacher-scope-smoke.mjs
+      - name: B7 academic-year rollover checks
+        run: node scripts/b7-academic-year-rollover-smoke.mjs
+      - name: C5 analytics-ready approval checks
+        run: node scripts/c5-analytics-ready-approval-smoke.mjs
+      - name: C6 correct-answer authority checks
+        run: node scripts/c6-correct-answer-authority-smoke.mjs
+      - name: C7 question collaboration checks
+        run: node scripts/c7-question-collaboration-smoke.mjs
+      - name: C8 question retention checks
+        run: node scripts/c8-question-retention-smoke.mjs
+      - name: C9 question-bank pagination checks
+        run: node scripts/c9-question-bank-pagination-smoke.mjs
+      - name: C10 simplified import-flow checks
+        run: node scripts/c10-simplified-import-flow-smoke.mjs
+      - name: C11 exact duplicate prevention checks
+        run: node scripts/c11-question-duplicate-prevention-smoke.mjs
+      - name: D3 guided paper-builder checks
+        run: node scripts/d3-paper-builder-wizard-smoke.mjs
+      - name: D4 assignment-preview checks
+        run: node scripts/d4-assignment-preview-smoke.mjs
+      - name: D4 audience-filter checks
+        run: node scripts/d6-audience-filter-smoke.mjs
+      - name: D5 paper version-clone checks
+        run: node scripts/d5-paper-clone-version-smoke.mjs
+      - name: D6 publish-readiness checks
+        run: node scripts/d6-paper-publish-readiness-smoke.mjs
+      - name: D7 normalized paper-access checks
+        run: node scripts/d7-normalized-paper-access-smoke.mjs
+      - name: D7 paper-card action checks
+        run: node scripts/d7-paper-card-actions-smoke.mjs
+      - name: E6 idempotent submission and receipt checks
+        run: node scripts/e6-idempotent-submission-smoke.mjs
+      - name: E7 integrity evidence report checks
+        run: node scripts/e7-integrity-evidence-smoke.mjs
+      - name: E8 concurrency serialization safety checks
+        run: node scripts/e8-concurrency-serialization-smoke.mjs
+      - name: F2 analytics metric dictionary checks
+        run: node scripts/f2-analytics-metric-dictionary-smoke.mjs
+      - name: F3 not-assessed analytics checks
+        run: node scripts/f3-not-assessed-smoke.mjs
+      - name: F4 student question drill-down checks
+        run: node scripts/f4-student-question-drilldown-smoke.mjs
+      - name: F5 standardized analytics row checks
+        run: node scripts/f5-standard-analytics-row-smoke.mjs
+      - name: F6 measured class leaderboard checks
+        run: node scripts/f6-measured-class-leaderboard-smoke.mjs
+      - name: F7 taxonomy response evidence checks
+        run: node scripts/f7-taxonomy-evidence-smoke.mjs
+      - name: F6 canonical topic evidence threshold checks
+        run: node scripts/f6-topic-evidence-threshold-smoke.mjs
+      - name: F7 canonical percentile cohort checks
+        run: node scripts/f7-percentile-cohort-smoke.mjs
+      - name: F8 institution hierarchy drilldown checks
+        run: node scripts/f8-institution-drilldown-smoke.mjs
+      - name: F9 teacher needs-attention checks
+        run: node scripts/f9-teacher-needs-attention-smoke.mjs
+      - name: F10 raw response evidence scope checks
+        run: node scripts/f10-raw-response-evidence-smoke.mjs
+      - name: F11 traditional result sheet checks
+        run: node scripts/f11-traditional-result-sheet-smoke.mjs
+      - name: F12 Excel analytics export checks
+        run: node scripts/f12-excel-export-smoke.mjs
+      - name: F13 institution aggregate scaling checks
+        run: node scripts/f13-institution-aggregate-scaling-smoke.mjs
+      - name: G subscription commercial-control checks
+        run: node scripts/g-commercial-controls-smoke.mjs
+      - name: H1/H2 role-focused navigation checks
+        run: node scripts/h1-h2-role-navigation-smoke.mjs
+      - name: H3/H4/H5 role-dashboard checks
+        run: node scripts/h3-h5-role-dashboard-smoke.mjs
+      - name: H6 UI consistency checks
+        run: node scripts/h6-ui-consistency-smoke.mjs
+      - name: I1-I3 platform health checks
+        run: node scripts/i1-i3-platform-health-smoke.mjs
+      - name: I5-I7 operations hardening checks
+        run: node scripts/i5-i7-operations-smoke.mjs
+      - name: J privacy governance checks
+        run: node scripts/j1-j5-privacy-governance-smoke.mjs
+      - name: Same-project acceptance safety checks
+        run: node scripts/phase1-same-project-acceptance-smoke.mjs
+      - name: Same-project acceptance preflight contract
+        env:
+          EVIDARA_LOAD_ACCEPTANCE: YES_I_UNDERSTAND_NON_PRODUCTION_ONLY
+          EVIDARA_ACCEPTANCE_MODE: same-project-isolated-tenant
+          EVIDARA_ACCEPTANCE_SUPABASE_REF: xzfozpnzvznqrvcsoail
+          EVIDARA_ACCEPTANCE_ORG_SLUG: evidara-school-acceptance
+          EVIDARA_ACCEPTANCE_DB_BYTES: '216394899'
+        run: node scripts/phase1-acceptance-preflight.mjs --target https://quizmaker2-git-phase1-hardening-saga0003s-projects.vercel.app --dry-run
+
+      - name: TypeScript
+        run: npm run typecheck -- --incremental false
+
+      - id: lint
+        name: Lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-regression.log
+
+      - name: Upload lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-regression-${{ github.run_id }}
+          path: lint-regression.log
+          retention-days: 2
+
+      - id: clean_school
+        name: Regression — clean school UX
+        continue-on-error: true
+        run: node scripts/phase1-clean-school-ux-smoke.mjs
+      - id: launch
+        name: Regression — launch
+        continue-on-error: true
+        run: node scripts/phase1-launch-smoke.mjs
+      - id: institution_analytics
+        name: Regression — institution analytics
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/institution-analytics-smoke.mjs 2>&1 | tee institution-analytics-regression.log
+      - name: Upload institution regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: institution-analytics-regression-${{ github.run_id }}
+          path: institution-analytics-regression.log
+          retention-days: 2
+      - id: increment3
+        name: Regression — increment 3
+        continue-on-error: true
+        run: node scripts/phase1-increment3-smoke.mjs
+      - id: increment4
+        name: Regression — increment 4
+        continue-on-error: true
+        run: node scripts/phase1-increment4-smoke.mjs
+      - id: increment58
+        name: Regression — increment 5-8
+        continue-on-error: true
+        run: node scripts/phase1-increment5-8-smoke.mjs
+      - id: public_student
+        name: Regression — public student
+        continue-on-error: true
+        run: node scripts/post8-public-student-smoke.mjs
+      - id: profile_auth
+        name: Regression — profile authorization
+        continue-on-error: true
+        run: node scripts/profile-authorization-smoke.mjs
+      - id: student_live
+        name: Regression — student live dashboard
+        continue-on-error: true
+        run: node scripts/student-live-dashboard-resources-smoke.mjs
+      - id: analytics
+        name: Regression — analytics
+        continue-on-error: true
+        run: node scripts/v13-2-analytics-smoke.mjs
+      - id: vercel_smoke
+        name: Regression — Vercel smoke
+        continue-on-error: true
+        run: node scripts/v13-2-vercel-smoke.mjs
+      - id: v14
+        name: Regression — v14
+        continue-on-error: true
+        run: node scripts/v14-smoke.mjs
+      - id: v15seo
+        name: Regression — v15 SEO
+        continue-on-error: true
+        run: node scripts/v15-seo-smoke.mjs
+      - id: v16pyq
+        name: Regression — v16 PYQ
+        continue-on-error: true
+        run: node scripts/v16-neet-pyq-smoke.mjs
+      - id: v18paper
+        name: Regression — v18 paper engine
+        continue-on-error: true
+        run: node scripts/v18-pyq-paper-engine-smoke.mjs
+      - id: v19fidelity
+        name: Regression — v19 fidelity
+        continue-on-error: true
+        run: node scripts/v19-pyq-source-fidelity-smoke.mjs
+      - id: v191import
+        name: Regression — v19.1 import
+        continue-on-error: true
+        run: node scripts/v19-1-latex-paper-import-smoke.mjs
+
+      - id: build
+        name: Production build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Enforce release gate
+        if: always()
+        env:
+          OUTCOMES: >-
+            ${{ steps.lint.outcome }} ${{ steps.build.outcome }}
+            ${{ steps.clean_school.outcome }} ${{ steps.launch.outcome }} ${{ steps.institution_analytics.outcome }}
+            ${{ steps.increment3.outcome }} ${{ steps.increment4.outcome }} ${{ steps.increment58.outcome }}
+            ${{ steps.public_student.outcome }} ${{ steps.profile_auth.outcome }} ${{ steps.student_live.outcome }}
+            ${{ steps.analytics.outcome }} ${{ steps.vercel_smoke.outcome }} ${{ steps.v14.outcome }}
+            ${{ steps.v15seo.outcome }} ${{ steps.v16pyq.outcome }} ${{ steps.v18paper.outcome }}
+            ${{ steps.v19fidelity.outcome }} ${{ steps.v191import.outcome }}
+        run: |
+          echo "Release outcomes: $OUTCOMES"
+          if echo "$OUTCOMES" | grep -q failure; then
+            echo "One or more required release checks failed."
+            exit 1
+          fi

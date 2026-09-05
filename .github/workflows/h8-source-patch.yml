@@ -1,0 +1,27 @@
+name: H8 Source Patch
+
+on:
+  push:
+    branches:
+      - phase1-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'stage mobile analytics source patch retry')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Apply guarded H8 patch
+        run: python scripts/h8-apply-mobile-patch.py
+      - name: Commit source patch
+        run: |
+          git config user.name "evidara-phase1-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/components/institution-analytics/institution-analytics-workspace.tsx
+          git commit -m "feat(h8): add mobile cards for analytics tables"
+          git push origin HEAD:phase1-hardening

@@ -14,6 +14,7 @@ const reports = read('src/lib/institutionReportPdf.ts');
 const workspace = read('src/components/institution-analytics/institution-analytics-workspace.tsx');
 const institutionCss = read('src/components/institution-analytics/institution-analytics.css');
 const studentAnalytics = read('src/components/analytics-v12/student-analytics-v12.tsx');
+const studentPreview = read('src/components/evidara/student-preview-analytics.tsx');
 const studentCss = read('src/components/analytics-v12/analytics-v12.css');
 const store = read('src/store/use-app-store.ts');
 const views = read('src/lib/workspaceViews.ts');
@@ -64,7 +65,7 @@ check('report downloads do not reveal server secrets', !reports.includes('SUPABA
 check('institution CSS remains isolated', institutionCss.includes('.institution-analytics') && institutionCss.includes('.institution-student-full-analytics'));
 check('admin analytics view remains registered', store.includes("| 'admin-analytics'") && views.includes("'admin-analytics': 'analytics'"));
 check('admin and school sidebars retain analytics routes', sidebar.includes("view: 'admin-analytics'") && sidebar.includes("view: 'school-analytics-overview'"));
-check('student analytics remains available to students', page.includes('AnalyticsV12Workspace mode="student"'));
+check('student analytics remains available to students', page.includes("view.startsWith('student-analytics-')") && page.includes('<StudentPreviewAnalytics view={analyticsView(view)} />') && studentPreview.includes('AnalyticsV12Workspace'));
 check('question select-all column remains compact', questions.includes('w-[44px] min-w-[44px] max-w-[44px] px-0 text-center'));
 check('question serial number column remains fixed', questions.includes('w-[72px] min-w-[72px] max-w-[72px]'));
 check('temporary installer payload is excluded from TypeScript', Array.isArray(tsconfig.exclude) && tsconfig.exclude.includes('_institution_analytics_payload'));
@@ -73,6 +74,7 @@ check('live-fix installer payload is absent after installation', !exists('_insti
 
 const failed = checks.filter((item) => !item.ok);
 for (const item of checks) console.log(`${item.ok ? '✓' : '✗'} ${item.label}`);
+for (const item of failed) console.error(`::error title=Institution analytics regression::${item.label}`);
 if (failed.length) {
   console.error(`\nInstitution analytics live validation failed (${failed.length}/${checks.length} checks).`);
   process.exit(1);

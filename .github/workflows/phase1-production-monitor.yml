@@ -1,0 +1,27 @@
+name: Evidara Phase 1 Production Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  production-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe production application and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://quizmaker2-saga0003s-projects.vercel.app"
+          curl --fail --silent --show-error --max-time 20 "$base/" >/dev/null
+          curl --fail --silent --show-error --max-time 20 "$base/api/ops/health/" | tee ops-health.json
+          node -e 'const fs=require("fs"); const h=JSON.parse(fs.readFileSync("ops-health.json","utf8")); if(!h.ok) process.exit(1); for (const [k,v] of Object.entries(h.dependencies||{})) if(!v) throw new Error(`dependency unhealthy: ${k}`); for (const [k,v] of Object.entries(h.activity||{})) if(v) throw new Error(`failure signal active: ${k}`);'
+
+      - name: Monitoring contract
+        if: always()
+        run: echo "A failed scheduled run is the Phase-1 operational alert. Build failures remain enforced by the release-gate workflow; production 5xx/dependency/activity failures fail this monitor."

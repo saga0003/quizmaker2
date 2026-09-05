@@ -28,8 +28,8 @@ check('the lifecycle manager has loading, unavailable, empty, retry, and permiss
   'Student roster access is not permitted',
 ].every((copy) => lifecycle.includes(copy)));
 check('teacher UI explains assigned-section read-only scope', lifecycle.includes('Assigned-section read-only access') && lifecycle.includes('Assigned sections'));
-check('student invitation and lifecycle statuses are represented honestly', lifecycle.includes('invitationStatus') && lifecycle.includes('<option value="invited">Invited</option>') && lifecycle.includes('<option value="revoked">Revoked</option>'));
-check('manager actions retain add, edit, password, promotion, track and revocation behavior', [
+check('student invitation and canonical lifecycle statuses are represented honestly', lifecycle.includes('invitationStatus') && lifecycle.includes('<option value="invited">Invited</option>') && lifecycle.includes('<option value="withdrawn">Withdrawn</option>') && lifecycle.includes('<option value="completed">Completed</option>') && lifecycle.includes('<option value="suspended">Suspended</option>'));
+check('manager actions retain add, edit, password, promotion, lifecycle and removal behavior', [
   'inviteStudent',
   'updateStudent',
   'setStudentPassword',
@@ -38,7 +38,7 @@ check('manager actions retain add, edit, password, promotion, track and revocati
   'revoke',
   'removeStudent',
 ].every((action) => lifecycle.includes(`execute("${action}"`) || lifecycle.includes(`command("${action}"`)));
-check('dangerous lifecycle actions use explicit confirmation dialogs', lifecycle.includes('Revoke this student') && lifecycle.includes('Promote {selected.size} selected student') && lifecycle.includes('Remove {detail.fullName} from this institution?'));
+check('dangerous lifecycle actions use explicit confirmation dialogs', lifecycle.includes('Withdraw this student?') && lifecycle.includes('Suspend this student?') && lifecycle.includes('Mark this student completed?') && lifecycle.includes('Promote {selected.size} selected student') && lifecycle.includes('Remove {detail.fullName} from this institution?'));
 check('desktop roster is responsive and exposes an explicit empty state', lifecycle.includes('min-w-[980px]') && lifecycle.includes('overflow-x-auto') && lifecycle.includes('No student records match this view'));
 check('narrow roster view collapses the existing sidebar without redesigning it', lifecycle.includes('window.matchMedia("(max-width: 640px)")') && lifecycle.includes('setSidebarOpen(false)'));
 check('cloud failures retain status for explicit permission handling', hook.includes('SchoolPlatformRequestError') && hook.includes('errorStatus'));

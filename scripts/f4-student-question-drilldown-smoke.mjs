@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const analytics = read('src/components/analytics-v12/student-analytics-v12.tsx');
+const institution = read('src/components/institution-analytics/institution-analytics-workspace.tsx');
+const types = read('src/types/analytics-v12.ts');
+const failures = [];
+let passed = 0;
+const check = (label, condition) => { if (condition) { passed += 1; console.log(`✓ ${label}`); } else { failures.push(label); console.error(`✗ ${label}`); } };
+check('institution student drill-down embeds the live AnalyticsV12 workspace', /AnalyticsV12Workspace mode="school" selectedStudentId=\{detail\.student\.id\} embedded hideStudentSelector/.test(institution));
+check('subject opens chapter drill-down', /openChapter=\{\(row\) => \{ setChapterId\(row\.id\); go\('chapter'\); \}\}/.test(analytics));
+check('chapter opens topic drill-down', /openTopic=\{\(row\) => \{ setTopicId\(row\.id\); go\('topic'\); \}\}/.test(analytics));
+check('topic opens question intelligence', /openQuestionIntelligence=\{\(\) => go\('question-intelligence'\)\}/.test(analytics));
+check('analytics contract carries question-level response evidence', /question_evidence\?: AnalyticsQuestionEvidenceRow\[\]/.test(types));
+check('question intelligence uses the current authorized payload rather than a second RPC', /const questionEvidence = \(payload\.question_evidence \|\| \[\]\)/.test(analytics));
+check('question evidence is restricted to the selected topic id', /\.filter\(\(row\) => row\.topic_id === topic\.id\)/.test(analytics));
+check('question rows expose question text, test and question number', /row\.paper_title[\s\S]*?row\.question_no[\s\S]*?row\.question_text/.test(analytics));
+check('question rows expose canonical outcome evidence', /row\.outcome === 'correct'[\s\S]*?'Incorrect'[\s\S]*?'Unanswered'/.test(analytics));
+check('question rows expose awarded marks and recorded time', /row\.marks_awarded[\s\S]*?row\.time_spent_seconds/.test(analytics));
+check('question rows use response id as stable evidence key', /key=\{row\.response_id\}/.test(analytics));
+check('missing topic evidence fails honestly without synthetic rows', /No question evidence for this topic[\s\S]*?No synthetic rows are substituted/.test(analytics));
+check('legacy question-level-not-available placeholder is removed', !analytics.includes('Question-level detail is not available yet'));
+if (failures.length) { console.error(`\nF4 student question drill-down smoke failed: ${failures.length} failed, ${passed} passed.`); process.exit(1); }
+console.log(`\nF4 student question drill-down checks passed (${passed} checks).`);

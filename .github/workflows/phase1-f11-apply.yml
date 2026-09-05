@@ -1,0 +1,25 @@
+name: Phase 1 F11 apply
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/phase1-f11-apply.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Apply F11 result sheet
+        run: python3 scripts/f11-apply-patch.py
+      - name: Verify F11 smoke
+        run: node scripts/f11-traditional-result-sheet-smoke.mjs
+      - name: Commit F11
+        run: |
+          git config user.name 'saga0003'
+          git config user.email 'sagar@smis.edu.in'
+          git add src/components/evidara/live-paper-catalogue-v8.tsx scripts/f11-traditional-result-sheet-smoke.mjs
+          git commit -m 'feat(f11): add traditional result sheet'
+          git push origin HEAD:phase1-hardening
