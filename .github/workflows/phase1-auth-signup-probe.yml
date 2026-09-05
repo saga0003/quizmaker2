@@ -24,17 +24,22 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const fs = require('fs');
-          const req = JSON.parse(fs.readFileSync('.github/phase1-auth-signup-probe-request.json','utf8'));
-          if (req.tenant !== 'evidara-school-acceptance' || req.projectRef !== 'xzfozpnzvznqrvcsoail' || req.syntheticOnly !== true) throw new Error('guard failed');
-          const email = `phase1-signup-probe-${Date.now()}@evidara.invalid`;
-          const res = await fetch('https://xzfozpnzvznqrvcsoail.supabase.co/auth/v1/signup', {
-            method:'POST',
-            headers:{apikey:process.env.SUPABASE_PUBLISHABLE_KEY,'content-type':'application/json'},
-            body:JSON.stringify({email,password:process.env.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD,data:{phase1_acceptance_probe:true}})
+          (async () => {
+            const req = JSON.parse(fs.readFileSync('.github/phase1-auth-signup-probe-request.json','utf8'));
+            if (req.tenant !== 'evidara-school-acceptance' || req.projectRef !== 'xzfozpnzvznqrvcsoail' || req.syntheticOnly !== true) throw new Error('guard failed');
+            const email = `phase1-signup-probe-${Date.now()}@evidara.invalid`;
+            const res = await fetch('https://xzfozpnzvznqrvcsoail.supabase.co/auth/v1/signup', {
+              method:'POST',
+              headers:{apikey:process.env.SUPABASE_PUBLISHABLE_KEY,'content-type':'application/json'},
+              body:JSON.stringify({email,password:process.env.EVIDARA_ACCEPTANCE_STUDENT_PASSWORD,data:{phase1_acceptance_probe:true}})
+            });
+            const body = await res.json().catch(()=>({}));
+            if (!res.ok) throw new Error(`signup HTTP ${res.status}`);
+            console.log(JSON.stringify({signupHttp:res.status,userCreated:Boolean(body.user?.id),sessionIssued:Boolean(body.access_token),emailDomain:'evidara.invalid',secretRecorded:false}));
+            if (!body.user?.id) process.exit(2);
+            if (!body.access_token) process.exit(3);
+          })().catch((err) => {
+            console.error(err instanceof Error ? err.message : String(err));
+            process.exit(1);
           });
-          const body = await res.json().catch(()=>({}));
-          if (!res.ok) throw new Error(`signup HTTP ${res.status}`);
-          console.log(JSON.stringify({signupHttp:res.status,userCreated:Boolean(body.user?.id),sessionIssued:Boolean(body.access_token),userId:body.user?.id??null,emailDomain:'evidara.invalid',secretRecorded:false}));
-          if (!body.user?.id) process.exit(2);
-          if (!body.access_token) process.exit(3);
           NODE
