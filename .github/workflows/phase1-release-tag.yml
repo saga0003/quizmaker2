@@ -1,0 +1,30 @@
+name: Record Phase 1 release tag
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/phase1-release-tag.yml']
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create immutable Phase 1 production tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='phase1-v19.1.0'
+          TARGET='cfcbade06e86d08b1019e6922b75ab479b4b630c'
+          git fetch origin main --tags
+          git cat-file -e "${TARGET}^{commit}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            existing="$(git rev-list -n 1 "${TAG}")"
+            test "$existing" = "$TARGET"
+            echo "Tag already records the expected production commit."
+            exit 0
+          fi
+          git tag -a "$TAG" "$TARGET" -m 'Evidara Phase 1 production release 19.1.0'
+          git push origin "refs/tags/${TAG}"
