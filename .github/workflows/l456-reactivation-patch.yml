@@ -1,0 +1,62 @@
+name: L456 Reactivation Patch
+on:
+  push:
+    branches: [phase1-hardening]
+    paths: ['.github/workflows/l456-reactivation-patch.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase1-hardening
+      - name: Patch suspended synthetic membership reactivation
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('scripts/phase1-l456-sharded-acceptance.mjs')
+          s=p.read_text()
+          old="""    // Enrol each fresh synthetic identity using the real School Admin membership RPC.
+    for (const actor of actors) {
+      const r = await rpc(admin.token, 'add_school_student_membership_v13', {
+        p_organization_id: ORG_ID, p_student_id: actor.userId, p_academic_year: '2026-27', p_grade: 11,
+        p_section: 'A', p_board: 'ISC', p_tracks: ['NEET'], p_parent_name: null, p_parent_phone: null,
+      });
+      if (!r.ok) throw new Error(`membership add failed for synthetic actor ${actor.actorIndex} (${r.status})`);
+    }
+    newMembershipsAdded = true;
+"""
+          new="""    // Enrol each fresh synthetic identity. Interrupted prior runs leave these exact
+    // acceptance memberships suspended/promotion-locked, so reactivate those through the
+    // lifecycle RPC instead of incorrectly sending them back through the add RPC.
+    const currentRosterResult = await rpc(admin.token, 'list_school_student_lifecycle_v13', { p_organization_id: ORG_ID });
+    if (!currentRosterResult.ok) throw new Error(`current roster failed (${currentRosterResult.status})`);
+    const currentRoster = JSON.parse(currentRosterResult.text);
+    const membershipByName = new Map((currentRoster.students ?? []).map((m) => [m.name, m]));
+    for (const actor of actors) {
+      const actorName = `phase1-l456-student-${String(actor.actorIndex).padStart(4, '0')}`;
+      const existing = membershipByName.get(actorName);
+      const r = existing
+        ? await rpc(admin.token, 'set_school_student_lifecycle_status_v14', {
+            p_membership_id: existing.id, p_status: 'active', p_reason: `Phase 1 L4-L6 synthetic shard ${shard} seat swap`,
+          })
+        : await rpc(admin.token, 'add_school_student_membership_v13', {
+            p_organization_id: ORG_ID, p_student_id: actor.userId, p_academic_year: '2026-27', p_grade: 11,
+            p_section: 'A', p_board: 'ISC', p_tracks: ['NEET'], p_parent_name: null, p_parent_phone: null,
+          });
+      if (!r.ok) throw new Error(`membership activate failed for synthetic actor ${actor.actorIndex} (${r.status})`);
+    }
+    newMembershipsAdded = true;
+"""
+          if old not in s:
+            raise SystemExit('guarded source block not found')
+          p.write_text(s.replace(old,new,1))
+      - name: Commit patch
+        run: |
+          git config user.name saga0003
+          git config user.email sagar@smis.edu.in
+          git add scripts/phase1-l456-sharded-acceptance.mjs
+          git commit -m "fix(load): reactivate suspended L4-L6 synthetic memberships"
+          git push origin HEAD:phase1-hardening
