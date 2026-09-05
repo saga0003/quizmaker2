@@ -174,7 +174,7 @@ This is the single source of truth for the Evidara Phase 1 hardening programme.
 # Load acceptance
 
 - [ ] L1 2,000 students/institution test dataset.
-- [ ] L2 50,000 questions/institution searchable without full-browser load.
+- [x] L2 50,000 questions/institution searchable without full-browser load. — Verified 5 Sep 2026 using only isolated evidara-school-acceptance in SMIS QP: exactly 50,000 institution questions (500 canonical + 49,500 clearly tagged synthetic draft rows). Authenticated institution-scoped search_question_bank_v1 paging avoided full-browser loading; exact synthetic search executed in 184.319 ms and general first 25-row page in 603.762 ms. Durable evidence: PHASE1_LOAD_ACCEPTANCE_EVIDENCE.md. Exact evidence checkpoint 7390047266c7cef726f42d4428c017bd9ea424ee passed complete Phase 1 release gate 33950889193. Permanent production remained protected.
 - [ ] L3 1,000 papers dataset.
 - [ ] L4 500 near-concurrent test starts.
 - [ ] L5 500 concurrent answer-save patterns.
