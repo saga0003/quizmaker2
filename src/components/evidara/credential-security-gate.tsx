@@ -16,43 +16,57 @@ type SecurityState = {
 
 export function CredentialSecurityGate({ children }: { children: ReactNode }) {
   const { session, signOut } = useAuth();
+  const userId = session?.user.id ?? null;
+  const accessToken = session?.access_token ?? null;
   const [security, setSecurity] = useState<SecurityState | null>(null);
+  const [securityUserId, setSecurityUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
 
-  const requestSecurity = useCallback(async () => {
-    if (!session?.access_token) return null;
+  const requestSecurity = useCallback(async (token: string) => {
     const response = await fetch('/api/account/security/', {
       cache: 'no-store',
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `Security check failed (${response.status}).`);
     return payload as SecurityState;
-  }, [session]);
+  }, []);
 
-  const refresh = useCallback(async () => {
-    if (!session?.access_token) {
+  const refreshSecurity = useCallback(async (token: string, targetUserId: string, blocking: boolean) => {
+    if (blocking) setLoading(true);
+    setError('');
+    try {
+      const state = await requestSecurity(token);
+      setSecurity(state);
+      setSecurityUserId(targetUserId);
+      return state;
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to verify account security.');
+      return null;
+    } finally {
+      if (blocking) setLoading(false);
+    }
+  }, [requestSecurity]);
+
+  useEffect(() => {
+    if (!userId || !accessToken) {
+      setSecurity(null);
+      setSecurityUserId(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError('');
-    try {
-      const state = await requestSecurity();
-      if (!state) return;
-      setSecurity(state);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to verify account security.');
-    } finally {
-      setLoading(false);
-    }
-  }, [requestSecurity, session]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+    // Supabase may rotate the access token when a background/mobile tab becomes
+    // active again. A token refresh is not a new login, so never tear down the
+    // current workspace just to repeat the same security check. Re-check only
+    // when the signed-in user actually changes.
+    if (securityUserId === userId) return;
+    void refreshSecurity(accessToken, userId, true);
+  }, [accessToken, refreshSecurity, securityUserId, userId]);
 
   const passwordReady = useMemo(() => (
     password.length >= 12
@@ -65,14 +79,14 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session?.access_token || !passwordReady) return;
+    if (!accessToken || !userId || !passwordReady) return;
     setSavingPassword(true);
     setError('');
     try {
       const response = await fetch('/api/account/security/', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ action: 'change_password', password }),
@@ -81,7 +95,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error(payload.error || 'Password could not be changed.');
       setPassword('');
       setConfirmPassword('');
-      await refresh();
+      await refreshSecurity(accessToken, userId, false);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Password could not be changed.');
     } finally {
@@ -89,7 +103,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     }
   }
 
-  if (loading || !security) {
+  if (loading || !security || securityUserId !== userId) {
     return (
       <div className="grid min-h-[65vh] place-items-center">
         <div className="text-center text-sm text-[#6B7980]"><LoaderCircle className="mx-auto mb-3 h-7 w-7 animate-spin text-[#0E5A5A]" />Verifying account security…</div>
