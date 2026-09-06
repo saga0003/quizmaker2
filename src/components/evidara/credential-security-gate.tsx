@@ -1,10 +1,8 @@
 'use client';
 
-import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-react';
+import { KeyRound, LoaderCircle, LockKeyhole } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -16,27 +14,14 @@ type SecurityState = {
   role: string;
 };
 
-type MfaMode = 'checking' | 'enroll' | 'challenge' | 'ready';
-
-type TotpEnrollment = {
-  factorId: string;
-  qrCode: string;
-  secret: string;
-};
-
 export function CredentialSecurityGate({ children }: { children: ReactNode }) {
-  const { session, profile, signOut } = useAuth();
+  const { session, signOut } = useAuth();
   const [security, setSecurity] = useState<SecurityState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
-  const [mfaMode, setMfaMode] = useState<MfaMode>('checking');
-  const [factorId, setFactorId] = useState('');
-  const [enrollment, setEnrollment] = useState<TotpEnrollment | null>(null);
-  const [mfaCode, setMfaCode] = useState('');
-  const [mfaBusy, setMfaBusy] = useState(false);
 
   const requestSecurity = useCallback(async () => {
     if (!session?.access_token) return null;
@@ -49,39 +34,6 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     return payload as SecurityState;
   }, [session]);
 
-  const checkMfa = useCallback(async (state: SecurityState) => {
-    if (!state.privileged || !supabase) {
-      setMfaMode('ready');
-      return;
-    }
-    setMfaMode('checking');
-    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (assurance.error) throw assurance.error;
-    if (assurance.data.currentLevel === 'aal2') {
-      setMfaMode('ready');
-      return;
-    }
-
-    const factors = await supabase.auth.mfa.listFactors();
-    if (factors.error) throw factors.error;
-    const verified = factors.data.totp.find((factor) => factor.status === 'verified');
-    if (verified) {
-      setFactorId(verified.id);
-      setMfaMode('challenge');
-      return;
-    }
-
-    const enroll = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Evidara privileged access' });
-    if (enroll.error) throw enroll.error;
-    setEnrollment({
-      factorId: enroll.data.id,
-      qrCode: enroll.data.totp.qr_code,
-      secret: enroll.data.totp.secret,
-    });
-    setFactorId(enroll.data.id);
-    setMfaMode('enroll');
-  }, []);
-
   const refresh = useCallback(async () => {
     if (!session?.access_token) {
       setLoading(false);
@@ -93,17 +45,12 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       const state = await requestSecurity();
       if (!state) return;
       setSecurity(state);
-      if (state.mustChangePassword) {
-        setMfaMode('checking');
-      } else {
-        await checkMfa(state);
-      }
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to verify account security.');
     } finally {
       setLoading(false);
     }
-  }, [checkMfa, requestSecurity, session]);
+  }, [requestSecurity, session]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -142,26 +89,6 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     }
   }
 
-  async function verifyMfa(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!supabase || !factorId || mfaCode.trim().length !== 6) return;
-    setMfaBusy(true);
-    setError('');
-    try {
-      const result = await supabase.auth.mfa.challengeAndVerify({ factorId, code: mfaCode.trim() });
-      if (result.error) throw result.error;
-      const refreshed = await supabase.auth.refreshSession();
-      if (refreshed.error) throw refreshed.error;
-      setMfaCode('');
-      setMfaMode('ready');
-      window.location.reload();
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'MFA verification failed.');
-    } finally {
-      setMfaBusy(false);
-    }
-  }
-
   if (loading || !security) {
     return (
       <div className="grid min-h-[65vh] place-items-center">
@@ -184,38 +111,6 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
             {error && <div className="rounded-xl border border-[#E5B5B5] bg-[#FFF4F4] px-4 py-3 text-sm text-[#A33A3A]">{error}</div>}
             <Button type="submit" disabled={!passwordReady || savingPassword} className="w-full bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{savingPassword ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}Set password and continue</Button>
           </form>
-          <button type="button" onClick={() => void signOut()} className="mt-4 w-full text-center text-xs font-medium text-[#6B7980] hover:text-[#14232B]">Sign out</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (security.privileged && mfaMode !== 'ready') {
-    return (
-      <div className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4 py-10">
-        <div className="w-full rounded-2xl border border-[#DDE5E8] bg-white p-6 shadow-sm sm:p-8">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#EAF6F4] text-[#0E5A5A]"><ShieldCheck className="h-6 w-6" /></div>
-          <h1 className="mt-5 text-2xl font-bold text-[#14232B]">Multi-factor verification required</h1>
-          <p className="mt-2 text-sm leading-6 text-[#6B7980]">{profile?.full_name || 'This privileged account'} can manage institution or platform data, so Evidara requires an authenticator code before the workspace is unlocked.</p>
-
-          {mfaMode === 'checking' && <div className="mt-6 flex items-center gap-2 rounded-xl bg-[#F7F9F7] p-4 text-sm text-[#6B7980]"><LoaderCircle className="h-4 w-4 animate-spin" />Checking your authenticator…</div>}
-
-          {mfaMode === 'enroll' && enrollment && (
-            <div className="mt-6 space-y-4">
-              <div className="rounded-xl border border-[#E7ECEB] bg-white p-4 text-center"><Image unoptimized src={enrollment.qrCode} alt="Authenticator QR code" width={192} height={192} className="mx-auto h-48 w-48" /></div>
-              <div className="rounded-xl bg-[#F7F9F7] p-4 text-xs leading-5 text-[#5E6E74]">Scan the QR code in Google Authenticator, Microsoft Authenticator, 1Password or another TOTP app. If scanning is unavailable, enter this setup key: <strong className="break-all text-[#14232B]">{enrollment.secret}</strong></div>
-            </div>
-          )}
-
-          {(mfaMode === 'enroll' || mfaMode === 'challenge') && (
-            <form className="mt-5 space-y-4" onSubmit={verifyMfa}>
-              <div><label htmlFor="mfa-code" className="text-sm font-medium text-[#14232B]">6-digit authenticator code</label><Input id="mfa-code" inputMode="numeric" autoComplete="one-time-code" value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" className="mt-2 text-center text-lg tracking-[0.35em]" /></div>
-              {error && <div className="rounded-xl border border-[#E5B5B5] bg-[#FFF4F4] px-4 py-3 text-sm text-[#A33A3A]">{error}</div>}
-              <Button type="submit" disabled={mfaCode.length !== 6 || mfaBusy} className="w-full bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{mfaBusy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Verify and unlock Evidara</Button>
-            </form>
-          )}
-
-          {error && mfaMode === 'checking' && <div className="mt-5 rounded-xl border border-[#E5B5B5] bg-[#FFF4F4] px-4 py-3 text-sm text-[#A33A3A]">{error}</div>}
           <button type="button" onClick={() => void signOut()} className="mt-4 w-full text-center text-xs font-medium text-[#6B7980] hover:text-[#14232B]">Sign out</button>
         </div>
       </div>
