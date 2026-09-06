@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
-import { normalizeEvidaraRole, type EvidaraRole } from '@/lib/roles';
-import { EVIDARA_MODULE_KEYS, type EvidaraModuleAccess, type EvidaraModuleKey } from '@/lib/modules';
+import { normalizeEvidaraRole } from '@/lib/roles';
+import { EVIDARA_MODULE_KEYS, isHardLockedModule, type EvidaraModuleAccess, type EvidaraModuleKey } from '@/lib/modules';
 
 type ModuleSetting = {
   organization_id: string | null;
@@ -14,12 +14,6 @@ type ModuleSetting = {
 };
 
 const modules = EVIDARA_MODULE_KEYS;
-
-export function isHardLockedModule(role: EvidaraRole, moduleKey: EvidaraModuleKey) {
-  if (role === 'student') return ['questions', 'students', 'subscriptions'].includes(moduleKey);
-  if (role === 'school_teacher') return ['students', 'subscriptions'].includes(moduleKey);
-  return false;
-}
 
 function defaults(role: string) {
   const normalized = normalizeEvidaraRole(role);
