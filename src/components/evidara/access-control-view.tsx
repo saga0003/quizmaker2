@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
 import { evidaraRoleLabel, type EvidaraRole } from '@/lib/roles';
+import { isHardLockedModule, type EvidaraModuleKey } from '@/lib/modules';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,15 +47,16 @@ import {
 import { HelpIcon } from '@/components/evidara/question-help';
 import { BulkAccountImport } from '@/components/evidara/bulk-account-import';
 
-const moduleDefinitions = [
-  ['questions', 'Questions', 'Create, import, review and manage question banks.'],
-  ['papers', 'Papers', 'Build, publish and manage assessment papers.'],
-  ['students', 'Students', 'View and manage school students.'],
-  ['resources', 'Resources', 'View and manage academic resources.'],
-  ['subscriptions', 'Subscriptions', 'View subscription and billing controls.'],
-] as const;
+const moduleDefinitions: ReadonlyArray<readonly [EvidaraModuleKey, string, string]> = [
+  ['questions', 'Questions', 'Create, import, review and manage question banks. Students never receive this workspace.'],
+  ['papers', 'Papers / Tests', 'Admins and teachers build papers; students use this permission only to access assigned tests.'],
+  ['students', 'Students', 'Manage the institution roster. Teachers can still see scoped learners inside tests and analytics.'],
+  ['analytics', 'Analytics', 'View role-scoped performance analytics and evidence.'],
+  ['resources', 'Resources', 'View or manage academic resources according to role and institution scope.'],
+  ['subscriptions', 'Subscriptions', 'Licence, seat and billing controls. Teachers and students never receive this module.'],
+];
 
-type ModuleKey = typeof moduleDefinitions[number][0];
+type ModuleKey = EvidaraModuleKey;
 
 type Setting = {
   id: string;
@@ -72,6 +74,13 @@ type Organization = {
   state?: string;
 };
 
+type Membership = {
+  organizationId: string;
+  organizationName: string;
+  role: EvidaraRole;
+  isActive?: boolean;
+};
+
 type Account = {
   id: string;
   full_name: string | null;
@@ -79,7 +88,7 @@ type Account = {
   email: string;
   role: EvidaraRole;
   updated_at: string;
-  memberships: Array<{ organizationId: string; organizationName: string; role: EvidaraRole }>;
+  memberships: Membership[];
 };
 
 type Snapshot = {
@@ -105,6 +114,8 @@ type Snapshot = {
 
 const roleOptions: EvidaraRole[] = ['super_admin', 'evidara_admin', 'school_admin', 'school_teacher', 'student'];
 const schoolRoleOptions: EvidaraRole[] = ['school_admin', 'school_teacher', 'student'];
+const schoolManageableRoles: EvidaraRole[] = ['school_teacher', 'student'];
+
 function makeTemporaryPassword() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#';
   return Array.from({ length: 12 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
@@ -149,11 +160,14 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const filterReady = useRef(false);
 
+  const actorRoleForUi: EvidaraRole = currentUser?.accessRole || snapshot?.actor.role || 'student';
+  const platformUi = kind === 'admin' && (actorRoleForUi === 'super_admin' || actorRoleForUi === 'evidara_admin');
+
   const applySnapshot = useCallback((data: Snapshot, requestedOrganizationId?: string) => {
     setSnapshot(data);
     const resolved = kind === 'school'
-      ? data.actor.organizationId || 'platform'
-      : requestedOrganizationId || (data.activeOrganizationId || 'platform');
+      ? data.actor.organizationId || data.activeOrganizationId || 'platform'
+      : requestedOrganizationId || data.activeOrganizationId || 'platform';
     setScopeOrganizationId(resolved);
     setRoleDrafts(Object.fromEntries(data.accounts.map((account) => [account.id, account.role])));
     setSchoolDrafts(Object.fromEntries(data.accounts.map((account) => [account.id, account.memberships[0]?.organizationId || ''])));
@@ -201,24 +215,36 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
 
   const effectiveRoles = useMemo(() => {
     if (!snapshot) return [] as EvidaraRole[];
-    if (snapshot.actor.superAdmin && scopeOrganizationId === 'platform') return roleOptions;
+    if (platformUi && actorRoleForUi === 'super_admin' && scopeOrganizationId === 'platform') return roleOptions;
     return schoolRoleOptions;
-  }, [scopeOrganizationId, snapshot]);
+  }, [actorRoleForUi, platformUi, scopeOrganizationId, snapshot]);
 
   const manageableRoles = useMemo(() => {
-    if (!snapshot) return [] as EvidaraRole[];
-    if (snapshot.actor.superAdmin) return roleOptions;
-    if (snapshot.actor.role === 'evidara_admin') return schoolRoleOptions;
-    return ['school_teacher', 'student'] as EvidaraRole[];
-  }, [snapshot]);
+    if (actorRoleForUi === 'super_admin') return roleOptions;
+    if (actorRoleForUi === 'evidara_admin') return schoolRoleOptions;
+    return schoolManageableRoles;
+  }, [actorRoleForUi]);
 
-  const canManageAccounts = Boolean(snapshot && (snapshot.actor.superAdmin || snapshot.actor.role === 'evidara_admin' || snapshot.actor.role === 'school_admin'));
+  const directoryRoleOptions = platformUi ? roleOptions : schoolRoleOptions;
+  const canManageAccounts = ['super_admin', 'evidara_admin', 'school_admin'].includes(actorRoleForUi);
   const importOrganizationId = scopeOrganizationId === 'platform' ? snapshot?.actor.organizationId || null : scopeOrganizationId;
-
   const visibleAccounts = snapshot?.accounts || [];
 
+  function accountCanBeManaged(account: Account) {
+    if (actorRoleForUi === 'super_admin') return true;
+    if (actorRoleForUi === 'evidara_admin') return !['super_admin', 'evidara_admin'].includes(account.role);
+    if (actorRoleForUi === 'school_admin') return ['school_teacher', 'student'].includes(account.role);
+    return false;
+  }
+
+  function moduleLockReason(role: EvidaraRole, moduleKey: ModuleKey) {
+    if (isHardLockedModule(role, moduleKey)) return 'Never available';
+    if (actorRoleForUi === 'school_admin' && role === 'school_admin') return 'Platform managed';
+    return '';
+  }
+
   function enabled(role: EvidaraRole, moduleKey: ModuleKey) {
-    if (role === 'student' && moduleKey === 'questions') return false;
+    if (isHardLockedModule(role, moduleKey)) return false;
     if (!snapshot) return true;
     const organizationId = scopeOrganizationId === 'platform' ? null : scopeOrganizationId;
     const scoped = snapshot.settings.find((setting) =>
@@ -229,7 +255,6 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
       setting.organization_id === null && setting.role === role && setting.module_key === moduleKey,
     );
     if (platform) return platform.enabled;
-    if (role === 'school_teacher' && (moduleKey === 'students' || moduleKey === 'subscriptions')) return false;
     return true;
   }
 
@@ -258,6 +283,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
   }
 
   async function setModule(role: EvidaraRole, moduleKey: ModuleKey, value: boolean) {
+    if (moduleLockReason(role, moduleKey)) return;
     await mutate({
       action: 'setModuleAccess',
       organizationId: scopeOrganizationId === 'platform' ? null : scopeOrganizationId,
@@ -268,6 +294,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
   }
 
   async function saveRole(account: Account) {
+    if (!accountCanBeManaged(account)) return;
     const role = roleDrafts[account.id] || account.role;
     const organizationId = schoolDrafts[account.id] || null;
     await mutate({
@@ -279,7 +306,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
   }
 
   async function resetPassword() {
-    if (!passwordAccount) return;
+    if (!passwordAccount || !accountCanBeManaged(passwordAccount)) return;
     await mutate({
       action: 'resetPassword',
       userId: passwordAccount.id,
@@ -303,9 +330,9 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
           </div>
           <div className="mt-2 flex items-center gap-2">
             <h1 className="text-2xl font-bold text-[var(--foreground)]">{kind === 'admin' ? 'Access & Accounts' : 'School Access Control'}</h1>
-            <HelpIcon text="A checked module appears for that role. Removing access hides it from navigation and blocks the workspace. Student access to Questions is permanently disabled." />
+            <HelpIcon text="Permissions are institution-scoped. Questions, Students and Subscriptions are permanently blocked for roles that should never receive those workspaces." />
           </div>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Manage module access and institution-scoped accounts. Super Admin controls all roles; Evidara Admin manages school roles; School Admin manages teachers and students in their own school.</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Super Admin owns platform policy; Evidara Admin operates schools and subscriptions; School Admin manages only teachers and students in their own institution.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManageAccounts && <BulkAccountImport organizationId={importOrganizationId} onCompleted={() => void load(scopeOrganizationId, 1, search, roleFilter)} />}
@@ -318,20 +345,14 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
       {error && <div className="rounded-xl border border-[var(--destructive)]/20 bg-[var(--destructive)]/5 px-4 py-3 text-sm text-[var(--destructive)]">{error}</div>}
       {message && <div className="rounded-xl border border-[var(--teal)]/20 bg-[var(--secondary)]/60 px-4 py-3 text-sm text-[var(--teal)]">{message}</div>}
 
-      {snapshot?.actor.platformAdmin && (
+      {platformUi && snapshot?.actor.platformAdmin && (
         <Card className="gap-0 border-[var(--line)] shadow-none">
           <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div>
               <strong className="text-sm text-[var(--foreground)]">Permission scope</strong>
-              <p className="text-xs text-[var(--muted-foreground)]">Platform defaults apply everywhere unless a school-specific setting overrides them.</p>
+              <p className="text-xs text-[var(--muted-foreground)]">Platform defaults apply everywhere unless a school-specific setting overrides an allowed module.</p>
             </div>
-            <Select
-              value={scopeOrganizationId}
-              onValueChange={(value) => {
-                setScopeOrganizationId(value);
-                void load(value, 1, search, roleFilter);
-              }}
-            >
+            <Select value={scopeOrganizationId} onValueChange={(value) => { setScopeOrganizationId(value); void load(value, 1, search, roleFilter); }}>
               <SelectTrigger className="w-full border-[var(--line)] md:w-[320px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="platform">Platform default</SelectItem>
@@ -348,7 +369,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
             <SlidersHorizontal className="h-5 w-5 text-[var(--teal)]" />
             <div>
               <strong className="text-sm text-[var(--foreground)]">Module permissions</strong>
-              <p className="text-xs text-[var(--muted-foreground)]">Changes apply immediately after the affected user refreshes or signs in again.</p>
+              <p className="text-xs text-[var(--muted-foreground)]">Analytics is now governed explicitly. Red/locked combinations cannot be granted even through the API.</p>
             </div>
           </div>
         </div>
@@ -368,7 +389,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
                     <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">{description}</p>
                   </td>
                   {effectiveRoles.map((role) => {
-                    const locked = role === 'student' && moduleKey === 'questions';
+                    const lockReason = moduleLockReason(role, moduleKey);
                     const key = `${role}:${moduleKey}`;
                     return (
                       <td key={role} className="px-4 py-4 text-center">
@@ -376,12 +397,12 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
                           {savingKey === key && <LoaderCircle className="h-4 w-4 animate-spin text-[var(--teal)]" />}
                           <Switch
                             checked={enabled(role, moduleKey)}
-                            disabled={locked || savingKey === key}
+                            disabled={Boolean(lockReason) || savingKey === key}
                             onCheckedChange={(value) => void setModule(role, moduleKey, value)}
                             aria-label={`${label} for ${evidaraRoleLabel(role)}`}
                           />
                         </div>
-                        {locked && <p className="mt-1 text-[10px] text-[var(--destructive)]">Never available</p>}
+                        {lockReason && <p className={`mt-1 text-[10px] ${lockReason === 'Never available' ? 'text-[var(--destructive)]' : 'text-[var(--muted-foreground)]'}`}>{lockReason}</p>}
                       </td>
                     );
                   })}
@@ -398,7 +419,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
             <UserCog className="h-5 w-5 text-[var(--teal)]" />
             <div>
               <strong className="text-sm text-[var(--foreground)]">{canManageAccounts ? 'Account roles and passwords' : 'Accounts in this scope'}</strong>
-              <p className="text-xs text-[var(--muted-foreground)]">{canManageAccounts ? 'Role changes are automatically limited to the signed-in administrator scope. Password reset always generates/sets a new temporary password; old passwords are never revealed.' : 'You have read-only access to this directory.'}</p>
+              <p className="text-xs text-[var(--muted-foreground)]">School Admin can edit only teachers and students in their own school. Platform administrator accounts remain protected.</p>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -406,7 +427,10 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
               <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, phone or school" className="w-full border-[var(--line)] pl-9 sm:w-[300px]" />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-full border-[var(--line)] sm:w-[170px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All roles</SelectItem>{roleOptions.map((role) => <SelectItem key={role} value={role}>{evidaraRoleLabel(role)}</SelectItem>)}</SelectContent></Select>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full border-[var(--line)] sm:w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All roles</SelectItem>{directoryRoleOptions.map((role) => <SelectItem key={role} value={role}>{evidaraRoleLabel(role)}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -424,7 +448,9 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
             <TableBody>
               {visibleAccounts.map((account) => {
                 const draftRole = roleDrafts[account.id] || account.role;
-                const schoolRequired = draftRole === 'school_admin' || draftRole === 'school_teacher';
+                const schoolRequired = ['school_admin', 'school_teacher', 'student'].includes(draftRole);
+                const editableAccount = canManageAccounts && accountCanBeManaged(account);
+                const schoolNames = [...new Set(account.memberships.filter((membership) => membership.isActive !== false).map((membership) => membership.organizationName).filter(Boolean))];
                 return (
                   <TableRow key={account.id} className="border-[var(--line)]">
                     <TableCell>
@@ -433,15 +459,15 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
                     </TableCell>
                     <TableCell><Badge className="bg-[var(--secondary)] text-[var(--teal)]">{evidaraRoleLabel(account.role)}</Badge></TableCell>
                     <TableCell>
-                      {canManageAccounts && snapshot?.actor.platformAdmin ? (
+                      {editableAccount && platformUi ? (
                         <Select value={schoolDrafts[account.id] || 'none'} onValueChange={(value) => setSchoolDrafts((current) => ({ ...current, [account.id]: value === 'none' ? '' : value }))}>
                           <SelectTrigger disabled={!schoolRequired} className="w-[220px] border-[var(--line)]"><SelectValue placeholder={schoolRequired ? 'Choose school' : 'Not required'} /></SelectTrigger>
-                          <SelectContent><SelectItem value="none">No school</SelectItem>{snapshot.organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent>
+                          <SelectContent><SelectItem value="none">No school</SelectItem>{snapshot?.organizations.map((organization) => <SelectItem key={organization.id} value={organization.id}>{organization.name}</SelectItem>)}</SelectContent>
                         </Select>
-                      ) : <span className="text-sm text-[var(--muted-foreground)]">{account.memberships.map((membership) => membership.organizationName).join(', ') || 'No staff school'}</span>}
+                      ) : <span className="text-sm text-[var(--muted-foreground)]">{schoolNames.join(', ') || 'No active school'}</span>}
                     </TableCell>
                     <TableCell>
-                      {canManageAccounts ? (
+                      {editableAccount ? (
                         <Select value={draftRole} onValueChange={(value) => setRoleDrafts((current) => ({ ...current, [account.id]: value as EvidaraRole }))}>
                           <SelectTrigger className="w-[180px] border-[var(--line)]"><SelectValue /></SelectTrigger>
                           <SelectContent>{manageableRoles.map((role) => <SelectItem key={role} value={role}>{evidaraRoleLabel(role)}</SelectItem>)}</SelectContent>
@@ -449,7 +475,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
                       ) : <span className="text-sm text-[var(--muted-foreground)]">{evidaraRoleLabel(account.role)}</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      {canManageAccounts ? (
+                      {editableAccount ? (
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" size="sm" disabled={savingKey === `role:${account.id}` || (schoolRequired && !schoolDrafts[account.id])} onClick={() => void saveRole(account)} className="border-[var(--line)]">
                             {savingKey === `role:${account.id}` && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Save role
@@ -458,7 +484,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
                             <KeyRound className="mr-2 h-4 w-4" />Reset password
                           </Button>
                         </div>
-                      ) : <span className="text-xs text-[var(--muted-foreground)]">Read only</span>}
+                      ) : <span className="text-xs text-[var(--muted-foreground)]">Protected / read only</span>}
                     </TableCell>
                   </TableRow>
                 );
@@ -467,30 +493,13 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
             </TableBody>
           </Table>
         </div>
+
         {snapshot && snapshot.accountPage.totalPages > 1 && (
           <div className="flex flex-col gap-3 border-t border-[var(--line)] bg-[var(--canvas)] px-5 py-3 text-xs text-[var(--muted-foreground)] sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Page {snapshot.accountPage.page} of {snapshot.accountPage.totalPages} · {snapshot.accountPage.total.toLocaleString()} accounts
-            </span>
+            <span>Page {snapshot.accountPage.page} of {snapshot.accountPage.totalPages} · {snapshot.accountPage.total.toLocaleString()} accounts</span>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loading || snapshot.accountPage.page <= 1}
-                onClick={() => void load(scopeOrganizationId, snapshot.accountPage.page - 1, search, roleFilter)}
-                className="border-[var(--line)]"
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={loading || snapshot.accountPage.page >= snapshot.accountPage.totalPages}
-                onClick={() => void load(scopeOrganizationId, snapshot.accountPage.page + 1, search, roleFilter)}
-                className="border-[var(--line)]"
-              >
-                Next<ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="sm" disabled={loading || snapshot.accountPage.page <= 1} onClick={() => void load(scopeOrganizationId, snapshot.accountPage.page - 1, search, roleFilter)} className="border-[var(--line)]"><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button>
+              <Button variant="outline" size="sm" disabled={loading || snapshot.accountPage.page >= snapshot.accountPage.totalPages} onClick={() => void load(scopeOrganizationId, snapshot.accountPage.page + 1, search, roleFilter)} className="border-[var(--line)]">Next<ChevronRight className="ml-1 h-4 w-4" /></Button>
             </div>
           </div>
         )}
@@ -500,9 +509,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
         <DialogContent className="border-[var(--line)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Set Temporary Password</DialogTitle>
-            <DialogDescription>
-              Set a new temporary password for {passwordAccount?.full_name || passwordAccount?.email}. Evidara cannot display the old password.
-            </DialogDescription>
+            <DialogDescription>Set a new temporary password for {passwordAccount?.full_name || passwordAccount?.email}. Evidara cannot display the old password.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-3">
             <div className="flex gap-2"><Input value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} placeholder="At least 8 characters" className="border-[var(--line)] font-mono" /><Button type="button" variant="outline" onClick={() => setTemporaryPassword(makeTemporaryPassword())}>Generate</Button></div>
@@ -511,8 +518,7 @@ export function AccessControlView({ kind }: { kind: 'admin' | 'school' }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPasswordAccount(null)} className="border-[var(--line)]">Cancel</Button>
             <Button onClick={() => void resetPassword()} disabled={temporaryPassword.length < 8 || Boolean(passwordAccount && savingKey === `password:${passwordAccount.id}`)} className="bg-[var(--teal)] text-white">
-              {passwordAccount && savingKey === `password:${passwordAccount.id}` ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-              Set Password
+              {passwordAccount && savingKey === `password:${passwordAccount.id}` ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}Set Password
             </Button>
           </DialogFooter>
         </DialogContent>
