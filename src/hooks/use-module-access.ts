@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/store/use-app-store';
-import { normalizeEvidaraRole } from '@/lib/roles';
+import { normalizeEvidaraRole, type EvidaraRole } from '@/lib/roles';
 import { EVIDARA_MODULE_KEYS, type EvidaraModuleAccess, type EvidaraModuleKey } from '@/lib/modules';
 
 type ModuleSetting = {
@@ -15,12 +15,17 @@ type ModuleSetting = {
 
 const modules = EVIDARA_MODULE_KEYS;
 
+export function isHardLockedModule(role: EvidaraRole, moduleKey: EvidaraModuleKey) {
+  if (role === 'student') return ['questions', 'students', 'subscriptions'].includes(moduleKey);
+  if (role === 'school_teacher') return ['students', 'subscriptions'].includes(moduleKey);
+  return false;
+}
+
 function defaults(role: string) {
   const normalized = normalizeEvidaraRole(role);
   return Object.fromEntries(modules.map((moduleKey) => [
     moduleKey,
-    !(normalized === 'student' && moduleKey === 'questions')
-      && !(normalized === 'school_teacher' && (moduleKey === 'students' || moduleKey === 'subscriptions')),
+    !isHardLockedModule(normalized, moduleKey),
   ])) as EvidaraModuleAccess;
 }
 
@@ -39,22 +44,34 @@ export function useModuleAccess() {
 
     let cancelled = false;
     void (async () => {
-      const [{ data: memberships }, { data: settings }] = await Promise.all([
+      const [staffMembershipResult, studentMembershipResult, settingsResult] = await Promise.all([
         supabase
           .from('organization_members')
           .select('organization_id')
           .eq('user_id', user.id)
           .eq('is_active', true)
           .limit(1),
+        role === 'student'
+          ? supabase
+              .from('student_school_memberships')
+              .select('organization_id')
+              .eq('student_id', user.id)
+              .eq('status', 'active')
+              .limit(1)
+          : Promise.resolve({ data: [] as Array<{ organization_id: string }> }),
         supabase
           .from('module_access_settings')
           .select('organization_id,role,module_key,enabled')
           .eq('role', role),
       ]);
       if (cancelled) return;
-      const organizationId = memberships?.[0]?.organization_id || null;
+
+      const organizationId = role === 'student'
+        ? studentMembershipResult.data?.[0]?.organization_id || null
+        : staffMembershipResult.data?.[0]?.organization_id || null;
       const next = defaults(role);
-      const rows = (settings || []) as ModuleSetting[];
+      const rows = (settingsResult.data || []) as ModuleSetting[];
+
       rows.filter((setting) => setting.organization_id === null).forEach((setting) => {
         next[setting.module_key] = setting.enabled;
       });
@@ -63,7 +80,10 @@ export function useModuleAccess() {
           next[setting.module_key] = setting.enabled;
         });
       }
-      if (role === 'student') next.questions = false;
+
+      modules.forEach((moduleKey) => {
+        if (isHardLockedModule(role, moduleKey)) next[moduleKey] = false;
+      });
       setAccess(next);
     })();
 
