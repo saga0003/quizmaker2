@@ -12,6 +12,10 @@ const serviceKey = (
   ""
 ).trim();
 
+// Temporary Phase 1 rollback: privileged TOTP/AAL2 is disabled while a
+// replacement privileged-access mechanism is evaluated. Role/tenant checks remain active.
+const privilegedMfaRequired = false;
+
 const privilegedRoles = new Set([
   "super_admin",
   "evidara_admin",
@@ -117,7 +121,7 @@ export async function authenticateRequest(
   }
 
   const admin = createServiceClient();
-  if (!options.allowPrivilegedAal1) {
+  if (privilegedMfaRequired && !options.allowPrivilegedAal1) {
     const { data: profile } = await admin
       .from("profiles")
       .select("role")
