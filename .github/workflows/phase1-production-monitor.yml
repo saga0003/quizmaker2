@@ -15,13 +15,15 @@ jobs:
     steps:
       - name: Probe production application and dependencies
         shell: bash
+        env:
+          EVIDARA_PRODUCTION_URL: https://quizmaker2.vercel.app
         run: |
           set -euo pipefail
-          base="https://quizmaker2-saga0003s-projects.vercel.app"
+          base="${EVIDARA_PRODUCTION_URL%/}"
           curl --fail --silent --show-error --max-time 20 "$base/" >/dev/null
           curl --fail --silent --show-error --max-time 20 "$base/api/ops/health/" | tee ops-health.json
-          node -e 'const fs=require("fs"); const h=JSON.parse(fs.readFileSync("ops-health.json","utf8")); if(!h.ok) process.exit(1); for (const [k,v] of Object.entries(h.dependencies||{})) if(!v) throw new Error(`dependency unhealthy: ${k}`); for (const [k,v] of Object.entries(h.activity||{})) if(v) throw new Error(`failure signal active: ${k}`);'
+          node -e 'const fs=require("fs"); const h=JSON.parse(fs.readFileSync("ops-health.json","utf8")); if(!h.ok) throw new Error("production health returned ok=false"); const required=["database","auth","storage"]; for (const k of required) if(h.dependencies?.[k]!==true) throw new Error(`dependency unhealthy: ${k}`); for (const [k,v] of Object.entries(h.activity||{})) if(v===true) throw new Error(`failure signal active: ${k}`);'
 
       - name: Monitoring contract
         if: always()
-        run: echo "A failed scheduled run is the Phase-1 operational alert. Build failures remain enforced by the release-gate workflow; production 5xx/dependency/activity failures fail this monitor."
+        run: echo "A failed scheduled run is the Phase-1 operational alert. The canonical public production URL is probed; production 5xx/dependency/activity failures fail this monitor."
