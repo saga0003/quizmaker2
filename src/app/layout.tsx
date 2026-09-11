@@ -11,19 +11,22 @@ import { QuestionBankPolicy } from "@/components/evidara/question-bank-policy";
 import { UniversalTableEnhancer } from "@/components/ui/UniversalTableEnhancer";
 import { Toaster } from "@/components/ui/toaster";
 
+const platformTitle = "Evidara — Assessment & Testing Platform for Schools and Colleges";
+const platformDescription = "Question banks, intelligent paper creation, secure testing, analytics and academic insights — built for institutions.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://evidara.natscix.com"),
-  title: "Evidara — NEET & JEE Question Papers, Solved Questions and Test Series",
-  description: "Find NEET, JEE Main and JEE Advanced previous-year papers, model papers, solved questions and online test series with Evidara analytics.",
-  keywords: ["NEET question papers", "JEE Main question papers", "JEE Advanced question papers", "previous year question papers", "model question papers", "NEET test series", "JEE test series", "solved questions"],
+  title: platformTitle,
+  description: platformDescription,
+  keywords: ["school assessment platform", "college testing platform", "question bank software", "online assessment platform", "test analytics", "student performance analytics", "question paper generator"],
   alternates: { canonical: "/" },
   icons: {
     icon: "/brand/evidara-emblem.png",
     apple: "/brand/evidara-emblem.png",
   },
   openGraph: {
-    title: "Evidara — NEET & JEE Question Papers, Solved Questions and Test Series",
-    description: "Previous-year papers, model papers, solved questions and online test series for NEET, JEE Main and JEE Advanced.",
+    title: platformTitle,
+    description: platformDescription,
     type: "website",
   },
 };
