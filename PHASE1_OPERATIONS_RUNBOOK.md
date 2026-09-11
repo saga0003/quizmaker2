@@ -7,10 +7,10 @@ This runbook is the production recovery contract for Phase 1. Permanent producti
 ## Monitoring and first response
 
 1. GitHub `Evidara Phase 1 Release Gate` is the build/release alarm: any TypeScript, lint, regression or production-build failure blocks promotion.
-2. GitHub `Evidara Phase 1 Production Monitor` probes the permanent application plus `/api/ops/health/` hourly. A failed scheduled job is an operational alert.
+2. GitHub `Evidara Phase 1 Production Monitor` probes the canonical public application plus `/api/ops/health/` hourly. A failed scheduled job is an operational alert.
 3. `/api/ops/health/` is deliberately sanitized. It returns only release identity, dependency booleans, and boolean activity-failure categories; no student, institution or usage data is exposed publicly.
 4. Vercel runtime errors are checked for production 5xx/fatal clusters when an alert fires. Supabase database/auth/storage logs are then checked for the matching window.
-5. Classify the incident: deployment/build, application 5xx, database, auth, R2/storage, import, test start, answer save, submission, or unknown.
+5. Classify the incident: deployment/build, application 5xx, database, auth, Supabase Storage, import, test start, answer save, submission, or unknown.
 
 ## Supabase database backup / PITR strategy
 
@@ -21,13 +21,14 @@ This runbook is the production recovery contract for Phase 1. Permanent producti
 - Recovery order: identify last known-good timestamp → restore to a separate recovery project/branch when possible → validate row counts/tenant isolation/attempt and response integrity → only then schedule production restore or data replay.
 - Never overwrite production from an unverified recovery copy.
 
-## R2 recovery strategy
+## Supabase Storage recovery strategy
 
-- Institution/private resource metadata remains in Supabase; object bytes are stored in the configured R2 bucket.
-- R2 credentials are server-only. Recovery requires the configured account, bucket and object keys; never copy secret keys into logs or tickets.
-- For a missing-object incident, first confirm whether the database metadata points to the expected object key. Do not fabricate a new URL.
-- Restore the exact object key from the provider backup/version/history process if available. If no recoverable object exists, mark the resource unavailable and require an authorized institution/platform operator to re-upload it.
-- After restoration, verify magic-byte/upload policy, signed/private access semantics and tenant authorization before declaring recovery complete.
+- Public question and PYQ image bytes are stored in the public Supabase Storage bucket `question-assets`. Private academic resources remain in the private bucket `academic-resources-private` and are served through short-lived signed URLs.
+- Storage credentials remain server-only. Do not expose service-role or secret keys in client code, logs, tickets or screenshots.
+- `/api/ops/health/` probes the real `question-assets` bucket through the server-side Supabase client; a missing bucket, permission failure or Storage outage must make the storage dependency unhealthy.
+- For a missing-object incident, first confirm the database/question content points to the expected object key. Do not fabricate a replacement URL.
+- Restore the exact object key from an available provider backup/history source when possible. If no recoverable object exists, require an authorized institution/platform operator to re-upload it.
+- After restoration, verify upload signature policy, permanent public access semantics for question assets, signed/private access semantics for academic resources, and tenant authorization before declaring recovery complete.
 
 ## Vercel rollback
 
@@ -44,12 +45,12 @@ A web rollback does not automatically roll back Supabase. Database rollback/rest
 ### Build/release gate failure
 - Do not promote.
 - Inspect the failing GitHub job and first failing regression/build step.
-- Fix on `phase1-hardening`; rerun the complete gate on the exact candidate.
+- Fix on the active Phase 1 hardening branch; rerun the complete gate on the exact candidate.
 
 ### Production 5xx / dependency outage
 - Check Vercel runtime-error clusters and deployment state.
 - Check Supabase project health plus API/auth/postgres/storage logs.
-- Check R2 configuration/reachability where resource paths are involved.
+- Check `question-assets` bucket reachability where question-image paths are involved and `academic-resources-private` where protected resource paths are involved.
 - Prefer rollback for a release-caused fault; prefer dependency recovery/fail-closed behavior for provider outages.
 
 ### Authentication failure spike
