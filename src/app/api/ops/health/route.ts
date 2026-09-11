@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { EVIDARA_RELEASE } from "@/lib/release";
-import { isR2Configured } from "@/lib/server/r2";
+import { probePublicQuestionAssetStorage } from "@/lib/server/publicQuestionAssetStorage";
 import { createServiceClient, isServerSupabaseReady } from "@/lib/server/supabaseServer";
 
 type HealthSnapshot = {
@@ -13,23 +13,24 @@ export async function GET() {
   const checkedAt = new Date().toISOString();
   if (!isServerSupabaseReady) {
     return NextResponse.json(
-      { ok: false, checkedAt, release: EVIDARA_RELEASE, dependencies: { database: false, auth: false, storage: isR2Configured } },
+      { ok: false, checkedAt, release: EVIDARA_RELEASE, dependencies: { database: false, auth: false, storage: false } },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 
   try {
     const admin = createServiceClient();
-    const [{ data: snapshotData, error: snapshotError }, authResult] = await Promise.all([
+    const [{ data: snapshotData, error: snapshotError }, authResult, storageResult] = await Promise.all([
       admin.rpc("phase1_platform_health_snapshot"),
       admin.auth.admin.listUsers({ page: 1, perPage: 1 }),
+      probePublicQuestionAssetStorage(admin),
     ]);
     const snapshot = (snapshotData ?? {}) as HealthSnapshot;
     const failures = snapshot.failures24h ?? {};
     const failureTotal = Object.values(failures).reduce((sum, value) => sum + Number(value || 0), 0);
     const databaseOk = !snapshotError;
     const authOk = !authResult.error;
-    const storageOk = isR2Configured;
+    const storageOk = storageResult.ok;
     const activityOk = failureTotal <= FAILURE_THRESHOLD;
     const ok = databaseOk && authOk && storageOk && activityOk;
 
@@ -39,6 +40,7 @@ export async function GET() {
         databaseOk,
         authOk,
         storageOk,
+        storageError: storageResult.error,
         activityOk,
         failureCategories: Object.fromEntries(Object.entries(failures).filter(([, count]) => Number(count || 0) > 0)),
       });
@@ -62,7 +64,7 @@ export async function GET() {
   } catch (error) {
     console.error("EVIDARA_OPS_ALERT", { checkedAt, kind: "health-probe-exception", error });
     return NextResponse.json(
-      { ok: false, checkedAt, release: EVIDARA_RELEASE, dependencies: { database: false, auth: false, storage: isR2Configured } },
+      { ok: false, checkedAt, release: EVIDARA_RELEASE, dependencies: { database: false, auth: false, storage: false } },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
