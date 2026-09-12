@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateRequest } from "@/lib/server/supabaseServer";
 import { isPlatformAdmin, isSchoolStaff, normalizeEvidaraRole } from "@/lib/roles";
-import { uploadQuestionAssetToR2 } from "@/lib/server/r2";
+import { uploadQuestionAsset } from "@/lib/server/publicQuestionAssetStorage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,8 @@ export async function POST(request: Request) {
       throw Object.assign(new Error("Choose an image file to upload."), { status: 400 });
     }
 
-    const result = await uploadQuestionAssetToR2({
+    const result = await uploadQuestionAsset({
+      admin: auth.admin,
       bytes: new Uint8Array(await file.arrayBuffer()),
       contentType: file.type,
       originalName: file.name,

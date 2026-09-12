@@ -8,8 +8,8 @@ const institution = read('src/components/institution-analytics/institution-analy
 const failures = [];
 let passed = 0;
 const check = (label, condition) => { if (condition) { passed += 1; console.log(`✓ ${label}`); } else { failures.push(label); console.error(`✗ ${label}`); } };
-check('launch empty average has no denominator instead of becoming zero', /function avg\(values: number\[\]\)[\s\S]*?values\.length \?[\s\S]*?: null;/.test(launch));
-check('launch scope top score is null when there are no attempts', /top: rows\.length \? Math\.max\([\s\S]*?\) : null/.test(launch));
+check('launch analytics delegates to the live institution workspace', /return <InstitutionAnalyticsWorkspace mode=\{mode\} \/>/.test(launch));
+check('launch analytics no longer owns a parallel zero-default metric implementation', !/function avg\(values: number\[\]\)/.test(launch) && !/Math\.max\(/.test(launch));
 check('hierarchy group metrics admit missing evidence', /average: number \| null;[\s\S]*?accuracy: number \| null;[\s\S]*?top: number \| null;/.test(hierarchy));
 check('hierarchy empty average is null', /function avg\(values: number\[\]\)[\s\S]*?values\.length \?[\s\S]*?: null;/.test(hierarchy));
 check('hierarchy group top is null without submitted evidence', /top: rows\.length \? Math\.max\([\s\S]*?\) : null,/.test(hierarchy));
