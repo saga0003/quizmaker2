@@ -19,9 +19,10 @@ check('importer performs direct Question Bank import',importer.includes('importV
 const assetRoute=read('src/app/api/admin/pyq-v19-assets/route.ts');
 check('asset upload is Super Admin protected',assetRoute.includes('super_admin'));
 check('asset route requires assets-relative paths',assetRoute.includes("startsWith('assets/')"));
-const r2=read('src/lib/server/r2.ts');
-check('R2 V19 upload helper exists',r2.includes('uploadPyqV19AssetToR2'));
-check('V19 R2 keys are deterministic',r2.includes('question-assets/platform/pyq-v19'));
+const storage=read('src/lib/server/publicQuestionAssetStorage.ts');
+check('Supabase V19 upload helper exists',storage.includes('uploadPyqV19Asset'));
+check('V19 Supabase keys are deterministic',storage.includes('question-assets/platform/pyq-v19'));
+check('V19 assets use the question-assets Supabase bucket',storage.includes("PUBLIC_QUESTION_ASSET_BUCKET = 'question-assets'")&&storage.includes('.storage.from(PUBLIC_QUESTION_ASSET_BUCKET).upload'));
 const api=read('src/app/api/admin/pyq-staging-import/route.ts');
 check('direct importer requires V19 package',api.includes("package_version || '') !== 'v19.0'"));
 check('direct importer requires prompt and solution assets',api.includes('!prompt.length')&&api.includes('!solution.length'));
