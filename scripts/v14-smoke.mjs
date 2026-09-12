@@ -31,7 +31,7 @@ ok('question bank implements teacher own-question scope',questions.includes('p_o
 ok('Evidara Admin does not publish platform questions directly',questions.includes('canPublish'));
 ok('paper catalogue has Super Admin publication governance',papers.includes('canApprove'));
 ok('hierarchical resource manager exists',resources.includes('New folder')&&resources.includes('Upload file'));
-ok('resource API uses protected Supabase storage for new platform and institution files',resourceApi.includes('uploadPrivateAcademicResource')&&resourceApi.includes("scope === 'platform' ? 'platform' : 'organization'")&&!resourceApi.includes('uploadResourceFileToR2'));
+ok('resource API uses protected Supabase storage for new platform and institution files',resourceApi.includes('uploadPrivateAcademicResource')&&resourceApi.includes("ctx.mode === 'platform' ? 'platform' : 'organization'")&&!resourceApi.includes('uploadResourceFileToR2'));
 ok('protected resource helper supports platform namespace',privateStorage.includes("scope?: 'organization' | 'platform'")&&privateStorage.includes("scope === 'platform' ? 'platform'"));
 ok('student/school resource hierarchy is shared',read('src/components/school/ResourceLibrary.tsx').includes('ResourceManagerV14'));
 ok('super admin resource inventory exists',admin.includes('AdminResourcesView'));
