@@ -29,8 +29,9 @@ export async function uploadPrivateAcademicResource(input: {
   bytes: Uint8Array;
   contentType: string;
   originalName: string;
-  organizationId: string;
+  organizationId?: string | null;
   userId: string;
+  scope?: 'organization' | 'platform';
 }) {
   const contentType = assertUploadSignature({
     bytes: input.bytes,
@@ -41,10 +42,16 @@ export async function uploadPrivateAcademicResource(input: {
   });
   if (input.bytes.length > 20 * 1024 * 1024) throw Object.assign(new Error('Resource files must be 20 MB or smaller.'), { status: 413 });
 
+  const scope = input.scope ?? 'organization';
+  if (scope === 'organization' && !input.organizationId) {
+    throw Object.assign(new Error('Institution resource storage requires an organization id.'), { status: 400 });
+  }
+
   const original = safeSegment(input.originalName);
   const now = new Date();
   const month = now.toISOString().slice(0, 7);
-  const key = `organization/${safeSegment(input.organizationId)}/${month}/${safeSegment(input.userId)}/${randomUUID()}-${original}`;
+  const owner = scope === 'platform' ? 'platform' : `organization/${safeSegment(input.organizationId!)}`;
+  const key = `${owner}/${month}/${safeSegment(input.userId)}/${randomUUID()}-${original}`;
   const { error } = await input.admin.storage.from(PRIVATE_RESOURCE_BUCKET).upload(key, input.bytes, {
     contentType,
     cacheControl: 'private, max-age=0, no-store',
