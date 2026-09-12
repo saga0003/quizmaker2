@@ -10,6 +10,7 @@ const questions=read('src/components/evidara/live-question-bank.tsx');
 const papers=read('src/components/evidara/live-paper-catalogue-v8.tsx');
 const resources=read('src/components/evidara/resource-manager-v14.tsx');
 const resourceApi=read('src/app/api/resources-v14/route.ts');
+const privateStorage=read('src/lib/server/privateResourceStorage.ts');
 const self=read('src/components/evidara/self-assessment-center.tsx');
 const referral=read('src/components/commerce/ReferralCenter.tsx');
 const admin=read('src/components/evidara/admin-v14-views.tsx');
@@ -30,7 +31,8 @@ ok('question bank implements teacher own-question scope',questions.includes('p_o
 ok('Evidara Admin does not publish platform questions directly',questions.includes('canPublish'));
 ok('paper catalogue has Super Admin publication governance',papers.includes('canApprove'));
 ok('hierarchical resource manager exists',resources.includes('New folder')&&resources.includes('Upload file'));
-ok('resource API uploads to R2',resourceApi.includes('uploadResourceFileToR2'));
+ok('resource API uses protected Supabase storage for new platform and institution files',resourceApi.includes('uploadPrivateAcademicResource')&&resourceApi.includes("scope === 'platform' ? 'platform' : 'organization'")&&!resourceApi.includes('uploadResourceFileToR2'));
+ok('protected resource helper supports platform namespace',privateStorage.includes("scope?: 'organization' | 'platform'")&&privateStorage.includes("scope === 'platform' ? 'platform'"));
 ok('student/school resource hierarchy is shared',read('src/components/school/ResourceLibrary.tsx').includes('ResourceManagerV14'));
 ok('super admin resource inventory exists',admin.includes('AdminResourcesView'));
 ok('institutions module exists',admin.includes('AdminInstitutionsView'));
