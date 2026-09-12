@@ -9,7 +9,7 @@ const checks=[
   ['new resource uploads use protected Supabase storage',route.includes('uploadPrivateAcademicResource')&&!route.includes('uploadResourceFileToR2')],
   ['platform and institution scopes share the protected uploader',route.includes("ctx.mode === 'platform' ? 'platform' : 'organization'")&&storage.includes("scope?: 'organization' | 'platform'")],
   ['new protected resource rows do not persist a public URL',route.includes('content_url: null')],
-  ['private backend is recorded',route.includes("storage_backend: 'supabase-private-v1'")) ,
+  ['private backend is recorded',route.includes("storage_backend: 'supabase-private-v1'")],
   ['private storage creates short-lived signed URLs',storage.includes('createSignedUrl')&&storage.includes('expiresIn ?? 300')],
   ['resource download is re-authorized through authenticated API',route.includes("params.get('resourceId')")&&route.includes('studentEligibleResources')],
   ['legacy institution public resources fail closed',route.includes('legacy institution resource must be migrated to protected storage')],
