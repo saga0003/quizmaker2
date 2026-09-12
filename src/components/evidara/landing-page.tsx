@@ -24,7 +24,7 @@ import { useAppStore } from '@/store/use-app-store';
 const launchFeatures = [
   { icon: Upload, title: 'Easy question upload', desc: 'Import teacher question banks from Excel, CSV or LaTeX, review issues and save them into the institution question bank.' },
   { icon: FileText, title: 'Unlimited tests', desc: 'Build chapter tests, weekly tests, mocks and internal assessments without counting each paper as a separate purchase.' },
-  { icon: Users, title: 'Per-student annual access', desc: 'License the institution roster at ₹199 per licensed student per year, with each student using their own login.' },
+  { icon: Users, title: 'Institution advantage', desc: 'Individual student access is ₹999 per year, while schools and colleges can start from ₹199 per licensed student per year.' },
   { icon: BarChart3, title: 'Actionable analysis', desc: 'Review performance by student, test, subject, chapter, topic and question using actual attempt data.' },
   { icon: FolderOpen, title: 'Study resources', desc: 'Keep the existing Evidara resource library available for schools and students alongside assessments.' },
   { icon: ShieldCheck, title: 'Institution-scoped access', desc: 'Questions, students, papers and results stay scoped to the correct institution and role.' },
@@ -89,21 +89,30 @@ export default function LandingPage() {
                 <Button size="lg" variant="outline" onClick={signIn}>Sign in</Button>
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--muted-foreground)]">
-                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />₹199 / licensed student / year</span>
+                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Student access ₹999 / year</span>
+                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Institutions from ₹199 / student / year</span>
                 <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Unlimited tests</span>
-                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />No per-test charge</span>
               </div>
             </div>
 
             <Card className="overflow-hidden rounded-2xl border-[var(--line)] shadow-[var(--ev-shadow-sm)]">
               <CardContent className="p-0">
                 <div className="bg-[var(--midnight)] p-6 text-white sm:p-8">
-                  <div className="flex items-center gap-3"><Building2 className="h-7 w-7 text-[var(--amber)]" /><span className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">Founding Institution Plan</span></div>
-                  <div className="mt-6 flex items-end gap-2"><strong className="text-5xl font-black">₹199</strong><span className="pb-1 text-white/60">/ licensed student / year</span></div>
-                  <p className="mt-3 max-w-md text-sm leading-6 text-white/70">Annual access is licensed per student. Create unlimited tests with no additional per-test charge.</p>
+                  <div className="flex items-center gap-3"><Building2 className="h-7 w-7 text-[var(--amber)]" /><span className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">Pricing</span></div>
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">Student plan</p>
+                      <div className="mt-2 flex items-end gap-2"><strong className="text-4xl font-black">₹999</strong><span className="pb-1 text-white/60">/ year</span></div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--amber)]">Institution plan</p>
+                      <div className="mt-2 flex items-end gap-2"><strong className="text-4xl font-black">₹199</strong><span className="pb-1 text-white/60">/ student / year</span></div>
+                    </div>
+                  </div>
+                  <p className="mt-5 max-w-md text-sm leading-6 text-white/70">Individual access is priced higher; partner institutions receive lower per-student pricing for school-wide rollout.</p>
                 </div>
                 <div className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
-                  {['₹199 / licensed student / year', 'Unlimited tests', 'No per-test charge', 'Question-bank import', 'Test creation', 'Student results', 'Performance analytics', 'Institution roles'].map((item) => (
+                  {['Student plan: ₹999 / year', 'Institution plan: from ₹199 / student / year', 'Unlimited tests', 'No per-test charge', 'Question-bank import', 'Test creation', 'Student results', 'Performance analytics'].map((item) => (
                     <div key={item} className="flex items-center gap-2 text-sm font-medium"><CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--teal)]" />{item}</div>
                   ))}
                 </div>
@@ -140,7 +149,7 @@ export default function LandingPage() {
 
         <section id="pricing" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
           <div className="grid gap-8 rounded-2xl border border-[var(--line)] bg-[var(--midnight)] p-7 text-white shadow-[var(--ev-shadow-sm)] sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center">
-            <div><p className="text-sm font-bold uppercase tracking-[0.16em] text-[var(--amber)]">Launch pricing</p><h2 className="mt-3 text-3xl font-black sm:text-4xl">₹199 / licensed student / year.</h2><p className="mt-4 max-w-2xl leading-7 text-white/70">Unlimited tests with no per-test charge. Evidara provides question-bank workflows, paper creation, secure assessments, results, analytics and institution controls.</p></div>
+            <div><p className="text-sm font-bold uppercase tracking-[0.16em] text-[var(--amber)]">Launch pricing</p><h2 className="mt-3 text-3xl font-black sm:text-4xl">Student ₹999/year. Institutions from ₹199/student/year.</h2><p className="mt-4 max-w-2xl leading-7 text-white/70">Unlimited tests with no per-test charge. Partner schools and colleges receive institution pricing for roster-based rollout, with question-bank workflows, secure assessments, results, analytics and institution controls.</p></div>
             <Button size="lg" onClick={register} className="bg-white text-[var(--midnight)] hover:bg-white/90">Register institution <ArrowRight className="ml-2 h-4 w-4" /></Button>
           </div>
         </section>
