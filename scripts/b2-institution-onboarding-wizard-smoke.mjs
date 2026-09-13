@@ -9,7 +9,7 @@ const checks = [
   ['wizard starts with complete institution details', /step === 0[\s\S]*Institution details[\s\S]*Address line 1[\s\S]*PIN \/ postal code[\s\S]*Website/],
   ['institution step requires name city and state', /step === 0[\s\S]*school\.name[\s\S]*school\.city[\s\S]*school\.state/],
   ['wizard has explicit first School Admin step', /step === 1[\s\S]*First School Admin/],
-  ['UUID is explicitly removed from operator workflow', /No UUID required/],
+  ['operator UI contains no UUID workflow', !ui.includes('UUID') && !ui.includes('Existing Evidara user ID')],
   ['first admin captures name email and mobile', /Full name \*[\s\S]*Email \*[\s\S]*Mobile number/],
   ['first admin email is required before continuing', /step === 1[\s\S]*admin\.fullName[\s\S]*admin\.email/],
   ['wizard has annual licence step', /step === 2[\s\S]*Annual institution licence/],
