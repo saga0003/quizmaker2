@@ -23,16 +23,24 @@ function normaliseWebsite(value: string) {
   }
 }
 
-async function findAuthUserByEmail(admin: Awaited<ReturnType<typeof authenticateRequest>>['admin'], email: string) {
-  const wanted = email.trim().toLowerCase();
-  for (let page = 1; page <= 20; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error) throw new Error(error.message);
-    const found = data.users.find((user) => String(user.email || '').trim().toLowerCase() === wanted);
-    if (found) return found;
-    if (data.users.length < 1000) return null;
-  }
-  throw new Error('Account directory is too large to resolve this email safely.');
+type ExistingOnboardingAccount = {
+  user_id: string;
+  profile_role: string | null;
+  full_name: string | null;
+  phone: string | null;
+  active_memberships: number | string | null;
+};
+
+async function findOnboardingAccountByEmail(
+  admin: Awaited<ReturnType<typeof authenticateRequest>>['admin'],
+  email: string,
+): Promise<ExistingOnboardingAccount | null> {
+  const { data, error } = await admin.rpc('resolve_onboarding_account_by_email', {
+    p_email: email.trim().toLowerCase(),
+  });
+  if (error) throw new Error(`Unable to resolve the School Admin email: ${error.message}`);
+  const rows = Array.isArray(data) ? data : [];
+  return (rows[0] as ExistingOnboardingAccount | undefined) ?? null;
 }
 
 export async function POST(request: Request) {
@@ -71,19 +79,28 @@ export async function POST(request: Request) {
     if (!startsAt || !endsAt || endsAt <= startsAt) return fail('Licence end date must be after its start date.');
     if (!['full', 'limited'].includes(resourceAccess)) return fail('Unsupported resource access setting.');
 
-    let adminUser = await findAuthUserByEmail(auth.admin, adminEmail);
+    const actorEmail = String(auth.user.email || '').trim().toLowerCase();
+    if (actorEmail && adminEmail === actorEmail) {
+      return fail('Use a different email for the institution School Admin. Your Super Admin login must remain separate from institution accounts.');
+    }
+
+    const existing = await findOnboardingAccountByEmail(auth.admin, adminEmail);
+    let adminUser: { id: string } | null = null;
     let adminCreated = false;
 
-    if (adminUser) {
-      const [{ data: profile }, { count: activeMemberships }] = await Promise.all([
-        auth.admin.from('profiles').select('id,full_name,phone,role').eq('id', adminUser.id).maybeSingle(),
-        auth.admin.from('organization_members').select('id', { count: 'exact', head: true }).eq('user_id', adminUser.id).eq('is_active', true),
-      ]);
-      if (!profile) return fail('The existing Evidara account is missing its profile. Use another admin email or repair the account first.');
+    if (existing) {
+      const profile = {
+        id: existing.user_id,
+        full_name: existing.full_name,
+        phone: existing.phone,
+        role: existing.profile_role,
+      };
+      adminUser = { id: existing.user_id };
+      if (!profile.role) return fail('The existing Evidara account is missing its profile. Use another admin email or repair the account first.');
       if (String(profile.role) !== 'school_admin') {
         return fail(`An Evidara account already exists for ${adminEmail}, but its role is ${String(profile.role)}. Use a dedicated School Admin email so another account is not changed unexpectedly.`);
       }
-      if (Number(activeMemberships || 0) > 0) return fail('This School Admin already belongs to an institution. Use a dedicated admin email for the new institution.');
+      if (Number(existing.active_memberships || 0) > 0) return fail('This School Admin already belongs to an institution. Use a dedicated admin email for the new institution.');
     } else {
       const invited = await auth.admin.auth.admin.inviteUserByEmail(adminEmail, { data: { full_name: adminFullName } });
       if (invited.error || !invited.data.user) return fail(invited.error?.message || 'Unable to invite the first School Admin.', 500);
@@ -114,6 +131,8 @@ export async function POST(request: Request) {
         return fail(`School Admin security setup failed: ${profileError?.message || securityError?.message || 'unknown error'}`, 500);
       }
     }
+
+    if (!adminUser) return fail('Unable to resolve the first School Admin account.', 500);
 
     const { data, error } = await auth.admin.rpc('onboard_institution_v2', {
       p_actor_id: auth.user.id,
@@ -158,6 +177,10 @@ export async function POST(request: Request) {
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const value = error as { message?: string; status?: number };
+    console.error('[institution-onboarding] request failed', {
+      message: value.message || 'Institution onboarding failed.',
+      status: value.status || 500,
+    });
     return fail(value.message || 'Institution onboarding failed.', value.status || 500);
   }
 }
