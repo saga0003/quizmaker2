@@ -18,7 +18,7 @@ const checks = [
   ['wizard shows fixed institution price', /Institution rate[\s\S]*₹199 \/ student \/ year/],
   ['wizard shows estimated annual licence value', /Estimated annual licence/],
   ['review summarizes institution admin licence and term', /Review before onboarding[\s\S]*First School Admin[\s\S]*Annual licence[\s\S]*Term/],
-  ['review communicates duplicate and admin safety', /Duplicate institutions are blocked[\s\S]*School Admin is invited by email/],
+  ['review communicates the School Admin invitation without backend implementation detail', /Please confirm the details above[\s\S]*School Admin will receive an invitation by email/],
   ['creation uses dedicated onboarding endpoint', /fetch\('\/api\/admin\/institution-onboarding\/'/],
   ['creation payload carries first admin object', /firstAdmin: admin/],
   ['normal school-control create action is not used by UI', !/action:\s*'create'/.test(ui)],
