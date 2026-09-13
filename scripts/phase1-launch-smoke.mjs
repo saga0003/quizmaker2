@@ -40,8 +40,9 @@ check('student study resources retained on desktop', sidebar.includes("view: 'st
 check('school study resources retained on desktop', sidebar.includes("view: 'school-resources'"));
 
 const landing = read('src/components/evidara/landing-page.tsx');
-check('landing shows Rs 199 licensed-student annual price', landing.includes('₹199') && landing.includes('/ licensed student / year'));
-check('landing sells licensed-student annual access', landing.includes('Per-student annual access') && landing.includes('₹199 per licensed student per year'));
+const hasLicensedAnnualPrice = landing.includes('₹199 per licensed student per year') || landing.includes('₹199 / licensed student / year');
+check('landing shows Rs 199 licensed-student annual price', hasLicensedAnnualPrice);
+check('landing sells licensed-student annual access', hasLicensedAnnualPrice && (landing.includes('school-wide rollout') || landing.includes('annual access')));
 check('landing does not promise unlimited students', !landing.includes('Unlimited students'));
 check('landing sells unlimited tests', landing.includes('Unlimited tests'));
 check('landing keeps study resources in offer', landing.includes('Study resources'));

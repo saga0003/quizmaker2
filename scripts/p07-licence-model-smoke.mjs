@@ -13,6 +13,7 @@ const check = (name, condition) => {
 const migration = read('supabase/migrations/20260830172500_phase1_assignment_and_subscription_core.sql');
 const subscriptionCenter = read('src/components/school/SubscriptionCenter.tsx');
 const schoolControl = read('src/app/api/admin/school-control/route.ts');
+const onboardingRoute = read('src/app/api/admin/institution-onboarding/route.ts');
 const canonicalPlan = read('supabase/migrations/20260901150443_phase1_canonical_commercial_plan.sql');
 
 check('canonical annual licence state exists', /create or replace function public\.school_license_state_v19/i.test(migration));
@@ -26,7 +27,7 @@ check('school UI reports remaining licence quantity', /available\s*=\s*Math\.max
 check('school UI never promises unlimited students', !/Unlimited students|Unlimited on activation|No seat limits/i.test(subscriptionCenter));
 check('unlimited applies only to tests', /Unlimited tests/i.test(subscriptionCenter) && /No per-test charge/i.test(subscriptionCenter));
 check('Super Admin and database enforce ₹199 in paise', /annual_price_per_student_paise:\s*19900/i.test(schoolControl) && /check\s*\(annual_price_per_student_paise\s*=\s*19900\)/i.test(canonicalPlan));
-check('Super Admin stores explicit seat_limit', /seat_limit:\s*Math\.max\(0, Number\(subscription\.seat_limit \|\| 0\)\)/i.test(schoolControl));
+check('Super Admin validates and stores explicit seat_limit', /Number\.isInteger\(seatLimit\)[\s\S]*seatLimit < 1[\s\S]*seatLimit > 100000/i.test(schoolControl) && /seat_limit:\s*seatLimit/i.test(schoolControl) && /Number\.isInteger\(seatLimit\)[\s\S]*seatLimit < 1[\s\S]*seatLimit > 100000/i.test(onboardingRoute));
 
 console.log(`\n${12 - failures.length}/12 P0.7 licence-model checks passed.`);
 if (failures.length) {
