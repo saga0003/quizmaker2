@@ -6,11 +6,6 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function generateTemporaryPassword() {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#';
-  return Array.from({ length: 16 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-}
-
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -68,6 +63,7 @@ export async function POST(request: Request) {
 
     if (name.length < 3) return fail('Institution name must contain at least 3 characters.');
     if (city.length < 2 || state.length < 2) return fail('City and state are required.');
+    if (adminFullName.length < 2) return fail('First School Admin name is required.');
     if (!validEmail(adminEmail)) return fail('A valid first School Admin email is required.');
     if (contactEmail && !validEmail(contactEmail)) return fail('Contact email is not valid.');
     if (websiteInput && !website) return fail('Website must be a valid web address.');
@@ -76,7 +72,6 @@ export async function POST(request: Request) {
     if (!['full', 'limited'].includes(resourceAccess)) return fail('Unsupported resource access setting.');
 
     let adminUser = await findAuthUserByEmail(auth.admin, adminEmail);
-    let temporaryPassword: string | null = null;
     let adminCreated = false;
 
     if (adminUser) {
@@ -88,20 +83,11 @@ export async function POST(request: Request) {
       if (String(profile.role) !== 'school_admin') {
         return fail(`An Evidara account already exists for ${adminEmail}, but its role is ${String(profile.role)}. Use a dedicated School Admin email so another account is not changed unexpectedly.`);
       }
-      if (Number(activeMemberships || 0) > 0) {
-        return fail('This School Admin already belongs to an institution. Use a dedicated admin email for the new institution.');
-      }
+      if (Number(activeMemberships || 0) > 0) return fail('This School Admin already belongs to an institution. Use a dedicated admin email for the new institution.');
     } else {
-      if (adminFullName.length < 2) return fail('First School Admin name is required when creating a new account.');
-      temporaryPassword = generateTemporaryPassword();
-      const created = await auth.admin.auth.admin.createUser({
-        email: adminEmail,
-        password: temporaryPassword,
-        email_confirm: true,
-        user_metadata: { full_name: adminFullName },
-      });
-      if (created.error || !created.data.user) return fail(created.error?.message || 'Unable to create the first School Admin account.', 500);
-      adminUser = created.data.user;
+      const invited = await auth.admin.auth.admin.inviteUserByEmail(adminEmail, { data: { full_name: adminFullName } });
+      if (invited.error || !invited.data.user) return fail(invited.error?.message || 'Unable to invite the first School Admin.', 500);
+      adminUser = invited.data.user;
       createdUserId = adminUser.id;
       adminCreated = true;
 
@@ -132,7 +118,7 @@ export async function POST(request: Request) {
       p_phone: String(school.phone || '').trim() || adminPhone,
       p_secondary_phone: String(school.secondary_phone || '').trim() || null,
       p_website: website,
-      p_contact_name: String(school.contact_name || '').trim() || adminFullName || null,
+      p_contact_name: String(school.contact_name || '').trim() || adminFullName,
       p_contact_email: contactEmail || adminEmail,
       p_seat_limit: seatLimit,
       p_starts_at: startsAt,
@@ -154,20 +140,12 @@ export async function POST(request: Request) {
       firstAdmin: {
         userId: adminUser.id,
         email: adminEmail,
-        fullName: adminFullName || null,
+        fullName: adminFullName,
         created: adminCreated,
-        temporaryPassword,
+        invitationSent: adminCreated,
       },
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    if (createdUserId) {
-      try {
-        const auth = await authenticateRequest(request);
-        await auth.admin.auth.admin.deleteUser(createdUserId);
-      } catch {
-        // Best-effort cleanup only; do not hide the original failure.
-      }
-    }
     const value = error as { message?: string; status?: number };
     return fail(value.message || 'Institution onboarding failed.', value.status || 500);
   }
