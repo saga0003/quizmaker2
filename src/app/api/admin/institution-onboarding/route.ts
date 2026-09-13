@@ -91,16 +91,27 @@ export async function POST(request: Request) {
       createdUserId = adminUser.id;
       adminCreated = true;
 
-      const { error: profileError } = await auth.admin.from('profiles').upsert({
-        id: adminUser.id,
-        full_name: adminFullName,
-        phone: adminPhone || null,
-        role: 'school_admin',
-      }, { onConflict: 'id' });
-      if (profileError) {
+      const now = new Date().toISOString();
+      const [{ error: profileError }, { error: securityError }] = await Promise.all([
+        auth.admin.from('profiles').upsert({
+          id: adminUser.id,
+          full_name: adminFullName,
+          phone: adminPhone || null,
+          role: 'school_admin',
+        }, { onConflict: 'id' }),
+        auth.admin.from('credential_security_states').upsert({
+          user_id: adminUser.id,
+          must_change_password: true,
+          temporary_issued_at: now,
+          password_changed_at: null,
+          updated_by: auth.user.id,
+          updated_at: now,
+        }, { onConflict: 'user_id' }),
+      ]);
+      if (profileError || securityError) {
         await auth.admin.auth.admin.deleteUser(adminUser.id);
         createdUserId = null;
-        return fail(`School Admin profile setup failed: ${profileError.message}`, 500);
+        return fail(`School Admin security setup failed: ${profileError?.message || securityError?.message || 'unknown error'}`, 500);
       }
     }
 
