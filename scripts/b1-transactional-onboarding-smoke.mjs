@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const migration = fs.readFileSync('supabase/migrations/20260913030000_institution_onboarding_v2.sql', 'utf8');
+const retirement = fs.readFileSync('supabase/migrations/20260913031500_retire_institution_onboarding_v1.sql', 'utf8');
 const route = fs.readFileSync('src/app/api/admin/institution-onboarding/route.ts', 'utf8');
 
 const checks = [
@@ -20,6 +21,7 @@ const checks = [
   ['invalid dates fail transaction', /Licence end date must be after its start date/],
   ['browser roles cannot execute onboarding RPC', /revoke all on function[\s\S]*from public, anon, authenticated/],
   ['service role is the only application executor', /grant execute on function[\s\S]*to service_role/],
+  ['legacy v1 service-role execution is retired', /revoke execute on function public\.onboard_institution_v1[\s\S]*from service_role/],
   ['server route requires Super Admin', /isSuperAdmin\(actorProfile\.role\)/],
   ['server route requires first admin identity by email', /First School Admin name is required[\s\S]*first School Admin email is required/],
   ['new School Admin is invited rather than given a generated password', /inviteUserByEmail\(adminEmail/],
@@ -31,8 +33,11 @@ const checks = [
 
 let failed = 0;
 for (const [label, pattern] of checks) {
-  const routeCheck = label.startsWith('server route') || label.startsWith('new School') || label.startsWith('invited School') || label.startsWith('route refuses') || label.startsWith('route cleans');
-  const source = routeCheck ? route : migration;
+  const source = label.startsWith('legacy v1')
+    ? retirement
+    : (label.startsWith('server route') || label.startsWith('new School') || label.startsWith('invited School') || label.startsWith('route refuses') || label.startsWith('route cleans'))
+      ? route
+      : migration;
   const ok = pattern.test(source);
   console.log(`${ok ? 'PASS' : 'FAIL'} B1 — ${label}`);
   if (!ok) failed += 1;
