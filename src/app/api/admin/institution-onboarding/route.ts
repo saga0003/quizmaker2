@@ -6,6 +6,21 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
+function readableError(error: unknown, fallback: string) {
+  if (typeof error === 'string') {
+    const value = error.trim();
+    if (value && value !== '{}') return value;
+  }
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    for (const key of ['message', 'error_description', 'msg', 'code']) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim() && value.trim() !== '{}') return value.trim();
+    }
+  }
+  return fallback;
+}
+
 function validEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
@@ -38,7 +53,7 @@ async function findOnboardingAccountByEmail(
   const { data, error } = await admin.rpc('resolve_onboarding_account_by_email', {
     p_email: email.trim().toLowerCase(),
   });
-  if (error) throw new Error(`Unable to resolve the School Admin email: ${error.message}`);
+  if (error) throw new Error(`Unable to resolve the School Admin email: ${readableError(error, 'account lookup failed')}`);
   const rows = Array.isArray(data) ? data : [];
   return (rows[0] as ExistingOnboardingAccount | undefined) ?? null;
 }
@@ -87,6 +102,8 @@ export async function POST(request: Request) {
     const existing = await findOnboardingAccountByEmail(auth.admin, adminEmail);
     let adminUser: { id: string } | null = null;
     let adminCreated = false;
+    let invitationSent = false;
+    let invitationLink: string | null = null;
 
     if (existing) {
       const profile = {
@@ -103,10 +120,38 @@ export async function POST(request: Request) {
       if (Number(existing.active_memberships || 0) > 0) return fail('This School Admin already belongs to an institution. Use a dedicated admin email for the new institution.');
     } else {
       const invited = await auth.admin.auth.admin.inviteUserByEmail(adminEmail, { data: { full_name: adminFullName } });
-      if (invited.error || !invited.data.user) return fail(invited.error?.message || 'Unable to invite the first School Admin.', 500);
-      adminUser = invited.data.user;
-      createdUserId = adminUser.id;
-      adminCreated = true;
+
+      if (!invited.error && invited.data.user) {
+        adminUser = invited.data.user;
+        createdUserId = adminUser.id;
+        adminCreated = true;
+        invitationSent = true;
+      } else {
+        const inviteFailure = readableError(invited.error, 'Automatic invitation email could not be sent.');
+        console.warn('[institution-onboarding] automatic invitation email failed; generating a secure invitation link instead', {
+          message: inviteFailure,
+        });
+
+        const partial = await findOnboardingAccountByEmail(auth.admin, adminEmail);
+        if (partial) {
+          if (!partial.profile_role && Number(partial.active_memberships || 0) === 0) {
+            await auth.admin.auth.admin.deleteUser(partial.user_id);
+          } else {
+            return fail('The School Admin email is already registered. Use another email or open the existing account instead.');
+          }
+        }
+
+        const generated = await auth.admin.auth.admin.generateLink({ type: 'invite', email: adminEmail });
+        if (generated.error || !generated.data.user || !generated.data.properties?.action_link) {
+          const linkFailure = readableError(generated.error, 'Unable to create a secure School Admin invitation link.');
+          return fail(`${inviteFailure} ${linkFailure}`, 502);
+        }
+
+        adminUser = generated.data.user;
+        createdUserId = adminUser.id;
+        adminCreated = true;
+        invitationLink = generated.data.properties.action_link;
+      }
 
       const now = new Date().toISOString();
       const [{ error: profileError }, { error: securityError }] = await Promise.all([
@@ -128,7 +173,7 @@ export async function POST(request: Request) {
       if (profileError || securityError) {
         await auth.admin.auth.admin.deleteUser(adminUser.id);
         createdUserId = null;
-        return fail(`School Admin security setup failed: ${profileError?.message || securityError?.message || 'unknown error'}`, 500);
+        return fail(`School Admin security setup failed: ${readableError(profileError || securityError, 'unknown error')}`, 500);
       }
     }
 
@@ -161,7 +206,7 @@ export async function POST(request: Request) {
         await auth.admin.auth.admin.deleteUser(createdUserId);
         createdUserId = null;
       }
-      return fail(error.message, error.code === '23505' || error.code === '22023' ? 400 : 500);
+      return fail(readableError(error, 'Institution creation failed.'), error.code === '23505' || error.code === '22023' ? 400 : 500);
     }
 
     return NextResponse.json({
@@ -172,15 +217,17 @@ export async function POST(request: Request) {
         email: adminEmail,
         fullName: adminFullName,
         created: adminCreated,
-        invitationSent: adminCreated,
+        invitationSent,
+        invitationLink,
       },
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    const value = error as { message?: string; status?: number };
+    const value = error as { status?: number };
+    const message = readableError(error, 'Institution onboarding failed.');
     console.error('[institution-onboarding] request failed', {
-      message: value.message || 'Institution onboarding failed.',
+      message,
       status: value.status || 500,
     });
-    return fail(value.message || 'Institution onboarding failed.', value.status || 500);
+    return fail(message, value.status || 500);
   }
 }
