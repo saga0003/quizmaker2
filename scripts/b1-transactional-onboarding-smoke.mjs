@@ -23,6 +23,7 @@ const checks = [
   ['server route requires Super Admin', /isSuperAdmin\(actorProfile\.role\)/],
   ['server route requires first admin identity by email', /First School Admin name is required[\s\S]*first School Admin email is required/],
   ['new School Admin is invited rather than given a generated password', /inviteUserByEmail\(adminEmail/],
+  ['invited School Admin is forced through private password setup', /credential_security_states[\s\S]*must_change_password:\s*true/],
   ['route refuses silent promotion of existing non-school-admin account', /role is \$\{String\(profile\.role\)\}[\s\S]*dedicated School Admin email/],
   ['route cleans invited account if transaction fails', /if \(createdUserId\)[\s\S]*deleteUser\(createdUserId\)/],
   ['server route delegates bootstrap to one v2 RPC', /auth\.admin\.rpc\('onboard_institution_v2'/],
@@ -30,9 +31,8 @@ const checks = [
 
 let failed = 0;
 for (const [label, pattern] of checks) {
-  const source = label.startsWith('server route') || label.startsWith('new School') || label.startsWith('route refuses') || label.startsWith('route cleans')
-    ? route
-    : migration;
+  const routeCheck = label.startsWith('server route') || label.startsWith('new School') || label.startsWith('invited School') || label.startsWith('route refuses') || label.startsWith('route cleans');
+  const source = routeCheck ? route : migration;
   const ok = pattern.test(source);
   console.log(`${ok ? 'PASS' : 'FAIL'} B1 — ${label}`);
   if (!ok) failed += 1;
