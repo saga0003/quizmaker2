@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/server/supabaseServer';
 import { isSuperAdmin } from '@/lib/roles';
 
+const ORGANIZATION_STATUSES = new Set(['pending', 'active', 'suspended']);
+const SUBSCRIPTION_STATUSES = new Set(['trial', 'active', 'expired', 'suspended', 'cancelled']);
+const PAYMENT_STATUSES = new Set(['unpaid', 'paid', 'partial', 'waived']);
+const RESOURCE_ACCESS = new Set(['full', 'limited']);
+
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
@@ -11,10 +16,6 @@ async function superAdmin(request: Request) {
   const { data: profile } = await auth.admin.from('profiles').select('role').eq('id', auth.user.id).single();
   if (!profile || !isSuperAdmin(profile.role)) throw Object.assign(new Error('Super Admin permission is required.'), { status: 403 });
   return auth;
-}
-
-function slugify(value: string) {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'school';
 }
 
 async function latestSubscription(admin: Awaited<ReturnType<typeof superAdmin>>['admin'], organizationId: string) {
@@ -59,11 +60,11 @@ export async function GET(request: Request) {
     const demoAttempts = countBy((demoAttemptsResult.data || []) as Array<{ organization_id: string }>);
 
     const schools = (organizations || []).map((org) => {
-      const sub = latest.get(org.id) || null;
+      const subscription = latest.get(org.id) || null;
       const isDemo = Boolean(org.is_demo);
       return {
         ...org,
-        subscription: sub,
+        subscription,
         usage: {
           activeStudents: isDemo ? (demoStudents.get(org.id) || 0) : (liveStudents.get(org.id) || 0),
           questions: questions.get(org.id) || 0,
@@ -80,7 +81,7 @@ export async function GET(request: Request) {
         activeSchools: schools.filter((row) => row.status === 'active' && row.subscription?.status === 'active').length,
         licensedSeats: schools.reduce((sum, row) => sum + Number(row.subscription?.seat_limit || 0), 0),
         activeStudents: schools.reduce((sum, row) => sum + Number(row.usage.activeStudents || 0), 0),
-        manualRevenuePaise: schools.reduce((sum, row) => row.subscription?.payment_status === 'paid' ? sum + Number(row.subscription.manual_amount_paise || 0) : sum, 0),
+        manualRevenuePaise: schools.reduce((sum, row) => ['paid', 'partial'].includes(String(row.subscription?.payment_status || '')) ? sum + Number(row.subscription?.manual_amount_paise || 0) : sum, 0),
       },
       schools,
     }, { headers: { 'Cache-Control': 'no-store' } });
@@ -97,101 +98,91 @@ export async function POST(request: Request) {
     const action = String(body.action || '');
 
     if (action === 'create') {
-      const school = (body.school || {}) as Record<string, unknown>;
-      const subscription = (body.subscription || {}) as Record<string, unknown>;
-      const name = String(school.name || '').trim();
-      if (!name) return fail('School name is required.');
-      let slug = slugify(name);
-      const { data: existing } = await auth.admin.from('organizations').select('id').eq('slug', slug).maybeSingle();
-      if (existing) slug = `${slug}-${Date.now().toString().slice(-6)}`;
-      const { data: created, error: createError } = await auth.admin.from('organizations').insert({
-        name,
-        slug,
-        institute_type: String(school.institute_type || 'School'),
-        board: String(school.board || 'Other'),
-        address_line1: String(school.address_line1 || '') || null,
-        address_line2: String(school.address_line2 || '') || null,
-        city: String(school.city || ''),
-        state: String(school.state || ''),
-        postal_code: String(school.postal_code || '') || null,
-        contact_name: String(school.contact_name || '') || null,
-        contact_email: String(school.contact_email || '') || null,
-        phone: String(school.phone || ''),
-        secondary_phone: String(school.secondary_phone || '') || null,
-        website: String(school.website || '') || null,
-        status: String(school.status || 'active'),
-        created_by: auth.user.id,
-      }).select('id').single();
-      if (createError || !created) return fail(createError?.message || 'School could not be created.', 500);
-      const today = new Date().toISOString().slice(0, 10);
-      const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
-      const { error: subError } = await auth.admin.from('school_subscriptions').insert({
-        organization_id: created.id,
-        plan_name: String(subscription.plan_name || 'Evidara ₹199 Student Licence'),
-        status: String(subscription.status || 'active'),
-        starts_at: String(subscription.starts_at || today),
-        ends_at: String(subscription.ends_at || nextYear.toISOString().slice(0, 10)),
-        seat_limit: Math.max(0, Number(subscription.seat_limit || 0)),
-        resource_access: String(subscription.resource_access || 'full'),
-        annual_price_per_student_paise: 19900,
-        manual_amount_paise: subscription.manual_amount_paise == null ? null : Math.max(0, Number(subscription.manual_amount_paise)),
-        payment_date: String(subscription.payment_date || '') || null,
-        payment_method: String(subscription.payment_method || '') || null,
-        payment_reference: String(subscription.payment_reference || '') || null,
-        invoice_reference: String(subscription.invoice_reference || '') || null,
-        payment_notes: String(subscription.payment_notes || '') || null,
-        payment_status: String(subscription.payment_status || 'unpaid'),
-        created_by: auth.user.id,
-      });
-      if (subError) return fail(subError.message, 500);
-      return NextResponse.json({ ok: true, organizationId: created.id });
+      return fail('Legacy institution creation is disabled. Use the guided institution-onboarding workflow.', 410);
     }
 
-    const organizationId = String(body.organizationId || '');
-    if (!organizationId) return fail('School is required.');
+    const organizationId = String(body.organizationId || '').trim();
+    if (!organizationId) return fail('Institution is required.');
 
     if (action === 'save') {
       const school = (body.school || {}) as Record<string, unknown>;
       const subscription = (body.subscription || {}) as Record<string, unknown>;
+      const name = String(school.name || '').trim();
+      const city = String(school.city || '').trim();
+      const state = String(school.state || '').trim();
+      const organizationStatus = String(school.status || 'active');
+      const subscriptionStatus = String(subscription.status || 'active');
+      const paymentStatus = String(subscription.payment_status || 'unpaid');
+      const resourceAccess = String(subscription.resource_access || 'full');
+      const seatLimit = Number(subscription.seat_limit || 0);
+      const startsAt = String(subscription.starts_at || '').trim();
+      const endsAt = String(subscription.ends_at || '').trim();
+      const amountPaise = subscription.manual_amount_paise == null || subscription.manual_amount_paise === '' ? null : Number(subscription.manual_amount_paise);
+
+      if (name.length < 3 || city.length < 2 || state.length < 2) return fail('Institution name, city and state are required.');
+      if (!ORGANIZATION_STATUSES.has(organizationStatus)) return fail('Unsupported institution status.');
+      if (!SUBSCRIPTION_STATUSES.has(subscriptionStatus)) return fail('Unsupported licence status.');
+      if (!PAYMENT_STATUSES.has(paymentStatus)) return fail('Unsupported payment status.');
+      if (!RESOURCE_ACCESS.has(resourceAccess)) return fail('Unsupported resource access setting.');
+      if (!Number.isInteger(seatLimit) || seatLimit < 1 || seatLimit > 100000) return fail('Licensed students must be between 1 and 100000.');
+      if (!startsAt || !endsAt || endsAt <= startsAt) return fail('Licence end date must be after its start date.');
+      if (amountPaise != null && (!Number.isFinite(amountPaise) || amountPaise < 0)) return fail('Payment amount must be zero or greater.');
+      if (['paid', 'partial'].includes(paymentStatus) && !(Number(amountPaise || 0) > 0)) return fail('A positive payment amount is required for paid or partial status.');
+
+      const { data: existingOrg, error: existingOrgError } = await auth.admin.from('organizations').select('id').eq('id', organizationId).maybeSingle();
+      if (existingOrgError) return fail(existingOrgError.message, 500);
+      if (!existingOrg) return fail('Institution was not found.', 404);
+
       const { error: orgError } = await auth.admin.from('organizations').update({
-        name: String(school.name || '').trim(),
+        name,
         institute_type: String(school.institute_type || 'School'),
         board: String(school.board || 'Other'),
-        address_line1: String(school.address_line1 || '') || null,
-        address_line2: String(school.address_line2 || '') || null,
-        city: String(school.city || ''),
-        state: String(school.state || ''),
-        postal_code: String(school.postal_code || '') || null,
-        contact_name: String(school.contact_name || '') || null,
-        contact_email: String(school.contact_email || '') || null,
-        phone: String(school.phone || ''),
-        secondary_phone: String(school.secondary_phone || '') || null,
-        website: String(school.website || '') || null,
-        status: String(school.status || 'active'),
+        address_line1: String(school.address_line1 || '').trim() || null,
+        address_line2: String(school.address_line2 || '').trim() || null,
+        city,
+        state,
+        postal_code: String(school.postal_code || '').trim() || null,
+        contact_name: String(school.contact_name || '').trim() || null,
+        contact_email: String(school.contact_email || '').trim() || null,
+        phone: String(school.phone || '').trim(),
+        secondary_phone: String(school.secondary_phone || '').trim() || null,
+        website: String(school.website || '').trim() || null,
+        status: organizationStatus,
       }).eq('id', organizationId);
       if (orgError) return fail(orgError.message, 500);
 
-      const subscriptionId = String(subscription.id || '') || await latestSubscription(auth.admin, organizationId);
+      const subscriptionId = String(subscription.id || '').trim() || await latestSubscription(auth.admin, organizationId);
       const subPayload = {
-        plan_name: String(subscription.plan_name || 'Evidara ₹199 Student Licence'),
-        status: String(subscription.status || 'active'),
-        starts_at: String(subscription.starts_at || new Date().toISOString().slice(0, 10)),
-        ends_at: String(subscription.ends_at || new Date().toISOString().slice(0, 10)),
-        seat_limit: Math.max(0, Number(subscription.seat_limit || 0)),
-        resource_access: String(subscription.resource_access || 'full'),
+        plan_name: 'Evidara Institution Licence',
+        status: subscriptionStatus,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        seat_limit: seatLimit,
+        resource_access: resourceAccess,
         annual_price_per_student_paise: 19900,
-        manual_amount_paise: subscription.manual_amount_paise == null || subscription.manual_amount_paise === '' ? null : Math.max(0, Number(subscription.manual_amount_paise)),
-        payment_date: String(subscription.payment_date || '') || null,
-        payment_method: String(subscription.payment_method || '') || null,
-        payment_reference: String(subscription.payment_reference || '') || null,
-        invoice_reference: String(subscription.invoice_reference || '') || null,
-        payment_notes: String(subscription.payment_notes || '') || null,
-        payment_status: String(subscription.payment_status || 'unpaid'),
+        manual_amount_paise: amountPaise,
+        payment_date: String(subscription.payment_date || '').trim() || null,
+        payment_method: String(subscription.payment_method || '').trim() || null,
+        payment_reference: String(subscription.payment_reference || '').trim() || null,
+        invoice_reference: String(subscription.invoice_reference || '').trim() || null,
+        payment_notes: String(subscription.payment_notes || '').trim() || null,
+        payment_status: paymentStatus,
       };
-      const subResult = subscriptionId
-        ? await auth.admin.from('school_subscriptions').update(subPayload).eq('id', subscriptionId)
-        : await auth.admin.from('school_subscriptions').insert({ ...subPayload, organization_id: organizationId, created_by: auth.user.id });
-      if (subResult.error) return fail(subResult.error.message, 500);
+
+      if (subscriptionId) {
+        const { data: updated, error: subError } = await auth.admin
+          .from('school_subscriptions')
+          .update(subPayload)
+          .eq('id', subscriptionId)
+          .eq('organization_id', organizationId)
+          .select('id')
+          .maybeSingle();
+        if (subError) return fail(subError.message, 500);
+        if (!updated) return fail('The selected licence does not belong to this institution.', 409);
+      } else {
+        const { error: subError } = await auth.admin.from('school_subscriptions').insert({ ...subPayload, organization_id: organizationId, created_by: auth.user.id });
+        if (subError) return fail(subError.message, 500);
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -202,7 +193,7 @@ export async function POST(request: Request) {
       const { error: orgError } = await auth.admin.from('organizations').update({ status: organizationStatus }).eq('id', organizationId);
       if (orgError) return fail(orgError.message, 500);
       if (subId) {
-        const { error: subError } = await auth.admin.from('school_subscriptions').update({ status: subscriptionStatus, access_suspended_at: action === 'activate' ? null : new Date().toISOString() }).eq('id', subId);
+        const { error: subError } = await auth.admin.from('school_subscriptions').update({ status: subscriptionStatus, access_suspended_at: action === 'activate' ? null : new Date().toISOString() }).eq('id', subId).eq('organization_id', organizationId);
         if (subError) return fail(subError.message, 500);
       }
       return NextResponse.json({ ok: true });
