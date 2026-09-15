@@ -12,7 +12,7 @@ const checks = [
   ['required fields are explained in the UI', /Required columns[\s\S]*Student name · Email · Grade \/ class · Academic year/],
   ['downloadable CSV template is available', /student-import-template\.csv/.test(ui) && /^Student name,Email,Grade,Academic year,Section,Phone,Board,Parent name,Parent phone\s*$/m.test(template)],
   ['header aliases tolerate common school naming differences', /student email/.test(ui) && /standard/.test(ui) && /school year/.test(ui)],
-  ['manual column mapping remains available for unusual or misspelled headings', /If your CSV uses different or misspelled headings/[\s\S]*<SelectItem value="none">Not mapped<\/SelectItem>/],
+  ['manual column mapping remains available for unusual or misspelled headings', /If your CSV uses different or misspelled headings,[\s\S]*<SelectItem value="none">Not mapped<\/SelectItem>/],
   ['client validates proper email shape', /\^\[\^\\s@\]\+@\[\^\\s@\]\+\\\.\[\^\\s@\]\+\$/],
   ['client validates grade 1 through 12', /Number\.isInteger\(grade\)[\s\S]*grade < 1[\s\S]*grade > 12/],
   ['client validates academic year shape', /Academic year should look like 2026 or 2026-27/],
