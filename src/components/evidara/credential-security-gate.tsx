@@ -144,7 +144,15 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error(payload.error || 'Password could not be changed.');
       setPassword('');
       setConfirmPassword('');
-      await refreshSecurity(accessToken, userId, false);
+
+      // Supabase terminates the current auth session when a password changes.
+      // Do not immediately re-check security with the now-stale access token;
+      // clear the browser session and require a clean login with the new password.
+      if (supabase) {
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+        if (signOutError && !/auth session missing/i.test(signOutError.message)) throw signOutError;
+      }
+      window.location.replace('/?view=login');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Password could not be changed.');
     } finally {
