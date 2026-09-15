@@ -20,6 +20,8 @@ const checks = [
   ['new password policy is server enforced', /password\.length < 12/.test(route) && /uppercase letter/.test(route) && /symbol/.test(route)],
   ['password completion is audited', /account\.password_setup_completed/.test(route)],
   ['workspace gate enforces password replacement', /mustChangePassword/.test(gate) && /Create your private password/.test(gate)],
+  ['password setup clears the invalidated local auth session', /auth\.signOut\(\{ scope: 'local' \}\)/.test(gate)],
+  ['password setup returns to a clean login instead of reusing the stale token', /window\.location\.replace\('\/\?view=login'\)/.test(gate) && !/await refreshSecurity\(accessToken, userId, false\)/.test(gate)],
   ['workspace gate enrolls and verifies TOTP', /auth\.mfa\.enroll/.test(gate) && /challengeAndVerify/.test(gate) && /getAuthenticatorAssuranceLevel/.test(gate)],
   ['root workspace is wrapped in security gate', /<CredentialSecurityGate>[\s\S]*<ViewRouter \/>[\s\S]*<\/CredentialSecurityGate>/.test(page)],
   ['school issued passwords use cryptographic randomness', /crypto\.randomUUID\(\)/.test(schoolRoute)],
