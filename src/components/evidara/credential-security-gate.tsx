@@ -21,6 +21,22 @@ type TotpEnrollment = {
   secret: string;
 };
 
+class SecurityRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'SecurityRequestError';
+    this.status = status;
+  }
+}
+
+function isAuthFailure(value: unknown) {
+  if (value instanceof SecurityRequestError && value.status === 401) return true;
+  const message = value instanceof Error ? value.message : String(value ?? '');
+  return /auth session missing|jwt|token.*(expired|invalid)|invalid.*token|session.*expired|unauthorized/i.test(message);
+}
+
 export function CredentialSecurityGate({ children }: { children: ReactNode }) {
   const { session, signOut } = useAuth();
   const userId = session?.user.id ?? null;
@@ -47,25 +63,69 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       headers: { Authorization: `Bearer ${token}` },
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Security check failed (${response.status}).`);
+    if (!response.ok) {
+      throw new SecurityRequestError(
+        payload.error || `Security check failed (${response.status}).`,
+        response.status,
+      );
+    }
     return payload as SecurityState;
+  }, []);
+
+  const returnToLogin = useCallback(async () => {
+    try {
+      if (supabase) {
+        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+        if (signOutError && !/auth session missing/i.test(signOutError.message)) {
+          console.warn('Unable to clear local auth session before login redirect:', signOutError.message);
+        }
+      }
+    } finally {
+      window.location.replace('/?view=login');
+    }
   }, []);
 
   const refreshSecurity = useCallback(async (token: string, targetUserId: string, blocking: boolean) => {
     if (blocking) setLoading(true);
     setError('');
-    try {
-      const state = await requestSecurity(token);
+
+    const acceptState = (state: SecurityState) => {
       setSecurity(state);
       setSecurityUserId(targetUserId);
       return state;
+    };
+
+    try {
+      return acceptState(await requestSecurity(token));
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to verify account security.');
+      let failure: unknown = value;
+
+      if (isAuthFailure(failure) && supabase) {
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        const refreshedToken = refreshData.session?.access_token ?? null;
+
+        if (!refreshError && refreshedToken) {
+          try {
+            return acceptState(await requestSecurity(refreshedToken));
+          } catch (retryFailure) {
+            failure = retryFailure;
+          }
+        } else if (refreshError) {
+          failure = refreshError;
+        }
+
+        if (isAuthFailure(failure) || !refreshedToken) {
+          await returnToLogin();
+          return null;
+        }
+      }
+
+      setError(failure instanceof Error ? failure.message : 'Unable to verify account security.');
       return null;
     } finally {
       if (blocking) setLoading(false);
     }
-  }, [requestSecurity]);
+  }, [requestSecurity, returnToLogin]);
 
   useEffect(() => {
     if (!userId || !accessToken) {
@@ -87,6 +147,18 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     setMfaCode('');
     void refreshSecurity(accessToken, userId, true);
   }, [accessToken, refreshSecurity, securityUserId, userId]);
+
+  useEffect(() => {
+    if (!userId || !accessToken || typeof window === 'undefined') return;
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    if (!params.has('error') && !params.has('error_code')) return;
+
+    const url = new URL(window.location.href);
+    url.hash = '';
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}`);
+  }, [accessToken, userId]);
 
   useEffect(() => {
     if (!security?.privileged || security.mustChangePassword || !supabase || mfaReady || mfaChecking) return;
@@ -148,11 +220,7 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       // Supabase terminates the current auth session when a password changes.
       // Do not immediately re-check security with the now-stale access token;
       // clear the browser session and require a clean login with the new password.
-      if (supabase) {
-        const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
-        if (signOutError && !/auth session missing/i.test(signOutError.message)) throw signOutError;
-      }
-      window.location.replace('/?view=login');
+      await returnToLogin();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Password could not be changed.');
     } finally {
@@ -202,6 +270,31 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     } finally {
       setMfaWorking(false);
     }
+  }
+
+  if (!loading && error && (!security || securityUserId !== userId)) {
+    return (
+      <div className="mx-auto grid min-h-[70vh] max-w-xl place-items-center px-4 py-10">
+        <div className="w-full rounded-2xl border border-[#DDE5E8] bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-xl font-bold text-[#14232B]">We couldn’t verify this session</h1>
+          <p className="mt-2 text-sm leading-6 text-[#6B7980]">Your secure session could not be confirmed. Retry once, or sign in again.</p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              onClick={() => {
+                if (accessToken && userId) void refreshSecurity(accessToken, userId, true);
+              }}
+              disabled={!accessToken || !userId}
+            >
+              Retry
+            </Button>
+            <Button type="button" variant="outline" onClick={() => void returnToLogin()}>
+              Sign in again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading || !security || securityUserId !== userId) {
