@@ -2,16 +2,28 @@ import fs from 'node:fs';
 
 const ui = fs.readFileSync('src/components/evidara/bulk-account-import.tsx', 'utf8');
 const route = fs.readFileSync('src/app/api/access-control/route.ts', 'utf8');
+const template = fs.readFileSync('public/templates/student-import-template.csv', 'utf8');
 
 const checks = [
-  ['student-specific import UI', /Bulk student import/],
+  ['student import uses simple customer-facing title', /<DialogTitle>Import students<\/DialogTitle>/],
+  ['student import avoids internal roster jargon', !/roster/i.test(ui)],
   ['student action is dedicated', /action:\s*'bulkImportStudents'/],
   ['required mapping includes name email grade and academic year', /\['fullName'.*true\][\s\S]*\['email'.*true\][\s\S]*\['grade'.*true\][\s\S]*\['academicYear'.*true\]/],
+  ['required fields are explained in the UI', /Required columns[\s\S]*Student name · Email · Grade \/ class · Academic year/],
+  ['downloadable CSV template is available', /student-import-template\.csv/.test(ui) && /^Student name,Email,Grade,Academic year,Section,Phone,Board,Parent name,Parent phone\s*$/m.test(template)],
+  ['header aliases tolerate common school naming differences', /student email/.test(ui) && /standard/.test(ui) && /school year/.test(ui)],
+  ['manual column mapping remains available for unusual or misspelled headings', /If your CSV uses different or misspelled headings,[\s\S]*<SelectItem value="none">Not mapped<\/SelectItem>/],
   ['client validates proper email shape', /\^\[\^\\s@\]\+@\[\^\\s@\]\+\\\.\[\^\\s@\]\+\$/],
   ['client validates grade 1 through 12', /Number\.isInteger\(grade\)[\s\S]*grade < 1[\s\S]*grade > 12/],
-  ['client validates academic year shape', /Academic year must look like 2026 or 2026-27/],
-  ['client refuses more than 1000 rows instead of truncating', /will not silently truncate a student roster/],
-  ['validation blocks upload while rows are invalid', /invalidCount === 0/],
+  ['client validates academic year shape', /Academic year should look like 2026 or 2026-27/],
+  ['client flags duplicate emails before confirmation', /appears more than once in the CSV/],
+  ['client refuses more than 1000 rows without silent truncation', /split it into files of at most 1,000 students/],
+  ['invalid rows block review', /invalidCount === 0[\s\S]*Review students/],
+  ['review is a separate step before the import request', /async function beginReview\(\)[\s\S]*loadLicencePreview\(\)[\s\S]*setReviewing\(true\)/],
+  ['review checks current licence quantity without creating accounts', /fetch\('\/api\/school-platform\/'[\s\S]*licensed[\s\S]*available[\s\S]*remaining/],
+  ['final confirmation explicitly assigns student licences', /Add \{mapped\.length\} student[\s\S]*assign \{mapped\.length\} licence/],
+  ['insufficient licences disable final confirmation', /disabled=\{!licencePreview\?\.enough \|\| busy\}/],
+  ['licence availability is rechecked immediately before import', /async function upload\(\)[\s\S]*const latest = await loadLicencePreview\(\)[\s\S]*if \(!latest\.enough\)/],
   ['failed-row export is explicit', /evidara-student-import-failures\.csv/],
   ['failed export includes source row number and error', /failureKeys = \['rowNumber'[\s\S]*'error'\]/],
   ['successful credentials remain separately exportable', /evidara-student-import-credentials\.csv/],
@@ -31,7 +43,7 @@ const checks = [
 let failed = 0;
 for (const [label, pattern] of checks) {
   const source = label.startsWith('server') ? route : ui;
-  const ok = pattern.test(source);
+  const ok = typeof pattern === 'boolean' ? pattern : pattern.test(source);
   console.log(`${ok ? 'PASS' : 'FAIL'} B3 — ${label}`);
   if (!ok) failed += 1;
 }
