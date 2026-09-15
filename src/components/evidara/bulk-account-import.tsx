@@ -161,7 +161,7 @@ export function BulkAccountImport({ organizationId, onCompleted }: { organizatio
     }
     if (!parsed.rows.length) { setHeaders(parsed.headers); setRawRows([]); setMapping({}); setError('The CSV has headings but no student rows.'); return; }
     setHeaders(parsed.headers); setRawRows(parsed.rows);
-    setMapping(Object.fromEntries(targetFields.map(([key]) => [key, guess(key, parsed.headers)]));
+    setMapping(Object.fromEntries(targetFields.map(([key]) => [key, guess(key, parsed.headers)])));
   }
 
   async function loadLicencePreview(): Promise<LicencePreview> {
