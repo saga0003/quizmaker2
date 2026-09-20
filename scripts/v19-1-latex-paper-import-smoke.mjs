@@ -32,5 +32,14 @@ check('paper preview renders rich math content',paperPreview.includes('RichQuest
 check('device preview renders rich math content',device.includes('RichQuestionContent')&&device.includes('RichOptionContent'));
 check('paper template is bundled',exists('public/templates/Evidara_LaTeX_Paper_Template.tex'));
 check('AI conversion prompt is bundled',exists('public/templates/Evidara_AI_QuestionBank_to_LaTeX_Prompt.txt'));
+const docReader=read('src/lib/questionDocumentReader.ts');
+check('bulk LaTeX parser uses balanced braces',docReader.includes('readBalancedValue')&&docReader.includes('parseTopLevelLatexCommands'));
+check('inline and multiple image references retain context',docReader.includes('__image_references')&&docReader.includes("rememberImages(inlineImages, 'solution')"));
+const bulkImport=read('src/components/evidara/question-bulk-import-dialog-core.tsx');
+check('missing ZIP images identify question and location',bulkImport.includes('missingZipIssues')&&bulkImport.includes('Question {issue.questionNumber}')&&bulkImport.includes('solution image'));
+const aiHelper=read('src/components/evidara/ai-import-helper.tsx');
+check('AI helper requires complete classification before output',aiHelper.includes('Every question MUST have a non-empty grade, subject, chapter, topic and difficulty')&&aiHelper.includes('DO NOT ask me to choose one grade for the whole paper'));
+check('AI helper preflights exact image references',aiHelper.includes('Question N — question/option/solution')&&aiHelper.includes('all image references resolve to real packaged files'));
+
 console.log(`\nEvidara V19.1 LaTeX Paper Import: ${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);

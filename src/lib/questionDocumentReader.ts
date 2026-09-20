@@ -26,35 +26,147 @@ function optionKey(value: string) {
   return match ? `option_${match[1].toLowerCase()}` : "";
 }
 
+type ParsedLatexImageReference = {
+  path: string;
+  location: 'question' | 'option' | 'solution';
+  option?: string;
+  imageIndex: number;
+};
+
+function isEscaped(source: string, index: number) {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor -= 1) slashCount += 1;
+  return slashCount % 2 === 1;
+}
+
+function readBalancedValue(source: string, start: number, open: string, close: string) {
+  if (source[start] !== open) return null;
+  let depth = 1;
+  let cursor = start + 1;
+  while (cursor < source.length) {
+    if (!isEscaped(source, cursor)) {
+      if (source[cursor] === open) depth += 1;
+      else if (source[cursor] === close) {
+        depth -= 1;
+        if (depth === 0) return { value: source.slice(start + 1, cursor), end: cursor + 1 };
+      }
+    }
+    cursor += 1;
+  }
+  return null;
+}
+
+function parseTopLevelLatexCommands(block: string) {
+  const commands: Array<{ name: string; qualifier: string; value: string }> = [];
+  let cursor = 0;
+  while (cursor < block.length) {
+    const slash = block.indexOf('\\', cursor);
+    if (slash < 0) break;
+    let index = slash + 1;
+    if (!/[A-Za-z]/.test(block[index] || '')) {
+      cursor = index + 1;
+      continue;
+    }
+
+    const nameStart = index;
+    while (index < block.length && /[A-Za-z0-9_]/.test(block[index])) index += 1;
+    const name = block.slice(nameStart, index);
+    while (index < block.length && /\s/.test(block[index])) index += 1;
+
+    let qualifier = '';
+    if (block[index] === '[') {
+      const optional = readBalancedValue(block, index, '[', ']');
+      if (!optional) {
+        cursor = index + 1;
+        continue;
+      }
+      qualifier = clean(optional.value);
+      index = optional.end;
+      while (index < block.length && /\s/.test(block[index])) index += 1;
+    }
+
+    if (block[index] !== '{') {
+      cursor = index + 1;
+      continue;
+    }
+    const body = readBalancedValue(block, index, '{', '}');
+    if (!body) {
+      cursor = index + 1;
+      continue;
+    }
+    commands.push({ name, qualifier, value: body.value });
+    cursor = body.end;
+  }
+  return commands;
+}
+
+function extractImagePaths(value: string) {
+  return [...value.matchAll(/\\includegraphics(?:\s*\[[^\]]*\])?\s*\{([^{}]+)\}/gi)]
+    .map((match) => clean(match[1]))
+    .filter(Boolean);
+}
+
+function stripIncludeGraphics(value: string) {
+  return clean(value.replace(/\\includegraphics(?:\s*\[[^\]]*\])?\s*\{[^{}]+\}/gi, ' '));
+}
+
 function parseLatexQuestionBlocks(text: string): Record<string, unknown>[] {
   const blocks = [...text.matchAll(/\\begin\{question\}([\s\S]*?)\\end\{question\}/gi)].map((match) => match[1]);
   if (!blocks.length) return [];
 
   return blocks.map((block) => {
     const row: Record<string, unknown> = {};
-    let imageTarget = 'question_image';
-    const commands = [...block.matchAll(/\\([a-zA-Z][a-zA-Z0-9_]*)\s*(?:\[([^\]]+)\])?\s*\{([\s\S]*?)\}(?=\s*\\[a-zA-Z]|\s*$)/g)];
-    for (const command of commands) {
-      const name = normalizeKey(command[1]);
-      const qualifier = clean(command[2] || '');
-      const value = clean(command[3]);
+    const imageReferences: ParsedLatexImageReference[] = [];
+    let imageTarget: { location: 'question' | 'option' | 'solution'; option?: string } = { location: 'question' };
+
+    const rememberImages = (paths: string[], location: 'question' | 'option' | 'solution', option?: string) => {
+      paths.forEach((path, imageIndex) => {
+        imageReferences.push({ path, location, option, imageIndex: imageIndex + 1 });
+      });
+    };
+
+    for (const command of parseTopLevelLatexCommands(block)) {
+      const name = normalizeKey(command.name);
+      const qualifier = clean(command.qualifier || '');
+      const value = clean(command.value);
+      const inlineImages = extractImagePaths(command.value);
+
       if (name === 'question' || name === 'stem') {
-        row.question = value;
-        imageTarget = 'question_image';
+        row.question = stripIncludeGraphics(command.value);
+        imageTarget = { location: 'question' };
+        if (inlineImages[0]) row.question_image = inlineImages[0];
+        rememberImages(inlineImages, 'question');
       } else if (name === 'option' && qualifier) {
         const option = qualifier.toLowerCase();
-        row[`option_${option}`] = value;
-        imageTarget = `option_${option}_image`;
-      } else if ((name === 'questionimage' || name === 'question_image') && value) row.question_image = value;
-      else if ((name === 'optionimage' || name === 'option_image') && qualifier && value) row[`option_${qualifier.toLowerCase()}_image`] = value;
-      else if (name === 'includegraphics' && value) row[imageTarget] = value;
-      else if (name === 'answer') row.correct_answer = value;
-      else if (name === 'solution') row.solution = value;
-      else if (name === 'exam' || name === 'exam_type' || name === 'exam_types') row.exam_types = value;
+        row[`option_${option}`] = stripIncludeGraphics(command.value);
+        imageTarget = { location: 'option', option };
+        if (inlineImages[0]) row[`option_${option}_image`] = inlineImages[0];
+        rememberImages(inlineImages, 'option', option);
+      } else if ((name === 'questionimage' || name === 'question_image') && value) {
+        row.question_image = value;
+        imageTarget = { location: 'question' };
+        rememberImages([value], 'question');
+      } else if ((name === 'optionimage' || name === 'option_image') && qualifier && value) {
+        const option = qualifier.toLowerCase();
+        row[`option_${option}_image`] = value;
+        imageTarget = { location: 'option', option };
+        rememberImages([value], 'option', option);
+      } else if (name === 'includegraphics' && value) {
+        if (imageTarget.location === 'question') row.question_image = value;
+        else if (imageTarget.location === 'option' && imageTarget.option) row[`option_${imageTarget.option}_image`] = value;
+        rememberImages([value], imageTarget.location, imageTarget.option);
+      } else if (name === 'answer') row.correct_answer = value;
+      else if (name === 'solution') {
+        row.solution = value;
+        imageTarget = { location: 'solution' };
+        rememberImages(inlineImages, 'solution');
+      } else if (name === 'exam' || name === 'exam_type' || name === 'exam_types') row.exam_types = value;
       else if (name === 'negative' || name === 'negative_marks') row.negative_marks = value;
       else if (name === 'latex' || name === 'question_latex') row.question_latex = value;
       else row[name] = value;
     }
+
+    if (imageReferences.length) row.__image_references = imageReferences;
     return row;
   });
 }
