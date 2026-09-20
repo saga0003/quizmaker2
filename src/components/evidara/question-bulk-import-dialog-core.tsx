@@ -229,6 +229,7 @@ export function QuestionBulkImportDialog({
   const [questionFile, setQuestionFile] = useState<File | null>(null);
   const [imageZip, setImageZip] = useState<File | null>(null);
   const [zipNames, setZipNames] = useState<Set<string> | null>(null);
+  const [previewImageUrls, setPreviewImageUrls] = useState<Map<string, string>>(new Map());
   const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);
   const [localSubjects, setLocalSubjects] = useState<TaxonomySubject[]>(subjects);
   const [localChapters, setLocalChapters] = useState<TaxonomyChapter[]>(chapters);
@@ -262,6 +263,54 @@ export function QuestionBulkImportDialog({
   useEffect(() => { setLocalTopics(topics); }, [topics]);
   useEffect(() => { setPublishMaster(platformImport); }, [platformImport]);
   useEffect(() => { setCreatePaper(false); }, [kind, embeddedPaperMode, open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls: string[] = [];
+    setPreviewImageUrls(new Map());
+
+    if (!imageZip) return () => undefined;
+
+    void (async () => {
+      try {
+        const zip = await readZip(await imageZip.arrayBuffer());
+        const entries = [...zip.values()].filter((entry) => !entry.name.endsWith('/'));
+        const nameCounts = new Map<string, number>();
+        for (const entry of entries) {
+          const name = baseName(entry.name);
+          nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+        }
+
+        const next = new Map<string, string>();
+        for (const entry of entries) {
+          const name = baseName(entry.name);
+          let blob: Blob;
+          try {
+            ({ blob } = normalizeImageBytes(entry.bytes, name, 4 * 1024 * 1024));
+          } catch {
+            continue;
+          }
+          const url = URL.createObjectURL(blob);
+          objectUrls.push(url);
+          next.set(archivePath(entry.name), url);
+          if ((nameCounts.get(name) || 0) === 1) next.set(name, url);
+        }
+
+        if (cancelled) {
+          objectUrls.forEach((url) => URL.revokeObjectURL(url));
+          return;
+        }
+        setPreviewImageUrls(next);
+      } catch {
+        if (!cancelled) setPreviewImageUrls(new Map());
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imageZip]);
   useEffect(() => {
     if (!rawRows.length) return;
     const firstExam = rawRows.map((row) => String(row.exam_types || row.exam_type || '').split(/[|,;]/)[0].trim()).find(Boolean) || '';
@@ -878,7 +927,17 @@ export function QuestionBulkImportDialog({
     }
   }
 
-  const previewOptions = currentPayload?.options || [];
+  function previewImageUrl(value?: string) {
+    const clean = String(value || '').trim();
+    if (!clean) return '';
+    if (isRemoteUrl(clean)) return clean;
+    return previewImageUrls.get(archivePath(clean)) || previewImageUrls.get(baseName(clean)) || '';
+  }
+
+  const previewOptions = (currentPayload?.options || []).map((option) => ({
+    ...option,
+    image_url: previewImageUrl(option.image_url),
+  }));
   const previewCorrect = Array.isArray(currentPayload?.correct_answer)
     ? currentPayload.correct_answer.join('|')
     : String(currentPayload?.correct_answer || '');
@@ -1008,7 +1067,7 @@ export function QuestionBulkImportDialog({
                   <div className="rounded-2xl border border-[#E7ECEB] bg-white p-4"><div className="mb-4"><strong className="text-sm text-[#14232B]">Solution and remaining details</strong></div><div className="grid gap-4 lg:grid-cols-2"><div className="space-y-2"><GuidedLabel help="Human-readable solution.">Solution</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution')} onChange={(event) => updateRaw('solution', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Optional solution LaTeX.">Solution LaTeX</GuidedLabel><Textarea rows={5} value={rawText(current.raw, 'solution_latex')} onChange={(event) => updateRaw('solution_latex', event.target.value)} className="border-[#E7ECEB] font-mono text-xs" /></div></div><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-2"><GuidedLabel help="Marks for a correct answer.">Marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'marks')} onChange={(event) => updateRaw('marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Incorrect-answer deduction.">Negative marks</GuidedLabel><Input type="number" value={rawText(current.raw, 'negative_marks')} onChange={(event) => updateRaw('negative_marks', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Expected solving time.">Expected seconds</GuidedLabel><Input type="number" value={rawText(current.raw, 'estimated_seconds')} onChange={(event) => updateRaw('estimated_seconds', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Learner-facing language.">Language</GuidedLabel><Select value={currentPayload.language} onValueChange={(value) => updateRaw('language', value)}><SelectTrigger className="border-[#E7ECEB]"><SelectValue /></SelectTrigger><SelectContent>{languages.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div></div><div className="mt-4 grid gap-4 md:grid-cols-3"><div className="space-y-2"><GuidedLabel help="Question source.">Source</GuidedLabel><Input value={rawText(current.raw, 'source')} onChange={(event) => updateRaw('source', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Source year.">Source year</GuidedLabel><Input type="number" value={rawText(current.raw, 'source_year')} onChange={(event) => updateRaw('source_year', event.target.value)} className="border-[#E7ECEB]" /></div><div className="space-y-2"><GuidedLabel help="Comma- or pipe-separated search tags.">Tags</GuidedLabel><Input value={rawText(current.raw, 'tags')} onChange={(event) => updateRaw('tags', event.target.value)} className="border-[#E7ECEB]" /></div></div></div>
                 </main>
 
-                <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start"><QuestionDevicePreview value={{ stemText: currentPayload.stem_text, stemLatex: currentPayload.stem_latex || '', imageUrl: isRemoteUrl(currentPayload.question_image_url || '') ? currentPayload.question_image_url : '', passageText: currentPayload.passage_text || '', questionType: currentPayload.question_type, options: previewOptions, numericAnswer: previewCorrect, subject: orderedSubjects.find((subject) => subject.id === currentPayload.subject_id)?.name || rawText(current.raw, 'subject'), chapter: orderedChapters.find((chapter) => chapter.id === currentPayload.chapter_id)?.name || rawText(current.raw, 'chapter'), topic: orderedTopics.find((topic) => topic.id === currentPayload.topic_id)?.name || rawText(current.raw, 'topic'), difficulty: currentPayload.difficulty, showCorrectAnswer: true }} /></aside>
+                <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start"><QuestionDevicePreview value={{ stemText: currentPayload.stem_text, stemLatex: currentPayload.stem_latex || '', imageUrl: previewImageUrl(currentPayload.question_image_url || ''), passageText: currentPayload.passage_text || '', questionType: currentPayload.question_type, options: previewOptions, numericAnswer: previewCorrect, subject: orderedSubjects.find((subject) => subject.id === currentPayload.subject_id)?.name || rawText(current.raw, 'subject'), chapter: orderedChapters.find((chapter) => chapter.id === currentPayload.chapter_id)?.name || rawText(current.raw, 'chapter'), topic: orderedTopics.find((topic) => topic.id === currentPayload.topic_id)?.name || rawText(current.raw, 'topic'), difficulty: currentPayload.difficulty, showCorrectAnswer: true }} /></aside>
               </div>}
             </>}
           </div>

@@ -41,5 +41,8 @@ const aiHelper=read('src/components/evidara/ai-import-helper.tsx');
 check('AI helper requires complete classification before output',aiHelper.includes('Every question MUST have a non-empty grade, subject, chapter, topic and difficulty')&&aiHelper.includes('DO NOT ask me to choose one grade for the whole paper'));
 check('AI helper preflights exact image references',aiHelper.includes('Question N — question/option/solution')&&aiHelper.includes('all image references resolve to real packaged files'));
 
+const bulkPreview=read('src/components/evidara/question-bulk-import-dialog-core.tsx');
+check('bundled local images preview before import',bulkPreview.includes('previewImageUrls')&&bulkPreview.includes('URL.createObjectURL')&&bulkPreview.includes('image_url: previewImageUrl(option.image_url)')&&bulkPreview.includes("imageUrl: previewImageUrl(currentPayload.question_image_url || '')"));
+
 console.log(`\nEvidara V19.1 LaTeX Paper Import: ${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);
