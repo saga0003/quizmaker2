@@ -32,16 +32,27 @@ function parseLatexQuestionBlocks(text: string): Record<string, unknown>[] {
 
   return blocks.map((block) => {
     const row: Record<string, unknown> = {};
+    let imageTarget = 'question_image';
     const commands = [...block.matchAll(/\\([a-zA-Z][a-zA-Z0-9_]*)\s*(?:\[([^\]]+)\])?\s*\{([\s\S]*?)\}(?=\s*\\[a-zA-Z]|\s*$)/g)];
     for (const command of commands) {
       const name = normalizeKey(command[1]);
-      const qualifier = clean(command[2] || "");
+      const qualifier = clean(command[2] || '');
       const value = clean(command[3]);
-      if (name === "question" || name === "stem") row.question = value;
-      else if (name === "option" && qualifier) row[`option_${qualifier.toLowerCase()}`] = value;
-      else if (name === "answer") row.correct_answer = value;
-      else if (name === "solution") row.solution = value;
-      else if (name === "latex" || name === "question_latex") row.question_latex = value;
+      if (name === 'question' || name === 'stem') {
+        row.question = value;
+        imageTarget = 'question_image';
+      } else if (name === 'option' && qualifier) {
+        const option = qualifier.toLowerCase();
+        row[`option_${option}`] = value;
+        imageTarget = `option_${option}_image`;
+      } else if ((name === 'questionimage' || name === 'question_image') && value) row.question_image = value;
+      else if ((name === 'optionimage' || name === 'option_image') && qualifier && value) row[`option_${qualifier.toLowerCase()}_image`] = value;
+      else if (name === 'includegraphics' && value) row[imageTarget] = value;
+      else if (name === 'answer') row.correct_answer = value;
+      else if (name === 'solution') row.solution = value;
+      else if (name === 'exam' || name === 'exam_type' || name === 'exam_types') row.exam_types = value;
+      else if (name === 'negative' || name === 'negative_marks') row.negative_marks = value;
+      else if (name === 'latex' || name === 'question_latex') row.question_latex = value;
       else row[name] = value;
     }
     return row;

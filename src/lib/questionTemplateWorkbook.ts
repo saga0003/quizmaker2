@@ -227,22 +227,54 @@ export async function downloadQuestionTemplateWorkbook(input: {
 
 export async function downloadQuestionImageZipTemplate() {
   const guide = [
-    'EVIDARA V12 QUESTION IMAGE ZIP TEMPLATE',
+    'EVIDARA QUESTION + IMAGE ZIP BUNDLE TEMPLATE',
     '',
-    '1. Put every question and option image inside this ZIP.',
-    '2. Use simple unique names such as physics-q001.png and physics-q001-a.png.',
-    '3. Enter the exact filename in the Excel question_image or option image column.',
-    '4. After selecting Excel, the Image ZIP selector remains visible in Evidara.',
-    '5. Evidara uploads images to the Supabase question-assets bucket and replaces filenames with public URLs.',
-    '6. Cloudflare R2 is optional and is not required for V12 imports.',
+    'Upload this ZIP directly from Choose file.',
+    '1. Keep exactly one question source in the ZIP (questions.tex is recommended).',
+    '2. Put question/option images inside assets/ and use unique filenames.',
+    '3. Reference exact relative paths such as assets/q001.png.',
+    '4. In LaTeX, use \\questionimage{assets/q001.png} and \\optionimage[A]{assets/q001-a.png}.',
+    '5. Evidara also accepts \\includegraphics{assets/q001.png} immediately after a question or option.',
+    '6. Evidara validates the source, matches images, uploads them, and shows review before saving.',
+    '7. You may still upload Excel/CSV/TEX first and attach a separate image ZIP if you prefer.',
   ].join('\n');
+  const latex = String.raw`\\begin{question}
+\\exam{NEET}
+\\grade{Grade 12}
+\\subject{Physics}
+\\chapter{Example Chapter}
+\\topic{Example Topic}
+\\difficulty{moderate}
+\\marks{4}
+\\negative_marks{1}
+\\question{Replace this with the original question text.}
+\\questionimage{assets/q001.png}
+\\option[A]{Option A}
+\\optionimage[A]{assets/q001-a.png}
+\\option[B]{Option B}
+\\option[C]{Option C}
+\\option[D]{Option D}
+\\answer{A}
+\\solution{Replace with the supplied solution, or leave blank.}
+\\end{question}`;
   downloadBlob(await createZipBlob([
     { name: 'README.txt', data: guide },
-    { name: 'images/PLACE_IMAGES_HERE.txt', data: 'Replace this file with the images referenced by the Excel or CSV template.' },
-  ]), 'evidara-v7-1-question-images-template.zip');
+    { name: 'questions.tex', data: latex },
+    { name: 'assets/REPLACE_WITH_REAL_IMAGES.txt', data: 'Delete this placeholder and place the images referenced by questions.tex in this folder.' },
+  ]), 'evidara-question-image-bundle-template.zip');
 }
 
 export function downloadQuestionImportGuide() {
   const guide = guideRows.map(([column, requirement, how, note]) => `${column}\nRequirement: ${requirement}\nHow: ${how}\nNote: ${note}\n`).join('\n');
-  downloadBlob(new Blob([`EVIDARA V12 BULK QUESTION IMPORT GUIDE\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-v7-1-question-import-guide.txt');
+  const bundle = [
+    'ZIP BUNDLE IMPORT',
+    '• You can upload one ZIP directly from Choose file.',
+    '• Keep exactly one supported question source in the ZIP; questions.tex is recommended.',
+    '• Put images in assets/ (or another folder) and reference their relative paths.',
+    '• Preferred LaTeX image commands: \\questionimage{assets/q001.png} and \\optionimage[A]{assets/q001-a.png}.',
+    '• \\includegraphics{assets/file.png} is accepted immediately after the question/option it belongs to.',
+    '• Evidara matches the exact relative path first. A filename-only fallback is used only when that filename is unique.',
+    '• The separate Image ZIP workflow remains supported for Excel/CSV/TEX imports.',
+  ].join('\n');
+  downloadBlob(new Blob([`EVIDARA BULK QUESTION IMPORT GUIDE\n\n${bundle}\n\n${guide}`], { type: 'text/plain;charset=utf-8' }), 'evidara-question-import-guide.txt');
 }
