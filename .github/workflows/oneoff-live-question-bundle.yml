@@ -1,0 +1,64 @@
+name: Current-main question bundle release
+
+on:
+  push:
+    branches:
+      - question-bundle-live-2026-09-20
+    paths:
+      - .github/workflows/oneoff-live-question-bundle.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-verify-commit:
+    if: ${{ !contains(github.event.head_commit.message, '[current-main-zip-import]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: question-bundle-live-2026-09-20
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply verified import patch onto current main
+        shell: bash
+        run: |
+          git fetch origin phase1-launch-hardening-2026-09-11
+          git diff 28f67e31679aa3d5e8384cd310c382f2a6b6c7c2 08941b00ce6118e29e356d46a7884c0384bbfc06 -- \
+            src/components/evidara/ai-import-helper.tsx \
+            src/components/evidara/live-paper-catalogue-v8.tsx \
+            src/components/evidara/question-bulk-import-dialog-core.tsx \
+            src/lib/questionDocumentReader.ts \
+            src/lib/questionTemplateWorkbook.ts > /tmp/question-bundle.patch
+          test -s /tmp/question-bundle.patch
+          git apply -3 /tmp/question-bundle.patch
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck -- --incremental false
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Import regression smoke
+        run: npm run qa:v19-1
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit current-main release candidate
+        shell: bash
+        run: |
+          git config user.name "Evidara Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/oneoff-live-question-bundle.yml
+          git add src/components/evidara/ai-import-helper.tsx src/components/evidara/live-paper-catalogue-v8.tsx src/components/evidara/question-bulk-import-dialog-core.tsx src/lib/questionDocumentReader.ts src/lib/questionTemplateWorkbook.ts
+          git commit -m "feat: add direct ZIP question bundles and paper imports [current-main-zip-import]"
+          git push origin HEAD:question-bundle-live-2026-09-20
