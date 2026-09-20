@@ -337,16 +337,56 @@ export function QuestionBulkImportDialog({
     });
   }, [canPublish, exams, grades, imageZip, orderedChapters, orderedSubjects, orderedTopics, rawRows]);
 
-  const localImageReferences = useMemo(() => rows.flatMap((row) => {
-    const payload = row.payload;
-    if (!payload) return [];
-    return [payload.question_image_url || '', ...payload.options.map((option) => option.image_url || '')]
-      .filter((value) => value && !isRemoteUrl(value));
-  }), [rows]);
-  const missingZipFiles = useMemo(() => {
+  type LocalImageIssue = { questionNumber: number; location: string; path: string };
+  const localImageIssues = useMemo<LocalImageIssue[]>(() => {
+    const parserIssues = rawRows.flatMap((raw, index) => {
+      const entries = Array.isArray(raw.__image_references) ? raw.__image_references : [];
+      return entries.flatMap((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+        const reference = entry as Record<string, unknown>;
+        const path = String(reference.path ?? '').trim();
+        if (!path || isRemoteUrl(path)) return [];
+        const rawLocation = String(reference.location ?? 'image').trim().toLowerCase();
+        const option = String(reference.option ?? '').trim().toUpperCase();
+        const imageIndex = Math.max(1, Number(reference.imageIndex) || 1);
+        const location = rawLocation === 'option'
+          ? `option ${option || '?'} image ${imageIndex}`
+          : rawLocation === 'solution'
+            ? `solution image ${imageIndex}`
+            : `question image ${imageIndex}`;
+        return [{ questionNumber: index + 1, location, path }];
+      });
+    });
+
+    const issues = parserIssues.length ? parserIssues : rows.flatMap((row, index) => {
+      const payload = row.payload;
+      if (!payload) return [];
+      const result: LocalImageIssue[] = [];
+      if (payload.question_image_url && !isRemoteUrl(payload.question_image_url)) {
+        result.push({ questionNumber: index + 1, location: 'question image 1', path: payload.question_image_url });
+      }
+      payload.options.forEach((option) => {
+        if (option.image_url && !isRemoteUrl(option.image_url)) {
+          result.push({ questionNumber: index + 1, location: `option ${option.option_key} image 1`, path: option.image_url });
+        }
+      });
+      return result;
+    });
+
+    const seen = new Set<string>();
+    return issues.filter((issue) => {
+      const key = `${issue.questionNumber}|${issue.location}|${archivePath(issue.path)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawRows, rows]);
+  const localImageReferences = useMemo(() => localImageIssues.map((issue) => issue.path), [localImageIssues]);
+  const missingZipIssues = useMemo(() => {
     if (!zipNames) return [];
-    return [...new Set(localImageReferences.filter(Boolean))].filter((value) => !zipNames.has(archivePath(value)) && !zipNames.has(baseName(value)));
-  }, [localImageReferences, zipNames]);
+    return localImageIssues.filter((issue) => !zipNames.has(archivePath(issue.path)) && !zipNames.has(baseName(issue.path)));
+  }, [localImageIssues, zipNames]);
+  const missingZipFiles = useMemo(() => missingZipIssues.map((issue) => issue.path), [missingZipIssues]);
   const valid = useMemo(() => rows.filter((row) => row.payload && row.errors.length === 0 && !row.duplicate), [rows]);
   const invalid = useMemo(() => rows.filter((row) => !row.payload || row.errors.length > 0 || row.duplicate), [rows]);
   const issueIndexes = useMemo(() => rows.map((row, index) => ({ row, index })).filter(({ row }) => row.errors.length > 0 || row.duplicate).map(({ index }) => index), [rows]);
@@ -770,8 +810,8 @@ export function QuestionBulkImportDialog({
       return;
     }
     if (imageBlocked) {
-      setError(missingZipFiles.length
-        ? `The image ZIP is missing: ${missingZipFiles.slice(0, 8).join(', ')}${missingZipFiles.length > 8 ? '…' : ''}`
+      setError(missingZipIssues.length
+        ? `The image ZIP is missing: ${missingZipIssues.slice(0, 8).map((issue) => `Question ${issue.questionNumber} — ${issue.location}: ${issue.path}`).join('; ')}${missingZipIssues.length > 8 ? '…' : ''}`
         : 'Attach the matching image ZIP before importing.');
       return;
     }
@@ -910,7 +950,7 @@ export function QuestionBulkImportDialog({
               <AiImportHelper />
             </div>
 
-            {missingZipFiles.length > 0 && <div className="mt-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]"><strong>The ZIP does not contain {missingZipFiles.length} referenced image file{missingZipFiles.length === 1 ? '' : 's'}.</strong><p className="mt-1 text-xs">Missing: {missingZipFiles.slice(0, 12).join(', ')}{missingZipFiles.length > 12 ? '…' : ''}</p></div>}
+            {missingZipIssues.length > 0 && <div className="mt-4 rounded-xl border border-[#B54747]/20 bg-[#B54747]/5 px-4 py-3 text-sm text-[#B54747]"><strong>The ZIP does not contain {missingZipIssues.length} referenced image file{missingZipIssues.length === 1 ? '' : 's'}.</strong><div className="mt-2 space-y-1 text-xs">{missingZipIssues.slice(0, 12).map((issue) => <p key={`${issue.questionNumber}-${issue.location}-${issue.path}`}><strong>Question {issue.questionNumber}</strong> — {issue.location}: {issue.path}</p>)}{missingZipIssues.length > 12 && <p>…and {missingZipIssues.length - 12} more.</p>}</div></div>}
 
             {showLatexWorkspace && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><strong className="text-sm text-[#14232B]">Paste structured LaTeX questions</strong><p className="text-xs text-[#6B7980]">Review the parsed fields and rendered question before import.</p></div><Button type="button" onClick={reviewPastedLatex} disabled={!latexText.trim()} className="bg-[#0E5A5A] text-white"><FileCode2 className="mr-2 h-4 w-4" />Review pasted LaTeX</Button></div><Textarea rows={10} value={latexText} onChange={(event) => setLatexText(event.target.value)} placeholder={'\\begin{question}\n\\subject{Physics}\n\\question{...}\n\\option[A]{...}\n\\answer{A}\n\\solution{...}\n\\end{question}'} className="mt-4 border-[#E7ECEB] font-mono text-xs" /></div>}
 
