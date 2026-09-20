@@ -93,6 +93,7 @@ const languages = ['English', 'Kannada', 'Hindi', 'Bilingual'];
 const normalizeName = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ');
 const nameKey = (value: unknown) => normalizeName(value).toLocaleLowerCase();
 const baseName = (value: string) => value.trim().split(/[\\/]/).pop()?.toLocaleLowerCase() || '';
+const archivePath = (value: string) => value.trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '').toLocaleLowerCase();
 
 type EditPatch = {
   index: number;
@@ -190,7 +191,7 @@ function friendlyDatabaseError(value: string) {
   if (/btrim\(app_role\)/i.test(message)) return 'The database role compatibility update is missing. Apply Supabase migration 30 and retry.';
   if (/bulk_import_questions_v71/i.test(message) && /does not exist|not found/i.test(message)) return 'The V7.1 database migration is not applied yet. Run migration 30 in Supabase SQL Editor.';
   if (/row-level security|permission denied|42501/i.test(message)) return 'Your account does not have permission for this import. Check the Evidara role and school assignment.';
-  if (/question-assets|bucket|r2/i.test(message)) return 'Question image storage is not ready. Check the Cloudflare R2 environment values, bucket token and public URL.';
+  if (/question-assets|bucket|r2/i.test(message)) return 'Question image storage is not ready. Ask an administrator to check Evidara image storage and retry.';
   return message || 'The database could not save this import.';
 }
 
@@ -208,6 +209,7 @@ export function QuestionBulkImportDialog({
   chapters,
   topics,
   onImported,
+  embeddedPaperMode = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -217,6 +219,7 @@ export function QuestionBulkImportDialog({
   chapters: TaxonomyChapter[];
   topics: TaxonomyTopic[];
   onImported: () => Promise<void> | void;
+  embeddedPaperMode?: boolean;
 }) {
   const { user, profile, session } = useAuth();
   const role = normalizeEvidaraRole(profile?.role);
@@ -247,7 +250,7 @@ export function QuestionBulkImportDialog({
   const [resultOpen, setResultOpen] = useState(false);
   const [undoStack, setUndoStack] = useState<EditPatch[]>([]);
   const [redoStack, setRedoStack] = useState<EditPatch[]>([]);
-  const [createPaper, setCreatePaper] = useState(kind === 'school');
+  const [createPaper, setCreatePaper] = useState(false);
   const [paperTitle, setPaperTitle] = useState('');
   const [paperExam, setPaperExam] = useState('');
   const [paperGrade, setPaperGrade] = useState('');
@@ -258,7 +261,7 @@ export function QuestionBulkImportDialog({
   useEffect(() => { setLocalChapters(chapters); }, [chapters]);
   useEffect(() => { setLocalTopics(topics); }, [topics]);
   useEffect(() => { setPublishMaster(platformImport); }, [platformImport]);
-  useEffect(() => { setCreatePaper(kind === 'school'); }, [kind]);
+  useEffect(() => { setCreatePaper(false); }, [kind, embeddedPaperMode, open]);
   useEffect(() => {
     if (!rawRows.length) return;
     const firstExam = rawRows.map((row) => String(row.exam_types || row.exam_type || '').split(/[|,;]/)[0].trim()).find(Boolean) || '';
@@ -342,7 +345,7 @@ export function QuestionBulkImportDialog({
   }), [rows]);
   const missingZipFiles = useMemo(() => {
     if (!zipNames) return [];
-    return [...new Set(localImageReferences.map(baseName).filter(Boolean))].filter((name) => !zipNames.has(name));
+    return [...new Set(localImageReferences.filter(Boolean))].filter((value) => !zipNames.has(archivePath(value)) && !zipNames.has(baseName(value)));
   }, [localImageReferences, zipNames]);
   const valid = useMemo(() => rows.filter((row) => row.payload && row.errors.length === 0 && !row.duplicate), [rows]);
   const invalid = useMemo(() => rows.filter((row) => !row.payload || row.errors.length > 0 || row.duplicate), [rows]);
@@ -447,6 +450,8 @@ export function QuestionBulkImportDialog({
   useEffect(() => { void runPreflight(); }, [open, kind, organizationId, user]);
 
   async function parse(file: File) {
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    let sourceFile = file;
     setQuestionFile(file);
     setRawRows([]);
     setResult(null);
@@ -456,14 +461,51 @@ export function QuestionBulkImportDialog({
     setBusy(true);
     setStage(`Reading ${file.name}…`);
     try {
-      const document = await readQuestionDocument(file);
+      if (extension === 'zip') {
+        setStage(`Opening ${file.name}…`);
+        const zip = await readZip(await file.arrayBuffer());
+        const entries = [...zip.values()].filter((entry) => !entry.name.endsWith('/') && !entry.name.startsWith('__MACOSX/'));
+        const candidates = entries.filter((entry) => /\.(tex|csv|xlsx|xls|json|docx|pdf|txt)$/i.test(entry.name) && !/(^|\/)readme\.txt$/i.test(entry.name));
+        const preferred = candidates.filter((entry) => !/\.txt$/i.test(entry.name));
+        const sourceCandidates = preferred.length ? preferred : candidates;
+        if (!sourceCandidates.length) throw new Error('This ZIP has no supported question source. Add exactly one TEX, XLSX, XLS, CSV, JSON, DOCX, text PDF or TXT question file.');
+        if (sourceCandidates.length > 1) throw new Error(`This ZIP contains multiple question sources (${sourceCandidates.map((entry) => entry.name).join(', ')}). Keep exactly one source file so Evidara cannot choose the wrong paper.`);
+        const sourceEntry = sourceCandidates[0];
+        const sourceName = sourceEntry.name.split('/').pop() || 'questions.tex';
+        sourceFile = new File([sourceEntry.blob], sourceName);
+
+        const nameCounts = new Map<string, number>();
+        for (const entry of entries) {
+          const name = baseName(entry.name);
+          nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+        }
+        const names = new Set<string>();
+        for (const entry of entries) {
+          names.add(archivePath(entry.name));
+          const name = baseName(entry.name);
+          if ((nameCounts.get(name) || 0) === 1) names.add(name);
+        }
+        setImageZip(file);
+        setZipNames(names);
+        setNotice(`ZIP bundle opened: ${sourceName} plus ${Math.max(0, entries.length - 1)} bundled asset${entries.length - 1 === 1 ? '' : 's'}. Evidara will match local image references automatically.`);
+      } else {
+        setImageZip(null);
+        setZipNames(null);
+      }
+
+      const document = await readQuestionDocument(sourceFile);
       if (document.rows.length > 2000) throw new Error('This file contains more than 2,000 questions. Split it into smaller batches.');
       setRawRows(document.rows);
       setFormat(document.format);
       setCurrentIndex(0);
       setSummaryRequested(true);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Evidara could not read this question file.');
+      setQuestionFile(null);
+      if (extension === 'zip') {
+        setImageZip(null);
+        setZipNames(null);
+      }
+      setError(caught instanceof Error ? caught.message : 'Evidara could not read this question file or ZIP bundle.');
     } finally {
       setBusy(false);
       setStage('');
@@ -478,10 +520,21 @@ export function QuestionBulkImportDialog({
     setStage(`Checking ${file.name}…`);
     try {
       const zip = await readZip(await file.arrayBuffer());
-      const names = new Set([...zip.values()].filter((entry) => !entry.name.endsWith('/')).map((entry) => baseName(entry.name)));
-      if (!names.size) throw new Error('The selected ZIP does not contain any files.');
+      const entries = [...zip.values()].filter((entry) => !entry.name.endsWith('/'));
+      if (!entries.length) throw new Error('The selected ZIP does not contain any files.');
+      const nameCounts = new Map<string, number>();
+      for (const entry of entries) {
+        const name = baseName(entry.name);
+        nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+      }
+      const names = new Set<string>();
+      for (const entry of entries) {
+        names.add(archivePath(entry.name));
+        const name = baseName(entry.name);
+        if ((nameCounts.get(name) || 0) === 1) names.add(name);
+      }
       setZipNames(names);
-      setNotice(`${names.size} image file${names.size === 1 ? '' : 's'} found in ${file.name}.`);
+      setNotice(`${entries.length} bundled file${entries.length === 1 ? '' : 's'} found in ${file.name}.`);
     } catch (caught) {
       setImageZip(null);
       setError(caught instanceof Error ? caught.message : 'Evidara could not open this image ZIP.');
@@ -669,23 +722,32 @@ export function QuestionBulkImportDialog({
     const localReferences = payloads.flatMap((payload) => [payload.question_image_url || '', ...payload.options.map((option) => option.image_url || '')])
       .filter((value) => value && !isRemoteUrl(value));
     if (!localReferences.length) return payloads;
-    if (!imageZip) throw new Error(`${localReferences.length} local image reference${localReferences.length === 1 ? '' : 's'} found. Choose the matching image ZIP before importing.`);
+    if (!imageZip) throw new Error(`${localReferences.length} local image reference${localReferences.length === 1 ? '' : 's'} found. Choose the matching image ZIP or a complete question ZIP bundle before importing.`);
     if (!supabase || !user) throw new Error('Sign in again before uploading question images.');
 
     const zip = await readZip(await imageZip.arrayBuffer());
-    const byName = new Map([...zip.values()].map((entry) => [baseName(entry.name), entry]));
+    const entries = [...zip.values()].filter((entry) => !entry.name.endsWith('/'));
+    const byPath = new Map(entries.map((entry) => [archivePath(entry.name), entry]));
+    const byBase = new Map<string, typeof entries>();
+    for (const entry of entries) {
+      const key = baseName(entry.name);
+      byBase.set(key, [...(byBase.get(key) || []), entry]);
+    }
     const uploaded = new Map<string, string>();
 
     async function resolve(value: string) {
       if (!value || isRemoteUrl(value)) return value.trim();
-      const key = baseName(value);
-      if (uploaded.has(key)) return uploaded.get(key)!;
-      const entry = byName.get(key);
-      if (!entry) throw new Error(`Image '${value}' is referenced in Excel but is missing from ${imageZip?.name}.`);
-      const { blob } = normalizeImageBytes(entry.bytes, key, 4 * 1024 * 1024);
-      setStage(`Uploading ${key} to Cloudflare R2…`);
-      const result = await uploadQuestionAsset(blob, safeImageFileName(key), 'imports');
-      uploaded.set(key, result.publicUrl);
+      const pathKey = archivePath(value);
+      if (uploaded.has(pathKey)) return uploaded.get(pathKey)!;
+      const name = baseName(value);
+      const basenameMatches = byBase.get(name) || [];
+      const entry = byPath.get(pathKey) || (basenameMatches.length === 1 ? basenameMatches[0] : undefined);
+      if (!entry && basenameMatches.length > 1) throw new Error(`Image '${value}' is ambiguous because ${imageZip?.name} contains more than one file named '${name}'. Use the relative path from the ZIP, for example assets/${name}.`);
+      if (!entry) throw new Error(`Image '${value}' is referenced by a question but is missing from ${imageZip?.name}.`);
+      const { blob } = normalizeImageBytes(entry.bytes, name, 4 * 1024 * 1024);
+      setStage(`Uploading ${name}…`);
+      const result = await uploadQuestionAsset(blob, safeImageFileName(name), 'imports');
+      uploaded.set(pathKey, result.publicUrl);
       return result.publicUrl;
     }
 
@@ -731,6 +793,7 @@ export function QuestionBulkImportDialog({
         delete payload.metadata.custom_test_type;
         if (!canPublish && payload.status === 'approved') payload.status = 'in_review';
         if (platformImport && publishMaster) payload.status = 'approved';
+        if (embeddedPaperMode && canPublish) payload.status = 'approved';
         if (payload.status === 'approved') payload.metadata.published_at = payload.metadata.published_at || new Date().toISOString();
         return payload;
       });
@@ -794,13 +857,13 @@ export function QuestionBulkImportDialog({
             <div className="flex flex-col gap-3 pr-8 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#0E5A5A]">Bulk question upload</p>
-                <DialogTitle className="mt-1 text-xl text-[#14232B]">Excel, CSV or LaTeX import</DialogTitle>
+                <DialogTitle className="mt-1 text-xl text-[#14232B]">Excel, CSV, LaTeX or ZIP import</DialogTitle>
                 <DialogDescription className="mt-1 max-w-3xl">Choose the question file, let Evidara validate every row, fix only what needs attention, and import the ready questions into the correct question bank.</DialogDescription>
               </div>
               <div className="flex flex-wrap gap-2">
                 <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md bg-[#0E5A5A] px-3 text-sm font-medium text-white shadow-sm transition hover:bg-[#0A4747]">
                   <Upload className="mr-1.5 h-4 w-4" />{questionFile ? 'Choose another file' : 'Choose file'}
-                  <input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} />
+                  <input hidden type="file" accept=".csv,.xlsx,.xls,.docx,.pdf,.tex,.txt,.json,.zip" onChange={(event) => event.target.files?.[0] && void parse(event.target.files[0])} />
                 </label>
                 <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionTemplateWorkbook({ subjects: localSubjects, chapters: localChapters, topics: localTopics, grades: grades.map((item) => item.value), exams: exams.map((item) => item.value) })} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />Excel template</Button>
                 <Button type="button" variant="outline" size="sm" onClick={downloadCsvTemplate} className="border-[#E7ECEB]"><Download className="mr-1.5 h-4 w-4" />CSV template</Button>
@@ -825,7 +888,7 @@ export function QuestionBulkImportDialog({
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#DCE9E7] text-[#0E5A5A]"><FileSpreadsheet className="h-5 w-5" /></div>
-                  <div className="min-w-0"><strong className="text-sm text-[#14232B]">{questionFile ? questionFile.name : 'Choose an Excel, CSV or LaTeX question file'}</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">XLSX is recommended. Evidara also supports CSV, XLS, DOCX, text PDF, TEX, TXT and JSON, then shows a validation review before saving anything.</p></div>
+                  <div className="min-w-0"><strong className="text-sm text-[#14232B]">{questionFile ? questionFile.name : 'Choose a question file or complete ZIP bundle'}</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">XLSX is recommended. Evidara also supports CSV, XLS, DOCX, text PDF, TEX, TXT, JSON and a ZIP containing one question source plus its images.</p></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => void downloadQuestionImageZipTemplate()} className="border-[#E7ECEB]"><FileArchive className="mr-1.5 h-4 w-4" />Image ZIP template</Button>
@@ -834,7 +897,7 @@ export function QuestionBulkImportDialog({
               </div>
               <div className="mt-4 grid gap-3 border-t border-[#EEF2F1] pt-4 sm:grid-cols-2">
                 <div className="rounded-xl bg-[#F7F9F7] px-4 py-3"><strong className="text-xs text-[#14232B]">Academic Setup assistance</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">Missing chapters and topics are detected automatically. Use “Create all missing taxonomy” after validation to add the unique entries safely.</p></div>
-                <div className="rounded-xl bg-[#F7F9F7] px-4 py-3"><strong className="text-xs text-[#14232B]">LaTeX + images</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">Use a TEX question source and attach the matching image ZIP only when the imported rows refer to local image filenames.</p></div>
+                <div className="rounded-xl bg-[#F7F9F7] px-4 py-3"><strong className="text-xs text-[#14232B]">LaTeX + images</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">Upload one ZIP containing a TEX/Excel/CSV question source plus its images, or choose a question file first and attach a separate image ZIP. Relative paths such as assets/q17.png are matched automatically.</p></div>
               </div>
             </div>
 
@@ -862,7 +925,7 @@ export function QuestionBulkImportDialog({
 
               {platformImport && <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-[#DCE9E7] bg-white p-4"><input type="checkbox" checked={publishMaster} onChange={(event) => setPublishMaster(event.target.checked)} className="mt-1 h-4 w-4" /><span><strong className="block text-sm text-[#14232B]">Publish Evidara master questions immediately</strong><span className="mt-1 block text-xs text-[#6B7980]">Enabled by default for Super Admin and Evidara Admin so approved master questions appear to School Admins and Teachers.</span></span></label>}
 
-              {kind === 'school' && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><strong className="text-sm text-[#14232B]">Create a paper from this import</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">When enabled, Evidara reuses questions already in your bank, adds new questions, and creates one draft paper in the same order.</p></div><label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0E5A5A]"><input type="checkbox" checked={createPaper} onChange={(event) => setCreatePaper(event.target.checked)} className="h-4 w-4 accent-[#0E5A5A]" />Create paper</label></div>{createPaper && <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5"><label className="text-xs font-semibold text-[#596A70] xl:col-span-2">Paper title<Input value={paperTitle} onChange={(event) => setPaperTitle(event.target.value)} className="mt-1" placeholder="NEET Practice Paper - Set A" /></label><label className="text-xs font-semibold text-[#596A70]">Exam<Select value={paperExam || undefined} onValueChange={setPaperExam}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose exam" /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Grade<Select value={paperGrade || undefined} onValueChange={setPaperGrade}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose grade" /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Duration (min)<Input type="number" min={1} max={1440} value={paperDuration} onChange={(event) => setPaperDuration(event.target.value)} className="mt-1" /></label><label className="text-xs font-semibold text-[#596A70]">Set name<Input value={paperSetName} onChange={(event) => setPaperSetName(event.target.value)} className="mt-1" placeholder="Set A" /></label><div className="md:col-span-2 xl:col-span-5 flex flex-col gap-2 rounded-xl border border-[#DCE9E7] bg-[#F8FBFA] p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-[#596A70]">If imported questions do not contain an exam or grade, Evidara can fill those missing fields from the paper settings above.</p><Button type="button" variant="outline" size="sm" onClick={applyPaperDefaultsToMissing} className="shrink-0 border-[#9FC9C1] text-[#0E5A5A]">Apply exam & grade to missing questions</Button></div></div>}</div>}
+              {kind === 'school' && !embeddedPaperMode && <div className="mt-4 rounded-2xl border border-[#DCE9E7] bg-white p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><strong className="text-sm text-[#14232B]">Create a paper from this import</strong><p className="mt-1 text-xs leading-5 text-[#6B7980]">When enabled, Evidara reuses questions already in your bank, adds new questions, and creates one draft paper in the same order.</p></div><label className="flex shrink-0 items-center gap-2 text-sm font-semibold text-[#0E5A5A]"><input type="checkbox" checked={createPaper} onChange={(event) => setCreatePaper(event.target.checked)} className="h-4 w-4 accent-[#0E5A5A]" />Create paper</label></div>{createPaper && <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5"><label className="text-xs font-semibold text-[#596A70] xl:col-span-2">Paper title<Input value={paperTitle} onChange={(event) => setPaperTitle(event.target.value)} className="mt-1" placeholder="NEET Practice Paper - Set A" /></label><label className="text-xs font-semibold text-[#596A70]">Exam<Select value={paperExam || undefined} onValueChange={setPaperExam}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose exam" /></SelectTrigger><SelectContent>{exams.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Grade<Select value={paperGrade || undefined} onValueChange={setPaperGrade}><SelectTrigger className="mt-1"><SelectValue placeholder="Choose grade" /></SelectTrigger><SelectContent>{grades.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></label><label className="text-xs font-semibold text-[#596A70]">Duration (min)<Input type="number" min={1} max={1440} value={paperDuration} onChange={(event) => setPaperDuration(event.target.value)} className="mt-1" /></label><label className="text-xs font-semibold text-[#596A70]">Set name<Input value={paperSetName} onChange={(event) => setPaperSetName(event.target.value)} className="mt-1" placeholder="Set A" /></label><div className="md:col-span-2 xl:col-span-5 flex flex-col gap-2 rounded-xl border border-[#DCE9E7] bg-[#F8FBFA] p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs leading-5 text-[#596A70]">If imported questions do not contain an exam or grade, Evidara can fill those missing fields from the paper settings above.</p><Button type="button" variant="outline" size="sm" onClick={applyPaperDefaultsToMissing} className="shrink-0 border-[#9FC9C1] text-[#0E5A5A]">Apply exam & grade to missing questions</Button></div></div>}</div>}
 
               <div className="mt-4 flex flex-col gap-3 rounded-xl border border-[#E7ECEB] bg-white p-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
@@ -913,7 +976,7 @@ export function QuestionBulkImportDialog({
           <DialogFooter className="border-t border-[#E7ECEB] bg-white px-4 py-3 sm:px-6 sm:py-4">
             <div className="mr-auto hidden max-w-2xl text-xs text-[#6B7980] md:block">{rows.length ? `${valid.length} ready · ${invalid.length} need correction${localImageReferences.length ? ` · ${localImageReferences.length} local image reference${localImageReferences.length === 1 ? '' : 's'}` : ''}. Ctrl+Z undoes your latest review edit.` : 'Choose a question file. Evidara will validate it before anything is saved.'}</div>
             <Button variant="outline" onClick={requestClose} className="border-[#E7ECEB]">{result ? 'Close' : 'Cancel'}</Button>
-            {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{createPaper && kind === 'school' ? `Import ${valid.length} & Create Paper` : canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
+            {!result && <Button onClick={() => void runImport()} disabled={importBlocked} className="bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}{embeddedPaperMode ? `Import ${valid.length} & Add to Paper` : createPaper && kind === 'school' ? `Import ${valid.length} & Create Paper` : canPublish ? `Import ${valid.length} Ready Question${valid.length === 1 ? '' : 's'}` : `Import ${valid.length} Draft/Review Question${valid.length === 1 ? '' : 's'}`}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

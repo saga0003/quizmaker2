@@ -1513,6 +1513,7 @@ return <div key={label} className={`rounded-xl border p-4 ${check && current ? (
 {kind === 'admin' && <PaperFileImportDialog open={paperFileImportOpen} onOpenChange={setPaperFileImportOpen} onImported={()=>void load()} />}
 <QuestionBulkImportDialog
 open={importOpen}
+embeddedPaperMode
 onOpenChange={(open) => {
 setImportOpen(open);
 if (!open && importBefore) {
