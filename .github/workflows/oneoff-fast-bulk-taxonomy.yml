@@ -27,6 +27,18 @@ jobs:
       - name: Apply fast taxonomy fix
         run: python scripts/apply-fast-bulk-taxonomy-fix.py
 
+      - name: Correct generated result typing
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/api/question-taxonomy/route.ts')
+          s = p.read_text()
+          s = s.replace('let createdChapterRows: Array<Record<string, unknown>> = [];', 'let createdChapterRows: typeof visibleChapters = [];')
+          s = s.replace('let createdTopicRows: Array<Record<string, unknown>> = [];', 'let createdTopicRows: typeof visibleTopics = [];')
+          p.write_text(s)
+          PY
+
       - name: Install dependencies
         run: npm ci
 
