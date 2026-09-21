@@ -838,50 +838,95 @@ export function QuestionBulkImportDialog({
   }
 
   async function createAllMissingTaxonomy() {
+    if (!session?.access_token) {
+      setError('Your session has expired. Sign in again, then retry.');
+      return;
+    }
+
     setBusy(true);
     setError('');
-    setStage('Creating missing chapters and topics…');
     try {
-      const nextChapters = [...localChapters];
-      const nextTopics = [...localTopics];
       const subjectByName = new Map(localSubjects.flatMap((subject) => [[nameKey(subject.name), subject], [nameKey(subject.code), subject]] as const));
       const chapterRequests = new Map<string, { name: string; subjectId: string }>();
+      const topicRequests = new Map<string, { name: string; subjectId: string; chapterName: string }>();
 
-      for (const raw of rawRows) {
-        const subject = subjectByName.get(nameKey(raw.subject));
-        const chapterName = normalizeName(raw.chapter);
-        if (!subject || !chapterName) continue;
-        const key = `${subject.id}|${nameKey(chapterName)}`;
-        if (!nextChapters.some((chapter) => chapter.subject_id === subject.id && nameKey(chapter.name) === nameKey(chapterName))) chapterRequests.set(key, { name: chapterName, subjectId: subject.id });
-      }
-
-      for (const request of chapterRequests.values()) {
-        const item = await postTaxonomy('createChapter', request) as TaxonomyChapter;
-        if (!nextChapters.some((chapter) => chapter.id === item.id)) nextChapters.push(item);
-      }
-
-      const topicRequests = new Map<string, { name: string; chapterId: string }>();
       for (const raw of rawRows) {
         const subject = subjectByName.get(nameKey(raw.subject));
         const chapterName = normalizeName(raw.chapter);
         const topicName = normalizeName(raw.topic);
-        if (!subject || !chapterName || !topicName) continue;
-        const chapter = nextChapters.find((item) => item.subject_id === subject.id && nameKey(item.name) === nameKey(chapterName));
-        if (!chapter) continue;
-        const key = `${chapter.id}|${nameKey(topicName)}`;
-        if (!nextTopics.some((topic) => topic.chapter_id === chapter.id && nameKey(topic.name) === nameKey(topicName))) topicRequests.set(key, { name: topicName, chapterId: chapter.id });
+        if (!subject || !chapterName) continue;
+
+        const chapterKey = `${subject.id}|${nameKey(chapterName)}`;
+        const chapterExists = localChapters.some((chapter) => chapter.subject_id === subject.id && nameKey(chapter.name) === nameKey(chapterName));
+        if (!chapterExists) chapterRequests.set(chapterKey, { name: chapterName, subjectId: subject.id });
+
+        if (topicName) {
+          const existingChapter = localChapters.find((chapter) => chapter.subject_id === subject.id && nameKey(chapter.name) === nameKey(chapterName));
+          const topicExists = existingChapter
+            ? localTopics.some((topic) => topic.chapter_id === existingChapter.id && nameKey(topic.name) === nameKey(topicName))
+            : false;
+          if (!topicExists) topicRequests.set(`${subject.id}|${nameKey(chapterName)}|${nameKey(topicName)}`, { name: topicName, subjectId: subject.id, chapterName });
+        }
       }
 
-      for (const request of topicRequests.values()) {
-        const item = await postTaxonomy('createTopic', request) as TaxonomyTopic;
-        if (!nextTopics.some((topic) => topic.id === item.id)) nextTopics.push(item);
+      const total = chapterRequests.size + topicRequests.size;
+      if (!total) {
+        setNotice('All chapters and topics are already available.');
+        return;
       }
 
-      setLocalChapters(nextChapters);
-      setLocalTopics(nextTopics);
-      setNotice(`Taxonomy updated: ${chapterRequests.size} chapter${chapterRequests.size === 1 ? '' : 's'} and ${topicRequests.size} topic${topicRequests.size === 1 ? '' : 's'} checked.`);
+      setStage(`Adding ${chapterRequests.size} chapter${chapterRequests.size === 1 ? '' : 's'} and ${topicRequests.size} topic${topicRequests.size === 1 ? '' : 's'}…`);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 45000);
+      let response: Response;
+      try {
+        response = await fetch('/api/question-taxonomy/', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'createMissingTaxonomy',
+            organizationId: kind === 'school' ? organizationId : null,
+            chapters: [...chapterRequests.values()],
+            topics: [...topicRequests.values()],
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+
+      const payload = await response.json().catch(() => ({})) as {
+        error?: string;
+        chapters?: TaxonomyChapter[];
+        topics?: TaxonomyTopic[];
+        createdChapters?: number;
+        createdTopics?: number;
+      };
+      if (!response.ok) throw new Error(payload.error || 'Evidara could not add the missing chapters and topics.');
+
+      const returnedChapters = payload.chapters || [];
+      const returnedTopics = payload.topics || [];
+      setLocalChapters((existing) => {
+        const byId = new Map(existing.map((item) => [item.id, item]));
+        returnedChapters.forEach((item) => byId.set(item.id, item));
+        return [...byId.values()];
+      });
+      setLocalTopics((existing) => {
+        const byId = new Map(existing.map((item) => [item.id, item]));
+        returnedTopics.forEach((item) => byId.set(item.id, item));
+        return [...byId.values()];
+      });
+
+      const createdChapters = Number(payload.createdChapters || 0);
+      const createdTopics = Number(payload.createdTopics || 0);
+      setNotice(createdChapters || createdTopics
+        ? `Done. Added ${createdChapters} chapter${createdChapters === 1 ? '' : 's'} and ${createdTopics} topic${createdTopics === 1 ? '' : 's'}. Evidara is rechecking the questions now.`
+        : 'Done. The required chapters and topics were already available. Evidara is rechecking the questions now.');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Evidara could not create the missing taxonomy.');
+      const timedOut = caught instanceof DOMException && caught.name === 'AbortError';
+      setError(timedOut
+        ? 'Adding the academic structure took longer than expected. Nothing needs to be edited manually — click Create all missing taxonomy again to safely retry.'
+        : caught instanceof Error ? caught.message : 'Evidara could not add the missing chapters and topics. Please retry.');
     } finally {
       setBusy(false);
       setStage('');
