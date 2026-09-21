@@ -44,5 +44,11 @@ check('AI helper preflights exact image references',aiHelper.includes('Question 
 const bulkPreview=read('src/components/evidara/question-bulk-import-dialog-core.tsx');
 check('bundled local images preview before import',bulkPreview.includes('previewImageUrls')&&bulkPreview.includes('URL.createObjectURL')&&bulkPreview.includes('image_url: previewImageUrl(option.image_url)')&&bulkPreview.includes("imageUrl: previewImageUrl(currentPayload.question_image_url || '')"));
 
+const smartZipImport=read('src/components/evidara/question-bulk-import-dialog-core.tsx');
+check('ZIP import auto-detects the real question source',smartZipImport.includes('supportFilePattern')&&smartZipImport.includes('sourceChoice'));
+check('taxonomy audit CSV is treated as support, not a paper',smartZipImport.includes("classificationHeaders >= 4")&&smartZipImport.includes("confidence = 'support'"));
+check('structured Evidara TEX is preferred automatically',smartZipImport.includes("3000 + Math.min(blocks, 500)")&&smartZipImport.includes("confidence = 'strong'"));
+check('ZIP success notice is teacher-friendly',smartZipImport.includes('ZIP ready. Evidara automatically chose'));
+
 console.log(`\nEvidara V19.1 LaTeX Paper Import: ${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);
