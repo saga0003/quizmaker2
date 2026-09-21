@@ -50,5 +50,11 @@ check('taxonomy audit CSV is treated as support, not a paper',smartZipImport.inc
 check('structured Evidara TEX is preferred automatically',smartZipImport.includes("3000 + Math.min(blocks, 500)")&&smartZipImport.includes("confidence = 'strong'"));
 check('ZIP success notice is teacher-friendly',smartZipImport.includes('ZIP ready. Evidara automatically chose'));
 
+const taxonomyRoute=read('src/app/api/question-taxonomy/route.ts');
+check('missing taxonomy has a single bulk server action',taxonomyRoute.includes("action === 'createMissingTaxonomy'")&&taxonomyRoute.includes('.insert(chaptersToCreate)')&&taxonomyRoute.includes('.insert(topicsToCreate)'));
+const bulkImportFast=read('src/components/evidara/question-bulk-import-dialog-core.tsx');
+check('bulk import creates missing taxonomy in one request',bulkImportFast.includes("action: 'createMissingTaxonomy'")&&bulkImportFast.includes('Adding ${chapterRequests.size} chapter')&&bulkImportFast.includes('controller.abort()'));
+check('bulk taxonomy no longer loops browser requests serially',!bulkImportFast.includes("for (const request of chapterRequests.values()) {\n        const item = await postTaxonomy('createChapter'"));
+
 console.log(`\nEvidara V19.1 LaTeX Paper Import: ${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);

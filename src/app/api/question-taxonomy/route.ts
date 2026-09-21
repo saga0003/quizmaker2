@@ -113,6 +113,146 @@ export async function POST(request: Request) {
       return NextResponse.json({ item: data, duplicate: false }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
+    if (action === 'createMissingTaxonomy') {
+      const organizationId = resolvedScope(ctx, body.organizationId);
+      const chapterInput = Array.isArray(body.chapters) ? body.chapters : [];
+      const topicInput = Array.isArray(body.topics) ? body.topics : [];
+
+      if (chapterInput.length > 500 || topicInput.length > 1000) {
+        throw Object.assign(new Error('This paper contains too many new academic items to add at once. Split the import into smaller batches.'), { status: 400 });
+      }
+
+      const chapterRequests = new Map<string, { subjectId: string; name: string }>();
+      for (const raw of chapterInput) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const item = raw as Record<string, unknown>;
+        const subjectId = String(item.subjectId || '').trim();
+        if (!subjectId) continue;
+        const name = cleanName(item.name, 'Chapter name');
+        chapterRequests.set(`${subjectId}|${name.toLowerCase()}`, { subjectId, name });
+      }
+
+      const topicRequests = new Map<string, { subjectId: string; chapterName: string; name: string }>();
+      for (const raw of topicInput) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const item = raw as Record<string, unknown>;
+        const subjectId = String(item.subjectId || '').trim();
+        if (!subjectId) continue;
+        const chapterName = cleanName(item.chapterName, 'Chapter name');
+        const name = cleanName(item.name, 'Topic name');
+        topicRequests.set(`${subjectId}|${chapterName.toLowerCase()}|${name.toLowerCase()}`, { subjectId, chapterName, name });
+      }
+
+      const subjectIds = [...new Set([
+        ...[...chapterRequests.values()].map((item) => item.subjectId),
+        ...[...topicRequests.values()].map((item) => item.subjectId),
+      ])];
+      if (!subjectIds.length) {
+        return NextResponse.json({ chapters: [], topics: [], createdChapters: 0, createdTopics: 0 }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+
+      const { data: subjectRows, error: subjectError } = await ctx.admin
+        .from('subjects')
+        .select('id,organization_id,is_active')
+        .in('id', subjectIds);
+      if (subjectError) throw new Error(subjectError.message);
+      const visibleSubjectIds = new Set((subjectRows || [])
+        .filter((row) => row.is_active !== false && (ctx.superAdmin || row.organization_id === null || row.organization_id === organizationId))
+        .map((row) => String(row.id)));
+      const hiddenSubject = subjectIds.find((id) => !visibleSubjectIds.has(id));
+      if (hiddenSubject) throw Object.assign(new Error('One of the subjects in this paper is no longer available. Refresh and try again.'), { status: 400 });
+
+      const { data: existingChapterRows, error: chapterReadError } = await ctx.admin
+        .from('chapters')
+        .select('id,name,subject_id,organization_id,is_active')
+        .in('subject_id', subjectIds)
+        .eq('is_active', true);
+      if (chapterReadError) throw new Error(chapterReadError.message);
+
+      const visibleChapters = (existingChapterRows || []).filter((row) =>
+        ctx.superAdmin || row.organization_id === null || row.organization_id === organizationId
+      );
+      const chapterByKey = new Map(visibleChapters.map((row) => [
+        `${row.subject_id}|${String(row.name || '').trim().toLowerCase()}`,
+        row,
+      ]));
+
+      const requiredChapters = new Map(chapterRequests);
+      for (const item of topicRequests.values()) {
+        requiredChapters.set(`${item.subjectId}|${item.chapterName.toLowerCase()}`, { subjectId: item.subjectId, name: item.chapterName });
+      }
+
+      const chaptersToCreate = [...requiredChapters.entries()]
+        .filter(([key]) => !chapterByKey.has(key))
+        .map(([, item]) => ({ name: item.name, subject_id: item.subjectId, organization_id: organizationId, is_active: true }));
+
+      let createdChapterRows: typeof visibleChapters = [];
+      if (chaptersToCreate.length) {
+        const { data, error } = await ctx.admin
+          .from('chapters')
+          .insert(chaptersToCreate)
+          .select('id,name,subject_id,organization_id,is_active');
+        if (error) throw new Error(error.message);
+        createdChapterRows = data || [];
+        for (const row of createdChapterRows) {
+          chapterByKey.set(`${row.subject_id}|${String(row.name || '').trim().toLowerCase()}`, row);
+        }
+      }
+
+      const requestedChapterRows = [...requiredChapters.entries()]
+        .map(([key]) => chapterByKey.get(key))
+        .filter(Boolean);
+      const requestedChapterIds = [...new Set(requestedChapterRows.map((row) => String(row!.id)))];
+
+      let visibleTopics: Array<Record<string, unknown>> = [];
+      if (requestedChapterIds.length) {
+        const { data, error } = await ctx.admin
+          .from('topics')
+          .select('id,name,chapter_id,organization_id,is_active')
+          .in('chapter_id', requestedChapterIds)
+          .eq('is_active', true);
+        if (error) throw new Error(error.message);
+        visibleTopics = (data || []).filter((row) =>
+          ctx.superAdmin || row.organization_id === null || row.organization_id === organizationId
+        );
+      }
+      const topicByKey = new Map(visibleTopics.map((row) => [
+        `${row.chapter_id}|${String(row.name || '').trim().toLowerCase()}`,
+        row,
+      ]));
+
+      const topicsToCreate: Array<{ name: string; chapter_id: string; organization_id: string | null; is_active: boolean }> = [];
+      const requestedTopicKeys: string[] = [];
+      for (const item of topicRequests.values()) {
+        const chapter = chapterByKey.get(`${item.subjectId}|${item.chapterName.toLowerCase()}`);
+        if (!chapter) throw new Error(`Evidara could not resolve chapter '${item.chapterName}' while creating its topics.`);
+        const key = `${chapter.id}|${item.name.toLowerCase()}`;
+        requestedTopicKeys.push(key);
+        if (!topicByKey.has(key)) topicsToCreate.push({ name: item.name, chapter_id: String(chapter.id), organization_id: organizationId, is_active: true });
+      }
+
+      let createdTopicRows: typeof visibleTopics = [];
+      if (topicsToCreate.length) {
+        const { data, error } = await ctx.admin
+          .from('topics')
+          .insert(topicsToCreate)
+          .select('id,name,chapter_id,organization_id,is_active');
+        if (error) throw new Error(error.message);
+        createdTopicRows = data || [];
+        for (const row of createdTopicRows) {
+          topicByKey.set(`${row.chapter_id}|${String(row.name || '').trim().toLowerCase()}`, row);
+        }
+      }
+
+      const requestedTopics = requestedTopicKeys.map((key) => topicByKey.get(key)).filter(Boolean);
+      return NextResponse.json({
+        chapters: requestedChapterRows,
+        topics: requestedTopics,
+        createdChapters: createdChapterRows.length,
+        createdTopics: createdTopicRows.length,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     if (action === 'createChapter') {
       const name = cleanName(body.name, 'Chapter name');
       const subjectId = String(body.subjectId || '');
