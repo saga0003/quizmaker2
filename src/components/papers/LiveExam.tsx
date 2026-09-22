@@ -661,16 +661,17 @@ export function LiveExam() {
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
-              {orderedOptions.map((option) => {
+              {orderedOptions.map((option, optionIndex) => {
                 const checked = answerKeys.includes(option.option_key);
+                const presentationLabel = sourceFidelity ? String(optionIndex + 1) : String.fromCharCode(65 + optionIndex);
                 return (
                   <button key={option.option_key} onClick={() => void selectOption(option.option_key)} style={{ display: 'grid', gridTemplateColumns: '38px 1fr', gap: 10, alignItems: 'center', textAlign: 'left', padding: 13, borderRadius: 12, border: checked ? '2px solid #f6b100' : '1px solid #dfe4ec', background: checked ? '#fff8e6' : 'white' }}>
-                    <span style={{ width: 32, height: 32, borderRadius: question.question_type === 'multiple_correct' ? 8 : 999, display: 'grid', placeItems: 'center', background: checked ? '#f6b100' : '#f2f4f7', fontWeight: 800 }}>{sourceFidelity ? orderedOptions.findIndex((item) => item.option_key === option.option_key) + 1 : option.option_key}</span>
+                    <span style={{ width: 32, height: 32, borderRadius: question.question_type === 'multiple_correct' ? 8 : 999, display: 'grid', placeItems: 'center', background: checked ? '#f6b100' : '#f2f4f7', fontWeight: 800 }}>{presentationLabel}</span>
                     <span>
                       {sourceFidelity ? (
-                        <strong>Option {orderedOptions.findIndex((item) => item.option_key === option.option_key) + 1}</strong>
+                        <strong>Option {presentationLabel}</strong>
                       ) : (
-                        <RichOptionContent text={option.content_text} latex={option.content_latex || undefined} imageUrl={option.image_url || undefined} imageAlt={`Option ${option.option_key}`} />
+                        <RichOptionContent text={option.content_text} latex={option.content_latex || undefined} imageUrl={option.image_url || undefined} imageAlt={`Option ${presentationLabel}`} />
                       )}
                     </span>
                   </button>

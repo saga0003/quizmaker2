@@ -10,6 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { RichOptionContent, RichQuestionContent } from '@/components/evidara/rich-math-content';
 
 export type SelfClassification =
   | 'concept_gap'
@@ -19,9 +20,29 @@ export type SelfClassification =
   | 'ran_out_of_time'
   | 'other';
 
+type ReflectionOption = {
+  option_key: string;
+  content_text?: string | null;
+  content_latex?: string | null;
+  image_url?: string | null;
+  display_order?: number | null;
+  is_correct?: boolean;
+};
+
 type QueueItem = {
   response_id: string;
   paper_question_id: string;
+  question_number: number | null;
+  question_type: string | null;
+  stem_text: string | null;
+  stem_latex: string | null;
+  passage_text: string | null;
+  question_image_url: string | null;
+  options: ReflectionOption[];
+  response: unknown;
+  correct_answer: unknown;
+  answers_released: boolean;
+  shuffle_options: boolean;
   is_correct: boolean;
   is_skipped: boolean;
   time_spent_seconds: number;
@@ -48,6 +69,85 @@ function isComplete(item: QueueItem) {
   return Boolean(
     item.confidence_rating
       && (item.is_correct || item.classification),
+  );
+}
+
+function stableHash(value: string) {
+  let output = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    output ^= value.charCodeAt(index);
+    output = Math.imul(output, 16777619);
+  }
+  return output >>> 0;
+}
+
+function answerValues(value: unknown) {
+  if (value === null || value === undefined || value === '') return [] as string[];
+  if (Array.isArray(value)) return value.map((item) => String(item));
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const nested = record.option_keys ?? record.options ?? record.answer ?? record.value;
+    if (nested !== undefined) return answerValues(nested);
+  }
+  return [String(value)];
+}
+
+function orderedReflectionOptions(item: QueueItem, attemptId: string) {
+  const values = [...(item.options || [])];
+  if (item.shuffle_options) {
+    values.sort((a, b) =>
+      stableHash(`${attemptId}-${item.paper_question_id}-${a.option_key}`)
+      - stableHash(`${attemptId}-${item.paper_question_id}-${b.option_key}`),
+    );
+  } else {
+    values.sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
+  }
+  return values;
+}
+
+function ReflectionAnswer({
+  title,
+  value,
+  item,
+  attemptId,
+  tone,
+}: {
+  title: string;
+  value: unknown;
+  item: QueueItem;
+  attemptId: string;
+  tone: 'student' | 'correct';
+}) {
+  const values = answerValues(value);
+  const ordered = orderedReflectionOptions(item, attemptId);
+  const matches = ordered
+    .map((option, index) => ({ option, index }))
+    .filter(({ option }) => values.includes(option.option_key));
+  const border = tone === 'correct' ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white';
+
+  return (
+    <div className={`rounded-xl border p-3 ${border}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      {!values.length ? (
+        <p className="mt-2 text-sm font-medium text-slate-700">Not answered</p>
+      ) : matches.length ? (
+        <div className="mt-2 space-y-2">
+          {matches.map(({ option, index }) => (
+            <div key={option.option_key} className="flex min-w-0 items-start gap-2 text-sm text-slate-900">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 font-bold text-slate-700">{String.fromCharCode(65 + index)}</span>
+              <RichOptionContent
+                text={option.content_text || undefined}
+                latex={option.content_latex || undefined}
+                imageUrl={option.image_url || undefined}
+                imageAlt={`${title} option ${String.fromCharCode(65 + index)}`}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 break-words text-sm font-medium text-slate-900">{values.join(', ')}</p>
+      )}
+    </div>
   );
 }
 
@@ -226,12 +326,27 @@ export function PostTestErrorClassification({
 
       <div className="post-test-question-summary">
         {item.is_correct ? <CheckCircle2 /> : <AlertTriangle />}
-        <div>
-          <strong>Reflection item {index + 1} of {items.length}</strong>
+        <div className="min-w-0 flex-1">
+          <strong>Question {item.question_number || index + 1} <span className="font-normal text-slate-500">· Reflection {index + 1} of {items.length}</span></strong>
           <p>
             {item.is_correct ? 'Correct response' : item.is_skipped ? 'Skipped question' : 'Incorrect response'}
             <span aria-hidden="true"> · </span><Clock3 /> {item.time_spent_seconds || 0} sec
           </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+        <RichQuestionContent
+          text={item.stem_text || undefined}
+          latex={item.stem_latex || undefined}
+          passageText={item.passage_text || undefined}
+          imageUrl={item.question_image_url || undefined}
+          imageAlt={`Question ${item.question_number || index + 1}`}
+          textClassName="font-medium text-slate-950"
+        />
+        <div className={`mt-4 grid gap-3 ${item.answers_released ? 'md:grid-cols-2' : ''}`}>
+          <ReflectionAnswer title="Your answer" value={item.response} item={item} attemptId={attemptId} tone="student" />
+          {item.answers_released && <ReflectionAnswer title="Correct answer" value={item.correct_answer} item={item} attemptId={attemptId} tone="correct" />}
         </div>
       </div>
 

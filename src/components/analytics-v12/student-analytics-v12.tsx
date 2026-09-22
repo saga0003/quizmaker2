@@ -605,12 +605,20 @@ export function AnalyticsV12Workspace({
     if (mode === 'school') setPayload(emptyPayload(studentId));
     setLoading(true);
     setError('');
-    const { data, error: analyticsError } = await supabase.rpc('get_student_analytics_v12', {
-      p_student_id: studentId,
-      p_product_id: null,
-      p_date_from: null,
-      p_date_to: null,
-    });
+    const analyticsResult = mode === 'student'
+      ? await supabase.rpc('get_live_student_analytics_v12', {
+          p_student_id: studentId,
+          p_product_id: null,
+          p_date_from: null,
+          p_date_to: null,
+        })
+      : await supabase.rpc('get_student_analytics_v12', {
+          p_student_id: studentId,
+          p_product_id: null,
+          p_date_from: null,
+          p_date_to: null,
+        });
+    const { data, error: analyticsError } = analyticsResult;
     if (analyticsError) {
       setPayload(emptyPayload(studentId));
       setError(/get_student_analytics_v12|schema cache|could not find/i.test(analyticsError.message)
