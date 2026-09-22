@@ -189,18 +189,32 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [mfaChecking, mfaReady, security]);
 
-  const passwordReady = useMemo(() => (
-    password.length >= 12
-    && /[A-Z]/.test(password)
-    && /[a-z]/.test(password)
-    && /\d/.test(password)
-    && /[^A-Za-z0-9]/.test(password)
-    && password === confirmPassword
-  ), [confirmPassword, password]);
+  const passwordProblems = useMemo(() => {
+    const problems: string[] = [];
+    if (password.length < 12) problems.push('Use at least 12 characters.');
+    if (!/[A-Z]/.test(password)) problems.push('Add an uppercase letter.');
+    if (!/[a-z]/.test(password)) problems.push('Add a lowercase letter.');
+    if (!/\d/.test(password)) problems.push('Add a number.');
+    if (!/[^A-Za-z0-9]/.test(password)) problems.push('Add a symbol.');
+    if (confirmPassword && password !== confirmPassword) problems.push('The passwords do not match.');
+    return problems;
+  }, [confirmPassword, password]);
+  const canAttemptPasswordChange = Boolean(accessToken && userId && password && confirmPassword) && !savingPassword;
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!accessToken || !userId || !passwordReady) return;
+    if (!accessToken || !userId) {
+      setError('Your secure session is not ready. Sign in again and retry.');
+      return;
+    }
+    if (!password || !confirmPassword) {
+      setError('Enter the new password in both fields.');
+      return;
+    }
+    if (passwordProblems.length) {
+      setError(passwordProblems.join(' '));
+      return;
+    }
     setSavingPassword(true);
     setError('');
     try {
@@ -315,9 +329,12 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
           <form className="mt-6 space-y-4" onSubmit={changePassword}>
             <div><label htmlFor="new-password" className="text-sm font-medium text-[#14232B]">New password</label><Input id="new-password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2" /></div>
             <div><label htmlFor="confirm-password" className="text-sm font-medium text-[#14232B]">Confirm password</label><Input id="confirm-password" type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-2" /></div>
-            <div className="rounded-xl bg-[#F7F9F7] p-4 text-xs leading-5 text-[#5E6E74]">Use at least 12 characters with uppercase, lowercase, a number and a symbol. Do not use your name, email or common passwords.</div>
+            <div className="rounded-xl bg-[#F7F9F7] p-4 text-xs leading-5 text-[#5E6E74]">
+              <p>Use at least 12 characters with uppercase, lowercase, a number and a symbol. Do not use your name, email or common passwords.</p>
+              {(password || confirmPassword) && passwordProblems.length > 0 && <p className="mt-2 font-medium text-[#8A5F00]">Still needed: {passwordProblems.join(' ')}</p>}
+            </div>
             {error && <div className="rounded-xl border border-[#E5B5B5] bg-[#FFF4F4] px-4 py-3 text-sm text-[#A33A3A]">{error}</div>}
-            <Button type="submit" disabled={!passwordReady || savingPassword} className="w-full bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{savingPassword ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}Set password and continue</Button>
+            <Button type="submit" disabled={!canAttemptPasswordChange} className="w-full bg-[#0E5A5A] text-white hover:bg-[#0A4747]">{savingPassword ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="mr-2 h-4 w-4" />}Set password and continue</Button>
           </form>
           <button type="button" onClick={() => void signOut()} className="mt-4 w-full text-center text-xs font-medium text-[#6B7980] hover:text-[#14232B]">Sign out</button>
         </div>

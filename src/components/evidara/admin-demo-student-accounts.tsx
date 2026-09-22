@@ -124,6 +124,8 @@ export function AdminAccessWorkspace() {
 
   async function resetPassword() {
     if (!selected) return;
+    if (!newPassword) { setError('Enter a new password first.'); return; }
+    if (newPassword.length < 12) { setError('Use a password with at least 12 characters.'); return; }
     setWorking(true); setError(''); setMessage('');
     try {
       await request('POST', { action: 'resetPassword', demoStudentId: selected.id, newPassword });
@@ -177,6 +179,6 @@ export function AdminAccessWorkspace() {
       </>}
     </section>
 
-    {selected && <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4"><Card className="w-full max-w-lg rounded-2xl"><CardContent className="p-6"><h3 className="text-xl font-bold">Set demo login password</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{selected.full_name} · {selected.email}</p><Input className="mt-5" type="password" autoComplete="new-password" placeholder="New password — minimum 12 characters" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /><p className="mt-2 text-xs text-[var(--muted-foreground)]">The new password goes directly to Supabase Auth. Evidara does not store a readable copy.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => { setSelected(null); setNewPassword(''); }}>Cancel</Button><Button disabled={working || newPassword.length < 12} onClick={() => void resetPassword()}>{working && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Set new password</Button></div></CardContent></Card></div>}
+    {selected && <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4"><Card className="w-full max-w-lg rounded-2xl"><CardContent className="p-6"><h3 className="text-xl font-bold">Set demo login password</h3><p className="mt-1 text-sm text-[var(--muted-foreground)]">{selected.full_name} · {selected.email}</p><Input className="mt-5" type="password" autoComplete="new-password" placeholder="New password — minimum 12 characters" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /><p className="mt-2 text-xs text-[var(--muted-foreground)]">The new password goes directly to Supabase Auth. Evidara does not store a readable copy.</p>{error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}<div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={() => { setSelected(null); setNewPassword(''); setError(''); }}>Cancel</Button><Button disabled={working || !newPassword} onClick={() => void resetPassword()}>{working && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Set new password</Button></div></CardContent></Card></div>}
   </div>;
 }
