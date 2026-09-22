@@ -131,6 +131,7 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
     && (!grades.length || grades.includes(row.grade))
   ), [academicYear, grades, sections]);
   const selectedPaper = papers.find((paper) => paper.id === paperId) || null;
+  const canAssign = Boolean(paperId) && (mode !== 'students' || studentIds.length > 0);
 
   useEffect(() => {
     setPreview(null);
@@ -184,17 +185,44 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
   }
 
   async function assign() {
-    if (!supabase || !paperId) return;
+    if (!supabase || !canAssign) return;
     setBusy('assign'); setError(''); setMessage('');
+    const requestedAudience = audience();
+
+    // Preview internally so teachers can click Assign immediately after selecting
+    // students. Preview remains available as an optional confidence check.
+    const { data: previewData, error: previewError } = await supabase.rpc('preview_paper_assignment_v19', {
+      p_paper_id: paperId,
+      p_audience: requestedAudience,
+    });
+    if (previewError) {
+      setError(previewError.message);
+      setBusy('');
+      return;
+    }
+    const prepared = (previewData || null) as AssignmentPreview | null;
+    setPreview(prepared);
+    const blocking = prepared?.warnings?.filter((warning) => warning.severity === 'blocking') || [];
+    if (!prepared?.assigned_count) {
+      setError('No eligible students match this audience. Check the selected students or class filters and try again.');
+      setBusy('');
+      return;
+    }
+    if (blocking.length) {
+      setError(blocking.map((warning) => warning.message).join(' '));
+      setBusy('');
+      return;
+    }
+
     const { data, error: assignError } = await supabase.rpc('assign_paper_audience_v19', {
       p_paper_id: paperId,
-      p_audience: audience(),
+      p_audience: requestedAudience,
     });
     if (assignError) setError(assignError.message);
     else {
       const result = (data || null) as AssignmentPreview | null;
       setPreview(result);
-      setMessage(`${Number(result?.assigned_count || 0).toLocaleString('en-IN')} students are now assigned to this test. The cohort will be frozen once the first attempt starts.`);
+      setMessage(`${Number(result?.assigned_count || 0).toLocaleString('en-IN')} student${Number(result?.assigned_count || 0) === 1 ? '' : 's'} assigned. You can continue to the release check.`);
     }
     setBusy('');
   }
@@ -208,7 +236,7 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--teal)]"><Users className="h-4 w-4" />Audience & Assignment</div>
           <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{embedded ? 'Choose the audience for this paper' : 'Assign a test to the right students'}</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">{embedded ? 'Define the audience, preview the exact eligible count, then materialize the cohort before publishing.' : 'Choose an institutional paper, define the audience, preview the exact eligible count, then materialize the cohort.'} {organizationName}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">{embedded ? 'Choose the audience and assign it. Preview is optional and can be used to check the eligible count first.' : 'Choose an institutional paper, define the audience, preview the exact eligible count, then materialize the cohort.'} {organizationName}</p>
         </div>
         <Badge variant="outline" className="w-fit border-[var(--line)]">₹199 licensed-student plan</Badge>
       </div>
@@ -253,8 +281,8 @@ export function PaperAssignmentCenter({ paperId: fixedPaperId, embedded = false 
         </div>}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" disabled={busy !== '' || !paperId || (mode === 'students' && !studentIds.length)} onClick={() => void previewAssignment()}>{busy === 'preview' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Preview audience</Button>
-          <Button type="button" disabled={busy !== '' || !preview?.assigned_count || preview?.warnings?.some((warning) => warning.severity === 'blocking')} onClick={() => void assign()}>{busy === 'assign' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Assign {preview?.assigned_count ? preview.assigned_count.toLocaleString('en-IN') : ''} students</Button>
+          <Button type="button" variant="outline" disabled={busy !== '' || !canAssign} onClick={() => void previewAssignment()}>{busy === 'preview' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}Preview audience</Button>
+          <Button type="button" disabled={busy !== '' || !canAssign} onClick={() => void assign()}>{busy === 'assign' && <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />}{mode === 'students' && studentIds.length ? `Assign ${studentIds.length.toLocaleString('en-IN')} selected` : 'Assign students'}</Button>
         </div>
 
         {preview && <div className="grid gap-3 md:grid-cols-[1fr_1fr]">

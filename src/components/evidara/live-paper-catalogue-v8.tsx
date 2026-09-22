@@ -183,6 +183,24 @@ Biology: ['biology', 'botany', 'zoology'],
 };
 return map[subject] || [normal(subject)];
 }
+const PAPER_SUBJECT_ORDER = ['Physics', 'Chemistry', 'Mathematics', 'Biology', 'Logical Reasoning'];
+function canonicalPaperSubject(question: QuestionRow) {
+const values = [question.subjects?.name, question.subjects?.code, ...(question.tags || [])].map(normal).filter(Boolean);
+const contains = (tokens: string[]) => values.some((value) => tokens.some((token) => value === token || value.includes(token)));
+if (contains(['physics', 'phy'])) return 'Physics';
+if (contains(['chemistry', 'chem'])) return 'Chemistry';
+if (contains(['mathematics', 'maths', 'math'])) return 'Mathematics';
+if (contains(['biology', 'botany', 'zoology'])) return 'Biology';
+if (contains(['logicalreasoning', 'reasoning', 'aptitude', 'mentalability'])) return 'Logical Reasoning';
+return question.subjects?.name?.trim() || 'General';
+}
+function orderedPaperSubjects(values: string[]) {
+return [...new Set(values.filter(Boolean))].sort((a, b) => {
+const ai = PAPER_SUBJECT_ORDER.indexOf(a); const bi = PAPER_SUBJECT_ORDER.indexOf(b);
+if (ai < 0 && bi < 0) return a.localeCompare(b);
+if (ai < 0) return 1; if (bi < 0) return -1; return ai - bi;
+});
+}
 function subjectMatches(question: QuestionRow, section: PaperSectionInput) {
 const subject = section.subject_key || '';
 if (!subject) return true;
@@ -357,6 +375,7 @@ const [builder, setBuilder] = useState<Builder>(emptyBuilder);
 const [sections, setSections] = useState<PaperSectionInput[]>([emptySection()]);
 const [activeSection, setActiveSection] = useState('');
 const [selected, setSelected] = useState<Selected[]>([]);
+const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(new Set());
 const [questionSearch, setQuestionSearch] = useState('');
 const [difficultyFilter, setDifficultyFilter] = useState('all');
 const [autosave, setAutosave] = useState('Autosave ready');
@@ -432,15 +451,40 @@ useEffect(() => {
 if (!importBefore) return;
 const added = questions.filter((item) => !importBefore.has(item.id));
 if (!added.length) return;
-const sectionId = importSection || activeSection || sections[0]?.client_id;
-if (!sectionId) return;
+const subjectsInImport = orderedPaperSubjects(added.map(canonicalPaperSubject));
+const splitBySubject = subjectsInImport.length > 1;
+let plannedSections = [...sections];
+const sectionBySubject = new Map<string, string>();
+
+if (splitBySubject) {
+const alreadyHasPaperQuestions = selected.length > 0;
+if (!alreadyHasPaperQuestions) plannedSections = [];
+for (const subject of subjectsInImport) {
+let section = plannedSections.find((candidate) => normal(candidate.subject_key) === normal(subject));
+if (!section) {
+section = { ...emptySection(plannedSections.length, builder.defaultMode, subjectNames), title: subject, subject_key: subject, display_order: plannedSections.length };
+plannedSections.push(section);
+} else if (!alreadyHasPaperQuestions || /^Section [A-Z]$/i.test(section.title)) {
+section = { ...section, title: subject, subject_key: subject };
+plannedSections = plannedSections.map((candidate) => candidate.client_id === section!.client_id ? section! : candidate);
+}
+sectionBySubject.set(subject, section.client_id);
+}
+plannedSections = plannedSections.map((section, index) => ({ ...section, display_order: index }));
+setSections(plannedSections);
+setActiveSection(sectionBySubject.get(subjectsInImport[0]) || plannedSections[0]?.client_id || '');
+}
+
+const fallbackSectionId = importSection || activeSection || plannedSections[0]?.client_id;
+if (!fallbackSectionId) return;
 setSelected((current) => {
 const existing = new Set(current.map((item) => item.question_id));
+const fresh = added.filter((question) => !existing.has(question.id));
 return [
 ...current,
-...added.filter((item) => !existing.has(item.id)).map((question, index) => ({
+...fresh.map((question, index) => ({
 question_id: question.id,
-section_client_id: sectionId,
+section_client_id: splitBySubject ? (sectionBySubject.get(canonicalPaperSubject(question)) || fallbackSectionId) : fallbackSectionId,
 display_order: current.length + index,
 marks: Number(question.marks),
 negative_marks: Number(question.negative_marks),
@@ -449,10 +493,12 @@ question,
 })),
 ];
 });
-setMessage(`${added.length} newly imported approved question${added.length === 1 ? '' : 's'} added.`);
+setMessage(splitBySubject
+? `${added.length} imported questions organized automatically into ${subjectsInImport.length} subject sections: ${subjectsInImport.join(', ')}.`
+: `${added.length} newly imported approved question${added.length === 1 ? '' : 's'} added.`);
 setImportBefore(null);
 setImportSection('');
-}, [activeSection, importBefore, importSection, questions, sections]);
+}, [activeSection, builder.defaultMode, importBefore, importSection, questions, sections, selected.length, subjectNames]);
 const active = sections.find((section) => section.client_id === activeSection) || sections[0];
 const selectedIds = useMemo(() => new Set(selected.map((item) => item.question_id)), [selected]);
 const resolvedGrade = builder.grade === 'Custom' ? builder.customGrade : builder.grade;
@@ -647,6 +693,7 @@ question,
 }
 function removeQuestion(questionId: string) {
 setSelected((current) => current.filter((item) => item.question_id !== questionId).map((item, index) => ({ ...item, display_order: index })));
+setBulkSelectedIds((current) => { const next = new Set(current); next.delete(questionId); return next; });
 }
 function moveQuestion(index: number, direction: -1 | 1) {
 const target = index + direction;
@@ -715,6 +762,42 @@ generated.push(...result.items);
 setSelected([...retained, ...generated].map((item, index) => ({ ...item, display_order: index })));
 setError('');
 setMessage(`${generated.length} questions generated across Automatic/Hybrid sections.`);
+}
+function toggleBulkQuestion(questionId: string) {
+setBulkSelectedIds((current) => { const next = new Set(current); if (next.has(questionId)) next.delete(questionId); else next.add(questionId); return next; });
+}
+function selectActiveSectionQuestions() {
+if (!active) return;
+const ids = selected.filter((item) => item.section_client_id === active.client_id).map((item) => item.question_id);
+setBulkSelectedIds(new Set(ids));
+}
+function moveBulkQuestions(sectionId: string) {
+if (!sectionId || !bulkSelectedIds.size) return;
+const count = bulkSelectedIds.size;
+setSelected((current) => current.map((item) => bulkSelectedIds.has(item.question_id) ? { ...item, section_client_id: sectionId } : item));
+setBulkSelectedIds(new Set());
+const title = sections.find((section) => section.client_id === sectionId)?.title || 'selected section';
+setMessage(`${count} question${count === 1 ? '' : 's'} moved to ${title}.`);
+}
+function organizeQuestionsBySubject() {
+const subjectsInPaper = orderedPaperSubjects(selected.map((item) => canonicalPaperSubject(item.question)));
+if (subjectsInPaper.length < 2) { setMessage('This paper currently contains one detected subject, so no subject split is needed.'); return; }
+const nextSections = subjectsInPaper.map((subject, index) => {
+const existing = sections.find((section) => normal(section.subject_key) === normal(subject));
+return existing
+? { ...existing, title: subject, subject_key: subject, display_order: index }
+: { ...emptySection(index, builder.defaultMode, subjectNames), title: subject, subject_key: subject, display_order: index };
+});
+const sectionBySubject = new Map(nextSections.map((section) => [section.subject_key, section.client_id]));
+setSections(nextSections);
+setSelected((current) => current.map((item, index) => ({
+...item,
+section_client_id: sectionBySubject.get(canonicalPaperSubject(item.question)) || nextSections[0].client_id,
+display_order: index,
+})));
+setActiveSection(nextSections[0].client_id);
+setBulkSelectedIds(new Set());
+setMessage(`${selected.length} questions organized into ${subjectsInPaper.length} subject sections: ${subjectsInPaper.join(', ')}.`);
 }
 function validate(status: PaperStatus) {
 if (builder.duration < 1) return 'Duration must be at least one minute.';
@@ -1385,10 +1468,17 @@ title="Paper questions"
 description="Review order, section assignment and marks before saving or submitting the paper."
 action={<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={() => setPreviewOpen(true)} className="border-[var(--line)]"><Eye className="mr-2 h-4 w-4" />Test Preview</Button>}
 />
-<div className="mt-4 max-h-[590px] space-y-2 overflow-y-auto pr-1">
+<div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-2">
+<Button type="button" variant="outline" size="sm" disabled={!selected.length} onClick={selectActiveSectionQuestions}>Select all in {active?.title || 'section'}</Button>
+<Button type="button" variant="outline" size="sm" disabled={selected.length < 2} onClick={organizeQuestionsBySubject}>Organize by subject</Button>
+{bulkSelectedIds.size > 0 && <><Select onValueChange={moveBulkQuestions}><SelectTrigger className="h-9 w-[190px] border-[var(--line)] text-xs"><SelectValue placeholder={`Move ${bulkSelectedIds.size} to section…`} /></SelectTrigger><SelectContent>{sections.map((section) => <SelectItem key={section.client_id} value={section.client_id}>{section.title}</SelectItem>)}</SelectContent></Select><Button type="button" variant="ghost" size="sm" onClick={() => setBulkSelectedIds(new Set())}>Clear selection</Button></>}
+<span className="ml-auto text-xs text-[var(--muted-foreground)]">{bulkSelectedIds.size ? `${bulkSelectedIds.size} selected` : 'Tick questions to move them in bulk'}</span>
+</div>
+<div className="mt-3 max-h-[590px] space-y-2 overflow-y-auto pr-1">
 {selected.map((item, index) => (
 <div key={item.question_id} className="rounded-xl border border-[var(--line)] p-3">
 <div className="flex items-start gap-2">
+<input type="checkbox" aria-label={`Select question ${index + 1}`} checked={bulkSelectedIds.has(item.question_id)} onChange={() => toggleBulkQuestion(item.question_id)} className="mt-2 h-4 w-4 shrink-0 accent-[var(--teal)]" />
 <div className="flex shrink-0 flex-col gap-1">
 <Button type="button" variant="ghost" size="icon" disabled={index === 0} onClick={() => moveQuestion(index, -1)} className="h-7 w-7"><ChevronUp className="h-3.5 w-3.5" /></Button>
 <Button type="button" variant="ghost" size="icon" disabled={index === selected.length - 1} onClick={() => moveQuestion(index, 1)} className="h-7 w-7"><ChevronDown className="h-3.5 w-3.5" /></Button>
