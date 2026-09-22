@@ -25,6 +25,15 @@ class SchoolPlatformRequestError extends Error {
   }
 }
 
+function responseError(value: unknown, fallback: string) {
+  if (typeof value === "string" && value.trim() && value.trim() !== "{}") return value;
+  if (value && typeof value === "object") {
+    const message = (value as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim() && message.trim() !== "{}") return message;
+  }
+  return fallback;
+}
+
 const unavailableCloudState: SchoolPlatformState = {
   school: {
     id: "",
@@ -84,14 +93,40 @@ export function useSchoolPlatform({
       },
       body: body ? JSON.stringify(body) : undefined,
     });
-    const payload = await response.json().catch(() => ({}));
+    const payload = await response.json().catch(() => ({})) as { error?: unknown } & CloudPayload;
     if (!response.ok) {
       throw new SchoolPlatformRequestError(
-        payload.error || `Cloud request failed (${response.status}).`,
+        responseError(payload.error, `Cloud request failed (${response.status}).`),
         response.status,
       );
     }
     return payload as CloudPayload;
+  }, [activeOrganizationId, requiresInstitutionSelection, session?.access_token]);
+
+  const provisionStudent = useCallback(async (payload: Record<string, unknown>) => {
+    const token = session?.access_token;
+    if (!token) throw new Error("Cloud sign-in is required.");
+    if (requiresInstitutionSelection) {
+      throw new SchoolPlatformRequestError("Choose an active institution before adding a student.", 409);
+    }
+    const response = await fetch("/api/school-student-provision/", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(activeOrganizationId ? { "X-Evidara-Organization-Id": activeOrganizationId } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({})) as Record<string, unknown> & { error?: unknown };
+    if (!response.ok) {
+      throw new SchoolPlatformRequestError(
+        responseError(result.error, `Student account could not be created (${response.status}).`),
+        response.status,
+      );
+    }
+    return result;
   }, [activeOrganizationId, requiresInstitutionSelection, session?.access_token]);
 
   const applyCloud = useCallback((payload: CloudPayload) => {
@@ -183,12 +218,9 @@ export function useSchoolPlatform({
     setSyncing(true);
     try {
       return await requestCloud("POST", { action, ...payload }) as unknown as Record<string, unknown>;
-    } catch (cloudError) {
-      const message = cloudError instanceof Error ? cloudError.message : "Cloud action failed.";
-      setError(message);
-      setErrorStatus(cloudError instanceof SchoolPlatformRequestError ? cloudError.status : 500);
-      throw cloudError;
     } finally {
+      // A failed action is shown by the calling screen. It must not invalidate a roster
+      // that was already loaded successfully.
       setSyncing(false);
     }
   }, [manager, mode, requestCloud]);
@@ -198,18 +230,20 @@ export function useSchoolPlatform({
     if (!manager) throw new Error("School-manager permission is required.");
     setSyncing(true);
     try {
+      if (action === "inviteStudent") {
+        const provisioned = await provisionStudent(payload);
+        const refreshed = await requestCloud("GET");
+        applyCloud(refreshed);
+        return { ...refreshed, ...provisioned };
+      }
       const result = await requestCloud("POST", { action, ...payload });
       applyCloud(result);
       return result;
-    } catch (cloudError) {
-      const message = cloudError instanceof Error ? cloudError.message : "Cloud action failed.";
-      setError(message);
-      setErrorStatus(cloudError instanceof SchoolPlatformRequestError ? cloudError.status : 500);
-      throw cloudError;
     } finally {
+      // Mutation errors belong to action feedback, not the roster availability state.
       setSyncing(false);
     }
-  }, [applyCloud, manager, mode, requestCloud]);
+  }, [applyCloud, manager, mode, provisionStudent, requestCloud]);
 
   function reset() {
     if (mode === "demo") update(structuredClone(defaultSchoolPlatformState));
