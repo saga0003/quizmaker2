@@ -1,0 +1,49 @@
+name: Apply reviewed V19.2 import
+
+on:
+  push:
+    branches:
+      - review/v19-2-safe-import-20260923
+    paths:
+      - scripts/apply-v19-2-reviewed.py
+      - scripts/v19-reviewed/**
+      - .github/workflows/apply-v19-2-reviewed.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/v19-2-safe-import-20260923
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply reviewed patch
+        run: python scripts/apply-v19-2-reviewed.py
+      - name: Verify refund safety invariants
+        run: |
+          grep -q "cumulative_refund" supabase/migrations/20260923000000_phase2_refunds_and_reconciliation.sql
+          grep -q "refund.processed" supabase/functions/razorpay-webhook/index.ts
+          ! grep -q "payment.refunded.*process" supabase/functions/razorpay-webhook/index.ts
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build production bundle
+        run: npm run build
+      - name: Remove temporary patch machinery
+        run: rm -rf scripts/v19-reviewed scripts/apply-v19-2-reviewed.py .github/workflows/apply-v19-2-reviewed.yml
+      - name: Commit verified source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import reviewed V19.2 launch fixes safely"
+          git push origin HEAD:review/v19-2-safe-import-20260923
