@@ -10,6 +10,7 @@ import { AppSidebar } from '@/components/evidara/app-sidebar';
 import { MobileTopBar } from '@/components/evidara/mobile-top-bar';
 import LandingPage from '@/components/evidara/landing-page';
 import LoginPage from '@/components/evidara/login-page';
+import { InstitutionRegisterPage } from '@/components/evidara/institution-register-page';
 import { CredentialSecurityGate } from '@/components/evidara/credential-security-gate';
 import { StudentDashboard } from '@/components/evidara/student-dashboard';
 import { StudentResultsView, StudentResourcesView } from '@/components/evidara/student-live-views';
@@ -184,7 +185,8 @@ export default function Home() {
   }
 
   if (view === 'landing') return <LandingPage />;
-  if (view === 'login' || view === 'register-school') return <LoginPage />;
+  if (view === 'login') return <LoginPage />;
+  if (view === 'register-school') return <InstitutionRegisterPage />;
 
   if (user) {
     return (

@@ -21,8 +21,9 @@ export default function CallbackPage() {
         const oauthError = params.get('error_description') || params.get('error');
         if (oauthError) throw new Error(oauthError);
 
-        let { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        const initialSession = await supabase.auth.getSession();
+        if (initialSession.error) throw initialSession.error;
+        let data = initialSession.data;
 
         const code = params.get('code');
         if (!data.session && code) {

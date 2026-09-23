@@ -150,7 +150,9 @@
   h1, h2, h3, h4, h5, h6 {
     line-height: 1.25;
     letter-spacing: -0.01em;
-    color: var(--foreground);
+    /* Headings inherit their colour from the surrounding section. Forcing
+       var(--foreground) here made headings inside dark bands (e.g. the launch
+       pricing card) render dark-on-dark. */
   }
 }
 

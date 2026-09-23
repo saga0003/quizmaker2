@@ -1,1 +1,0 @@
-Safe reviewed V19.2 subset archive validated locally: 21 files, ZIP CRC OK. This marker retriggers the verification workflow after the archive transport is repaired.

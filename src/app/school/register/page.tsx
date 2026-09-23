@@ -1,2 +1,13 @@
-import Link from "next/link";import { SchoolRegistrationForm } from "@/components/InstituteRegistrationForm";import { Navbar } from "@/components/Navbar";
-export default function RegisterSchool(){return <><Navbar/><main className="rm-container" style={{padding:"42px 0 70px"}}><div style={{maxWidth:720,margin:"0 auto 22px"}}><span className="rm-label">School onboarding</span><h1 style={{fontSize:38,color:"#131e35",margin:"6px 0"}}>Create a standalone school workspace</h1><p style={{color:"#667085",lineHeight:1.7}}>For live mode, first <Link href="/login/" style={{color:"#8a5f00",fontWeight:800}}>register or login</Link>, then submit this form.</p></div><SchoolRegistrationForm/></main></>}
+import type { Metadata } from 'next';
+
+import { InstitutionRegisterPage } from '@/components/evidara/institution-register-page';
+
+export const metadata: Metadata = {
+  title: 'Register your institution · Evidara',
+  description:
+    'Create your school, college or coaching workspace on Evidara: question banks, paper building, secure online exams and per-student analytics.',
+};
+
+export default function RegisterSchool() {
+  return <InstitutionRegisterPage />;
+}

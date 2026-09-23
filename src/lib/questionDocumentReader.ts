@@ -183,14 +183,14 @@ function parseLabelledBlock(block: string): Record<string, unknown> {
     const line = originalLine.trim();
     if (!line) continue;
 
-    const option = line.match(/^([A-F])\s*[\).:-]\s*(.+)$/i);
+    const option = line.match(/^([A-F])\s*[).:-]\s*(.+)$/i);
     if (option) {
       currentKey = `option_${option[1].toLowerCase()}`;
       append(currentKey, option[2]);
       continue;
     }
 
-    const numberedQuestion = line.match(/^(?:Q(?:uestion)?\s*)?\d+\s*[\).:-]\s*(.+)$/i);
+    const numberedQuestion = line.match(/^(?:Q(?:uestion)?\s*)?\d+\s*[).:-]\s*(.+)$/i);
     if (numberedQuestion && !row.question) {
       currentKey = "question";
       append(currentKey, numberedQuestion[1]);
@@ -236,7 +236,7 @@ export function parseStructuredQuestionText(text: string): Record<string, unknow
     .filter(Boolean);
   if (explicitBlocks.length > 1) return explicitBlocks.map(parseLabelledBlock);
 
-  const numberedStarts = [...normalized.matchAll(/(?:^|\n)\s*(?:Q(?:uestion)?\s*)?(\d+)\s*[\).:-]\s+/gi)];
+  const numberedStarts = [...normalized.matchAll(/(?:^|\n)\s*(?:Q(?:uestion)?\s*)?(\d+)\s*[).:-]\s+/gi)];
   if (numberedStarts.length > 1) {
     return numberedStarts.map((start, index) => {
       const from = (start.index || 0) + (start[0].startsWith("\n") ? 1 : 0);
@@ -245,7 +245,7 @@ export function parseStructuredQuestionText(text: string): Record<string, unknow
     });
   }
 
-  const paragraphBlocks = normalized.split(/\n\s*\n(?=\s*(?:Q(?:uestion)?\s*)?\d+\s*[\).:-])/i).map(clean).filter(Boolean);
+  const paragraphBlocks = normalized.split(/\n\s*\n(?=\s*(?:Q(?:uestion)?\s*)?\d+\s*[).:-])/i).map(clean).filter(Boolean);
   if (paragraphBlocks.length > 1) return paragraphBlocks.map(parseLabelledBlock);
 
   return [parseLabelledBlock(normalized)].filter((row) => Object.keys(row).length > 0);
