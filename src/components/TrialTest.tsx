@@ -4,15 +4,187 @@ import { BlockMath } from "react-katex";
 import { CheckCircle2, Clock3, Flag, RotateCcw, XCircle } from "lucide-react";
 import { trialQuestions } from "@/data/trialQuestions";
 
-export function TrialTest(){
- const [started,setStarted]=useState(false);const [index,setIndex]=useState(0);const [answers,setAnswers]=useState<Record<number,number>>({});const [review,setReview]=useState<number[]>([]);const [submitted,setSubmitted]=useState(false);
- const q=trialQuestions[index];
- const result=useMemo(()=>{let correct=0,wrong=0,unanswered=0;for(const item of trialQuestions){const a=answers[item.id];if(a===undefined)unanswered++;else if(a===item.answer)correct++;else wrong++;}return{correct,wrong,unanswered,score:correct*4-wrong,total:trialQuestions.length*4,percentage:Math.round(((correct*4-wrong)/(trialQuestions.length*4))*100)}} ,[answers]);
- function toggleReview(){setReview(r=>r.includes(q.id)?r.filter(x=>x!==q.id):[...r,q.id])}
- function submitTest(){try{const old=JSON.parse(localStorage.getItem("rankmint_trial_history")||"[]");old.push({date:new Date().toISOString(),score:result.score,total:result.total,percentage:result.percentage,correct:result.correct,wrong:result.wrong});localStorage.setItem("rankmint_trial_history",JSON.stringify(old.slice(-20)))}catch{}setSubmitted(true)}
- function reset(){setStarted(false);setIndex(0);setAnswers({});setReview([]);setSubmitted(false)}
- if(!started)return <section className="rm-card" style={{padding:28,maxWidth:850,margin:"24px auto"}}><span className="rm-badge" style={{background:"#fff4cc",color:"#7a5400"}}>V12 Trial Laboratory</span><h1 style={{fontSize:34,color:"#131e35",marginBottom:10}}>Evidara Mixed Entrance Trial Test</h1><p style={{color:"#667085",fontSize:17,lineHeight:1.7}}>Eight sample questions demonstrate MCQs, LaTeX equations, scientific notation, image-based questions, navigation, review flags, evaluation and a basic result summary.</p><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,margin:"22px 0"}}><div className="rm-card" style={{padding:14}}><strong>8 Questions</strong><div style={{color:"#667085",fontSize:13}}>Physics, Chemistry, Mathematics, Biology</div></div><div className="rm-card" style={{padding:14}}><strong>32 Marks</strong><div style={{color:"#667085",fontSize:13}}>+4 correct, −1 incorrect</div></div><div className="rm-card" style={{padding:14}}><strong>Demo Timer</strong><div style={{color:"#667085",fontSize:13}}>30 minutes display</div></div></div><button className="rm-btn-primary" onClick={()=>setStarted(true)} style={{width:"100%"}}>Start Trial Test</button></section>;
- if(submitted)return <section className="rm-container" style={{padding:"28px 0 50px"}}><div className="rm-card" style={{padding:26}}><div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}><div><span className="rm-label">Trial result</span><h1 style={{margin:"4px 0",fontSize:38,color:"#131e35"}}>{result.score}/{result.total}</h1><p style={{margin:0,color:"#667085"}}>{result.percentage}% score · saved to this browser&apos;s trial history</p></div><button onClick={reset} className="rm-btn-secondary" style={{display:"flex",gap:8,alignItems:"center"}}><RotateCcw size={17}/>Retake</button></div><div className="result-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginTop:22}}><ResultBox label="Correct" value={result.correct} color="#137a3a"/><ResultBox label="Incorrect" value={result.wrong} color="#b42318"/><ResultBox label="Unanswered" value={result.unanswered} color="#667085"/><ResultBox label="Accuracy" value={`${Math.round(result.correct/Math.max(1,result.correct+result.wrong)*100)}%`} color="#7a5af8"/></div></div><div style={{display:"grid",gap:14,marginTop:18}}>{trialQuestions.map((item,n)=>{const a=answers[item.id];const correct=a===item.answer;return <div className="rm-card" key={item.id} style={{padding:20,borderLeft:`5px solid ${correct?"#137a3a":a===undefined?"#98a2b3":"#b42318"}`}}><div style={{display:"flex",gap:10,alignItems:"center"}}>{correct?<CheckCircle2 color="#137a3a"/>:<XCircle color="#b42318"/>}<strong>Q{n+1}. {item.subject}</strong></div><p style={{lineHeight:1.6}}>{item.question}</p>{item.latex&&<BlockMath math={item.latex}/>}<p><strong>Your answer:</strong> {a===undefined?"Not answered":item.options[a]}</p><p><strong>Correct answer:</strong> {item.options[item.answer]}</p><div style={{background:"#f8fafc",padding:14,borderRadius:12}}><strong>Explanation:</strong> {item.explanation}{item.explanationLatex&&<BlockMath math={item.explanationLatex}/>}</div></div>})}</div></section>;
- return <div style={{minHeight:"100vh",background:"#eef1f5"}}><header style={{background:"#131e35",color:"white",padding:"14px 20px",position:"sticky",top:0,zIndex:10}}><div className="rm-container" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12}}><strong>Evidara Trial Test</strong><span style={{display:"flex",alignItems:"center",gap:8,fontWeight:800}}><Clock3 size={18}/>29:59</span></div></header><main className="rm-container trial-grid" style={{padding:"22px 0",display:"grid",gridTemplateColumns:"1fr 270px",gap:18}}><section className="rm-card" style={{padding:24}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}><span className="rm-badge" style={{background:"#eef4ff",color:"#3538cd"}}>{q.subject}</span><span style={{fontSize:13,color:"#667085"}}>Question {index+1} of {trialQuestions.length} · +{q.marks}/−{q.negative}</span></div><h2 style={{fontSize:21,lineHeight:1.5,marginTop:22}}>{q.question}</h2>{q.latex&&<BlockMath math={q.latex}/>} {q.image&&<img src={q.image} alt="Question diagram" style={{width:"100%",maxHeight:290,objectFit:"contain",border:"1px solid #e4e7ec",borderRadius:14,margin:"8px 0 18px"}}/>}<div style={{display:"grid",gap:11}}>{q.options.map((option,i)=><button key={option} onClick={()=>setAnswers(a=>({...a,[q.id]:i}))} style={{textAlign:"left",padding:14,borderRadius:12,border:`2px solid ${answers[q.id]===i?"#f6b100":"#e4e7ec"}`,background:answers[q.id]===i?"#fff9e8":"white",fontWeight:650}}><span style={{display:"inline-grid",placeItems:"center",width:28,height:28,borderRadius:"50%",background:answers[q.id]===i?"#f6b100":"#f2f4f7",marginRight:10}}>{String.fromCharCode(65+i)}</span>{option}</button>)}</div><div style={{display:"flex",justifyContent:"space-between",gap:10,marginTop:24,flexWrap:"wrap"}}><button className="rm-btn-secondary" onClick={toggleReview} style={{display:"flex",alignItems:"center",gap:7}}><Flag size={17}/>{review.includes(q.id)?"Remove Review":"Mark for Review"}</button><div style={{display:"flex",gap:10}}><button className="rm-btn-secondary" disabled={index===0} onClick={()=>setIndex(i=>Math.max(0,i-1))}>Previous</button>{index<trialQuestions.length-1?<button className="rm-btn-primary" onClick={()=>setIndex(i=>i+1)}>Save & Next</button>:<button className="rm-btn-dark" onClick={submitTest}>Submit Test</button>}</div></div></section><aside className="rm-card" style={{padding:18,height:"fit-content"}}><h3 style={{marginTop:0}}>Question palette</h3><div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>{trialQuestions.map((item,i)=>{const answered=answers[item.id]!==undefined;const flagged=review.includes(item.id);return <button key={item.id} onClick={()=>setIndex(i)} style={{height:42,borderRadius:9,border:index===i?"3px solid #131e35":"1px solid #d0d5dd",background:flagged?"#ede9fe":answered?"#dcfae6":"white",fontWeight:800}}>{i+1}</button>})}</div><div style={{display:"grid",gap:7,marginTop:16,fontSize:12,color:"#667085"}}><span>Green: answered</span><span>Purple: marked for review</span><span>White: unanswered</span></div><button className="rm-btn-dark" onClick={submitTest} style={{width:"100%",marginTop:20}}>Submit Now</button></aside></main><style jsx>{`@media(max-width:800px){.trial-grid{grid-template-columns:1fr!important}.result-grid{grid-template-columns:repeat(2,1fr)!important}}`}</style></div>
+/**
+ * Self-contained public trial test. Runs entirely client-side against the
+ * bundled sample question set, so it works in demo builds without a backend.
+ */
+export function TrialTest() {
+  const [started, setStarted] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [review, setReview] = useState<number[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+  const q = trialQuestions[index];
+
+  const result = useMemo(() => {
+    let correct = 0, wrong = 0, unanswered = 0;
+    for (const item of trialQuestions) {
+      const a = answers[item.id];
+      if (a === undefined) unanswered++;
+      else if (a === item.answer) correct++;
+      else wrong++;
+    }
+    return {
+      correct, wrong, unanswered,
+      score: correct * 4 - wrong,
+      total: trialQuestions.length * 4,
+      percentage: Math.round(((correct * 4 - wrong) / (trialQuestions.length * 4)) * 100),
+    };
+  }, [answers]);
+
+  function toggleReview() {
+    setReview((current) => current.includes(q.id) ? current.filter((id) => id !== q.id) : [...current, q.id]);
+  }
+
+  function submitTest() {
+    try {
+      const old = JSON.parse(localStorage.getItem("rankmint_trial_history") || "[]") as unknown[];
+      old.push({ date: new Date().toISOString(), score: result.score, total: result.total, percentage: result.percentage, correct: result.correct, wrong: result.wrong });
+      localStorage.setItem("rankmint_trial_history", JSON.stringify(old.slice(-20)));
+    } catch {
+      // History is a convenience only.
+    }
+    setSubmitted(true);
+  }
+
+  function reset() { setStarted(false); setIndex(0); setAnswers({}); setReview([]); setSubmitted(false); }
+
+  if (!started) {
+    return (
+      <section className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-[var(--ev-shadow-sm)] sm:p-10">
+        <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--teal)]">Free trial test</span>
+        <h1 className="mt-4 text-3xl font-black text-[var(--foreground)] sm:text-4xl">Evidara mixed entrance trial test</h1>
+        <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted-foreground)]">
+          Eight sample questions demonstrate MCQs, LaTeX equations, scientific notation, image-based questions,
+          navigation, review flags, evaluation and a basic result summary — exactly how Evidara delivers exams.
+        </p>
+        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><strong className="text-[var(--foreground)]">8 questions</strong><p className="mt-1 text-sm text-[var(--muted-foreground)]">Physics, Chemistry, Mathematics, Biology</p></div>
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><strong className="text-[var(--foreground)]">32 marks</strong><p className="mt-1 text-sm text-[var(--muted-foreground)]">+4 correct, −1 incorrect</p></div>
+          <div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><strong className="text-[var(--foreground)]">Demo timer</strong><p className="mt-1 text-sm text-[var(--muted-foreground)]">30-minute display, untimed preview</p></div>
+        </div>
+        <button onClick={() => setStarted(true)} className="mt-8 h-12 w-full rounded-lg bg-[var(--teal)] text-sm font-semibold text-white transition-colors hover:bg-[var(--teal)]/90 sm:w-auto sm:px-10">Start trial test</button>
+      </section>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <section>
+        <div className="rounded-2xl border border-[var(--line)] bg-white p-6 shadow-[var(--ev-shadow-sm)] sm:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--teal)]">Trial result</p>
+              <h1 className="mt-1 text-4xl font-black text-[var(--foreground)]">{result.score}/{result.total}</h1>
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">{result.percentage}% score · saved to this browser&apos;s trial history</p>
+            </div>
+            <button onClick={reset} className="inline-flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-5 py-2.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+              <RotateCcw className="h-4 w-4" /> Retake
+            </button>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <ResultBox label="Correct" value={result.correct} tone="text-[var(--success)]" />
+            <ResultBox label="Incorrect" value={result.wrong} tone="text-[var(--ev-error)]" />
+            <ResultBox label="Unanswered" value={result.unanswered} tone="text-[var(--muted-foreground)]" />
+            <ResultBox label="Accuracy" value={`${Math.round((result.correct / Math.max(1, result.correct + result.wrong)) * 100)}%`} tone="text-[var(--ev-info)]" />
+          </div>
+        </div>
+        <div className="mt-5 grid gap-4">
+          {trialQuestions.map((item, n) => {
+            const a = answers[item.id];
+            const correct = a === item.answer;
+            return (
+              <div key={item.id} className={`rounded-2xl border border-[var(--line)] bg-white p-5 shadow-[var(--ev-shadow-xs)] sm:p-6 ${correct ? "border-l-4 border-l-[var(--success)]" : a === undefined ? "border-l-4 border-l-[var(--line)]" : "border-l-4 border-l-[var(--ev-error)]"}`}>
+                <div className="flex items-center gap-2 font-semibold text-[var(--foreground)]">
+                  {correct ? <CheckCircle2 className="h-5 w-5 text-[var(--success)]" /> : <XCircle className="h-5 w-5 text-[var(--ev-error)]" />}
+                  Q{n + 1}. {item.subject}
+                </div>
+                <p className="mt-2 leading-7 text-[var(--foreground)]">{item.question}</p>
+                {item.latex && <BlockMath math={item.latex} />}
+                <p className="mt-2 text-[var(--foreground)]"><strong>Your answer:</strong> {a === undefined ? "Not answered" : item.options[a]}</p>
+                <p className="mt-1 text-[var(--foreground)]"><strong>Correct answer:</strong> {item.options[item.answer]}</p>
+                <div className="mt-3 rounded-xl bg-[var(--canvas)] p-4 text-sm leading-6 text-[var(--muted-foreground)]">
+                  <strong className="text-[var(--foreground)]">Explanation:</strong> {item.explanation}
+                  {item.explanationLatex && <BlockMath math={item.explanationLatex} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-[var(--line)] bg-white shadow-[var(--ev-shadow-sm)]">
+      <header className="flex items-center justify-between gap-3 rounded-t-2xl bg-[var(--midnight)] px-5 py-3.5 text-white sm:px-6">
+        <strong className="text-sm font-semibold">Evidara trial test</strong>
+        <span className="inline-flex items-center gap-2 text-sm font-bold"><Clock3 className="h-4 w-4" />29:59</span>
+      </header>
+      <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[1fr_270px]">
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex rounded-full bg-[var(--ev-info-bg)] px-3 py-1 text-xs font-bold text-[var(--ev-info)]">{q.subject}</span>
+            <span className="text-sm text-[var(--muted-foreground)]">Question {index + 1} of {trialQuestions.length} · +{q.marks}/−{q.negative}</span>
+          </div>
+          <h2 className="mt-5 text-lg font-semibold leading-8 text-[var(--foreground)] sm:text-xl">{q.question}</h2>
+          {q.latex && <BlockMath math={q.latex} />}
+          {q.image && <img src={q.image} alt="Question diagram" className="my-3 max-h-[290px] w-full rounded-xl border border-[var(--line)] object-contain" />}
+          <div className="mt-4 grid gap-2.5">
+            {q.options.map((option, i) => {
+              const selected = answers[q.id] === i;
+              return (
+                <button
+                  key={option}
+                  onClick={() => setAnswers((a) => ({ ...a, [q.id]: i }))}
+                  className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left font-medium transition-colors ${selected ? "border-[var(--amber)] bg-[#FFFBEB] text-[var(--foreground)]" : "border-[var(--line)] bg-white text-[var(--foreground)] hover:bg-[var(--canvas)]"}`}
+                >
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm font-bold ${selected ? "bg-[var(--amber)] text-white" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>{String.fromCharCode(65 + i)}</span>
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <button onClick={toggleReview} className="inline-flex items-center gap-2 rounded-lg border border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]">
+              <Flag className="h-4 w-4" />{review.includes(q.id) ? "Remove review" : "Mark for review"}
+            </button>
+            <div className="flex gap-2.5">
+              <button disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))} className="rounded-lg border border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+              {index < trialQuestions.length - 1
+                ? <button onClick={() => setIndex((i) => i + 1)} className="rounded-lg bg-[var(--teal)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--teal)]/90">Save &amp; next</button>
+                : <button onClick={submitTest} className="rounded-lg bg-[var(--midnight)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--midnight)]/90">Submit test</button>}
+            </div>
+          </div>
+        </section>
+        <aside className="h-fit rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4 lg:sticky lg:top-24">
+          <h3 className="font-bold text-[var(--foreground)]">Question palette</h3>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {trialQuestions.map((item, i) => {
+              const answered = answers[item.id] !== undefined;
+              const flagged = review.includes(item.id);
+              return (
+                <button key={item.id} onClick={() => setIndex(i)} aria-label={`Go to question ${i + 1}`} className={`grid h-10 place-items-center rounded-lg border font-bold text-sm transition-colors ${index === i ? "border-2 border-[var(--midnight)]" : "border-[var(--line)]"} ${flagged ? "bg-[#EDE9FE] text-[var(--foreground)]" : answered ? "bg-[var(--ev-success-bg)] text-[var(--foreground)]" : "bg-white text-[var(--muted-foreground)]"}`}>{i + 1}</button>
+              );
+            })}
+          </div>
+          <div className="mt-4 grid gap-1.5 text-xs text-[var(--muted-foreground)]">
+            <span>Green: answered</span>
+            <span>Purple: marked for review</span>
+            <span>White: unanswered</span>
+          </div>
+          <button onClick={submitTest} className="mt-4 w-full rounded-lg bg-[var(--midnight)] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--midnight)]/90">Submit now</button>
+        </aside>
+      </div>
+    </div>
+  );
 }
-function ResultBox({label,value,color}:{label:string;value:string|number;color:string}){return <div style={{padding:15,border:"1px solid #e4e7ec",borderRadius:13}}><div className="rm-label">{label}</div><div style={{fontSize:27,fontWeight:900,color,marginTop:7}}>{value}</div></div>}
+
+function ResultBox({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return (
+    <div className="rounded-xl border border-[var(--line)] bg-white p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted-foreground)]">{label}</p>
+      <p className={`mt-1.5 text-2xl font-black ${tone}`}>{value}</p>
+    </div>
+  );
+}

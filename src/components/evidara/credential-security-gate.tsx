@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { KeyRound, LoaderCircle, LockKeyhole, ShieldCheck, Smartphone } from 'lucide-react';
 import { useAuth } from '@/context/AuthProvider';
-import { supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -39,6 +39,7 @@ function isAuthFailure(value: unknown) {
 
 export function CredentialSecurityGate({ children }: { children: ReactNode }) {
   const { session, signOut } = useAuth();
+  const demoMode = !isSupabaseConfigured;
   const userId = session?.user.id ?? null;
   const accessToken = session?.access_token ?? null;
   const [security, setSecurity] = useState<SecurityState | null>(null);
@@ -285,6 +286,8 @@ export function CredentialSecurityGate({ children }: { children: ReactNode }) {
       setMfaWorking(false);
     }
   }
+
+  if (demoMode) return <>{children}</>;
 
   if (!loading && error && (!security || securityUserId !== userId)) {
     return (

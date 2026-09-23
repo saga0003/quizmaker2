@@ -87,6 +87,9 @@ export default function LandingPage() {
                   Register your institution <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <Button size="lg" variant="outline" onClick={signIn}>Sign in</Button>
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/trial/">Try a free demo test</Link>
+                </Button>
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-[var(--muted-foreground)]">
                 <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[var(--success)]" />Student access ₹999 / year</span>

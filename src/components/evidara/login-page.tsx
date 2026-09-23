@@ -12,8 +12,8 @@ import { useAppStore } from '@/store/use-app-store';
 
 const leftBullets = [
   'Secure proctored exams',
-  'Real-time analytics',
-  'Achievement certificates',
+  'Question-level analytics',
+  'Offline-safe test delivery',
 ];
 
 const demoAccounts = [
@@ -294,17 +294,17 @@ export default function LoginPage() {
 
           {!isSupabaseConfigured && (
             <div className="mt-10">
-              <p className="text-xs font-semibold text-[#6B7980] uppercase tracking-wider mb-4 text-center">Demo Accounts</p>
-              <div className="grid grid-cols-3 gap-3">
+              <p className="text-xs font-semibold text-[#6B7980] uppercase tracking-wider mb-4 text-center">Explore the interactive demo</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {demoAccounts.map((account) => (
                   <Button
                     key={account.role}
                     type="button"
-                    className={`h-auto py-3 px-3 flex flex-col items-center gap-1.5 text-xs font-semibold ${account.className}`}
+                    className={`h-auto min-h-[3.5rem] whitespace-normal py-3 px-3 flex flex-col items-center gap-1 text-xs font-semibold ${account.className}`}
                     onClick={() => login(account.role)}
                   >
                     <span>{account.label}</span>
-                    <span className={`text-[10px] font-normal ${account.role === 'student' ? 'text-[#0E5A5A]/70' : 'text-white/70'}`}>
+                    <span className={`text-[10px] font-normal leading-4 ${account.role === 'student' ? 'text-[#0E5A5A]/70' : 'text-white/70'}`}>
                       {account.description}
                     </span>
                   </Button>
