@@ -359,6 +359,8 @@ const [cloningPaperId, setCloningPaperId] = useState('');
 const [actionPaper, setActionPaper] = useState<PaperListRow | null>(null);
 const [actionMode, setActionMode] = useState<PaperActionMode>(null);
 const [paperAttempts, setPaperAttempts] = useState<PaperAttemptSummary[]>([]);
+const [editingPaperHasAttempts, setEditingPaperHasAttempts] = useState(false);
+const [originalAttemptLimit, setOriginalAttemptLimit] = useState(1);
 const [integrityEvents, setIntegrityEvents] = useState<IntegrityEvent[]>([]);
 const [actionLoading, setActionLoading] = useState(false);
 const [error, setError] = useState('');
@@ -540,6 +542,8 @@ setBuilder(emptyBuilder());
 setSections([section]);
 setActiveSection(section.client_id);
 setSelected([]);
+setEditingPaperHasAttempts(false);
+setOriginalAttemptLimit(1);
 setQuestionSearch('');
 setDifficultyFilter('all');
 setAutosave('Autosave ready');
@@ -578,17 +582,22 @@ setBuilderStep(1);
 setBuilderOpen(true);
 setSaving(true);
 setError('');
-const [p, s, i] = await Promise.all([
+const [p, s, i, a] = await Promise.all([
 supabase.from('question_papers').select('*').eq('id', paper.id).single(),
 supabase.from('paper_sections').select('*').eq('paper_id', paper.id).order('display_order'),
 supabase.from('paper_questions').select('question_id,section_id,display_order,marks,negative_marks,is_mandatory').eq('paper_id', paper.id).order('display_order'),
+supabase.from('exam_attempts').select('id').eq('paper_id', paper.id).limit(1),
 ]);
-if (p.error || s.error || i.error || !p.data) {
-setError(p.error?.message || s.error?.message || i.error?.message || 'Unable to open paper.');
+if (p.error || s.error || i.error || a.error || !p.data) {
+setError(p.error?.message || s.error?.message || i.error?.message || a.error?.message || 'Unable to open paper.');
 setSaving(false);
 return false;
 }
 const row = p.data as Record<string, any>;
+const hasAttempts = Boolean((a.data || []).length);
+setEditingPaperHasAttempts(hasAttempts);
+setOriginalAttemptLimit(Number(row.attempt_limit || 1));
+if (hasAttempts) setBuilderStep(4);
 const loadedSections = (s.data || []).map((section: Record<string, any>, index) => ({
 client_id: String(section.id),
 id: String(section.id),
@@ -818,6 +827,32 @@ return `${section.title}: difficulty counts must equal its question target.`;
 }
 return '';
 }
+async function saveAttemptLimit() {
+if (!supabase || !builder.id) return;
+const nextLimit = Math.floor(Number(builder.attempts));
+if (!Number.isFinite(nextLimit) || nextLimit < 1) {
+setError('Attempts allowed must be at least 1.');
+return;
+}
+setSaving(true);
+setError('');
+const { data, error: updateError } = await supabase.rpc('update_question_paper_attempt_limit_v1', {
+p_paper_id: builder.id,
+p_attempt_limit: nextLimit,
+});
+setSaving(false);
+if (updateError) {
+setError(updateError.message);
+return;
+}
+const savedLimit = Number(data || nextLimit);
+setOriginalAttemptLimit(savedLimit);
+setBuilder((current) => ({ ...current, attempts: savedLimit }));
+setMessage(`Attempts allowed updated to ${savedLimit}. Existing student attempts, scores and analytics were not changed.`);
+setBuilderOpen(false);
+await load();
+}
+
 async function savePaper(status: PaperStatus, paperIdOverride?: string) {
 if (!supabase) return;
 const validation = validate(status);
@@ -1269,6 +1304,7 @@ className="h-11 border-[var(--line)] pl-9"
 </DialogHeader>
 <div className="min-h-0 flex-1 overflow-y-auto bg-[#FBFCFC] px-3 py-4 sm:px-6 sm:py-5">
 {error && <div className="mb-4 rounded-xl border border-[var(--destructive)]/20 bg-[var(--destructive)]/5 px-4 py-3 text-sm text-[var(--destructive)]">{error}</div>}
+{editingPaperHasAttempts && <div className="mb-4 rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/10 px-4 py-3 text-sm leading-6 text-[#6F5600]"><strong>Student attempts already exist.</strong> Questions, marks, duration, result history and analytics stay locked. You can safely change only <strong>Attempts allowed</strong>. Existing attempts are preserved, so a student who has used one attempt will show 1/{builder.attempts} after you update the limit.</div>}
 <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 {[
 { label: 'Sections', value: sections.length, icon: Layers3 },
@@ -1291,7 +1327,7 @@ className="h-11 border-[var(--line)] pl-9"
 { step: 4 as const, label: 'Settings' },
 { step: 5 as const, label: 'Preview & Publish' },
 ]).map((item) => (
-<button key={item.step} type="button" onClick={() => setBuilderStep(item.step)} className={`rounded-lg px-3 py-2 text-left transition ${builderStep === item.step ? 'bg-[var(--teal)] text-white' : 'text-[var(--muted-foreground)] hover:bg-[var(--canvas)]'}`}>
+<button key={item.step} type="button" disabled={editingPaperHasAttempts && item.step !== 4} onClick={() => setBuilderStep(item.step)} className={`rounded-lg px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${builderStep === item.step ? 'bg-[var(--teal)] text-white' : 'text-[var(--muted-foreground)] hover:bg-[var(--canvas)]'}`}>
 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] opacity-75">Step {item.step}</span>
 <span className="mt-0.5 block text-sm font-semibold">{item.label}</span>
 </button>
@@ -1339,13 +1375,13 @@ className="h-11 border-[var(--line)] pl-9"
 <CardContent className="space-y-5 p-4 sm:p-5">
 <SectionHeading number="4" title="Delivery and student experience" description="Set time, attempts, schedule, shuffle and result visibility for the assigned test." />
 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-<div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
-<div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
-<div className="space-y-2"><Label>Result display</Label><Select value={builder.resultMode} onValueChange={(resultMode) => setBuilder((current) => ({ ...current, resultMode: resultMode as ResultMode }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="score_only">Score only</SelectItem><SelectItem value="score_and_answers">Score and answers</SelectItem></SelectContent></Select></div>
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Open forever</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">No opening or closing date</p></div><Switch checked={builder.openForever} onCheckedChange={(openForever) => setBuilder((current) => ({ ...current, openForever }))} /></div>
-{!builder.openForever && <><div className="space-y-2"><Label>Opens at</Label><Input type="datetime-local" value={builder.from} onChange={(event) => setBuilder((current) => ({ ...current, from: event.target.value }))} className="h-11 border-[var(--line)]" /></div><div className="space-y-2"><Label>Closes at</Label><Input type="datetime-local" value={builder.until} onChange={(event) => setBuilder((current) => ({ ...current, until: event.target.value }))} className="h-11 border-[var(--line)]" /></div></>}
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle questions</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Change order per attempt</p></div><Switch checked={builder.shuffleQuestions} onCheckedChange={(shuffleQuestions) => setBuilder((current) => ({ ...current, shuffleQuestions }))} /></div>
-<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle options</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Randomise MCQ choices</p></div><Switch checked={builder.shuffleOptions} onCheckedChange={(shuffleOptions) => setBuilder((current) => ({ ...current, shuffleOptions }))} /></div>
+<div className="space-y-2"><Label>Duration (minutes)</Label><Input type="number" min={1} disabled={editingPaperHasAttempts} value={builder.duration} onChange={(event) => setBuilder((current) => ({ ...current, duration: Number(event.target.value) }))} className="h-11 border-[var(--line)]" /></div>
+<div className="space-y-2"><Label>Attempts allowed</Label><Input type="number" min={1} value={builder.attempts} onChange={(event) => setBuilder((current) => ({ ...current, attempts: Number(event.target.value) }))} className="h-11 border-[var(--line)]" />{editingPaperHasAttempts && <p className="text-xs leading-5 text-[var(--muted-foreground)]">This changes only the allowed-attempt count. Existing attempts and analytics remain unchanged.</p>}</div>
+<div className="space-y-2"><Label>Result display</Label><Select disabled={editingPaperHasAttempts} value={builder.resultMode} onValueChange={(resultMode) => setBuilder((current) => ({ ...current, resultMode: resultMode as ResultMode }))}><SelectTrigger className="h-11 border-[var(--line)]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="score_only">Score only</SelectItem><SelectItem value="score_and_answers">Score and answers</SelectItem></SelectContent></Select></div>
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Open forever</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">No opening or closing date</p></div><Switch disabled={editingPaperHasAttempts} checked={builder.openForever} onCheckedChange={(openForever) => setBuilder((current) => ({ ...current, openForever }))} /></div>
+{!builder.openForever && <><div className="space-y-2"><Label>Opens at</Label><Input type="datetime-local" disabled={editingPaperHasAttempts} value={builder.from} onChange={(event) => setBuilder((current) => ({ ...current, from: event.target.value }))} className="h-11 border-[var(--line)]" /></div><div className="space-y-2"><Label>Closes at</Label><Input type="datetime-local" disabled={editingPaperHasAttempts} value={builder.until} onChange={(event) => setBuilder((current) => ({ ...current, until: event.target.value }))} className="h-11 border-[var(--line)]" /></div></>}
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle questions</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Change order per attempt</p></div><Switch disabled={editingPaperHasAttempts} checked={builder.shuffleQuestions} onCheckedChange={(shuffleQuestions) => setBuilder((current) => ({ ...current, shuffleQuestions }))} /></div>
+<div className="flex min-h-20 items-center justify-between rounded-xl border border-[var(--line)] px-4 py-3"><div><Label>Shuffle options</Label><p className="mt-1 text-xs text-[var(--muted-foreground)]">Randomise MCQ choices</p></div><Switch disabled={editingPaperHasAttempts} checked={builder.shuffleOptions} onCheckedChange={(shuffleOptions) => setBuilder((current) => ({ ...current, shuffleOptions }))} /></div>
 
 </div>
 </CardContent>
@@ -1539,11 +1575,12 @@ return <div key={label} className={`rounded-xl border p-4 ${check && current ? (
 <DialogFooter className="border-t border-[var(--line)] bg-white px-4 py-4 sm:px-6">
 <div className="mr-auto text-sm text-[var(--muted-foreground)]">Step {builderStep} of 5 · {selected.length} questions · {totalMarks} marks</div>
 <Button type="button" variant="outline" onClick={() => setBuilderOpen(false)} disabled={saving} className="h-11 border-[var(--line)]">Close</Button>
-{builderStep > 1 && <Button type="button" variant="outline" disabled={saving} onClick={() => setBuilderStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 border-[var(--line)]">Back</Button>}
-<Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>
-{builderStep < 5 && <Button type="button" disabled={saving} onClick={() => setBuilderStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">Next</Button>}
-{builderStep === 5 && submitStatus === 'published' && (<Button type="button" disabled={saving || readinessLoading || !releaseCheckCurrent} onClick={() => void publishCheckedPaper()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Check className="mr-2 h-4 w-4" />Save and Publish</Button>)}
-{builderStep === 5 && submitStatus !== 'published' && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Send className="mr-2 h-4 w-4" />Submit for Approval</Button>)}
+{!editingPaperHasAttempts && builderStep > 1 && <Button type="button" variant="outline" disabled={saving} onClick={() => setBuilderStep((current) => Math.max(1, current - 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 border-[var(--line)]">Back</Button>}
+{!editingPaperHasAttempts && <Button type="button" variant="outline" disabled={saving} onClick={() => void savePaper('draft')} className="h-11 border-[var(--teal)]/30 text-[var(--teal)]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft</Button>}
+{editingPaperHasAttempts && <Button type="button" disabled={saving || builder.attempts === originalAttemptLimit || builder.attempts < 1} onClick={() => void saveAttemptLimit()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">{saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Update Attempts</Button>}
+{!editingPaperHasAttempts && builderStep < 5 && <Button type="button" disabled={saving} onClick={() => setBuilderStep((current) => Math.min(5, current + 1) as 1 | 2 | 3 | 4 | 5)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]">Next</Button>}
+{!editingPaperHasAttempts && builderStep === 5 && submitStatus === 'published' && (<Button type="button" disabled={saving || readinessLoading || !releaseCheckCurrent} onClick={() => void publishCheckedPaper()} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Check className="mr-2 h-4 w-4" />Save and Publish</Button>)}
+{!editingPaperHasAttempts && builderStep === 5 && submitStatus !== 'published' && (<Button type="button" disabled={saving} onClick={() => void savePaper(submitStatus)} className="h-11 bg-[var(--teal)] text-white hover:bg-[#0A4747]"><Send className="mr-2 h-4 w-4" />Submit for Approval</Button>)}
 </DialogFooter>
 </DialogContent>
 </Dialog>
