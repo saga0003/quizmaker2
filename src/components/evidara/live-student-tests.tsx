@@ -107,7 +107,7 @@ export function LiveStudentTests() {
           </div>
           {paper.available_until && <p className="mt-3 flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]"><CalendarClock className="h-3.5 w-3.5" />Closes {new Date(paper.available_until).toLocaleString('en-IN')}</p>}
           <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
-            <span className="text-xs text-[var(--muted-foreground)]">Attempts {paper.attempts_used}/{paper.attempt_limit}</span>
+            <span className="text-xs text-[var(--muted-foreground)]">Attempts used {paper.attempts_used}/{paper.attempt_limit}</span>
             <Button disabled={busy === paper.id || exhausted} onClick={() => void start(paper, accessCode)} className="bg-[var(--teal)] text-white hover:bg-[#0A4747]">
               {busy === paper.id ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
               {exhausted ? 'Attempts Used' : 'Start / Resume'}
