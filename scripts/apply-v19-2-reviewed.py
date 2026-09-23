@@ -5,8 +5,8 @@ import zipfile
 
 parts_dir = Path('scripts/v19-reviewed')
 parts = sorted(parts_dir.glob('part*.txt'))
-if len(parts) != 4:
-    raise SystemExit(f'Expected 4 reviewed payload parts, found {len(parts)}')
+if len(parts) != 5:
+    raise SystemExit(f'Expected 5 reviewed payload parts, found {len(parts)}')
 
 payload = ''.join(path.read_text().strip() for path in parts)
 archive = base64.b64decode(payload, validate=True)
